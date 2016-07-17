@@ -4,6 +4,7 @@
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <fstream>
 
 namespace vc
 {
@@ -20,8 +21,9 @@ namespace vc
       bool has_alt_at(std::uint64_t sample_off, std::uint8_t ploidy_off) const;
       bool has_ref_at(std::uint64_t sample_off, std::uint8_t ploidy_off) const;
       bool is_missing_at(std::uint64_t sample_off, std::uint8_t ploidy_off) const;
-
       allele_status operator()(std::uint64_t sample_off, std::uint8_t ploidy_off) const;
+
+      double calculate_allele_frequency() const;
     private:
       block& parent_;
       std::uint32_t offset_;
@@ -46,8 +48,8 @@ namespace vc
         typedef std::random_access_iterator_tag iterator_category;
 
         const_iterator(pointer ptr) : ptr_(ptr) { }
-        self_type& operator--(){ ++ptr_; return *this; }
-        self_type operator--(int) { self_type r = *this; ++ptr_; return r; }
+        self_type& operator--(){ --ptr_; return *this; }
+        self_type operator--(int) { self_type r = *this; --ptr_; return r; }
         self_type& operator++(){ ++ptr_; return *this; }
         self_type operator++(int) { self_type r = *this; ++ptr_; return r; }
         reference operator*() { return *ptr_; }
@@ -62,17 +64,16 @@ namespace vc
       bool has_ref_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const;
       bool is_missing_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const;
 
-      allele_status operator()(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t allele_off) const;
+      allele_status operator()(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const;
+      double calculate_allele_frequency(std::uint32_t marker_off) const;
 
       const_iterator begin();
       const_iterator end();
 
-      std::uint64_t sample_size() const { return sample_cnt_; }
-      std::size_t marker_size() const { return markers_.size(); }
-      const marker& operator[](std::size_t i) const
-      {
-        return this->markers_[i];
-      }
+      std::uint64_t sample_count() const { return sample_size_; }
+      std::size_t marker_count() const { return markers_.size(); }
+      const marker& operator[](std::size_t i) const;
+      static bool read_block(block& destination, std::istream& source);
     private:
       std::vector<marker> markers_;
 
@@ -80,7 +81,7 @@ namespace vc
       std::vector<std::uint64_t> haplotype_weights_;
       std::vector<std::uint32_t> sample_mappings_;
       std::vector<char> unique_haplotype_matrix_;
-      std::uint64_t sample_cnt_;
+      std::uint64_t sample_size_;
       std::uint32_t unique_haplotype_cnt_;
       std::uint8_t ploidy_level_;
       //---- GT Data ----//
@@ -89,10 +90,11 @@ namespace vc
     class reader
     {
     public:
-      reader(const std::string& file_path);
+      reader(std::istream& input_stream);
       bool read_next_block(block& destination);
     private:
       const std::string file_path_;
+      std::istream& input_stream_;
     };
   }
 }

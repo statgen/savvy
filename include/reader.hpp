@@ -32,10 +32,9 @@ namespace vc
       typedef std::input_iterator_tag iterator_category;  //usually std::forward_iterator_tag or similar
     };
 
-    reader(const std::string& file_path);
+    reader(std::istream& input_stream);
     virtual ~reader() {}
   private:
-    const std::string file_path_;
   };
 
 
