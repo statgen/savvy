@@ -7,111 +7,94 @@
 
 namespace vc
 {
-
-
-  class m3vcf_block
+  namespace m3vcf
   {
-  private:
-    static const char has_alt_code = '1';
-    static const char has_ref_code = '0';
-    static const char is_missing_code = '.';
-  public:
-    class marker_iterator
+    enum class allele_status : char { has_alt = '1', has_ref = '0', is_missing = '.' }; // TODO: make this enum generic across all formats.
+    class block;
+
+    class marker
     {
     public:
-      class variant_iterator
+      marker(block& parent, std::uint32_t offset, const std::string& chromosome, std::uint64_t position, const std::string& ref, const std::string& alt);
+
+      bool has_alt_at(std::uint64_t sample_off, std::uint8_t ploidy_off) const;
+      bool has_ref_at(std::uint64_t sample_off, std::uint8_t ploidy_off) const;
+      bool is_missing_at(std::uint64_t sample_off, std::uint8_t ploidy_off) const;
+
+      allele_status operator()(std::uint64_t sample_off, std::uint8_t ploidy_off) const;
+    private:
+      block& parent_;
+      std::uint32_t offset_;
+
+      std::string chromosome_;
+      std::uint64_t position_;
+      std::string ref_;
+      std::string alt_;
+    };
+
+    class block
+    {
+    public:
+      class const_iterator
       {
       public:
-        variant_iterator(marker_iterator& parent, std::uint64_t offset);
+        typedef const_iterator self_type;
+        typedef std::ptrdiff_t difference_type;
+        typedef marker value_type;
+        typedef const value_type& reference;
+        typedef const value_type* pointer;
+        typedef std::random_access_iterator_tag iterator_category;
 
-        bool has_alt_at(std::uint8_t allele_off) const
-        {
-          return parent_.has_alt_at(offset_, allele_off);
-        }
-
-        bool has_ref_at(std::uint8_t allele_off) const
-        {
-          return parent_.has_ref_at(offset_, allele_off);
-        }
-
-        bool is_missing_at(std::uint8_t allele_off) const
-        {
-          return parent_.is_missing_at(offset_, allele_off);
-        }
+        const_iterator(pointer ptr) : ptr_(ptr) { }
+        self_type& operator--(){ ++ptr_; return *this; }
+        self_type operator--(int) { self_type r = *this; ++ptr_; return r; }
+        self_type& operator++(){ ++ptr_; return *this; }
+        self_type operator++(int) { self_type r = *this; ++ptr_; return r; }
+        reference operator*() { return *ptr_; }
+        pointer operator->() { return ptr_; }
+        bool operator==(const self_type& rhs) { return ptr_ == rhs.ptr_; }
+        bool operator!=(const self_type& rhs) { return ptr_ != rhs.ptr_; }
       private:
-        marker_iterator& parent_;
-        std::uint64_t offset_;
+        pointer ptr_;
       };
 
-      marker_iterator(m3vcf_block& parent, std::uint32_t offset);
+      bool has_alt_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const;
+      bool has_ref_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const;
+      bool is_missing_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const;
 
-      bool has_alt_at(std::uint64_t sample_off, std::uint8_t allele_off) const
-      {
-        return parent_.has_alt_at(offset_, sample_off, allele_off);
-      }
+      allele_status operator()(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t allele_off) const;
 
-      bool has_ref_at(std::uint64_t sample_off, std::uint8_t allele_off) const
-      {
-        return parent_.has_ref_at(offset_, sample_off, allele_off);
-      }
+      const_iterator begin();
+      const_iterator end();
 
-      bool is_missing_at(std::uint64_t sample_off, std::uint8_t allele_off) const
+      std::uint64_t sample_size() const { return sample_cnt_; }
+      std::size_t marker_size() const { return markers_.size(); }
+      const marker& operator[](std::size_t i) const
       {
-        return parent_.is_missing_at(offset_, sample_off, allele_off);
+        return this->markers_[i];
       }
     private:
-      m3vcf_block& parent_;
-      std::uint32_t offset_;
+      std::vector<marker> markers_;
+
+      //---- GT Data ----//
+      std::vector<std::uint64_t> haplotype_weights_;
+      std::vector<std::uint32_t> sample_mappings_;
+      std::vector<char> unique_haplotype_matrix_;
+      std::uint64_t sample_cnt_;
+      std::uint32_t unique_haplotype_cnt_;
+      std::uint8_t ploidy_level_;
+      //---- GT Data ----//
     };
 
-
-    bool has_alt_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t allele_off) const
+    class reader
     {
-      return (unique_haplotype_matrix_[(marker_off * unique_haplotype_cnt_) + sample_mappings_[sample_off * ploidy_level_ + allele_off]] == m3vcf_block::has_alt_code);
-    }
-
-    bool has_ref_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t allele_off) const
-    {
-      return (unique_haplotype_matrix_[(marker_off * unique_haplotype_cnt_) + sample_mappings_[sample_off * ploidy_level_ + allele_off]] == m3vcf_block::has_ref_code);
-    }
-
-    bool is_missing_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t allele_off) const
-    {
-      return (unique_haplotype_matrix_[(marker_off * unique_haplotype_cnt_) + sample_mappings_[sample_off * ploidy_level_ + allele_off]] == m3vcf_block::is_missing_code);
-    }
-
-
-    std::uint64_t sample_size() const;
-    std::uint32_t marker_size() const;
-  private:
-    struct site_info
-    {
-      std::string chomosome;
-      std::uint64_t position;
-      std::string ref;
-      std::string alt;
+    public:
+      reader(const std::string& file_path);
+      bool read_next_block(block& destination);
+    private:
+      const std::string file_path_;
     };
-    std::vector<site_info> sites_;
-
-    //---- GT Data ----//
-    std::vector<std::uint64_t> haplotype_weights_;
-    std::vector<std::uint32_t> sample_mappings_;
-    std::vector<char> unique_haplotype_matrix_;
-    std::uint64_t sample_cnt_;
-    std::uint32_t variant_cnt_;
-    std::uint32_t unique_haplotype_cnt_;
-    std::uint8_t ploidy_level_;
-    //---- GT Data ----//
-  };
-
-  class m3vcf_reader
-  {
-  public:
-    m3vcf_reader(const std::string& file_path);
-    bool read_next_block(m3vcf_block& destination);
-  private:
-    const std::string file_path_;
-  };
+  }
 }
 
 #endif //VC_M3VCF_READER_HPP
