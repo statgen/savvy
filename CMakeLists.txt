@@ -6,10 +6,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 include_directories(include)
 
 set(HEADER_FILES
-    include/reader.hpp include/m3vcf_reader.hpp)
+    include/reader.hpp include/m3vcf_reader.hpp include/cvcf_reader.hpp include/allele_status.hpp)
 
 set(SOURCE_FILES
-    src/reader.cpp src/m3vcf_reader.cpp)
+    src/reader.cpp src/m3vcf_reader.cpp include/cvcf_reader.hpp src/cvcf_reader.cpp)
 
 add_library(vc ${SOURCE_FILES} ${HEADER_FILES})
 

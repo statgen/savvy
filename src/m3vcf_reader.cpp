@@ -43,6 +43,43 @@ namespace vc
       return parent_(offset_, sample_off, ploidy_off);
     }
 
+    void marker::for_each_allele(const std::function<void(std::uint64_t sample_off, std::uint8_t ploidy_off)>& fn)
+    {
+      for (std::uint64_t i = 0; i < parent_.sample_count(); ++i)
+      {
+        for (std::uint8_t j = 0; j < parent_.ploidy_level(); ++j)
+        {
+          if (parent_(offset_, i, j) == allele_status::has_alt)
+            fn(i, j);
+        }
+      }
+    }
+
+    void marker::for_each_missing(const std::function<void(std::uint64_t sample_off, std::uint8_t ploidy_off)>& fn)
+    {
+      for (std::uint64_t i = 0; i < parent_.sample_count(); ++i)
+      {
+        for (std::uint8_t j = 0; j < parent_.ploidy_level(); ++j)
+        {
+          if (parent_(offset_, i, j) == allele_status::is_missing)
+            fn(i, j);
+        }
+      }
+    }
+
+    void marker::for_each_non_ref(const std::function<void(allele_status status, std::uint64_t sample_off, std::uint8_t ploidy_off)>& fn)
+    {
+      for (std::uint64_t i = 0; i < parent_.sample_count(); ++i)
+      {
+        for (std::uint8_t j = 0; j < parent_.ploidy_level(); ++j)
+        {
+          allele_status s = parent_(offset_, i, j);
+          if (s != allele_status::has_ref)
+            fn(s, i, j);
+        }
+      }
+    }
+
     double marker::calculate_allele_frequency() const
     {
       return parent_.calculate_allele_frequency(offset_);
@@ -84,11 +121,10 @@ namespace vc
       for (std::uint32_t i = 0; i < unique_haplotype_cnt_; ++i)
       {
         char hap = unique_haplotype_matrix_[(marker_off * unique_haplotype_cnt_) + i];
-        if (hap == (char)allele_status::has_alt)
+        if (hap == '1')
           allele_cnt += haplotype_weights_[i];
-        else if (hap != (char)allele_status::has_ref) // missing
+        else if (hap != '0') // missing
           total_haplotypes -= haplotype_weights_[i];
-
       }
 
       return static_cast<double>(allele_cnt) / static_cast<double>(total_haplotypes);

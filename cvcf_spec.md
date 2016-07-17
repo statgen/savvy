@@ -20,11 +20,11 @@ Encoding is described at https://tools.ietf.org/html/rfc7541#section-5.1
 +-------------------------------------------------------------------------+
 | 01100011 01110110 01100011 01100110 XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX |
 +-------------------------------------------------------------------------+
-+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+vvvvvvvvvvvvvvvvvvvvvvvvvvvvv+
++~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
 | PLOIDY_LEVEL | SAMPLE_SIZE |     SAMPLE_ID_ARRAY ...     |
-+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+vvvvvvvvvvvvvvvvvvvvvvvvvvvvv+
++~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
 * PLOIDY_LEVEL: Ploidy level stored has VLQ.
-* SAMPLE_SIZE: Number of samples stored has VLQ.
+* SAMPLE_SIZE: Number of samples stored has VLQ.``````
 * SAMPLE_ID_ARRAY: Array of length SAMPLE_SIZE that stores sample ID's in VLS encoding.
 
 ```
@@ -47,9 +47,9 @@ A missing haplotype with an offset of 2.
 
 ## Record Format
 ```
-+vvvvvvvvv+~~~~~~~~~+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+~~~~~~~~~~+~~~~~~~~~~~~~~~~~~~~+
++vvvvvvvvv+~~~~~~~~~+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVV+
 |  CHROM  |   POS   |  MARKID  |   REF   |   ALT   |  HPA_SZ  | HAP_PAIR_ARRAY ... |
-+vvvvvvvvv+~~~~~~~~~+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+~~~~~~~~~~+~~~~~~~~~~~~~~~~~~~~+
++vvvvvvvvv+~~~~~~~~~+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVV+
 
 
 * CHROM: Chromosome string stored has VLS.
@@ -60,4 +60,4 @@ A missing haplotype with an offset of 2.
 * HPA_SZ: Size of paplotype pair array stored as VLQ.
 * HAP_PAIR_ARRAY: Array of size HPA_SZ that stores alleles or missing haplotypes in Haplotype Pair encoding.
 
-```
+```__

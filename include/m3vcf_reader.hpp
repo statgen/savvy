@@ -1,16 +1,18 @@
 #ifndef VC_M3VCF_READER_HPP
 #define VC_M3VCF_READER_HPP
 
+#include "allele_status.hpp"
+
 #include <string>
 #include <cstdint>
 #include <vector>
 #include <fstream>
+#include <functional>
 
 namespace vc
 {
   namespace m3vcf
   {
-    enum class allele_status : char { has_alt = '1', has_ref = '0', is_missing = '.' }; // TODO: make this enum generic across all formats.
     class block;
 
     class marker
@@ -22,6 +24,9 @@ namespace vc
       bool has_ref_at(std::uint64_t sample_off, std::uint8_t ploidy_off) const;
       bool is_missing_at(std::uint64_t sample_off, std::uint8_t ploidy_off) const;
       allele_status operator()(std::uint64_t sample_off, std::uint8_t ploidy_off) const;
+      void for_each_allele(const std::function<void(std::uint64_t sample_off, std::uint8_t ploidy_off)>& fn);
+      void for_each_missing(const std::function<void(std::uint64_t sample_off, std::uint8_t ploidy_off)>& fn);
+      void for_each_non_ref(const std::function<void(allele_status status, std::uint64_t sample_off, std::uint8_t ploidy_off)>& fn);
 
       double calculate_allele_frequency() const;
     private:
@@ -72,6 +77,7 @@ namespace vc
 
       std::uint64_t sample_count() const { return sample_size_; }
       std::size_t marker_count() const { return markers_.size(); }
+      std::uint8_t ploidy_level() const { return ploidy_level_; }
       const marker& operator[](std::size_t i) const;
       static bool read_block(block& destination, std::istream& source);
     private:

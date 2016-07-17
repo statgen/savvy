@@ -3,8 +3,7 @@
 
 namespace vc
 {
-  reader::reader(const std::string& file_path)
-    : file_path_(file_path)
+  reader::reader(std::istream& input_stream)
   {
   }
 }
