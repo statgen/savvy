@@ -41,21 +41,28 @@ namespace vc
 //      }
 //    }
 
-    const marker::non_ref_iterator::value_type marker::non_ref_iterator::const_is_missing = allele_status::is_missing;
-    const marker::non_ref_iterator::value_type marker::non_ref_iterator::const_has_alt = allele_status::has_alt;
-
-    const marker::haplotype_iterator::value_type marker::haplotype_iterator::const_is_missing = allele_status::is_missing;
-    const marker::haplotype_iterator::value_type marker::haplotype_iterator::const_has_ref = allele_status::has_ref;
-    const marker::haplotype_iterator::value_type marker::haplotype_iterator::const_has_alt = allele_status::has_alt;
+    const marker::const_iterator::value_type marker::const_iterator::const_is_missing = allele_status::is_missing;
+    const marker::const_iterator::value_type marker::const_iterator::const_has_ref = allele_status::has_ref;
+    const marker::const_iterator::value_type marker::const_iterator::const_has_alt = allele_status::has_alt;
 
     marker::non_ref_iterator marker::non_ref_begin() const
     {
-      return non_ref_iterator(non_zero_haplotypes_.begin());
+      return non_zero_haplotypes_.begin();
     }
 
     marker::non_ref_iterator marker::non_ref_end() const
     {
-      return non_ref_iterator(non_zero_haplotypes_.end());
+      return non_zero_haplotypes_.end();
+    }
+
+    marker::const_iterator marker::begin() const
+    {
+      return const_iterator(0, non_zero_haplotypes_.begin(), non_zero_haplotypes_.end());
+    }
+
+    marker::const_iterator marker::end() const
+    {
+      return const_iterator(sample_count_ * ploidy_level_, non_zero_haplotypes_.begin(), non_zero_haplotypes_.end());
     }
 
     double marker::calculate_allele_frequency() const
@@ -65,10 +72,10 @@ namespace vc
       std::uint64_t haplotype_offset = 0;
       for (auto it = non_zero_haplotypes_.begin(); it != non_zero_haplotypes_.end(); ++it)
       {
-        if (it->is_allele)
-          ++allele_cnt;
-        else // missing
+        if (it->is_missing)
           --total_haplotypes;
+        else // has alt
+          ++allele_cnt;
       }
 
       return static_cast<double>(allele_cnt) / static_cast<double>(total_haplotypes);

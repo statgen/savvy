@@ -21,39 +21,12 @@ namespace vc
         bool is_missing;
       };
 
-      class non_ref_iterator
+      typedef std::vector<sparse_allele>::const_iterator non_ref_iterator;
+
+      class const_iterator
       {
       public:
-        typedef non_ref_iterator self_type;
-        typedef std::ptrdiff_t difference_type;
-        typedef allele_status value_type;
-        typedef const value_type& reference;
-        typedef const value_type* pointer;
-        typedef std::forward_iterator_tag iterator_category;
-      private:
-        static const value_type const_is_missing;
-        static const value_type const_has_alt;
-      public:
-
-        non_ref_iterator(const std::vector<sparse_allele>::const_iterator& ptr) : ptr_(ptr) {}
-        self_type& operator--(){ --ptr_; return *this; }
-        self_type operator--(int) { self_type r = *this; --ptr_; return r; }
-        self_type& operator++(){ ++ptr_; return *this; }
-        self_type operator++(int) { self_type r = *this; ++ptr_; return r; }
-        reference operator*() { return (ptr_->is_missing ? const_is_missing : const_has_alt); }
-        pointer operator->() { return (ptr_->is_missing ? &const_is_missing : &const_has_alt); }
-        bool operator==(const self_type& rhs) { return ptr_ == rhs.ptr_; }
-        bool operator!=(const self_type& rhs) { return ptr_ != rhs.ptr_; }
-
-        std::uint64_t offset() const { return ptr_->offset; }
-      private:
-        std::vector<sparse_allele>::const_iterator ptr_;
-      };
-
-      class haplotype_iterator
-      {
-      public:
-        typedef haplotype_iterator self_type;
+        typedef const_iterator self_type;
         typedef std::ptrdiff_t difference_type;
         typedef allele_status value_type;
         typedef const value_type& reference;
@@ -64,7 +37,7 @@ namespace vc
         static const value_type const_has_ref;
         static const value_type const_has_alt;
       public:
-        haplotype_iterator(const std::vector<sparse_allele>::const_iterator& ptr, const std::vector<sparse_allele>::const_iterator& ptr_end) : ptr_(ptr), ptr_end_(ptr_end) {}
+        const_iterator(std::uint64_t off, const std::vector<sparse_allele>::const_iterator& ptr, const std::vector<sparse_allele>::const_iterator& ptr_end) : ptr_(ptr), ptr_end_(ptr_end) {}
         void increment()
         {
           if (ptr_ != ptr_end_ && i_ == ptr_->offset)
@@ -79,7 +52,7 @@ namespace vc
             return (ptr_->is_missing ? const_is_missing : const_has_alt);
           return const_has_ref;
         }
-        pointer operator->() { return &(haplotype_iterator::operator*()); }
+        pointer operator->() { return &(const_iterator::operator*()); }
         bool operator==(const self_type& rhs) { return i_ == rhs.i_; }
         bool operator!=(const self_type& rhs) { return i_ != rhs.i_; }
 
@@ -92,12 +65,15 @@ namespace vc
 
       non_ref_iterator non_ref_begin() const;
       non_ref_iterator non_ref_end() const;
+      const_iterator begin() const;
+      const_iterator end() const;
       double calculate_allele_frequency() const;
     private:
       std::vector<sparse_allele> non_zero_haplotypes_;
       std::uint8_t ploidy_level_;
       std::uint64_t sample_count_;
     };
+
 
     class reader
     {
