@@ -55,8 +55,6 @@ namespace vc
         pointer operator->() { return &(const_iterator::operator*()); }
         bool operator==(const self_type& rhs) { return i_ == rhs.i_; }
         bool operator!=(const self_type& rhs) { return i_ != rhs.i_; }
-
-        std::uint64_t offset() const { return i_; }
       private:
         std::size_t i_ = 0;
         std::vector<sparse_allele>::const_iterator ptr_;
