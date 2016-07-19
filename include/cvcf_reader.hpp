@@ -18,7 +18,7 @@ namespace vc
       struct sparse_allele
       {
         std::uint64_t offset;
-        bool is_missing;
+        allele_status status;
       };
 
       typedef std::vector<sparse_allele>::const_iterator non_ref_iterator;
@@ -49,7 +49,7 @@ namespace vc
         reference operator*()
         {
           if (ptr_ != ptr_end_ && i_ == ptr_->offset)
-            return (ptr_->is_missing ? const_is_missing : const_has_alt);
+            return (ptr_->status == allele_status::is_missing ? const_is_missing : const_has_alt);
           return const_has_ref;
         }
         pointer operator->() { return &(const_iterator::operator*()); }

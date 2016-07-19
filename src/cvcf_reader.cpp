@@ -72,7 +72,7 @@ namespace vc
       std::uint64_t haplotype_offset = 0;
       for (auto it = non_zero_haplotypes_.begin(); it != non_zero_haplotypes_.end(); ++it)
       {
-        if (it->is_missing)
+        if (it->status == allele_status::is_missing)
           --total_haplotypes;
         else // has alt
           ++allele_cnt;
