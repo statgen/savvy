@@ -5,9 +5,9 @@ Encoding is described at https://tools.ietf.org/html/rfc7541#section-5.1
 
 ## Variable Length String (VLS) Encoding
 ```
-+~~~~~~~~~~+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
-|   SIZE   |         STRING_DATA            |
-+~~~~~~~~~~+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
++~~~~~~~~~~+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+|   SIZE   |         STRING_DATA         |
++~~~~~~~~~~+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
 * SIZE: Size of string encoded as VLQ.
 * STRING_DATA: String payload stored in SIZE bytes.
 ```
