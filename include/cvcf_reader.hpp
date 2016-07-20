@@ -72,11 +72,39 @@ namespace vc
       std::uint64_t sample_count_;
     };
 
-
     class reader
     {
     public:
-      bool read_next_marker(marker& destination);
+      class input_iterator
+      {
+      public:
+        typedef input_iterator self_type;
+        typedef std::ptrdiff_t difference_type;
+        typedef marker value_type;
+        typedef const value_type& reference;
+        typedef const value_type* pointer;
+        typedef std::input_iterator_tag iterator_category;
+        typedef marker buffer;
+
+        input_iterator() : file_reader_(nullptr), buffer_(nullptr) {}
+        input_iterator(reader& file_reader, marker& buffer) : file_reader_(&file_reader), buffer_(&buffer) {}
+        void increment()
+        {
+          file_reader_->read_next_marker(*buffer_);
+        }
+        self_type& operator++(){ increment(); return *this; }
+        void operator++(int) { increment(); }
+        reference operator*() { return *buffer_; }
+        pointer operator->() { return buffer_; }
+        bool operator==(const self_type& rhs) { return (file_reader_ == rhs.file_reader_); }
+        bool operator!=(const self_type& rhs) { return (file_reader_ != rhs.file_reader_); }
+      private:
+        reader* file_reader_;
+        marker* buffer_;
+      };
+
+      reader(std::istream& input_stream) {} // TODO: impl
+      bool read_next_marker(marker& destination) { return false; } // TODO: impl
     private:
       std::uint8_t ploidy_level_;
       std::uint64_t sample_count_;
