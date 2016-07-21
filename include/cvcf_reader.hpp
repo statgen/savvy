@@ -90,7 +90,8 @@ namespace vc
         input_iterator(reader& file_reader, marker& buffer) : file_reader_(&file_reader), buffer_(&buffer) {}
         void increment()
         {
-          file_reader_->read_next_marker(*buffer_);
+          if (!file_reader_->read_next_marker(*buffer_))
+            file_reader_ = nullptr;
         }
         self_type& operator++(){ increment(); return *this; }
         void operator++(int) { increment(); }

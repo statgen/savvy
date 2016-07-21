@@ -3,6 +3,7 @@
 #include <algorithm>
 #include "cvcf_reader.hpp"
 #include "m3vcf_reader.hpp"
+#include "vcf_reader.hpp"
 #include "test_class.hpp"
 
 bool has_extension(const std::string& fullString, const std::string& ext)
@@ -49,11 +50,21 @@ int main(int argc, char** argv)
       vc::cvcf::reader input(ifs);
       handle_file_reader(input);
     }
-    else
+    else if (has_extension(file_path, ".m3vcf"))
     {
       std::ifstream ifs("/foobar.m3vcf");
       vc::m3vcf::reader input(ifs);
       handle_file_reader(input);
+    }
+    else if (has_extension(file_path, ".vcf") || has_extension(file_path, "vcf.gz") || has_extension(file_path, ".bcf"))
+    {
+      vc::vcf::marker m;
+      vc::vcf::reader input(file_path);
+      vc::vcf::reader::input_iterator eof;
+      vc::vcf::reader::input_iterator cur(input, m);
+
+      while (cur != eof)
+        ++cur;
     }
   }
   //----------------------------------------------------------------//

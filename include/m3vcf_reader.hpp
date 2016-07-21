@@ -156,8 +156,9 @@ namespace vc
             ++i_;
           else
           {
-            file_reader_->read_next_block(*buffer_);
             i_ = 0;
+            if (!file_reader_->read_next_block(*buffer_))
+              file_reader_ = nullptr;
           }
         }
         self_type& operator++(){ increment(); return *this; }

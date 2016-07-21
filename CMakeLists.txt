@@ -1,17 +1,38 @@
 cmake_minimum_required(VERSION 3.5)
 project(libvc)
 
+include(ExternalProject)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-include_directories(include)
+ExternalProject_Add(htslib
+                    BUILD_IN_SOURCE 1
+                    URL https://github.com/samtools/htslib/releases/download/1.3.1/htslib-1.3.1.tar.bz2
+                    URL_MD5 16d78f90b72f29971b042e8da8be6843
+                    #GIT_REPOSITORY "https://github.com/samtools/htslib"
+                    #GIT_TAG "1.3.1"
+                    UPDATE_COMMAND ""
+                    CONFIGURE_COMMAND autoconf && ./configure --prefix=<INSTALL_DIR>
+                    BUILD_COMMAND make
+                    INSTALL_COMMAND "")
+ExternalProject_Get_Property(htslib SOURCE_DIR)
+set(HTSLIB_SRC_DIR ${SOURCE_DIR})
+
+include_directories(include ${HTSLIB_SRC_DIR}/htslib)
+link_directories(${HTSLIB_SRC_DIR})
+
+
 
 set(HEADER_FILES
-    include/reader.hpp include/m3vcf_reader.hpp include/cvcf_reader.hpp include/allele_status.hpp)
+    include/reader.hpp include/m3vcf_reader.hpp include/cvcf_reader.hpp include/allele_status.hpp include/vcf_reader.hpp)
 
 set(SOURCE_FILES
-    src/reader.cpp src/m3vcf_reader.cpp include/cvcf_reader.hpp src/cvcf_reader.cpp include/test_class.hpp)
+    src/reader.cpp src/m3vcf_reader.cpp include/cvcf_reader.hpp src/cvcf_reader.cpp include/test_class.hpp src/vcf_reader.cpp)
 
 add_library(vc ${SOURCE_FILES} ${HEADER_FILES})
+add_dependencies(vc htslib)
 
 add_executable(vc-test src/test.cpp src/test_class.cpp include/test_class.hpp)
 target_link_libraries(vc-test vc)
+target_link_libraries(vc-test "hts")
+target_link_libraries(vc-test "z")
