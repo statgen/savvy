@@ -1,6 +1,8 @@
 #ifndef LIBVC_VCF_READER_HPP
 #define LIBVC_VCF_READER_HPP
 
+#include "allele_status.hpp"
+
 #include <iterator>
 #include <string>
 
@@ -21,15 +23,47 @@ namespace vc
     class marker
     {
     public:
+      class const_iterator
+      {
+      public:
+        typedef const_iterator self_type;
+        typedef std::ptrdiff_t difference_type;
+        typedef allele_status value_type;
+        typedef const value_type& reference;
+        typedef const value_type* pointer;
+        typedef std::bidirectional_iterator_tag iterator_category;
+      private:
+        static const value_type const_is_missing;
+        static const value_type const_has_ref;
+        static const value_type const_has_alt;
+      public:
+        const_iterator(const marker& parent, std::uint64_t index) : parent_(&parent), cur_(index) {}
+        self_type& operator--(){ --cur_; return *this; }
+        self_type operator--(int) { self_type r = *this; --cur_; return r; }
+        self_type& operator++(){ ++cur_; return *this; }
+        self_type operator++(int) { self_type r = *this; ++cur_; return r; }
+        reference operator*() { return (*parent_)[cur_]; }
+        pointer operator->() { return &(*parent_)[cur_]; }
+        bool operator==(const self_type& rhs) { return cur_ == rhs.cur_; }
+        bool operator!=(const self_type& rhs) { return cur_ != rhs.cur_; }
+      private:
+        const marker* parent_;
+        std::size_t cur_;
+      };
+
       marker();
       ~marker();
+
+      const allele_status& operator[](std::size_t i) const;
+      std::uint64_t haplotype_count() const;
+      const_iterator begin() const { return const_iterator(*this, 0); }
+      const_iterator end() const { return const_iterator(*this, haplotype_count()); }
 
       static bool read_marker(marker& destination, htsFile* hts_file_, bcf_hdr_t* hts_hdr_);
     private:
       bcf1_t* hts_rec_;
     };
 
-    void foo();
     class reader
     {
     public:
