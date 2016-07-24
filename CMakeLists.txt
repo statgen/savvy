@@ -14,7 +14,8 @@ ExternalProject_Add(htslib
                     UPDATE_COMMAND ""
                     CONFIGURE_COMMAND autoconf && ./configure --prefix=<INSTALL_DIR>
                     BUILD_COMMAND make
-                    INSTALL_COMMAND "")
+                    INSTALL_COMMAND make install)
+
 ExternalProject_Get_Property(htslib SOURCE_DIR)
 set(HTSLIB_SRC_DIR ${SOURCE_DIR})
 
@@ -24,10 +25,10 @@ link_directories(${HTSLIB_SRC_DIR})
 
 
 set(HEADER_FILES
-    include/reader.hpp include/m3vcf_reader.hpp include/cvcf_reader.hpp include/allele_status.hpp include/vcf_reader.hpp)
+    include/reader.hpp include/m3vcf_reader.hpp include/cvcf_reader.hpp include/allele_status.hpp include/vcf_reader.hpp include/varint.hpp)
 
 set(SOURCE_FILES
-    src/reader.cpp src/m3vcf_reader.cpp include/cvcf_reader.hpp src/cvcf_reader.cpp include/test_class.hpp src/vcf_reader.cpp)
+    src/reader.cpp src/m3vcf_reader.cpp include/cvcf_reader.hpp src/cvcf_reader.cpp include/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
 
 add_library(vc ${SOURCE_FILES} ${HEADER_FILES})
 add_dependencies(vc htslib)

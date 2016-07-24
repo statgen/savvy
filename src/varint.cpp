@@ -3,16 +3,20 @@
 
 namespace vc
 {
-  void varint_encode_with_1bit_prefix(std::uint8_t prefix_data, std::uint64_t input, std::back_insert_iterator<std::string> output_it)
+  //================================================================//
+  //----------------------------------------------------------------//
+  template<std::uint8_t PrefixMask, std::uint8_t ContinueFlagForFirstByte>
+  void prefixed_varint<PrefixMask, ContinueFlagForFirstByte>::encode(std::uint8_t prefix_data, std::uint64_t input, std::back_insert_iterator<std::string> output_it)
   {
-    prefix_data = prefix_data & (std::uint8_t)0x80;
+    static const std::uint8_t flipped_prefix_mask = (std::uint8_t)(0xFF & ~PrefixMask);
+    prefix_data = prefix_data & (std::uint8_t)PrefixMask;
 
-    if (input >= 64)
+    if (input >= ContinueFlagForFirstByte)
     {
-      prefix_data |= (std::uint8_t)(127 & (input % 64 + 64));
+      prefix_data |= (std::uint8_t)(flipped_prefix_mask & (input % ContinueFlagForFirstByte + ContinueFlagForFirstByte));
       *output_it = prefix_data;
       ++output_it;
-      input = input / 64;
+      input = input / ContinueFlagForFirstByte;
 
       while (input >= 128)
       {
@@ -31,15 +35,20 @@ namespace vc
       ++output_it;
     }
   }
+  //----------------------------------------------------------------//
 
-  std::uint64_t varint_decode_with_1bit_prefix(std::uint8_t& prefix_data, std::string::const_iterator& itr)
+  //----------------------------------------------------------------//
+  template<std::uint8_t PrefixMask, std::uint8_t ContinueFlagForFirstByte>
+  std::uint64_t prefixed_varint<PrefixMask, ContinueFlagForFirstByte>::decode(std::uint8_t& prefix_data, std::string::const_iterator& itr)
   {
-    prefix_data = (std::uint8_t)(*itr & 0x80);
-    std::uint64_t ret = (*itr & (unsigned)63);
-    bool continue_bit_set = (bool)(*itr & 64);
+    static const std::uint8_t first_byte_integer_value_mask = ContinueFlagForFirstByte - (std::uint8_t)1;
+    static const std::uint8_t initial_exponent = (std::uint8_t)std::log2(ContinueFlagForFirstByte);
+    prefix_data = (std::uint8_t)(*itr & PrefixMask);
+    std::uint64_t ret = ((std::uint8_t)(*itr) & first_byte_integer_value_mask);
+    bool continue_bit_set = (bool)(*itr & ContinueFlagForFirstByte);
     ++itr;
 
-    std::uint64_t m = 6;
+    std::uint64_t m = initial_exponent;
     while (continue_bit_set)
     {
       ret = ret + ((*itr & 127) * (std::uint64_t)std::pow(2,m));
@@ -51,7 +60,20 @@ namespace vc
 
     return ret;
   }
+  //----------------------------------------------------------------//
 
+  //----------------------------------------------------------------//
+  template class prefixed_varint<0x80, 0x40>;
+  template class prefixed_varint<0xC0, 0x20>;
+  template class prefixed_varint<0xE0, 0x10>;
+  template class prefixed_varint<0xF0,  0x8>;
+  template class prefixed_varint<0xF8,  0x4>;
+  template class prefixed_varint<0xFC,  0x2>;
+  template class prefixed_varint<0xFE,  0x1>;
+  //----------------------------------------------------------------//
+  //================================================================//
+
+  //----------------------------------------------------------------//
   void varint_encode(std::uint64_t input, std::back_insert_iterator<std::string> output_it)
   {
     while (input >= 128)
@@ -64,7 +86,9 @@ namespace vc
     *output_it = (std::uint8_t)input;
     ++output_it;
   }
+  //----------------------------------------------------------------//
 
+  //----------------------------------------------------------------//
   std::uint64_t varint_decode(std::string::const_iterator& itr)
   {
     std::uint64_t ret = 0;
@@ -83,6 +107,7 @@ namespace vc
 
     return ret;
   }
+  //----------------------------------------------------------------//
 
 //  void varint_encode(prefix_mask prfx_mask, std::uint64_t input, std::string& output)
 //  {
