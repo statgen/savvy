@@ -27,11 +27,7 @@ namespace vc
         typedef const value_type& reference;
         typedef const value_type* pointer;
         typedef std::bidirectional_iterator_tag iterator_category;
-      private:
-        static const value_type const_is_missing;
-        static const value_type const_has_ref;
-        static const value_type const_has_alt;
-      public:
+
         const_iterator(const marker& parent, std::uint64_t index) : parent_(&parent), cur_(index) {}
         self_type& operator--(){ --cur_; return *this; }
         self_type operator--(int) { self_type r = *this; --cur_; return r; }

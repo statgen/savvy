@@ -58,10 +58,10 @@ int main(int argc, char** argv)
     }
     else if (has_extension(file_path, ".vcf") || has_extension(file_path, "vcf.gz") || has_extension(file_path, ".bcf"))
     {
-      vc::vcf::marker m;
+      vc::vcf::block buff;
       vc::vcf::reader input(file_path);
       vc::vcf::reader::input_iterator eof;
-      vc::vcf::reader::input_iterator cur(input, m);
+      vc::vcf::reader::input_iterator cur(input, buff);
 
       while (cur != eof)
         ++cur;
