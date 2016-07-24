@@ -1,10 +1,14 @@
-#include <iostream>
-#include <fstream>
-#include <algorithm>
+
 #include "cvcf_reader.hpp"
 #include "m3vcf_reader.hpp"
 #include "vcf_reader.hpp"
 #include "test_class.hpp"
+#include "varint.hpp"
+
+#include <iostream>
+#include <fstream>
+#include <algorithm>
+#include <numeric>
 
 bool has_extension(const std::string& fullString, const std::string& ext)
 {
@@ -39,7 +43,7 @@ void handle_file_reader(T& reader)
 
 }
 
-int main(int argc, char** argv)
+int reader_tests()
 {
   //----------------------------------------------------------------//
   {
@@ -147,6 +151,44 @@ int main(int argc, char** argv)
       ++(zero_one_two_vec[i / ploidy_level]);
   }
   //----------------------------------------------------------------//
+  return 0;
+}
+
+int varint_test()
+{
+  std::vector<std::uint64_t> arr(65536);
+  for (std::uint64_t i = 0; i < arr.size(); ++i)
+    arr[i] = i;
+
+  std::cout << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
+
+  std::string str;
+  vc::varint_encode(300, std::back_insert_iterator<std::string>(str));
+  auto it = str.cbegin();
+  std::cout << vc::varint_decode(it) << std::endl;
+
+  std::uint8_t prefix_data = 0;
+
+  std::string compressed_arr;
+  std::back_insert_iterator<std::string> back_it (compressed_arr);
+  for (std::uint64_t i = 0; i < arr.size(); ++i)
+    vc::varint_encode_with_1bit_prefix(prefix_data, i, back_it);
+
+
+  std::fill(arr.begin(), arr.end(), 0);
+
+  auto decode_it = compressed_arr.cbegin();
+  for (std::uint64_t i = 0; i < arr.size(); ++i)
+    arr[i] = vc::varint_decode_with_1bit_prefix(prefix_data, decode_it);
+  std::cout << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
+
+  return 0;
+}
+
+
+int main(int argc, char** argv)
+{
+  varint_test();
 
   return 0;
 }
