@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <numeric>
 #include <chrono>
+#include <sstream>
 
 bool has_extension(const std::string& fullString, const std::string& ext)
 {
@@ -157,168 +158,239 @@ int reader_tests()
 
 int varint_test()
 {
-  std::vector<std::uint64_t> arr(65536);
+  std::vector<std::uint64_t> arr(0xFFFFFFF);
   for (std::uint64_t i = 0; i < arr.size(); ++i)
     arr[i] = i;
   std::cout << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
 
   {
-    std::vector<std::uint64_t> non_compressed_arr;
-    std::back_insert_iterator<std::vector<std::uint64_t>> back_it (non_compressed_arr);
-    std::copy(arr.begin(), arr.end(), back_it);
+    std::ofstream non_compressed_arr_ostream("foo-not-compressed.bin", std::ios::binary);
+    const auto encode_start = std::chrono::high_resolution_clock::now();
+    non_compressed_arr_ostream.write((char*)arr.data(), arr.size() * sizeof(std::uint64_t));
+    non_compressed_arr_ostream.flush();
+    //std::copy(arr.begin(), arr.end(), back_it);
+    auto encode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - encode_start).count();
+    std::cout << "Encode elapsed time: " << encode_elapsed_time << "ms" << std::endl;
+    non_compressed_arr_ostream.close();
 
     std::fill(arr.begin(), arr.end(), 0);
 
+    std::ifstream non_compressed_arr_istream("foo-not-compressed.bin", std::ios::binary);
     const auto decode_start = std::chrono::high_resolution_clock::now();
-    std::size_t i = 0;
-    for (auto it = non_compressed_arr.begin(); it != non_compressed_arr.end(); ++it,++i)
-      arr[i] = ntohll(*it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    non_compressed_arr_istream.read((char*)arr.data(), arr.size() * sizeof(std::uint64_t));
+//    for (std::size_t i = 0; i < arr.size(); ++i)
+//      arr[i] = ntohll(arr[i]);
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "Non-compressed copy: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
+    std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
+    std::cout << std::endl;
   }
 
   {
-    std::string compressed_arr;
-    std::back_insert_iterator<std::string> back_it (compressed_arr);
+    std::ofstream compressed_arr_ostream("foo-0bit.bin");
+    const auto encode_start = std::chrono::high_resolution_clock::now();
+    std::ostreambuf_iterator<char> output_it(compressed_arr_ostream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      vc::varint_encode(i, back_it);
+      vc::varint_encode(i, output_it);
+    compressed_arr_ostream.flush();
+    auto encode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - encode_start).count();
+    std::cout << "Encode elapsed time: " << encode_elapsed_time << "ms" << std::endl;
+    compressed_arr_ostream.close();
 
     std::fill(arr.begin(), arr.end(), 0);
 
+    std::ifstream compressed_arr_istream("foo-0bit.bin");
     const auto decode_start = std::chrono::high_resolution_clock::now();
-    auto decode_it = compressed_arr.cbegin();
+    std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::varint_decode(decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "0-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
+    std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
+    compressed_arr_istream.close();
+    std::cout << std::endl;
   }
 
   {
     std::uint8_t prefix_data = 0;
-    std::string compressed_arr;
-    std::back_insert_iterator<std::string> back_it (compressed_arr);
+    std::ofstream compressed_arr_ostream("foo-1bit.bin");
+    const auto encode_start = std::chrono::high_resolution_clock::now();
+    std::ostreambuf_iterator<char> output_it(compressed_arr_ostream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      vc::one_bit_prefixed_varint::encode(prefix_data, i, back_it);
+      vc::one_bit_prefixed_varint::encode(prefix_data, i, output_it);
+    compressed_arr_ostream.flush();
+    auto encode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - encode_start).count();
+    std::cout << "Encode elapsed time: " << encode_elapsed_time << "ms" << std::endl;
+    compressed_arr_ostream.close();
 
     std::fill(arr.begin(), arr.end(), 0);
 
+    std::ifstream compressed_arr_istream("foo-1bit.bin");
     const auto decode_start = std::chrono::high_resolution_clock::now();
-    auto decode_it = compressed_arr.cbegin();
+    std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::one_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "1-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
+    std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
+    compressed_arr_istream.close();
+    std::cout << std::endl;
   }
 
   {
     std::uint8_t prefix_data = 0;
-    std::string compressed_arr;
-    std::back_insert_iterator<std::string> back_it (compressed_arr);
+    std::ofstream compressed_arr_ostream("foo-2bit.bin");
+    const auto encode_start = std::chrono::high_resolution_clock::now();
+    std::ostreambuf_iterator<char> output_it(compressed_arr_ostream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      vc::two_bit_prefixed_varint::encode(prefix_data, i, back_it);
+      vc::two_bit_prefixed_varint::encode(prefix_data, i, output_it);
+    compressed_arr_ostream.flush();
+    auto encode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - encode_start).count();
+    std::cout << "Encode elapsed time: " << encode_elapsed_time << "ms" << std::endl;
+    compressed_arr_ostream.close();
 
     std::fill(arr.begin(), arr.end(), 0);
 
+    std::ifstream compressed_arr_istream("foo-2bit.bin");
     const auto decode_start = std::chrono::high_resolution_clock::now();
-    auto decode_it = compressed_arr.cbegin();
+    std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::two_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "2-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
+    std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
+    compressed_arr_istream.close();
+    std::cout << std::endl;
   }
 
   {
     std::uint8_t prefix_data = 0;
-    std::string compressed_arr;
-    std::back_insert_iterator<std::string> back_it (compressed_arr);
+    std::ofstream compressed_arr_ostream("foo-3bit.bin");
+    const auto encode_start = std::chrono::high_resolution_clock::now();
+    std::ostreambuf_iterator<char> output_it(compressed_arr_ostream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      vc::three_bit_prefixed_varint::encode(prefix_data, i, back_it);
+      vc::three_bit_prefixed_varint::encode(prefix_data, i, output_it);
+    compressed_arr_ostream.flush();
+    auto encode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - encode_start).count();
+    std::cout << "Encode elapsed time: " << encode_elapsed_time << "ms" << std::endl;
+    compressed_arr_ostream.close();
 
     std::fill(arr.begin(), arr.end(), 0);
 
+    std::ifstream compressed_arr_istream("foo-3bit.bin");
     const auto decode_start = std::chrono::high_resolution_clock::now();
-    auto decode_it = compressed_arr.cbegin();
+    std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::three_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "3-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
+    std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
+    compressed_arr_istream.close();
+    std::cout << std::endl;
   }
 
   {
     std::uint8_t prefix_data = 0;
-    std::string compressed_arr;
-    std::back_insert_iterator<std::string> back_it (compressed_arr);
+    std::ofstream compressed_arr_ostream("foo-4bit.bin");
+    const auto encode_start = std::chrono::high_resolution_clock::now();
+    std::ostreambuf_iterator<char> output_it(compressed_arr_ostream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      vc::four_bit_prefixed_varint::encode(prefix_data, i, back_it);
+      vc::four_bit_prefixed_varint::encode(prefix_data, i, output_it);
+    compressed_arr_ostream.flush();
+    auto encode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - encode_start).count();
+    std::cout << "Encode elapsed time: " << encode_elapsed_time << "ms" << std::endl;
+    compressed_arr_ostream.close();
 
     std::fill(arr.begin(), arr.end(), 0);
 
+    std::ifstream compressed_arr_istream("foo-4bit.bin");
     const auto decode_start = std::chrono::high_resolution_clock::now();
-    auto decode_it = compressed_arr.cbegin();
+    std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::four_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "4-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
+    std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
+    compressed_arr_istream.close();
+    std::cout << std::endl;
   }
 
   {
     std::uint8_t prefix_data = 0;
-    std::string compressed_arr;
-    std::back_insert_iterator<std::string> back_it (compressed_arr);
+    std::ofstream compressed_arr_ostream("foo-5bit.bin");
+    const auto encode_start = std::chrono::high_resolution_clock::now();
+    std::ostreambuf_iterator<char> output_it(compressed_arr_ostream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      vc::five_bit_prefixed_varint::encode(prefix_data, i, back_it);
+      vc::five_bit_prefixed_varint::encode(prefix_data, i, output_it);
+    compressed_arr_ostream.flush();
+    auto encode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - encode_start).count();
+    std::cout << "Encode elapsed time: " << encode_elapsed_time << "ms" << std::endl;
+    compressed_arr_ostream.close();
 
     std::fill(arr.begin(), arr.end(), 0);
 
+    std::ifstream compressed_arr_istream("foo-5bit.bin");
     const auto decode_start = std::chrono::high_resolution_clock::now();
-    auto decode_it = compressed_arr.cbegin();
+    std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::five_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "5-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
+    std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
+    compressed_arr_istream.close();
+    std::cout << std::endl;
   }
 
   {
     std::uint8_t prefix_data = 0;
-    std::string compressed_arr;
-    std::back_insert_iterator<std::string> back_it (compressed_arr);
+    std::ofstream compressed_arr_ostream("foo-6bit.bin");
+    const auto encode_start = std::chrono::high_resolution_clock::now();
+    std::ostreambuf_iterator<char> output_it(compressed_arr_ostream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      vc::six_bit_prefixed_varint::encode(prefix_data, i, back_it);
+      vc::six_bit_prefixed_varint::encode(prefix_data, i, output_it);
+    compressed_arr_ostream.flush();
+    auto encode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - encode_start).count();
+    std::cout << "Encode elapsed time: " << encode_elapsed_time << "ms" << std::endl;
+    compressed_arr_ostream.close();
 
     std::fill(arr.begin(), arr.end(), 0);
 
+    std::ifstream compressed_arr_istream("foo-6bit.bin");
     const auto decode_start = std::chrono::high_resolution_clock::now();
-    auto decode_it = compressed_arr.cbegin();
+    std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::six_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "6-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
+    std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
+    compressed_arr_istream.close();
+    std::cout << std::endl;
   }
 
   {
     std::uint8_t prefix_data = 0;
-    std::string compressed_arr;
-    std::back_insert_iterator<std::string> back_it (compressed_arr);
+    std::ofstream compressed_arr_ostream("foo-7bit.bin");
+    const auto encode_start = std::chrono::high_resolution_clock::now();
+    std::ostreambuf_iterator<char> output_it(compressed_arr_ostream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      vc::seven_bit_prefixed_varint::encode(prefix_data, i, back_it);
+      vc::seven_bit_prefixed_varint::encode(prefix_data, i, output_it);
+    compressed_arr_ostream.flush();
+    auto encode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - encode_start).count();
+    std::cout << "Encode elapsed time: " << encode_elapsed_time << "ms" << std::endl;
+    compressed_arr_ostream.close();
 
     std::fill(arr.begin(), arr.end(), 0);
 
+    std::ifstream compressed_arr_istream("foo-7bit.bin");
     const auto decode_start = std::chrono::high_resolution_clock::now();
-    auto decode_it = compressed_arr.cbegin();
+    std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::seven_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "7-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
+    std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
+    compressed_arr_istream.close();
+    std::cout << std::endl;
   }
 
   return 0;

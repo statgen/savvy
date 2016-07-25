@@ -1,37 +1,34 @@
 #include "varint.hpp"
 #include <cmath>
+#include <streambuf>
 
 namespace vc
 {
   //================================================================//
   //----------------------------------------------------------------//
   template<std::uint8_t PrefixMask, std::uint8_t ContinueFlagForFirstByte>
-  void prefixed_varint<PrefixMask, ContinueFlagForFirstByte>::encode(std::uint8_t prefix_data, std::uint64_t input, std::back_insert_iterator<std::string> output_it)
+  void prefixed_varint<PrefixMask, ContinueFlagForFirstByte>::encode(std::uint8_t prefix_data, std::uint64_t input, std::ostreambuf_iterator<char>& output_it)
   {
-    static const std::uint8_t flipped_prefix_mask = (std::uint8_t)(0xFF & ~PrefixMask);
+    static const std::uint8_t first_byte_integer_value_mask = ContinueFlagForFirstByte - (std::uint8_t)1;
+    //static const std::uint8_t flipped_prefix_mask = (std::uint8_t)(0xFF & ~PrefixMask);
+    static const std::uint8_t initial_bits_to_shift = (std::uint8_t)std::log2(ContinueFlagForFirstByte);
     prefix_data = prefix_data & (std::uint8_t)PrefixMask;
+    prefix_data |= (std::uint8_t)(first_byte_integer_value_mask & input);
+    input >>= initial_bits_to_shift;
+    if (input)
+      prefix_data |= ContinueFlagForFirstByte;
+    *output_it = prefix_data;
+    ++output_it;
 
-    if (input >= ContinueFlagForFirstByte)
+    while (input)
     {
-      prefix_data |= (std::uint8_t)(flipped_prefix_mask & (input % ContinueFlagForFirstByte + ContinueFlagForFirstByte));
-      *output_it = prefix_data;
-      ++output_it;
-      input = input / ContinueFlagForFirstByte;
+      std::uint8_t next_byte = static_cast<std::uint8_t>(input & 0x7F);
+      input >>= 7;
 
-      while (input >= 128)
-      {
-        *output_it = (std::uint8_t)(input % 128 + 128);
-        ++output_it;
-        input = input / 128;
-      }
+      if (input)
+        next_byte |= 0x80;
 
-      *output_it = (std::uint8_t)input;
-      ++output_it;
-    }
-    else
-    {
-      prefix_data |= input;
-      *output_it = prefix_data;
+      *output_it = next_byte;
       ++output_it;
     }
   }
@@ -39,24 +36,28 @@ namespace vc
 
   //----------------------------------------------------------------//
   template<std::uint8_t PrefixMask, std::uint8_t ContinueFlagForFirstByte>
-  std::uint64_t prefixed_varint<PrefixMask, ContinueFlagForFirstByte>::decode(std::uint8_t& prefix_data, std::string::const_iterator& itr)
+  std::uint64_t prefixed_varint<PrefixMask, ContinueFlagForFirstByte>::decode(std::uint8_t& prefix_data, std::istreambuf_iterator<char>& input_it)
   {
     static const std::uint8_t first_byte_integer_value_mask = ContinueFlagForFirstByte - (std::uint8_t)1;
-    static const std::uint8_t initial_exponent = (std::uint8_t)std::log2(ContinueFlagForFirstByte);
-    prefix_data = (std::uint8_t)(*itr & PrefixMask);
-    std::uint64_t ret = ((std::uint8_t)(*itr) & first_byte_integer_value_mask);
-    bool continue_bit_set = (bool)(*itr & ContinueFlagForFirstByte);
-    ++itr;
+    static const std::uint8_t initial_bits_to_shift = (std::uint8_t)std::log2(ContinueFlagForFirstByte);
+    std::uint8_t current_byte = static_cast<std::uint8_t>(*input_it);
+    ++input_it;
+    prefix_data = (std::uint8_t)(current_byte & PrefixMask);
+    std::uint64_t ret = 0;
+    ret |= (current_byte & first_byte_integer_value_mask);
 
-    std::uint64_t m = initial_exponent;
-    while (continue_bit_set)
+    if (current_byte & ContinueFlagForFirstByte)
     {
-      ret = ret + ((*itr & 127) * (std::uint64_t)std::pow(2,m));
-      m = m + 7;
-      continue_bit_set = (bool)(*itr & 128);
-      ++itr;
+      std::uint8_t bits_to_shift = initial_bits_to_shift;
+      do
+      {
+        current_byte = static_cast<std::uint8_t>(*input_it);
+        ++input_it;
+        ret |= (std::uint64_t) (current_byte & 0x7F) << bits_to_shift;
+        bits_to_shift += 7;
+      }
+      while (current_byte & 0x80);
     }
-
 
     return ret;
   }
@@ -74,30 +75,32 @@ namespace vc
   //================================================================//
 
   //----------------------------------------------------------------//
-  void varint_encode(std::uint64_t input, std::back_insert_iterator<std::string> output_it)
+  void varint_encode(std::uint64_t input, std::ostreambuf_iterator<char>& output_it)
   {
-    while (input >= 128)
+    do
     {
-      *output_it = (std::uint8_t)(input % 128 + 128);
-      ++output_it;
-      input = input / 128;
-    }
+      std::uint8_t next_byte = static_cast<std::uint8_t>(input & 0x7F);
+      input >>= 7;
 
-    *output_it = (std::uint8_t)input;
-    ++output_it;
+      if (input)
+        next_byte |= 0x80;
+
+      *output_it = next_byte;
+      ++output_it;
+    } while (input);
   }
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  std::uint64_t varint_decode(std::string::const_iterator& itr)
+  std::uint64_t varint_decode(std::istreambuf_iterator<char>& input_it)
   {
     std::uint64_t ret = 0;
     std::uint8_t bits_to_shift = 0;
     std::uint8_t current_byte;
     do
     {
-      current_byte = static_cast<std::uint8_t>(*itr);
-      ++itr;
+      current_byte = static_cast<std::uint8_t>(*input_it);
+      ++input_it;
       ret |= (std::uint64_t)(current_byte & 0x7F) << bits_to_shift;
       bits_to_shift += 7;
     } while (current_byte & 0x80);

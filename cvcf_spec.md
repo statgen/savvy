@@ -24,7 +24,7 @@ Encoding is described at https://tools.ietf.org/html/rfc7541#section-5.1
 | PLOIDY_LEVEL | SAMPLE_SIZE |     SAMPLE_ID_ARRAY ...     |
 +~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
 * PLOIDY_LEVEL: Ploidy level stored has VLQ.
-* SAMPLE_SIZE: Number of samples stored has VLQ.``````
+* SAMPLE_SIZE: Number of samples stored has VLQ.
 * SAMPLE_ID_ARRAY: Array of length SAMPLE_SIZE that stores sample ID's in VLS encoding.
 
 ```
