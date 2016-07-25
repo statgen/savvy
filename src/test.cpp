@@ -170,10 +170,12 @@ int varint_test()
     std::fill(arr.begin(), arr.end(), 0);
 
     const auto decode_start = std::chrono::high_resolution_clock::now();
-    std::copy(non_compressed_arr.begin(), non_compressed_arr.end(), arr.begin());
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    std::size_t i = 0;
+    for (auto it = non_compressed_arr.begin(); it != non_compressed_arr.end(); ++it,++i)
+      arr[i] = ntohll(*it);
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "Non-compressed copy: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "ns" << std::endl;
+    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
   }
 
   {
@@ -188,9 +190,9 @@ int varint_test()
     auto decode_it = compressed_arr.cbegin();
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::varint_decode(decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "0-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "ns" << std::endl;
+    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
   }
 
   {
@@ -206,9 +208,9 @@ int varint_test()
     auto decode_it = compressed_arr.cbegin();
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::one_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "1-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "ns" << std::endl;
+    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
   }
 
   {
@@ -224,9 +226,9 @@ int varint_test()
     auto decode_it = compressed_arr.cbegin();
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::two_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "2-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "ns" << std::endl;
+    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
   }
 
   {
@@ -242,9 +244,9 @@ int varint_test()
     auto decode_it = compressed_arr.cbegin();
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::three_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "3-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "ns" << std::endl;
+    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
   }
 
   {
@@ -260,9 +262,9 @@ int varint_test()
     auto decode_it = compressed_arr.cbegin();
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::four_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "4-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "ns" << std::endl;
+    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
   }
 
   {
@@ -278,9 +280,9 @@ int varint_test()
     auto decode_it = compressed_arr.cbegin();
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::five_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "5-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "ns" << std::endl;
+    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
   }
 
   {
@@ -296,9 +298,9 @@ int varint_test()
     auto decode_it = compressed_arr.cbegin();
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::six_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "6-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "ns" << std::endl;
+    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
   }
 
   {
@@ -314,9 +316,9 @@ int varint_test()
     auto decode_it = compressed_arr.cbegin();
     for (std::uint64_t i = 0; i < arr.size(); ++i)
       arr[i] = vc::seven_bit_prefixed_varint::decode(prefix_data, decode_it);
-    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
+    auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "7-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
-    std::cout << "Elapsed time: " << decode_elapsed_time << "ns" << std::endl;
+    std::cout << "Elapsed time: " << decode_elapsed_time << "us" << std::endl;
   }
 
   return 0;

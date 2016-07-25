@@ -92,18 +92,15 @@ namespace vc
   std::uint64_t varint_decode(std::string::const_iterator& itr)
   {
     std::uint64_t ret = 0;
-
-    std::uint64_t m = 0;
-
-    bool continue_bit_set;
+    std::uint8_t bits_to_shift = 0;
+    std::uint8_t current_byte;
     do
     {
-      ret = ret + ((*itr & 127) * (std::uint64_t)std::pow(2,m));
-      m = m + 7;
-      continue_bit_set = (bool)(*itr & 128);
+      current_byte = static_cast<std::uint8_t>(*itr);
       ++itr;
-    }
-    while (continue_bit_set);
+      ret |= (std::uint64_t)(current_byte & 0x7F) << bits_to_shift;
+      bits_to_shift += 7;
+    } while (current_byte & 0x80);
 
     return ret;
   }
