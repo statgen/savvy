@@ -49,14 +49,15 @@ namespace vc
     if (current_byte & ContinueFlagForFirstByte)
     {
       std::uint8_t bits_to_shift = initial_bits_to_shift;
-      do
+      while (true)
       {
         current_byte = static_cast<std::uint8_t>(*input_it);
         ++input_it;
         ret |= (std::uint64_t) (current_byte & 0x7F) << bits_to_shift;
+        if (current_byte & 0x80)
+          break;
         bits_to_shift += 7;
       }
-      while (current_byte & 0x80);
     }
 
     return ret;
@@ -97,13 +98,16 @@ namespace vc
     std::uint64_t ret = 0;
     std::uint8_t bits_to_shift = 0;
     std::uint8_t current_byte;
-    do
+
+    while (true)
     {
       current_byte = static_cast<std::uint8_t>(*input_it);
       ++input_it;
       ret |= (std::uint64_t)(current_byte & 0x7F) << bits_to_shift;
+      if (current_byte & 0x80)
+        break;
       bits_to_shift += 7;
-    } while (current_byte & 0x80);
+    }
 
     return ret;
   }
