@@ -54,7 +54,7 @@ namespace vc
         current_byte = static_cast<std::uint8_t>(*input_it);
         ++input_it;
         ret |= (std::uint64_t) (current_byte & 0x7F) << bits_to_shift;
-        if (current_byte & 0x80)
+        if ((current_byte & 0x80) == 0)
           break;
         bits_to_shift += 7;
       }
@@ -104,7 +104,7 @@ namespace vc
       current_byte = static_cast<std::uint8_t>(*input_it);
       ++input_it;
       ret |= (std::uint64_t)(current_byte & 0x7F) << bits_to_shift;
-      if (current_byte & 0x80)
+      if ((current_byte & 0x80) == 0)
         break;
       bits_to_shift += 7;
     }
