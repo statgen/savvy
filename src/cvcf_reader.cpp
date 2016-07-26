@@ -1,4 +1,7 @@
 #include "cvcf_reader.hpp"
+#include "varint.hpp"
+
+#include <iostream>
 
 namespace vc
 {
@@ -79,6 +82,36 @@ namespace vc
       }
 
       return static_cast<double>(allele_cnt) / static_cast<double>(total_haplotypes);
+    }
+
+    bool marker::read(marker& destination, std::istream& is)
+    {
+      std::istreambuf_iterator<char> input_it(is);
+      destination.position_ = varint_decode(input_it);
+
+      destination.id_.resize(varint_decode(input_it));
+      if (destination.id_.size())
+        is.read(&destination.id_[0], destination.alt_.size());
+
+      destination.ref_.resize(varint_decode(input_it));
+      if (destination.ref_.size())
+        is.read(&destination.ref_[0], destination.ref_.size());
+
+      destination.alt_.resize(varint_decode(input_it));
+      if (destination.alt_.size())
+        is.read(&destination.alt_[0], destination.alt_.size());
+
+      std::uint64_t offset = 0;
+      destination.non_zero_haplotypes_.reserve(varint_decode(input_it));
+      for (auto it = destination.non_zero_haplotypes_.begin(); it != destination.non_zero_haplotypes_.end(); ++it,++offset)
+      {
+        std::uint8_t allele = 0;
+        offset += one_bit_prefixed_varint::decode(allele, input_it);
+        it->offset = offset;
+        it->status = (allele ? allele_status::has_alt : allele_status::is_missing);
+      }
+
+      return true;
     }
     //================================================================//
   }

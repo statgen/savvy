@@ -66,8 +66,13 @@ namespace vc
       const_iterator begin() const;
       const_iterator end() const;
       double calculate_allele_frequency() const;
+      static bool read(marker& destination, std::istream& is);
     private:
       std::vector<sparse_allele> non_zero_haplotypes_;
+      std::string ref_;
+      std::string alt_;
+      std::string id_;
+      std::uint64_t position_;
       std::uint8_t ploidy_level_;
       std::uint64_t sample_count_;
     };
