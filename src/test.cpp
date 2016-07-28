@@ -158,7 +158,7 @@ int reader_tests()
 
 int varint_test()
 {
-  std::vector<std::uint64_t> arr(0xFFFFFFF);
+  std::vector<std::uint64_t> arr(0xFFFFFF);
   for (std::uint64_t i = 0; i < arr.size(); ++i)
     arr[i] = i;
   std::cout << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
@@ -203,7 +203,7 @@ int varint_test()
     const auto decode_start = std::chrono::high_resolution_clock::now();
     std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      arr[i] = vc::varint_decode(decode_it);
+      decode_it = vc::varint_decode(decode_it, std::istreambuf_iterator<char>(), arr[i]);
     auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "0-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
     std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;

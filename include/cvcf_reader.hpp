@@ -109,11 +109,12 @@ namespace vc
         marker* buffer_;
       };
 
-      reader(std::istream& input_stream) {} // TODO: impl
-      bool read_next_marker(marker& destination) { return false; } // TODO: impl
+      reader(std::istream& input_stream) : input_stream_(input_stream) {} // TODO: impl
+      bool read_next_marker(marker& destination) { return marker::read(destination, input_stream_); } // TODO: impl
     private:
       std::uint8_t ploidy_level_;
       std::uint64_t sample_count_;
+      std::istream& input_stream_;
     };
   }
 }
