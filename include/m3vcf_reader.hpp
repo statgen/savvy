@@ -95,11 +95,6 @@ namespace vc
       };
 
       const allele_status& haplotype_at(std::uint32_t marker_offset, std::uint64_t haplotype_offset);
-
-//      bool has_alt_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const;
-//      bool has_ref_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const;
-//      bool is_missing_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const;
-//      allele_status operator()(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const;
       double calculate_allele_frequency(std::uint32_t marker_off) const;
 
       const_iterator begin();
@@ -111,6 +106,9 @@ namespace vc
       std::uint8_t ploidy_level() const { return ploidy_level_; }
       const marker& operator[](std::size_t i) const;
       static bool read_block(block& destination, std::istream& source) { return false; } // TODO: impl
+
+
+      bool add_marker(std::uint64_t position, const std::string& ref, const std::string& alt, const char* hap_array, std::size_t hap_array_sz);
     private:
       static const allele_status const_has_ref;
       static const allele_status const_has_alt;

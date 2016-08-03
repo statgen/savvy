@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <iostream>
 
 namespace vc
 {
@@ -110,7 +111,7 @@ namespace vc
       };
 
       reader(std::istream& input_stream) : input_stream_(input_stream) {} // TODO: impl
-      bool read_next_marker(marker& destination) { return marker::read(destination, input_stream_); } // TODO: impl
+      bool read_next_marker(marker& destination) { return (input_stream_.good() ? marker::read(destination, input_stream_) : false); } // TODO: impl
     private:
       std::uint8_t ploidy_level_;
       std::uint64_t sample_count_;

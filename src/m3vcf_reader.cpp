@@ -1,5 +1,6 @@
 #include "m3vcf_reader.hpp"
 
+#include <unordered_set>
 #include <cmath>
 
 std::uint64_t ceil_divide(std::uint64_t dividend, std::uint64_t divisor)
@@ -23,63 +24,6 @@ namespace vc
     {
     }
 
-//    bool marker::has_alt_at(std::uint64_t sample_off, std::uint8_t ploidy_off) const
-//    {
-//      return parent_.has_alt_at(offset_, sample_off, ploidy_off);
-//    }
-//
-//    bool marker::has_ref_at(std::uint64_t sample_off, std::uint8_t ploidy_off) const
-//    {
-//      return parent_.has_ref_at(offset_, sample_off, ploidy_off);
-//    }
-//
-//    bool marker::is_missing_at(std::uint64_t sample_off, std::uint8_t ploidy_off) const
-//    {
-//      return parent_.is_missing_at(offset_, sample_off, ploidy_off);
-//    }
-//
-//    allele_status marker::operator()(std::uint64_t sample_off, std::uint8_t ploidy_off) const
-//    {
-//      return parent_(offset_, sample_off, ploidy_off);
-//    }
-//
-//    void marker::for_each_allele(const std::function<void(std::uint64_t sample_off, std::uint8_t ploidy_off)>& fn)
-//    {
-//      for (std::uint64_t i = 0; i < parent_.sample_count(); ++i)
-//      {
-//        for (std::uint8_t j = 0; j < parent_.ploidy_level(); ++j)
-//        {
-//          if (parent_(offset_, i, j) == allele_status::has_alt)
-//            fn(i, j);
-//        }
-//      }
-//    }
-//
-//    void marker::for_each_missing(const std::function<void(std::uint64_t sample_off, std::uint8_t ploidy_off)>& fn)
-//    {
-//      for (std::uint64_t i = 0; i < parent_.sample_count(); ++i)
-//      {
-//        for (std::uint8_t j = 0; j < parent_.ploidy_level(); ++j)
-//        {
-//          if (parent_(offset_, i, j) == allele_status::is_missing)
-//            fn(i, j);
-//        }
-//      }
-//    }
-//
-//    void marker::for_each_non_ref(const std::function<void(allele_status status, std::uint64_t sample_off, std::uint8_t ploidy_off)>& fn)
-//    {
-//      for (std::uint64_t i = 0; i < parent_.sample_count(); ++i)
-//      {
-//        for (std::uint8_t j = 0; j < parent_.ploidy_level(); ++j)
-//        {
-//          allele_status s = parent_(offset_, i, j);
-//          if (s != allele_status::has_ref)
-//            fn(s, i, j);
-//        }
-//      }
-//    }
-
     const allele_status& marker::operator[](std::size_t i) const
     {
       return parent_.haplotype_at(offset_, i);
@@ -100,32 +44,6 @@ namespace vc
     const allele_status block::const_has_ref = allele_status::has_ref;
     const allele_status block::const_has_alt = allele_status::has_alt;
     const allele_status block::const_is_missing = allele_status::is_missing;
-
-//    bool block::has_alt_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const
-//    {
-//      return (operator()(marker_off, sample_off, ploidy_off) == allele_status::is_missing);
-//    }
-//
-//    bool block::has_ref_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const
-//    {
-//      return (operator()(marker_off, sample_off, ploidy_off) == allele_status::is_missing);
-//    }
-//
-//    bool block::is_missing_at(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const
-//    {
-//      return (operator()(marker_off, sample_off, ploidy_off) == allele_status::is_missing);
-//    }
-//
-//    allele_status block::operator()(std::uint32_t marker_off, std::uint64_t sample_off, std::uint8_t ploidy_off) const
-//    {
-//      switch (unique_haplotype_matrix_[(marker_off * unique_haplotype_cnt_) + sample_mappings_[sample_off * ploidy_level_ + ploidy_off]])
-//      {
-//      case '0': return allele_status::has_ref;
-//      case '1': return allele_status::has_alt;
-//      case '.': return allele_status::is_missing;
-//      };
-//      return allele_status::is_missing;
-//    }
 
     const allele_status& block::haplotype_at(std::uint32_t marker_off, std::uint64_t haplotype_off)
     {
@@ -168,6 +86,50 @@ namespace vc
     const marker& block::operator[](std::size_t i) const
     {
       return markers_[i];
+    }
+
+    bool block::add_marker(std::uint64_t position, const std::string& ref, const std::string& alt, const char* hap_array, std::size_t hap_array_sz)
+    {
+      bool ret = false;
+
+      if (hap_array_sz == sample_size_ * ploidy_level_)
+      {
+        std::int64_t current_savings = static_cast<std::int64_t>(hap_array_sz * markers_.size()) - static_cast<std::int64_t>(unique_haplotype_cnt_ * markers_.size() + hap_array_sz);
+
+        std::unordered_set<std::string> new_unique_haps;
+        std::string column_string(markers_.size() + 1, '\0');
+
+        for (std::size_t i = 0; i < hap_array_sz; ++i)
+        {
+          std::size_t j = 0;
+          for (; j < markers_.size(); ++j)
+          {
+            column_string[j] = unique_haplotype_matrix_[(j * unique_haplotype_cnt_) + sample_mappings_[i]];
+          }
+          column_string[j] = hap_array[i];
+          new_unique_haps.insert(column_string);
+        }
+
+        std::int64_t new_savings = static_cast<std::int64_t>(hap_array_sz * (markers_.size() + 1)) - static_cast<std::int64_t>(new_unique_haps.size() * (markers_.size() + 1) + hap_array_sz);
+        if (new_savings >= current_savings)
+        {
+          markers_.push_back(marker(*this, markers_.size(), "", position, ref, alt));
+          std::vector<char> new_unqiue_haplotype_matrix(new_unique_haps.size() + markers_.size());
+          std::size_t i = 0;
+          for (auto it = new_unique_haps.begin(); it != new_unique_haps.end(); ++it,++i)
+          {
+            for (std::size_t j = 0; j < it->size(); ++j)
+            {
+              new_unqiue_haplotype_matrix[(j * unique_haplotype_cnt_) + i] = (*it)[j];
+            }
+          }
+
+          unique_haplotype_matrix_ = std::move(new_unqiue_haplotype_matrix);
+          ret = true;
+        }
+      }
+
+      return ret;
     }
     //================================================================//
 

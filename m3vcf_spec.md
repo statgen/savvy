@@ -19,9 +19,10 @@
 +-----------------------------------------------------------------------------------+
 
 
-+----------+-------------------------------------+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
-| PPPPPPPP | SSSSSSSS SSSSSSSS SSSSSSSS SSSSSSSS |     SAMPLE_ID_ARRAY ...     |
-+----------+-------------------------------------+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
++vvvvvvvvv+----------+-------------------------------------+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
+|  CHROM  | PPPPPPPP | SSSSSSSS SSSSSSSS SSSSSSSS SSSSSSSS |     SAMPLE_ID_ARRAY ...     |
++vvvvvvvvv+----------+-------------------------------------+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
+* CHROM: Chromosome string stored has VLS.
 * P: Ploidy level stored in 1 byte.
 * S: Number of samples stored has VLQ.
 * SAMPLE_ID_ARRAY: Array of length S that stores sample ID's in VLS encoding.
@@ -33,16 +34,15 @@
 +----------+---------------------------------------+VVVVVVVVVVVVVVVVVVVV+
 | MMMMMMMM | NNNNNNNN  NNNNNNNN  NNNNNNNN NNNNNNNN | SAMPLE_MAPPING ... |
 +----------+---------------------------------------+VVVVVVVVVVVVVVVVVVVV+
-+vvvvvvvvv+-------------------------------------------------------------------------+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVV+
-|  CHROM  | PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP |  MARKID  |   REF   |   ALT   | UNIQUE_HAP_ROW ... |
-+vvvvvvvvv+-------------------------------------------------------------------------+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVV+
++-------------------------------------------------------------------------+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVV+
+| PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP |  MARKID  |   REF   |   ALT   | UNIQUE_HAP_ROW ... |
++-------------------------------------------------------------------------+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVV+
 ...
 
 
 * M: Number of rows in unique haplotype matrix (number of markers in block).
 * N: Number of columns in unique haplotype matrix.
 * SAMPLE_MAPPING: Array of integers with a byte width of ceil(log2(N + 1) / 8). Array contains sample count times ploidy level elements.
-* CHROM: Chromosome string stored has VLS.
 * P: Chromosome pos stored in 8 bytes.
 * MARKID: Marker ID string stored has VLS.
 * REF: Reference haplotype stored has VLS.

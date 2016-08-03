@@ -20,9 +20,12 @@ All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB12
 +-------------------------------------------------------------------------+
 | 01100011 01110110 01100011 01100110 XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX |
 +-------------------------------------------------------------------------+
-+vvvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
-|  CHROM  | PLOIDY_LEVEL | SAMPLE_SIZE |     SAMPLE_ID_ARRAY ...     |
-+vvvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
++~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
+| SAMPLE_SIZE |     SAMPLE_ID_ARRAY ...     |
++~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
++vvvvvvvvv+~~~~~~~~~~~~~~+
+|  CHROM  | PLOIDY_LEVEL |
++vvvvvvvvv+~~~~~~~~~~~~~~+
 * CHROM: Chromosome string stored has VLS.
 * PLOIDY_LEVEL: Ploidy level stored has VLI.
 * SAMPLE_SIZE: Number of samples stored has VLI.

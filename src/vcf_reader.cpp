@@ -68,7 +68,11 @@ namespace vc
       {
         destination.num_gt_ = bcf_get_genotypes(hts_hdr, destination.hts_rec_, &(destination.gt_), &(destination.gt_sz_));
         destination.num_samples_ = hts_hdr->n[BCF_DT_SAMPLE];
-        if (destination.num_gt_ == 2 * destination.num_samples_) // for diploid
+        if (destination.num_gt_ % destination.num_samples_ != 0)
+        {
+          // TODO: mixed ploidy at site error.
+        }
+        else
         {
           for (std::uint16_t i = 1; i < destination.hts_rec_->n_allele; ++i) // TODO: figure out if n_alleles includes ref.
             destination.markers_.emplace_back(destination.gt_, destination.num_gt_, i);

@@ -97,8 +97,9 @@ namespace vc
       const_iterator begin() const { return const_iterator(this->markers_.data()); }
       const_iterator end() const { return const_iterator(this->markers_.data() + this->markers_.size()); }
       const marker& operator[](std::size_t i) const;
-      std::size_t marker_count() { return markers_.size(); }
-      int sample_count() { return num_samples_; }
+      std::size_t marker_count() const { return markers_.size(); }
+      int sample_count() const { return num_samples_; }
+      int ploidy() const { return num_gt_ / num_samples_; }
 
       static bool read_block(block& destination, htsFile* hts_file_, bcf_hdr_t* hts_hdr_);
     private:

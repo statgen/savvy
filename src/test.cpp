@@ -35,7 +35,7 @@ void handle_file_reader(T& reader)
       vc::allele_status foo = *jt;
     }
 
-    std::for_each(it->begin(), it->end(), [](const typename T::input_iterator::value_type::const_iterator::value_type& s)
+    std::for_each(it->begin(), it->end(), [](const typename vc::allele_status& s)
     {
       vc::allele_status foo = s;
     });
