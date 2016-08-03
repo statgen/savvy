@@ -114,13 +114,13 @@ namespace vc
         if (new_savings >= current_savings)
         {
           markers_.push_back(marker(*this, markers_.size(), "", position, ref, alt));
-          std::vector<char> new_unqiue_haplotype_matrix(new_unique_haps.size() + markers_.size());
+          std::vector<char> new_unqiue_haplotype_matrix(new_unique_haps.size() * markers_.size());
           std::size_t i = 0;
           for (auto it = new_unique_haps.begin(); it != new_unique_haps.end(); ++it,++i)
           {
             for (std::size_t j = 0; j < it->size(); ++j)
             {
-              new_unqiue_haplotype_matrix[(j * unique_haplotype_cnt_) + i] = (*it)[j];
+              new_unqiue_haplotype_matrix[(j * new_unique_haps.size()) + i] = (*it)[j];
             }
           }
 
