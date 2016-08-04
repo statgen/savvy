@@ -94,7 +94,10 @@ namespace vc
         pointer ptr_;
       };
 
-      const allele_status& haplotype_at(std::uint32_t marker_offset, std::uint64_t haplotype_offset);
+      const allele_status& sample_haplotype_at(std::uint32_t marker_offset, std::uint64_t haplotype_offset);
+      std::uint32_t sample_mapping_at(std::uint64_t haplotype_offset) { return sample_mappings_[haplotype_offset]; }
+      const allele_status& unique_haplotype_at(std::uint32_t marker_offset, std::uint64_t unique_haplotype_offset);
+      std::uint64_t unique_haplotype_weight_at(std::uint64_t unique_haplotype_offset) { return haplotype_weights_[unique_haplotype_offset]; }
       double calculate_allele_frequency(std::uint32_t marker_off) const;
 
       const_iterator begin();
@@ -102,10 +105,12 @@ namespace vc
 
       std::uint64_t sample_count() const { return sample_size_; }
       std::uint64_t haplotype_count() const { return sample_size_ * ploidy_level_; }
+      std::uint32_t unique_haplotype_count() const { return unique_haplotype_cnt_; }
       std::size_t marker_count() const { return markers_.size(); }
       std::uint8_t ploidy_level() const { return ploidy_level_; }
       const marker& operator[](std::size_t i) const;
       static bool read_block(block& destination, std::istream& source) { return false; } // TODO: impl
+      static bool write_block(std::ostream& destination, block& source);
 
 
       bool add_marker(std::uint64_t position, const std::string& ref, const std::string& alt, const char* hap_array, std::size_t hap_array_sz);

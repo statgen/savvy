@@ -24,16 +24,16 @@
 +vvvvvvvvv+----------+-------------------------------------+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
 * CHROM: Chromosome string stored has VLS.
 * P: Ploidy level stored in 1 byte.
-* S: Number of samples stored has VLQ.
+* S: Number of samples stored in 4 bytes.
 * SAMPLE_ID_ARRAY: Array of length S that stores sample ID's in VLS encoding.
 ```
 
 
 ## Block Format
 ```
-+----------+---------------------------------------+VVVVVVVVVVVVVVVVVVVV+
-| MMMMMMMM | NNNNNNNN  NNNNNNNN  NNNNNNNN NNNNNNNN | SAMPLE_MAPPING ... |
-+----------+---------------------------------------+VVVVVVVVVVVVVVVVVVVV+
++-------------------------------------+---------------------------------------+VVVVVVVVVVVVVVVVVVVV+
+| MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM | NNNNNNNN  NNNNNNNN  NNNNNNNN NNNNNNNN | SAMPLE_MAPPING ... |
++-------------------------------------+---------------------------------------+VVVVVVVVVVVVVVVVVVVV+
 +-------------------------------------------------------------------------+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVV+
 | PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP |  MARKID  |   REF   |   ALT   | UNIQUE_HAP_ROW ... |
 +-------------------------------------------------------------------------+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVV+
