@@ -68,6 +68,7 @@ namespace vc
       const_iterator end() const;
       double calculate_allele_frequency() const;
       static bool read(marker& destination, std::istream& is);
+      static bool write(std::ostream& os, marker& source);
     private:
       std::vector<sparse_allele> non_zero_haplotypes_;
       std::string ref_;
