@@ -16,13 +16,13 @@ namespace vc
     class marker
     {
     public:
-      struct sparse_allele
+      struct sparse_vector_allele
       {
         std::uint64_t offset;
         allele_status status;
       };
 
-      typedef std::vector<sparse_allele>::const_iterator non_ref_iterator;
+      typedef std::vector<sparse_vector_allele>::const_iterator non_ref_iterator;
 
       class const_iterator
       {
@@ -38,7 +38,7 @@ namespace vc
         static const value_type const_has_ref;
         static const value_type const_has_alt;
       public:
-        const_iterator(std::uint64_t off, const std::vector<sparse_allele>::const_iterator& ptr, const std::vector<sparse_allele>::const_iterator& ptr_end) : ptr_(ptr), ptr_end_(ptr_end) {}
+        const_iterator(std::uint64_t off, const std::vector<sparse_vector_allele>::const_iterator& ptr, const std::vector<sparse_vector_allele>::const_iterator& ptr_end) : ptr_(ptr), ptr_end_(ptr_end) {}
         void increment()
         {
           if (ptr_ != ptr_end_ && i_ == ptr_->offset)
@@ -58,8 +58,8 @@ namespace vc
         bool operator!=(const self_type& rhs) { return i_ != rhs.i_; }
       private:
         std::size_t i_ = 0;
-        std::vector<sparse_allele>::const_iterator ptr_;
-        const std::vector<sparse_allele>::const_iterator ptr_end_;
+        std::vector<sparse_vector_allele>::const_iterator ptr_;
+        const std::vector<sparse_vector_allele>::const_iterator ptr_end_;
       };
 
       non_ref_iterator non_ref_begin() const;
@@ -70,7 +70,7 @@ namespace vc
       static bool read(marker& destination, std::istream& is);
       static bool write(std::ostream& os, marker& source);
     private:
-      std::vector<sparse_allele> non_zero_haplotypes_;
+      std::vector<sparse_vector_allele> non_zero_haplotypes_;
       std::string ref_;
       std::string alt_;
       std::string id_;

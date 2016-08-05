@@ -133,7 +133,7 @@ int reader_tests()
   std::uint64_t sample_size = 1000;
   std::vector<int> zero_one_two_vec(sample_size, 0);
 
-  std::for_each(m.non_ref_begin(), m.non_ref_end(), [&zero_one_two_vec, ploidy_level](const vc::cvcf::marker::sparse_allele& a)
+  std::for_each(m.non_ref_begin(), m.non_ref_end(), [&zero_one_two_vec, ploidy_level](const vc::cvcf::marker::sparse_vector_allele& a)
   {
     if (a.status == vc::allele_status::has_alt)
       ++(zero_one_two_vec[a.offset / ploidy_level]);
