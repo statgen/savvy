@@ -1,6 +1,5 @@
 #include "m3vcf_reader.hpp"
 
-#include <list>
 #include <cmath>
 #include <assert.h>
 #include <arpa/inet.h>
@@ -99,70 +98,6 @@ namespace vc
     const marker& block::operator[](std::size_t i) const
     {
       return markers_[i];
-    }
-
-    bool block::add_marker(std::uint64_t position, const std::string& ref, const std::string& alt, const char* hap_array, std::size_t hap_array_sz)
-    {
-      bool ret = false;
-
-      if (hap_array_sz == sample_mappings_.size())
-      {
-        std::int64_t current_savings = static_cast<std::int64_t>(hap_array_sz * markers_.size()) - static_cast<std::int64_t>(unique_haplotype_cnt_ * markers_.size() + hap_array_sz);
-
-        std::list<std::string> new_unique_haps;
-
-        std::string column_string(markers_.size() + 1, '\0');
-        std::vector<std::uint32_t> new_sample_mappings(hap_array_sz);
-
-        for (std::size_t i = 0; i < hap_array_sz; ++i)
-        {
-          std::size_t j = 0;
-          for (; j < markers_.size(); ++j)
-          {
-            column_string[j] = unique_haplotype_matrix_[(j * unique_haplotype_cnt_) + sample_mappings_[i]];
-          }
-          column_string[j] = hap_array[i];
-
-          std::uint32_t unique_hap_offset = 0;
-          auto find_it = new_unique_haps.begin();
-          while (find_it != new_unique_haps.end())
-          {
-            if (*find_it == column_string)
-              break;
-            ++find_it;
-            ++unique_hap_offset;
-          }
-
-          if (find_it == new_unique_haps.end())
-            new_unique_haps.push_back(column_string);
-
-          new_sample_mappings[i] = unique_hap_offset;
-        }
-
-        std::int64_t new_savings = static_cast<std::int64_t>(hap_array_sz * (markers_.size() + 1)) - static_cast<std::int64_t>(new_unique_haps.size() * (markers_.size() + 1) + hap_array_sz);
-        if (new_savings >= current_savings)
-        {
-          markers_.push_back(marker(*this, markers_.size(), "", position, ref, alt));
-          std::vector<char> new_unique_haplotype_matrix(new_unique_haps.size() * markers_.size());
-
-          std::size_t i = 0;
-          for (auto it = new_unique_haps.begin(); it != new_unique_haps.end(); ++it,++i)
-          {
-            for (std::size_t j = 0; j < it->size(); ++j)
-            {
-              new_unique_haplotype_matrix[(j * new_unique_haps.size()) + i] = (*it)[j];
-            }
-          }
-
-          unique_haplotype_cnt_ = new_unique_haps.size();
-          unique_haplotype_matrix_ = std::move(new_unique_haplotype_matrix);
-          sample_mappings_ = std::move(new_sample_mappings);
-
-          ret = true;
-        }
-      }
-
-      return ret;
     }
 
     bool block::write_block(std::ostream& destination, block& source)
