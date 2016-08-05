@@ -81,6 +81,35 @@ namespace vc
 
       return is.good();
     }
+
+    bool marker::write(std::ostream& os, marker& source)
+    {
+      std::ostreambuf_iterator<char> os_it(os);
+      varint_encode(source.position_, os_it);
+
+      varint_encode(source.id_.size(), os_it);
+      if (source.id_.size())
+        os.write(&source.id_[0], source.id_.size());
+
+      varint_encode(source.ref_.size(), os_it);
+      if (source.ref_.size())
+        os.write(&source.ref_[0], source.ref_.size());
+
+      varint_encode(source.alt_.size(), os_it);
+      if (source.alt_.size())
+        os.write(&source.alt_[0], source.alt_.size());
+
+      std::uint64_t last_pos= 0;
+      for (auto it = source.non_zero_haplotypes_.begin(); it != source.non_zero_haplotypes_.end(); ++it)
+      {
+        std::uint64_t offset = it->offset - last_pos;
+        last_pos = it->offset + 1;
+        std::uint8_t allele = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
+        one_bit_prefixed_varint::encode(allele, offset, os_it);
+      }
+
+      return os.good();
+    }
     //================================================================//
   }
 }
