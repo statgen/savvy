@@ -2,6 +2,7 @@
 #define LIBVC_CVCF_READER_HPP
 
 #include "allele_status.hpp"
+#include "varint.hpp"
 
 #include <cstdint>
 #include <string>
@@ -20,6 +21,8 @@ namespace vc
       {
         std::uint64_t offset;
         allele_status status;
+        sparse_vector_allele() = default;
+        sparse_vector_allele(allele_status s, std::uint64_t o) : offset(o), status(s) {}
       };
 
       typedef std::vector<sparse_vector_allele>::const_iterator non_ref_iterator;
@@ -38,7 +41,8 @@ namespace vc
         static const value_type const_has_ref;
         static const value_type const_has_alt;
       public:
-        const_iterator(std::uint64_t off, const std::vector<sparse_vector_allele>::const_iterator& ptr, const std::vector<sparse_vector_allele>::const_iterator& ptr_end) : ptr_(ptr), ptr_end_(ptr_end) {}
+        const_iterator(std::uint64_t off, const std::vector<sparse_vector_allele>::const_iterator& ptr, const std::vector<sparse_vector_allele>::const_iterator& ptr_end)
+          : ptr_(ptr), ptr_end_(ptr_end), i_(off) {}
         void increment()
         {
           if (ptr_ != ptr_end_ && i_ == ptr_->offset)
@@ -57,26 +61,53 @@ namespace vc
         bool operator==(const self_type& rhs) { return i_ == rhs.i_; }
         bool operator!=(const self_type& rhs) { return i_ != rhs.i_; }
       private:
-        std::size_t i_ = 0;
         std::vector<sparse_vector_allele>::const_iterator ptr_;
         const std::vector<sparse_vector_allele>::const_iterator ptr_end_;
+        std::size_t i_;
       };
 
+      marker() = default;
+      template <typename RandAccessAlleleIterator>
+      marker(std::uint64_t position, const std::string& id, const std::string& ref, const std::string& alt, RandAccessAlleleIterator gt_beg, RandAccessAlleleIterator gt_end) :
+        position_(position),
+        id_(id),
+        ref_(ref),
+        alt_(alt)
+      {
+        haplotype_count_ = gt_end - gt_beg;
+        std::uint64_t off = 0;
+        while (gt_beg != gt_end)
+        {
+          if (*gt_beg != allele_status::has_ref)
+          {
+            non_zero_haplotypes_.reserve(static_cast<std::size_t>(non_zero_haplotypes_.size() * 1.1f));
+            non_zero_haplotypes_.emplace_back(*gt_beg, off);
+          }
+          ++gt_beg;
+          ++off;
+        }
+        non_zero_haplotypes_.shrink_to_fit();
+      }
+
+      std::uint64_t pos() const { return position_; }
+      const std::string& id() const { return id_; }
+      const std::string& ref() const { return ref_; }
+      const std::string& alt() const { return alt_; }
+      std::uint64_t haplotype_count() const { return haplotype_count_; }
       non_ref_iterator non_ref_begin() const;
       non_ref_iterator non_ref_end() const;
       const_iterator begin() const;
       const_iterator end() const;
       double calculate_allele_frequency() const;
-      static bool read(marker& destination, std::istream& is);
-      static bool write(std::ostream& os, marker& source);
+      static void read(marker& destination, std::uint64_t haplotype_count, std::istream& is);
+      static void write(std::ostream& os, const marker& source);
     private:
       std::vector<sparse_vector_allele> non_zero_haplotypes_;
       std::string ref_;
       std::string alt_;
       std::string id_;
       std::uint64_t position_;
-      std::uint8_t ploidy_level_;
-      std::uint64_t sample_count_;
+      std::uint64_t haplotype_count_;
     };
 
     class reader
@@ -94,10 +125,17 @@ namespace vc
         typedef marker buffer;
 
         input_iterator() : file_reader_(nullptr), buffer_(nullptr) {}
-        input_iterator(reader& file_reader, marker& buffer) : file_reader_(&file_reader), buffer_(&buffer) {}
+        input_iterator(reader& file_reader, marker& buffer) :
+          file_reader_(&file_reader),
+          buffer_(&buffer)
+        {
+          increment();
+        }
+
         void increment()
         {
-          if (!file_reader_->read_next_marker(*buffer_))
+          bool b = file_reader_->good();
+          if (!(*file_reader_ >> *buffer_))
             file_reader_ = nullptr;
         }
         self_type& operator++(){ increment(); return *this; }
@@ -111,13 +149,63 @@ namespace vc
         marker* buffer_;
       };
 
-      reader(std::istream& input_stream) : input_stream_(input_stream) {} // TODO: impl
-      bool read_next_marker(marker& destination) { return (input_stream_.good() ? marker::read(destination, input_stream_) : false); } // TODO: impl
+      reader(std::istream& input_stream);
+      reader& operator>>(marker& destination);
+      explicit operator bool() const { return input_stream_.good(); }
+      bool good() const { return input_stream_.good(); }
+      bool fail() const { return input_stream_.fail(); }
+      bool bad() const { return input_stream_.bad(); }
     private:
-      std::uint8_t ploidy_level_;
-      std::uint64_t sample_count_;
+      std::vector<std::string> sample_ids_;
+      std::string chromosome_;
       std::istream& input_stream_;
+      std::uint8_t ploidy_level_;
     };
+
+    class writer
+    {
+    public:
+      template <typename RandAccessStringIterator>
+      writer(std::ostream& output_stream, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end) :
+        output_stream_(output_stream),
+        sample_size_(samples_end - samples_beg),
+        ploidy_level_(ploidy)
+      {
+        std::string version_string("cvcf\x00\x01\x00\x00", 8);
+        output_stream_.write(version_string.data(), version_string.size());
+
+        std::ostreambuf_iterator<char> out_it(output_stream_);
+        varint_encode(sample_size_, out_it);
+        for (auto it = samples_beg; it != samples_end; ++it)
+        {
+          varint_encode(it->size(), out_it);
+          output_stream_.write(it->data(), it->size());
+        }
+
+        varint_encode(chromosome.size(), out_it);
+        std::copy(chromosome.begin(), chromosome.end(), out_it);
+        varint_encode(ploidy_level_, out_it);
+      }
+
+      writer& operator<<(const marker& m)
+      {
+        if (output_stream_.good())
+        {
+          if (m.haplotype_count() != sample_size_ * ploidy_level_)
+            output_stream_.setstate(std::ios::failbit);
+          else
+            marker::write(output_stream_, m);
+        }
+        return *this;
+      }
+
+    private:
+      std::ostream& output_stream_;
+      std::uint64_t sample_size_;
+      std::uint8_t ploidy_level_;
+    };
+
+
   }
 }
 

@@ -203,7 +203,7 @@ int varint_test()
     const auto decode_start = std::chrono::high_resolution_clock::now();
     std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      decode_it = vc::varint_decode(decode_it, std::istreambuf_iterator<char>(), arr[i]);
+      decode_it = ++vc::varint_decode(decode_it, std::istreambuf_iterator<char>(), arr[i]);
     auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "0-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
     std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
@@ -229,7 +229,7 @@ int varint_test()
     const auto decode_start = std::chrono::high_resolution_clock::now();
     std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      decode_it = vc::one_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
+      decode_it = ++vc::one_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
     auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "1-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
     std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
@@ -255,7 +255,7 @@ int varint_test()
     const auto decode_start = std::chrono::high_resolution_clock::now();
     std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      decode_it = vc::two_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
+      decode_it = ++vc::two_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
     auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "2-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
     std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
@@ -281,7 +281,7 @@ int varint_test()
     const auto decode_start = std::chrono::high_resolution_clock::now();
     std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      decode_it = vc::three_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
+      decode_it = ++vc::three_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
     auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "3-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
     std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
@@ -307,7 +307,7 @@ int varint_test()
     const auto decode_start = std::chrono::high_resolution_clock::now();
     std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      decode_it = vc::four_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
+      decode_it = ++vc::four_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
     auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "4-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
     std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
@@ -333,7 +333,7 @@ int varint_test()
     const auto decode_start = std::chrono::high_resolution_clock::now();
     std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      decode_it = vc::five_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
+      decode_it = ++vc::five_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
     auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "5-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
     std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
@@ -359,7 +359,7 @@ int varint_test()
     const auto decode_start = std::chrono::high_resolution_clock::now();
     std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      decode_it = vc::six_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
+      decode_it = ++vc::six_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
     auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "6-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
     std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
@@ -385,7 +385,7 @@ int varint_test()
     const auto decode_start = std::chrono::high_resolution_clock::now();
     std::istreambuf_iterator<char> decode_it(compressed_arr_istream);
     for (std::uint64_t i = 0; i < arr.size(); ++i)
-      decode_it = vc::seven_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
+      decode_it = ++vc::seven_bit_prefixed_varint::decode(decode_it, std::istreambuf_iterator<char>(), prefix_data, arr[i]);
     auto decode_elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - decode_start).count();
     std::cout << "7-bit prefixed: " << std::accumulate(arr.begin(), arr.end(), 0ULL) << std::endl;
     std::cout << "Decode elapsed time: " << decode_elapsed_time << "ms" << std::endl;
@@ -396,9 +396,91 @@ int varint_test()
   return 0;
 }
 
+void convert_file_test()
+{
+  {
+    std::ofstream ofs("sample_conversion.cvcf", std::ios::binary);
+
+    vc::vcf::block buff;
+    vc::vcf::reader input("sample_file.vcf");
+    vc::vcf::reader::input_iterator eof;
+    vc::vcf::reader::input_iterator cur(input, buff);
+
+    std::cout << "CHROM\tPOS\tREF\tALT\t";
+    for (auto it = input.samples_begin(); it != input.samples_end(); ++it)
+    {
+      std::cout << *it;
+      if (it + 1 < input.samples_end())
+        std::cout << "\t";
+    }
+    std::cout << std::endl;
+
+    std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
+    std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
+    vc::cvcf::writer compact_output(ofs, "22", 2, sample_ids.begin(), sample_ids.end());
+
+    while (cur != eof)
+    {
+      std::cout << vc::vcf::reader::get_chromosome(input, *cur) << "\t" << cur->pos() << "\t" << cur->ref() << "\t" << cur->alt() << "\t";
+      for (auto gt = cur->begin(); gt != cur->end(); )
+      {
+        if (*gt == vc::allele_status::has_ref)
+          std::cout << "0";
+        else if (*gt == vc::allele_status::has_alt)
+          std::cout << "1";
+        else
+          std::cout << ".";
+
+        ++gt;
+        if (gt != cur->end())
+          std::cout << "\t";
+      }
+
+      std::cout << std::endl;
+
+      compact_output << vc::cvcf::marker(cur->pos(), "", cur->ref(), cur->alt(), cur->begin(), cur->end());
+
+      ++cur;
+    }
+  }
+
+  {
+    std::cout << std::endl << std::endl;
+    std::ifstream ifs("sample_conversion.cvcf", std::ios::binary);
+    vc::cvcf::reader compact_input(ifs);
+    vc::cvcf::marker buff;
+    vc::cvcf::reader::input_iterator cur(compact_input, buff);
+    vc::cvcf::reader::input_iterator end;
+
+    while (cur != end)
+    {
+      std::cout << "22" << "\t" << cur->pos() << "\t" << cur->ref() << "\t" << cur->alt() << "\t";
+
+      for (auto gt = cur->begin(); gt != cur->end(); )
+      {
+        if (*gt == vc::allele_status::has_ref)
+          std::cout << "0";
+        else if (*gt == vc::allele_status::has_alt)
+          std::cout << "1";
+        else
+          std::cout << ".";
+
+        ++gt;
+        if (gt != cur->end())
+          std::cout << "\t";
+      }
+
+      std::cout << std::endl;
+
+      ++cur;
+    }
+  }
+
+}
 
 int main(int argc, char** argv)
 {
+  convert_file_test();
   varint_test();
 
   return 0;

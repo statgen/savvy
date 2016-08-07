@@ -6,6 +6,7 @@
 #include <iterator>
 #include <string>
 #include <vector>
+#include <vcf.h>
 
 
 //namespace vc
@@ -13,6 +14,7 @@
 //namespace vcf
 //{
 #include "vcf.h"
+#include "cvcf_reader.hpp"
 //}
 //}
 
@@ -35,6 +37,12 @@ namespace vc
         typedef std::bidirectional_iterator_tag iterator_category;
       public:
         const_iterator(const marker& parent, std::uint64_t index) : parent_(&parent), cur_(index) {}
+
+        self_type& operator+=(difference_type n) { cur_ += n; return *this; }
+        self_type& operator-=(difference_type n) { cur_ -= n; return *this; }
+        self_type operator-(difference_type n) const { self_type ret(*this); return (ret -= n); }
+        difference_type operator-(const self_type& b) const { return cur_ - b.cur_; }
+
         self_type& operator--(){ --cur_; return *this; }
         self_type operator--(int) { self_type r = *this; --cur_; return r; }
         self_type& operator++(){ ++cur_; return *this; }
@@ -48,17 +56,22 @@ namespace vc
         std::size_t cur_;
       };
 
-      marker(int* gt, int num_gt, std::uint16_t allele_index);
+      marker(bcf1_t* hts_rec, int* gt, int num_gt, std::uint16_t allele_index);
       ~marker();
 
       const allele_status& operator[](std::size_t i) const;
       std::uint64_t haplotype_count() const { return static_cast<std::uint64_t>(num_gt_); }
+      std::int32_t chrom_id() const;
+      std::uint64_t pos() const;
+      std::string ref() const;
+      std::string alt() const;
       const_iterator begin() const { return const_iterator(*this, 0); }
       const_iterator end() const { return const_iterator(*this, haplotype_count()); }
     private:
+      bcf1_t* hts_rec_;
       int* gt_;
       int num_gt_;
-      const std::uint32_t allele_index_;
+      std::uint32_t allele_index_;
 
       static const allele_status const_is_missing;
       static const allele_status const_has_ref;
@@ -92,6 +105,10 @@ namespace vc
       };
 
       block();
+      block(const block& source) = delete;
+      block(block&& source);
+      block& operator=(const block& source) = delete;
+      block& operator=(block&& source);
       ~block();
 
       const_iterator begin() const { return const_iterator(this->markers_.data()); }
@@ -99,13 +116,12 @@ namespace vc
       const marker& operator[](std::size_t i) const;
       std::size_t marker_count() const { return markers_.size(); }
       int sample_count() const { return num_samples_; }
-      int ploidy() const { return num_gt_ / num_samples_; }
+      int ploidy() const { return gt_sz_ / num_samples_; }
 
       static bool read_block(block& destination, htsFile* hts_file_, bcf_hdr_t* hts_hdr_);
     private:
       std::vector<marker> markers_;
       bcf1_t* hts_rec_;
-      int num_gt_;
       int* gt_;
       int gt_sz_;
       int num_samples_;
@@ -132,9 +148,8 @@ namespace vc
         }
         void increment()
         {
-          if (i_ < buffer_->marker_count())
-            ++i_;
-          else
+          ++i_;
+          if (i_ >= buffer_->marker_count())
           {
             i_ = 0;
             if (!file_reader_->read_next_block(*buffer_))
@@ -156,11 +171,26 @@ namespace vc
       reader(const std::string& file_path);
       ~reader();
       bool read_next_block(block& destination);
+      char** samples_begin() const;
+      char** samples_end() const;
+      static std::string get_chromosome(const reader& rdr, const marker& mkr);
     private:
       htsFile* hts_file_;
       bcf_hdr_t* hts_hdr_;
     };
   }
+}
+
+inline vc::vcf::marker::const_iterator operator+(const vc::vcf::marker::const_iterator& a, vc::vcf::marker::const_iterator::difference_type n)
+{
+  vc::vcf::marker::const_iterator ret(a);
+  return (ret += n);
+}
+
+inline vc::vcf::marker::const_iterator operator+(vc::vcf::marker::const_iterator::difference_type n, const vc::vcf::marker::const_iterator& a)
+{
+  vc::vcf::marker::const_iterator ret(a);
+  return (ret += n);
 }
 
 #endif //LIBVC_VCF_READER_HPP

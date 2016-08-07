@@ -41,23 +41,26 @@ namespace vc
     template <typename InputIt>
     static InputIt decode(InputIt input_it, const InputIt end_it, std::uint8_t& prefix_data, std::uint64_t& output)
     {
-      std::uint8_t current_byte = static_cast<std::uint8_t>(*input_it);
-      ++input_it;
-      prefix_data = (std::uint8_t)(current_byte & PrefixMask);
       output = 0;
-      output |= (current_byte & first_byte_integer_value_mask);
-
-      if (current_byte & ContinueFlagForFirstByte)
+      if (input_it != end_it)
       {
-        std::uint8_t bits_to_shift = initial_bits_to_shift;
-        while (input_it != end_it)
+        std::uint8_t current_byte = static_cast<std::uint8_t>(*input_it);
+        prefix_data = (std::uint8_t)(current_byte & PrefixMask);
+        output |= (current_byte & first_byte_integer_value_mask);
+
+        if (current_byte & ContinueFlagForFirstByte)
         {
-          current_byte = static_cast<std::uint8_t>(*input_it);
           ++input_it;
-          output |= (std::uint64_t) (current_byte & 0x7F) << bits_to_shift;
-          if ((current_byte & 0x80) == 0)
-            break;
-          bits_to_shift += 7;
+          std::uint8_t bits_to_shift = initial_bits_to_shift;
+          while (input_it != end_it)
+          {
+            current_byte = static_cast<std::uint8_t>(*input_it);
+            output |= (std::uint64_t) (current_byte & 0x7F) << bits_to_shift;
+            if ((current_byte & 0x80) == 0)
+              break;
+            ++input_it;
+            bits_to_shift += 7;
+          }
         }
       }
 
@@ -109,10 +112,10 @@ namespace vc
     while (input_it != end_it)
     {
       current_byte = static_cast<std::uint8_t>(*input_it);
-      ++input_it;
       output |= (std::uint64_t) (current_byte & 0x7F) << bits_to_shift;
       if ((current_byte & 0x80) == 0)
         break;
+      ++input_it;
       bits_to_shift += 7;
     }
 
