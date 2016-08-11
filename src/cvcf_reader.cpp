@@ -61,9 +61,9 @@ namespace vc
         if (in_it != end_it)
         {
           ++in_it;
-          destination.id_.resize(sz);
-          if (destination.id_.size())
-            is.read(&destination.id_[0], destination.id_.size());
+          destination.ref_.resize(sz);
+          if (destination.ref_.size())
+            is.read(&destination.ref_[0], destination.ref_.size());
 
           if (is.good())
           {
@@ -71,36 +71,24 @@ namespace vc
             if (in_it != end_it)
             {
               ++in_it;
-              destination.ref_.resize(sz);
-              if (destination.ref_.size())
-                is.read(&destination.ref_[0], destination.ref_.size());
+              destination.alt_.resize(sz);
+              if (destination.alt_.size())
+                is.read(&destination.alt_[0], destination.alt_.size());
 
               if (is.good())
               {
                 varint_decode(in_it, end_it, sz);
-                if (in_it != end_it)
+
+                destination.non_zero_haplotypes_.resize(sz);
+                std::uint64_t total_offset = 0;
+                for (auto it = destination.non_zero_haplotypes_.begin(); it != destination.non_zero_haplotypes_.end() && in_it != end_it; ++it,++total_offset)
                 {
-                  ++in_it;
-                  destination.alt_.resize(sz);
-                  if (destination.alt_.size())
-                    is.read(&destination.alt_[0], destination.alt_.size());
-
-                  if (is.good())
-                  {
-                    varint_decode(in_it, end_it, sz);
-
-                    destination.non_zero_haplotypes_.resize(sz);
-                    std::uint64_t total_offset = 0;
-                    for (auto it = destination.non_zero_haplotypes_.begin(); it != destination.non_zero_haplotypes_.end() && in_it != end_it; ++it,++total_offset)
-                    {
-                      std::uint8_t allele;
-                      std::uint64_t offset;
-                      one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
-                      total_offset += offset;
-                      it->offset = total_offset;
-                      it->status = (allele ? allele_status::has_alt : allele_status::is_missing);
-                    }
-                  }
+                  std::uint8_t allele;
+                  std::uint64_t offset;
+                  one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
+                  total_offset += offset;
+                  it->offset = total_offset;
+                  it->status = (allele ? allele_status::has_alt : allele_status::is_missing);
                 }
               }
             }
@@ -115,10 +103,6 @@ namespace vc
     {
       std::ostreambuf_iterator<char> os_it(os);
       varint_encode(source.position_, os_it);
-
-      varint_encode(source.id_.size(), os_it);
-      if (source.id_.size())
-        os.write(&source.id_[0], source.id_.size());
 
       varint_encode(source.ref_.size(), os_it);
       if (source.ref_.size())
@@ -150,32 +134,51 @@ namespace vc
       std::uint64_t sample_size;
       std::istreambuf_iterator<char> in_it(input_stream_);
       std::istreambuf_iterator<char> end;
-      in_it = ++varint_decode(in_it, end, sample_size);
-      sample_ids_.reserve(sample_size);
-      while (sample_size)
+
+      varint_decode(in_it, end, sample_size);
+      if (in_it != end)
       {
-        std::uint64_t id_sz;
-        in_it = ++varint_decode(in_it, end, id_sz);
-        sample_ids_.emplace_back();
-        if (id_sz)
+        ++in_it;
+        sample_ids_.reserve(sample_size);
+        while (sample_size)
         {
-          sample_ids_.back().resize(id_sz);
-          input_stream_.read(&sample_ids_.back()[0], id_sz);
+          std::uint64_t id_sz;
+          varint_decode(in_it, end, id_sz);
+          if (in_it == end)
+            break;
+          else
+          {
+            ++in_it;
+            sample_ids_.emplace_back();
+            if (id_sz)
+            {
+              sample_ids_.back().resize(id_sz);
+              input_stream_.read(&sample_ids_.back()[0], id_sz);
+            }
+            --sample_size;
+          }
         }
-        --sample_size;
+
+        if (in_it != end)
+        {
+          std::uint64_t sz;
+          varint_decode(in_it, end, sz);
+          if (in_it != end)
+          {
+            ++in_it;
+            if (sz)
+            {
+              chromosome_.resize(sz);
+              input_stream_.read(&chromosome_[0], sz);
+            }
+
+            varint_decode(in_it, end, sz);
+            assert(sz < 256);
+            ploidy_level_ = static_cast<std::uint8_t>(sz);
+          }
+        }
       }
 
-      std::uint64_t sz;
-      in_it = ++varint_decode(in_it, end, sz);
-      if (sz)
-      {
-        chromosome_.resize(sz);
-        input_stream_.read(&chromosome_[0], sz);
-      }
-
-      varint_decode(in_it, end, sz);
-      assert(sz < 256);
-      ploidy_level_ = static_cast<std::uint8_t>(sz);
       input_stream_.get();
     }
 
