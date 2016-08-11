@@ -409,7 +409,7 @@ void convert_file_test()
     std::cout << "CHROM\tPOS\tREF\tALT\t";
     for (auto it = input.samples_begin(); it != input.samples_end(); ++it)
     {
-      std::cout << *it;
+      std::cout << *it << "_1" << "\t" << *it << "_2";
       if (it + 1 < input.samples_end())
         std::cout << "\t";
     }
@@ -438,7 +438,7 @@ void convert_file_test()
 
       std::cout << std::endl;
 
-      compact_output << vc::cvcf::marker(cur->pos(), "", cur->ref(), cur->alt(), cur->begin(), cur->end());
+      compact_output << vc::cvcf::marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
 
       ++cur;
     }

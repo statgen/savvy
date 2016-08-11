@@ -52,45 +52,37 @@ namespace vc
       destination.haplotype_count_ = haplotype_count;
       std::istreambuf_iterator<char> in_it(is);
       std::istreambuf_iterator<char> end_it;
-      varint_decode(in_it, end_it, destination.position_);
-      if (in_it != end_it)
+
+      if (varint_decode(in_it, end_it, destination.position_) != end_it)
       {
         ++in_it;
         std::uint64_t sz;
-        varint_decode(in_it, end_it, sz);
-        if (in_it != end_it)
+        if (varint_decode(in_it, end_it, sz) != end_it)
         {
           ++in_it;
           destination.ref_.resize(sz);
           if (destination.ref_.size())
             is.read(&destination.ref_[0], destination.ref_.size());
 
-          if (is.good())
+          if (varint_decode(in_it, end_it, sz) != end_it)
           {
+            ++in_it;
+            destination.alt_.resize(sz);
+            if (destination.alt_.size())
+              is.read(&destination.alt_[0], destination.alt_.size());
+
             varint_decode(in_it, end_it, sz);
-            if (in_it != end_it)
+
+            destination.non_zero_haplotypes_.resize(sz);
+            std::uint64_t total_offset = 0;
+            for (auto it = destination.non_zero_haplotypes_.begin(); it != destination.non_zero_haplotypes_.end() && in_it != end_it; ++it,++total_offset)
             {
-              ++in_it;
-              destination.alt_.resize(sz);
-              if (destination.alt_.size())
-                is.read(&destination.alt_[0], destination.alt_.size());
-
-              if (is.good())
-              {
-                varint_decode(in_it, end_it, sz);
-
-                destination.non_zero_haplotypes_.resize(sz);
-                std::uint64_t total_offset = 0;
-                for (auto it = destination.non_zero_haplotypes_.begin(); it != destination.non_zero_haplotypes_.end() && in_it != end_it; ++it,++total_offset)
-                {
-                  std::uint8_t allele;
-                  std::uint64_t offset;
-                  one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
-                  total_offset += offset;
-                  it->offset = total_offset;
-                  it->status = (allele ? allele_status::has_alt : allele_status::is_missing);
-                }
-              }
+              std::uint8_t allele;
+              std::uint64_t offset;
+              one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
+              total_offset += offset;
+              it->offset = total_offset;
+              it->status = (allele ? allele_status::has_alt : allele_status::is_missing);
             }
           }
         }
@@ -135,19 +127,14 @@ namespace vc
       std::istreambuf_iterator<char> in_it(input_stream_);
       std::istreambuf_iterator<char> end;
 
-      varint_decode(in_it, end, sample_size);
-      if (in_it != end)
+      if (varint_decode(in_it, end, sample_size) != end)
       {
         ++in_it;
         sample_ids_.reserve(sample_size);
-        while (sample_size)
+
+        std::uint64_t id_sz;
+        while (sample_size && varint_decode(in_it, end, id_sz) != end)
         {
-          std::uint64_t id_sz;
-          varint_decode(in_it, end, id_sz);
-          if (in_it == end)
-            break;
-          else
-          {
             ++in_it;
             sample_ids_.emplace_back();
             if (id_sz)
@@ -156,14 +143,12 @@ namespace vc
               input_stream_.read(&sample_ids_.back()[0], id_sz);
             }
             --sample_size;
-          }
         }
 
-        if (in_it != end)
+        if (sample_size == 0)
         {
           std::uint64_t sz;
-          varint_decode(in_it, end, sz);
-          if (in_it != end)
+          if (varint_decode(in_it, end, sz) != end)
           {
             ++in_it;
             if (sz)
