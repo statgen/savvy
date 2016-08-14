@@ -45,7 +45,11 @@ namespace vc
 
       marker(block& parent, std::uint32_t offset, const std::string& chromosome, std::uint64_t position, const std::string& ref, const std::string& alt);
       const allele_status& operator[](std::size_t i) const;
+      const allele_status& at(std::size_t i) const;
       std::uint64_t haplotype_count() const;
+      std::uint64_t pos() const;
+      std::string ref() const;
+      std::string alt() const;
       const_iterator begin() const { return const_iterator(*this, 0); }
       const_iterator end() const { return const_iterator(*this, haplotype_count()); }
 
@@ -110,8 +114,9 @@ namespace vc
       std::size_t marker_count() const { return markers_.size(); }
       std::uint8_t ploidy_level() const { return ploidy_level_; }
       const marker& operator[](std::size_t i) const;
-      static bool read_block(block& destination, std::istream& source) { return false; } // TODO: impl
-      static bool write_block(std::ostream& destination, block& source);
+      const marker& at(std::size_t i) const;
+      static bool read(block& destination, std::istream& source, std::uint64_t sample_count, std::uint8_t ploidy);
+      static bool write(std::ostream& destination, const block& source);
 
 
       template <typename RandAccessAlleleStatusIt>
@@ -179,8 +184,55 @@ namespace vc
     private:
       const std::string file_path_;
       std::istream& input_stream_;
+      std::uint8_t ploidy_level_;
+      std::vector<std::string> sample_ids_;
     };
 
+    class writer
+    {
+    public:
+      template <typename RandAccessStringIterator>
+      writer(std::ostream& output_stream, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end) :
+        output_stream_(output_stream),
+        sample_size_(samples_end - samples_beg),
+        ploidy_level_(ploidy)
+      {
+        std::string version_string("m3vcf\x00\x01\x00\x00", 9);
+        output_stream_.write(version_string.data(), version_string.size());
+
+        std::uint8_t str_sz = std::uint8_t(0xFF & chromosome.size());
+        output_stream_.put(str_sz);
+        output_stream_.write(chromosome.data(), str_sz);
+
+        output_stream_.put(ploidy_level_);
+
+        std::uint64_t sample_size_nbo = htonll(sample_size_);
+        output_stream_.write((char*)(&sample_size_nbo), 8);
+        for (auto it = samples_beg; it != samples_end; ++it)
+        {
+          std::uint8_t sz = std::uint8_t(0xFF & it->size());
+          output_stream_.put(sz);
+          output_stream_.write(it->data(), sz);
+        }
+      }
+
+      writer& operator<<(const block& b)
+      {
+        if (output_stream_.good())
+        {
+          if (b.haplotype_count() != sample_size_ * ploidy_level_)
+            output_stream_.setstate(std::ios::failbit);
+          else
+            block::write(output_stream_, b);
+        }
+        return *this;
+      }
+
+    private:
+      std::ostream& output_stream_;
+      std::uint64_t sample_size_;
+      std::uint8_t ploidy_level_;
+    };
 
     template <typename RandAccessAlleleStatusIt>
     bool block::add_marker(std::uint64_t position, const std::string& ref, const std::string& alt, RandAccessAlleleStatusIt hap_array_beg, RandAccessAlleleStatusIt hap_array_end)
