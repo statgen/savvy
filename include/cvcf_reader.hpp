@@ -92,6 +92,8 @@ namespace vc
       const std::string& ref() const { return ref_; }
       const std::string& alt() const { return alt_; }
       std::uint64_t haplotype_count() const { return haplotype_count_; }
+      const allele_status& operator[](std::uint64_t i) const;
+      const allele_status& at(std::uint64_t i) const;
       non_ref_iterator non_ref_begin() const;
       non_ref_iterator non_ref_end() const;
       const_iterator begin() const;

@@ -1,6 +1,7 @@
 #include "cvcf_reader.hpp"
 
 #include <assert.h>
+#include <algorithm>
 
 
 namespace vc
@@ -11,6 +12,29 @@ namespace vc
     const marker::const_iterator::value_type marker::const_iterator::const_is_missing = allele_status::is_missing;
     const marker::const_iterator::value_type marker::const_iterator::const_has_ref = allele_status::has_ref;
     const marker::const_iterator::value_type marker::const_iterator::const_has_alt = allele_status::has_alt;
+
+    const allele_status const_is_missing = allele_status::is_missing;
+    const allele_status const_has_ref = allele_status::has_ref;
+    const allele_status const_has_alt = allele_status::has_alt;
+
+    const allele_status& marker::operator[](std::uint64_t i) const
+    {
+      auto end = non_zero_haplotypes_.end();
+      sparse_vector_allele val;
+      val.offset = i;
+      auto it = std::lower_bound(non_zero_haplotypes_.begin(), end, val, [](const sparse_vector_allele& a, const sparse_vector_allele& b) { return a.offset < b.offset; });
+      if (it == end || it->offset != i)
+        return const_has_ref;
+      else
+        return it->status;
+    }
+
+    const allele_status& marker::at(std::uint64_t i) const
+    {
+      if (i >= non_zero_haplotypes_.size())
+        throw std::out_of_range("index out of range");
+      return (*this)[i];
+    }
 
     marker::non_ref_iterator marker::non_ref_begin() const
     {
