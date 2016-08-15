@@ -155,6 +155,7 @@ namespace vc
       bool good() const { return input_stream_.good(); }
       bool fail() const { return input_stream_.fail(); }
       bool bad() const { return input_stream_.bad(); }
+      std::uint64_t sample_count() const { return this->sample_ids_.size(); }
     private:
       std::vector<std::string> sample_ids_;
       std::string chromosome_;
