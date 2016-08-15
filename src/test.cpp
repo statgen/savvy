@@ -399,88 +399,97 @@ int varint_test()
 void convert_file_test()
 {
   {
-    std::ofstream ofs("sample_conversion.cvcf", std::ios::binary);
+    std::ofstream ofs("chr1.m3vcf", std::ios::binary);
 
     vc::vcf::block buff;
-    vc::vcf::reader input("sample_file.vcf");
+    vc::vcf::reader input("chr1.bcf");
     vc::vcf::reader::input_iterator eof;
     vc::vcf::reader::input_iterator cur(input, buff);
 
-    std::cout << "CHROM\tPOS\tREF\tALT\t";
-    for (auto it = input.samples_begin(); it != input.samples_end(); ++it)
-    {
-      std::cout << *it;
-      if (it + 1 < input.samples_end())
-        std::cout << "\t";
-    }
-    std::cout << std::endl;
+//    std::cout << "CHROM\tPOS\tREF\tALT\t";
+//    for (auto it = input.samples_begin(); it != input.samples_end(); ++it)
+//    {
+//      std::cout << *it << "_1" << "\t" << *it << "_2";
+//      if (it + 1 < input.samples_end())
+//        std::cout << "\t";
+//    }
+//    std::cout << std::endl;
 
     std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
     std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-    vc::cvcf::writer compact_output(ofs, "22", 2, sample_ids.begin(), sample_ids.end());
+    vc::m3vcf::writer compact_output(ofs, "1", 2, sample_ids.begin(), sample_ids.end());
 
+    vc::m3vcf::block output_block(sample_ids.size(), 2);
     while (cur != eof)
     {
-      std::cout << vc::vcf::reader::get_chromosome(input, *cur) << "\t" << cur->pos() << "\t" << cur->ref() << "\t" << cur->alt() << "\t";
-      for (auto gt = cur->begin(); gt != cur->end(); )
+//      std::cout << vc::vcf::reader::get_chromosome(input, *cur) << "\t" << cur->pos() << "\t" << cur->ref() << "\t" << cur->alt() << "\t";
+//      for (auto gt = cur->begin(); gt != cur->end(); )
+//      {
+//        if (*gt == vc::allele_status::has_ref)
+//          std::cout << "0";
+//        else if (*gt == vc::allele_status::has_alt)
+//          std::cout << "1";
+//        else
+//          std::cout << ".";
+//
+//        ++gt;
+//        if (gt != cur->end())
+//          std::cout << "\t";
+//      }
+//
+//      std::cout << std::endl;
+
+      if (!output_block.add_marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end()))
       {
-        if (*gt == vc::allele_status::has_ref)
-          std::cout << "0";
-        else if (*gt == vc::allele_status::has_alt)
-          std::cout << "1";
-        else
-          std::cout << ".";
-
-        ++gt;
-        if (gt != cur->end())
-          std::cout << "\t";
+        compact_output << output_block;
+        output_block = vc::m3vcf::block(sample_ids.size(), 2);
+        output_block.add_marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
       }
-
-      std::cout << std::endl;
-
-      compact_output << vc::cvcf::marker(cur->pos(), "", cur->ref(), cur->alt(), cur->begin(), cur->end());
 
       ++cur;
     }
+    if (output_block.marker_count())
+      compact_output << output_block;
   }
 
-  {
-    std::cout << std::endl << std::endl;
-    std::ifstream ifs("sample_conversion.cvcf", std::ios::binary);
-    vc::cvcf::reader compact_input(ifs);
-    vc::cvcf::marker buff;
-    vc::cvcf::reader::input_iterator cur(compact_input, buff);
-    vc::cvcf::reader::input_iterator end;
-
-    while (cur != end)
-    {
-      std::cout << "22" << "\t" << cur->pos() << "\t" << cur->ref() << "\t" << cur->alt() << "\t";
-
-      for (auto gt = cur->begin(); gt != cur->end(); )
-      {
-        if (*gt == vc::allele_status::has_ref)
-          std::cout << "0";
-        else if (*gt == vc::allele_status::has_alt)
-          std::cout << "1";
-        else
-          std::cout << ".";
-
-        ++gt;
-        if (gt != cur->end())
-          std::cout << "\t";
-      }
-
-      std::cout << std::endl;
-
-      ++cur;
-    }
-  }
+//  {
+//    std::cout << std::endl << std::endl;
+//    std::ifstream ifs("sample_conversion.m3vcf", std::ios::binary);
+//    vc::m3vcf::reader compact_input(ifs);
+//    vc::m3vcf::block buff;
+//    vc::m3vcf::reader::input_iterator cur(compact_input, buff);
+//    vc::m3vcf::reader::input_iterator end;
+//
+//    while (cur != end)
+//    {
+//      std::cout << "22" << "\t" << cur->pos() << "\t" << cur->ref() << "\t" << cur->alt() << "\t";
+//
+//      for (auto gt = cur->begin(); gt != cur->end(); )
+//      {
+//        if (*gt == vc::allele_status::has_ref)
+//          std::cout << "0";
+//        else if (*gt == vc::allele_status::has_alt)
+//          std::cout << "1";
+//        else
+//          std::cout << ".";
+//
+//        ++gt;
+//        if (gt != cur->end())
+//          std::cout << "\t";
+//      }
+//
+//      std::cout << std::endl;
+//
+//      ++cur;
+//    }
+//  }
 
 }
 
 int main(int argc, char** argv)
 {
   convert_file_test();
+  return 0;
   varint_test();
 
   return 0;

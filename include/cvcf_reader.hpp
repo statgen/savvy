@@ -68,9 +68,8 @@ namespace vc
 
       marker() = default;
       template <typename RandAccessAlleleIterator>
-      marker(std::uint64_t position, const std::string& id, const std::string& ref, const std::string& alt, RandAccessAlleleIterator gt_beg, RandAccessAlleleIterator gt_end) :
+      marker(std::uint64_t position, const std::string& ref, const std::string& alt, RandAccessAlleleIterator gt_beg, RandAccessAlleleIterator gt_end) :
         position_(position),
-        id_(id),
         ref_(ref),
         alt_(alt)
       {
@@ -90,10 +89,11 @@ namespace vc
       }
 
       std::uint64_t pos() const { return position_; }
-      const std::string& id() const { return id_; }
       const std::string& ref() const { return ref_; }
       const std::string& alt() const { return alt_; }
       std::uint64_t haplotype_count() const { return haplotype_count_; }
+      const allele_status& operator[](std::uint64_t i) const;
+      const allele_status& at(std::uint64_t i) const;
       non_ref_iterator non_ref_begin() const;
       non_ref_iterator non_ref_end() const;
       const_iterator begin() const;
@@ -105,7 +105,6 @@ namespace vc
       std::vector<sparse_vector_allele> non_zero_haplotypes_;
       std::string ref_;
       std::string alt_;
-      std::string id_;
       std::uint64_t position_;
       std::uint64_t haplotype_count_;
     };

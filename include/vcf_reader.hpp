@@ -6,7 +6,6 @@
 #include <iterator>
 #include <string>
 #include <vector>
-#include <vcf.h>
 
 
 //namespace vc
@@ -14,7 +13,6 @@
 //namespace vcf
 //{
 #include "vcf.h"
-#include "cvcf_reader.hpp"
 //}
 //}
 
@@ -39,6 +37,7 @@ namespace vc
         const_iterator(const marker& parent, std::uint64_t index) : parent_(&parent), cur_(index) {}
 
         self_type& operator+=(difference_type n) { cur_ += n; return *this; }
+        self_type operator+(vc::vcf::marker::const_iterator::difference_type n) const { vc::vcf::marker::const_iterator ret(*this); return (ret += n); }
         self_type& operator-=(difference_type n) { cur_ -= n; return *this; }
         self_type operator-(difference_type n) const { self_type ret(*this); return (ret -= n); }
         difference_type operator-(const self_type& b) const { return cur_ - b.cur_; }
@@ -181,16 +180,9 @@ namespace vc
   }
 }
 
-inline vc::vcf::marker::const_iterator operator+(const vc::vcf::marker::const_iterator& a, vc::vcf::marker::const_iterator::difference_type n)
-{
-  vc::vcf::marker::const_iterator ret(a);
-  return (ret += n);
-}
-
-inline vc::vcf::marker::const_iterator operator+(vc::vcf::marker::const_iterator::difference_type n, const vc::vcf::marker::const_iterator& a)
-{
-  vc::vcf::marker::const_iterator ret(a);
-  return (ret += n);
-}
+// unqualified lookup error:
+// 'operator+' should be declared prior to the call site or in namespace
+//inline vc::vcf::marker::const_iterator operator+(const vc::vcf::marker::const_iterator& a, vc::vcf::marker::const_iterator::difference_type n);
+//inline vc::vcf::marker::const_iterator operator+(vc::vcf::marker::const_iterator::difference_type n, const vc::vcf::marker::const_iterator& a);
 
 #endif //LIBVC_VCF_READER_HPP

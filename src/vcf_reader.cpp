@@ -114,7 +114,7 @@ namespace vc
       destination = block();
       if (bcf_read(hts_file, hts_hdr, destination.hts_rec_) >= 0)
       {
-        bcf_unpack(destination.hts_rec_, BCF_UN_ALL);
+        bcf_unpack(destination.hts_rec_, BCF_UN_ALL); //BCF_UN_STR | BCF_UN_FMT);
         bcf_get_genotypes(hts_hdr, destination.hts_rec_, &(destination.gt_), &(destination.gt_sz_));
         destination.num_samples_ = hts_hdr->n[BCF_DT_SAMPLE];
         if (destination.gt_sz_ % destination.num_samples_ != 0)
@@ -140,7 +140,7 @@ namespace vc
     {
       if (hts_file_)
       {
-        hts_hdr_ = vcf_hdr_read(hts_file_);
+        hts_hdr_ = bcf_hdr_read(hts_file_);
       }
     }
 
@@ -181,3 +181,9 @@ namespace vc
     }
   }
 }
+
+//vc::vcf::marker::const_iterator operator+(vc::vcf::marker::const_iterator::difference_type n, const vc::vcf::marker::const_iterator& a)
+//{
+//  vc::vcf::marker::const_iterator ret(a);
+//  return (ret += n);
+//}
