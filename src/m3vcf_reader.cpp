@@ -129,8 +129,7 @@ namespace vc
 
     bool block::read(block& destination, std::istream& source, std::uint64_t sample_count, std::uint8_t ploidy)
     {
-      bool ret = true;
-
+      destination = block();
       std::uint32_t row_length = 0;
       std::uint32_t column_length = 0;
       source.read((char*)&row_length, sizeof(row_length));
@@ -151,6 +150,7 @@ namespace vc
       destination.ploidy_level_ = ploidy;
 
       std::vector<char> buff(destination.haplotype_count() * byte_width_needed);
+      destination.sample_mappings_.resize(buff.size(), 0xFFFFFFFF);
       source.read(buff.data(), buff.size());
       switch (byte_width_needed)
       {
@@ -221,17 +221,16 @@ namespace vc
           source.read(&alt[0], sz);
         }
 
-        destination.markers_.emplace_back(destination, i, "[CHROM]", pos, ref, alt);
+        destination.markers_.emplace_back(destination, i, "[CHROM]", ntohll(pos), ref, alt);
 
         source.read(&(destination.unique_haplotype_matrix_[i * column_length]), column_length);
       }
 
-      return ret;
+      return source.good();
     }
 
     bool block::write(std::ostream& destination, const block& source)
     {
-      bool ret = true;
 
       std::uint32_t row_length;
       std::uint32_t column_length;
@@ -299,7 +298,7 @@ namespace vc
       }
 
 
-      return ret;
+      return destination.good();
     }
     //================================================================//
 

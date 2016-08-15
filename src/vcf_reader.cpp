@@ -181,3 +181,9 @@ namespace vc
     }
   }
 }
+
+//vc::vcf::marker::const_iterator operator+(vc::vcf::marker::const_iterator::difference_type n, const vc::vcf::marker::const_iterator& a)
+//{
+//  vc::vcf::marker::const_iterator ret(a);
+//  return (ret += n);
+//}

@@ -99,6 +99,12 @@ namespace vc
         pointer ptr_;
       };
 
+      block() = default;
+      block(std::uint64_t sample_size, std::uint8_t ploidy) :
+        sample_size_(sample_size),
+        unique_haplotype_cnt_(0),
+        ploidy_level_(ploidy)
+      {}
       const allele_status& sample_haplotype_at(std::uint32_t marker_offset, std::uint64_t haplotype_offset);
       std::uint32_t sample_mapping_at(std::uint64_t haplotype_offset) { return sample_mappings_[haplotype_offset]; }
       const allele_status& unique_haplotype_at(std::uint32_t marker_offset, std::uint64_t unique_haplotype_offset);
@@ -158,9 +164,8 @@ namespace vc
         }
         void increment()
         {
-          if (i_ < buffer_->marker_count())
-            ++i_;
-          else
+          ++i_;
+          if (i_ >= buffer_->marker_count())
           {
             i_ = 0;
             if (!file_reader_->read_next_block(*buffer_))
@@ -240,6 +245,8 @@ namespace vc
       bool ret = false;
 
       std::size_t hap_array_sz = hap_array_end - hap_array_beg;
+      if (markers_.size() == 0)
+        sample_mappings_.resize(hap_array_sz, 0xFFFFFFFF);
       if (hap_array_sz == sample_mappings_.size())
       {
         std::int64_t current_savings = static_cast<std::int64_t>(hap_array_sz * markers_.size()) - static_cast<std::int64_t>(unique_haplotype_cnt_ * markers_.size() + hap_array_sz);
