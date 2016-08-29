@@ -107,6 +107,10 @@ namespace vc
       std::string alt_;
       std::uint64_t position_;
       std::uint64_t haplotype_count_;
+
+
+      std::size_t calculate_serialized_gt_size() const;
+      std::size_t calculate_rle_serialized_gt_size() const;
     };
 
     class reader

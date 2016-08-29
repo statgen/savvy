@@ -95,24 +95,114 @@ namespace vc
             if (destination.alt_.size())
               is.read(&destination.alt_[0], destination.alt_.size());
 
-            varint_decode(in_it, end_it, sz);
-
-            destination.non_zero_haplotypes_.resize(sz);
-            std::uint64_t total_offset = 0;
-            for (auto it = destination.non_zero_haplotypes_.begin(); it != destination.non_zero_haplotypes_.end() && in_it != end_it; ++it,++total_offset)
+            std::uint8_t rle = 0;
+            one_bit_prefixed_varint::decode(in_it, end_it, rle, sz);
+            if (rle)
             {
-              std::uint8_t allele;
-              std::uint64_t offset;
-              one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
-              total_offset += offset;
-              it->offset = total_offset;
-              it->status = (allele ? allele_status::has_alt : allele_status::is_missing);
+              std::vector<std::pair<sparse_vector_allele, std::uint64_t>> rle_non_zero_haplotypes(sz);
+              std::uint64_t total_repeat_bytes = 0;
+              for (auto it = rle_non_zero_haplotypes.begin(); it != rle_non_zero_haplotypes.end() && in_it != end_it; ++it)
+              {
+                std::uint8_t allele_repeat_prefix;
+                two_bit_prefixed_varint::decode(++in_it, end_it, allele_repeat_prefix, it->first.offset);
+                it->first.status = (allele_repeat_prefix & 0x80 ? allele_status::has_alt : allele_status::is_missing);
+
+                if (allele_repeat_prefix & 0x40 && in_it != end_it)
+                {
+                  // Read repeat byte.
+                  varint_decode(++in_it, end_it, it->second);
+                  total_repeat_bytes += it->second;
+                }
+                else
+                {
+                  it->second = 0;
+                }
+              }
+
+              std::uint64_t total_offset = 0;
+              destination.non_zero_haplotypes_.clear();
+              destination.non_zero_haplotypes_.reserve(sz + total_repeat_bytes);
+              for (auto it = rle_non_zero_haplotypes.begin(); it != rle_non_zero_haplotypes.end(); ++it,++total_offset)
+              {
+                total_offset += it->first.offset;
+                destination.non_zero_haplotypes_.emplace_back(it->first.status, total_offset);
+                while (it->second)
+                {
+                  total_offset += (it->first.offset + 1);
+                  destination.non_zero_haplotypes_.emplace_back(it->first.status, total_offset);
+                  --(it->second);
+                }
+              }
+            }
+            else
+            {
+              destination.non_zero_haplotypes_.resize(sz);
+
+              std::uint64_t total_offset = 0;
+              for (auto it = destination.non_zero_haplotypes_.begin(); it != destination.non_zero_haplotypes_.end() && in_it != end_it; ++it,++total_offset)
+              {
+                std::uint8_t allele;
+                std::uint64_t offset;
+                one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
+                total_offset += offset;
+                it->offset = total_offset;
+                it->status = (allele ? allele_status::has_alt : allele_status::is_missing);
+              }
             }
           }
         }
       }
 
       is.get();
+    }
+
+    std::size_t marker::calculate_serialized_gt_size() const
+    {
+      std::size_t ret = 0;
+
+      std::uint64_t last_pos = 0;
+      for (auto it = non_zero_haplotypes_.begin(); it != non_zero_haplotypes_.end(); ++it)
+      {
+        std::uint64_t offset = it->offset - last_pos;
+        last_pos = it->offset + 1;
+        ret += one_bit_prefixed_varint::encoded_byte_width(offset);
+      }
+
+      return ret;
+    }
+
+    std::size_t marker::calculate_rle_serialized_gt_size() const
+    {
+      std::size_t ret = 0;
+
+      std::uint64_t last_pos = 0;
+      for (auto it = non_zero_haplotypes_.begin(); it != non_zero_haplotypes_.end(); ++it)
+      {
+        std::uint64_t offset = it->offset - last_pos;
+        last_pos = it->offset + 1;
+
+        std::size_t number_of_repeats = 0;
+        while (it + 1 != non_zero_haplotypes_.end())
+        {
+          auto next_it = (it + 1);
+          if (offset != next_it->offset - last_pos || it->status != next_it->status)
+            break;
+
+          ++number_of_repeats;
+          ++it;
+          last_pos = it->offset + 1;
+        }
+
+        std::uint8_t allele_repeat_prefix = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
+        if (number_of_repeats)
+          allele_repeat_prefix |= 0x40;
+        ret += two_bit_prefixed_varint::encoded_byte_width(offset);
+
+        if (number_of_repeats)
+          ret += varint_encoded_byte_width(number_of_repeats);
+      }
+
+      return ret;
     }
 
     void marker::write(std::ostream& os, const marker& source)
@@ -128,14 +218,52 @@ namespace vc
       if (source.alt_.size())
         os.write(&source.alt_[0], source.alt_.size());
 
-      varint_encode(source.non_zero_haplotypes_.size(), os_it);
-      std::uint64_t last_pos= 0;
-      for (auto it = source.non_zero_haplotypes_.begin(); it != source.non_zero_haplotypes_.end(); ++it)
+
+      if (source.calculate_rle_serialized_gt_size() < source.calculate_serialized_gt_size())
       {
-        std::uint64_t offset = it->offset - last_pos;
-        last_pos = it->offset + 1;
-        std::uint8_t allele = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
-        one_bit_prefixed_varint::encode(allele, offset, os_it);
+        std::uint8_t rle = 0x80;
+        one_bit_prefixed_varint::encode(rle, source.non_zero_haplotypes_.size(), os_it);
+
+        std::uint64_t last_pos = 0;
+        for (auto it = source.non_zero_haplotypes_.begin(); it != source.non_zero_haplotypes_.end(); ++it)
+        {
+          std::uint64_t offset = it->offset - last_pos;
+          last_pos = it->offset + 1;
+
+          std::size_t number_of_repeats = 0;
+          while (it + 1 != source.non_zero_haplotypes_.end())
+          {
+            auto next_it = (it + 1);
+            if (offset != next_it->offset - last_pos || it->status != next_it->status)
+              break;
+
+            ++number_of_repeats;
+            ++it;
+            last_pos = it->offset + 1;
+          }
+
+          std::uint8_t allele_repeat_prefix = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
+          if (number_of_repeats)
+            allele_repeat_prefix |= 0x40;
+          two_bit_prefixed_varint::encode(allele_repeat_prefix, offset, os_it);
+
+          if (number_of_repeats)
+            varint_encode(number_of_repeats, os_it);
+        }
+      }
+      else
+      {
+        std::uint8_t rle = 0x00;
+        one_bit_prefixed_varint::encode(rle, source.non_zero_haplotypes_.size(), os_it);
+
+        std::uint64_t last_pos = 0;
+        for (auto it = source.non_zero_haplotypes_.begin(); it != source.non_zero_haplotypes_.end(); ++it)
+        {
+          std::uint64_t offset = it->offset - last_pos;
+          last_pos = it->offset + 1;
+          std::uint8_t allele = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
+          one_bit_prefixed_varint::encode(allele, offset, os_it);
+        }
       }
     }
     //================================================================//

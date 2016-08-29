@@ -38,6 +38,20 @@ namespace vc
       }
     }
 
+    static std::uint64_t encoded_byte_width(std::uint64_t input)
+    {
+      std::size_t ret = 1;
+
+      input >>= initial_bits_to_shift;
+      while (input)
+      {
+        ++ret;
+        input >>= 7;
+      }
+
+      return ret;
+    }
+
     template <typename InputIt>
     static InputIt decode(InputIt input_it, const InputIt end_it, std::uint8_t& prefix_data, std::uint64_t& output)
     {
@@ -99,6 +113,10 @@ namespace vc
       ++output_it;
     } while (input);
   }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  std::uint64_t varint_encoded_byte_width(std::uint64_t input);
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
