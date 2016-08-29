@@ -399,7 +399,7 @@ int varint_test()
 void convert_file_test()
 {
   {
-    std::ofstream ofs("chr1.m3vcf", std::ios::binary);
+    std::ofstream ofs("chr1.cvcf", std::ios::binary);
 
     vc::vcf::block buff;
     vc::vcf::reader input("chr1.bcf");
@@ -417,9 +417,9 @@ void convert_file_test()
 
     std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
     std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-    vc::m3vcf::writer compact_output(ofs, "1", 2, sample_ids.begin(), sample_ids.end());
+    vc::cvcf::writer compact_output(ofs, "1", 2, sample_ids.begin(), sample_ids.end());
 
-    vc::m3vcf::block output_block(sample_ids.size(), 2);
+
     while (cur != eof)
     {
 //      std::cout << vc::vcf::reader::get_chromosome(input, *cur) << "\t" << cur->pos() << "\t" << cur->ref() << "\t" << cur->alt() << "\t";
@@ -439,17 +439,10 @@ void convert_file_test()
 //
 //      std::cout << std::endl;
 
-      if (!output_block.add_marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end()))
-      {
-        compact_output << output_block;
-        output_block = vc::m3vcf::block(sample_ids.size(), 2);
-        output_block.add_marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
-      }
+      compact_output << vc::cvcf::marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
 
       ++cur;
     }
-    if (output_block.marker_count())
-      compact_output << output_block;
   }
 
 //  {
@@ -486,11 +479,94 @@ void convert_file_test()
 
 }
 
+template <typename Proc>
+class timed_procedure_call
+{
+public:
+  timed_procedure_call(Proc& procedure)
+  {
+    start_ = std::chrono::high_resolution_clock::now();
+    return_value_ = procedure();
+    end_ = std::chrono::high_resolution_clock::now();
+  }
+  bool return_value() const { return return_value_; }
+  template <typename Duration>
+  long long int elapsed_time()
+  {
+    return std::chrono::duration_cast<Duration>(end_ - start_).count();
+  }
+private:
+  bool return_value_;
+  std::chrono::high_resolution_clock::time_point start_;
+  std::chrono::high_resolution_clock::time_point end_;
+};
+
+template <typename Proc>
+timed_procedure_call<Proc> time_procedure(Proc& p)
+{
+  return timed_procedure_call<Proc>(p);
+}
+
+template <typename R1, typename R2>
+class file_checksum_test
+{
+public:
+  file_checksum_test(R1& reader1, R2& reader2) : reader1_(reader1), reader2_(reader2) {}
+  bool operator()() const
+  {
+    std::size_t checksum1 = get_checksum(reader1_);
+    std::size_t checksum2 = get_checksum(reader2_);
+
+    return checksum1 == checksum2;
+  }
+private:
+  template <typename ReaderType>
+  static std::size_t get_checksum(ReaderType reader)
+  {
+    std::size_t ret = 0;
+
+    typename ReaderType::input_iterator::buffer buff;
+    typename ReaderType::input_iterator cur(reader, buff);
+    typename ReaderType::input_iterator end;
+
+    while (cur != end)
+    {
+      ret = std::hash<std::uint64_t>()(cur->pos()) ^ ret;
+      ret = std::hash<std::string>()(cur->ref()) ^ ret;
+      ret = std::hash<std::string>()(cur->alt()) ^ ret;
+
+      for (auto gt = cur->begin(); gt != cur->end(); ++gt)
+        ret = std::hash<int>()(static_cast<int>(*gt)) ^ ret;
+
+      ++cur;
+    }
+
+    return ret;
+  }
+  R1 reader1_;
+  R2 reader2_;
+};
+
 int main(int argc, char** argv)
 {
-  convert_file_test();
-  return 0;
-  varint_test();
+//  {
+//    convert_file_test();
+//  }
+
+  {
+    vc::vcf::reader bcf_reader("chr1.bcf");
+
+    std::ifstream ifs("chr1.cvcf", std::ios::binary);
+    vc::cvcf::reader cvcf_reader(ifs);
+
+    file_checksum_test<vc::vcf::reader, vc::cvcf::reader> t(bcf_reader, cvcf_reader);
+
+    std::cout << "Starting checksum test ..." << std::endl;
+    auto timed_call = time_procedure(t);
+    std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
+    std::cout << "Elapsed Time: " << timed_call.elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
+  }
+
 
   return 0;
 }
