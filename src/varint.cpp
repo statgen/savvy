@@ -23,4 +23,19 @@ namespace vc
   template class prefixed_varint<0xFE,  0x1>;
   //----------------------------------------------------------------//
   //================================================================//
+
+
+  std::uint64_t varint_encoded_byte_width(std::uint64_t input)
+  {
+    std::size_t ret = 1;
+
+    input >>= 7;
+    while (input)
+    {
+      ++ret;
+      input >>= 7;
+    }
+
+    return ret;
+  }
 }
