@@ -168,6 +168,8 @@ namespace vc
       };
 
       reader(const std::string& file_path);
+      reader(const reader&) = delete;
+      reader& operator=(const reader&) = delete;
       ~reader();
       bool read_next_block(block& destination);
       char** samples_begin() const;

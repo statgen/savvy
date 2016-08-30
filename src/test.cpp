@@ -517,11 +517,20 @@ public:
     std::size_t checksum1 = get_checksum(reader1_);
     std::size_t checksum2 = get_checksum(reader2_);
 
+    std::cout << checksum1 << " " << checksum2 << std::endl;
+
     return checksum1 == checksum2;
   }
 private:
+  template <typename T>
+  static std::size_t hash_combine(std::size_t seed, const T& val)
+  {
+    seed ^= std::hash<T>()(val) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+    return seed;
+  }
+
   template <typename ReaderType>
-  static std::size_t get_checksum(ReaderType reader)
+  static std::size_t get_checksum(ReaderType& reader)
   {
     std::size_t ret = 0;
 
@@ -536,15 +545,15 @@ private:
       ret = std::hash<std::string>()(cur->alt()) ^ ret;
 
       for (auto gt = cur->begin(); gt != cur->end(); ++gt)
-        ret = std::hash<int>()(static_cast<int>(*gt)) ^ ret;
+        ret = hash_combine(ret, static_cast<int>(*gt));
 
       ++cur;
     }
 
     return ret;
   }
-  R1 reader1_;
-  R2 reader2_;
+  R1& reader1_;
+  R2& reader2_;
 };
 
 int main(int argc, char** argv)
@@ -559,7 +568,7 @@ int main(int argc, char** argv)
     std::ifstream ifs("chr1.cvcf", std::ios::binary);
     vc::cvcf::reader cvcf_reader(ifs);
 
-    file_checksum_test<vc::vcf::reader, vc::cvcf::reader> t(bcf_reader, cvcf_reader);
+    file_checksum_test<vc::cvcf::reader, vc::vcf::reader> t(cvcf_reader, bcf_reader);
 
     std::cout << "Starting checksum test ..." << std::endl;
     auto timed_call = time_procedure(t);

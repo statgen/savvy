@@ -4,6 +4,7 @@
 #include <algorithm>
 
 
+
 namespace vc
 {
   namespace cvcf
@@ -171,9 +172,10 @@ namespace vc
       return ret;
     }
 
-    std::size_t marker::calculate_rle_serialized_gt_size() const
+    std::tuple<std::size_t, std::size_t> marker::calculate_rle_serialized_gt_size_and_count() const
     {
-      std::size_t ret = 0;
+      std::size_t ret_sz = 0;
+      std::size_t total_number_of_repeats = 0;
 
       std::uint64_t last_pos = 0;
       for (auto it = non_zero_haplotypes_.begin(); it != non_zero_haplotypes_.end(); ++it)
@@ -196,13 +198,16 @@ namespace vc
         std::uint8_t allele_repeat_prefix = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
         if (number_of_repeats)
           allele_repeat_prefix |= 0x40;
-        ret += two_bit_prefixed_varint::encoded_byte_width(offset);
+        ret_sz += two_bit_prefixed_varint::encoded_byte_width(offset);
 
         if (number_of_repeats)
-          ret += varint_encoded_byte_width(number_of_repeats);
+        {
+          ret_sz += varint_encoded_byte_width(number_of_repeats);
+          total_number_of_repeats += number_of_repeats;
+        }
       }
 
-      return ret;
+      return std::make_tuple(ret_sz, non_zero_haplotypes_.size() - total_number_of_repeats);
     }
 
     void marker::write(std::ostream& os, const marker& source)
@@ -219,10 +224,13 @@ namespace vc
         os.write(&source.alt_[0], source.alt_.size());
 
 
-      if (source.calculate_rle_serialized_gt_size() < source.calculate_serialized_gt_size())
+      std::uint64_t normal_sz = source.calculate_serialized_gt_size();
+      std::uint64_t rle_size, rle_cnt;
+      std::tie(rle_size, rle_cnt) = source.calculate_rle_serialized_gt_size_and_count();
+      if (rle_size < normal_sz)
       {
         std::uint8_t rle = 0x80;
-        one_bit_prefixed_varint::encode(rle, source.non_zero_haplotypes_.size(), os_it);
+        one_bit_prefixed_varint::encode(rle, rle_cnt, os_it);
 
         std::uint64_t last_pos = 0;
         for (auto it = source.non_zero_haplotypes_.begin(); it != source.non_zero_haplotypes_.end(); ++it)

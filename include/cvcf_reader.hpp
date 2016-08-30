@@ -9,6 +9,7 @@
 #include <vector>
 #include <functional>
 #include <iostream>
+#include <tuple>
 
 namespace vc
 {
@@ -110,7 +111,7 @@ namespace vc
 
 
       std::size_t calculate_serialized_gt_size() const;
-      std::size_t calculate_rle_serialized_gt_size() const;
+      std::tuple<std::size_t, std::size_t> calculate_rle_serialized_gt_size_and_count() const;
     };
 
     class reader
@@ -153,6 +154,8 @@ namespace vc
       };
 
       reader(std::istream& input_stream);
+      reader(const reader&) = delete;
+      reader& operator=(const reader&) = delete;
       reader& operator>>(marker& destination);
       explicit operator bool() const { return input_stream_.good(); }
       bool good() const { return input_stream_.good(); }
