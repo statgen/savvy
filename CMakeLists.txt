@@ -37,3 +37,13 @@ add_executable(vc-test src/test.cpp src/test_class.cpp include/test_class.hpp)
 target_link_libraries(vc-test vc)
 target_link_libraries(vc-test "hts")
 target_link_libraries(vc-test "z")
+
+add_executable(bcf2m3vcf src/bcf2m3vcf.cpp)
+target_link_libraries(bcf2m3vcf vc)
+target_link_libraries(bcf2m3vcf "hts")
+target_link_libraries(bcf2m3vcf "z")
+
+add_executable(bcf2cvcf src/bcf2cvcf.cpp)
+target_link_libraries(bcf2cvcf vc)
+target_link_libraries(bcf2cvcf "hts")
+target_link_libraries(bcf2cvcf "z")
