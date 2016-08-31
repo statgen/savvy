@@ -2,7 +2,7 @@
 
 #include <cmath>
 #include <assert.h>
-#include <arpa/inet.h>
+#include <cstring>
 
 std::uint64_t ceil_divide(std::uint64_t dividend, std::uint64_t divisor)
 {
