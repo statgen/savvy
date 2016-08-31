@@ -134,8 +134,8 @@ namespace vc
       std::uint32_t column_length = 0;
       source.read((char*)&row_length, sizeof(row_length));
       source.read((char*)&column_length, sizeof(column_length));
-      row_length = ntohl(row_length);
-      column_length = ntohl(column_length);
+      row_length = be32toh(row_length);
+      column_length = be32toh(column_length);
 
       destination.unique_haplotype_cnt_ = column_length;
 
@@ -180,7 +180,7 @@ namespace vc
           {
             std::uint32_t nbo32;
             std::memcpy(&nbo32, &buff[i * 4], 4);
-            destination.sample_mappings_[i] = ntohl(nbo32);
+            destination.sample_mappings_[i] = be32toh(nbo32);
           }
         }
       }
@@ -221,7 +221,7 @@ namespace vc
           source.read(&alt[0], sz);
         }
 
-        destination.markers_.emplace_back(destination, i, "[CHROM]", ntohll(pos), ref, alt);
+        destination.markers_.emplace_back(destination, i, "[CHROM]", be64toh(pos), ref, alt);
 
         source.read(&(destination.unique_haplotype_matrix_[i * column_length]), column_length);
       }
@@ -235,8 +235,8 @@ namespace vc
       std::uint32_t row_length;
       std::uint32_t column_length;
       assert(source.markers_.size() <= 0xFFFFFFFF);
-      row_length = htonl(source.markers_.size());
-      column_length = htonl(source.unique_haplotype_cnt_);
+      row_length = htobe32(source.markers_.size());
+      column_length = htobe32(source.unique_haplotype_cnt_);
       destination.write((char*)&row_length, sizeof(row_length));
       destination.write((char*)&column_length, sizeof(column_length));
 
@@ -272,7 +272,7 @@ namespace vc
         {
           for (std::size_t i = 0; i < source.haplotype_count(); ++i)
           {
-            std::uint32_t nbo32 = htonl(source.sample_mappings_[i]);
+            std::uint32_t nbo32 = htobe32(source.sample_mappings_[i]);
             std::memcpy(&buff[i * 4], &nbo32, 4);
           }
         }
@@ -283,7 +283,7 @@ namespace vc
       std::size_t i = 0;
       for (auto it = source.markers_.begin(); it != source.markers_.end(); ++it,++i)
       {
-        std::uint64_t pos_nbo = htonll(it->pos());
+        std::uint64_t pos_nbo = htobe64(it->pos());
         destination.write((char*)(&pos_nbo), 8);
         destination.put(0); // rsid
         std::uint8_t sz = std::uint8_t(0xFF & it->ref().size());
@@ -324,7 +324,7 @@ namespace vc
 
       std::uint64_t sample_size = 0;
       input_stream_.read((char*)(&sample_size), 8);
-      sample_size = ntohll(sample_size);
+      sample_size = be64toh(sample_size);
       sample_ids_.reserve(sample_size);
       for (std::size_t i = 0; i < sample_size; ++i)
       {

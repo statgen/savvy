@@ -9,6 +9,7 @@
 #include <vector>
 #include <fstream>
 #include <functional>
+#include <portable_endian.h>
 
 namespace vc
 {
@@ -211,7 +212,7 @@ namespace vc
 
         output_stream_.put(ploidy_level_);
 
-        std::uint64_t sample_size_nbo = htonll(sample_size_);
+        std::uint64_t sample_size_nbo = htobe64(sample_size_);
         output_stream_.write((char*)(&sample_size_nbo), 8);
         for (auto it = samples_beg; it != samples_end; ++it)
         {
