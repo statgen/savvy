@@ -47,3 +47,9 @@ add_executable(bcf2cvcf src/bcf2cvcf.cpp)
 target_link_libraries(bcf2cvcf vc)
 target_link_libraries(bcf2cvcf "hts")
 target_link_libraries(bcf2cvcf "z")
+
+
+add_executable(cvcf-sample-sort src/cvcf_sample_sort.cpp)
+target_link_libraries(cvcf-sample-sort vc)
+target_link_libraries(cvcf-sample-sort "hts")
+target_link_libraries(cvcf-sample-sort "z")

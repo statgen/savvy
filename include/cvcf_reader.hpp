@@ -23,6 +23,10 @@ namespace vc
         std::uint64_t offset;
         allele_status status;
         sparse_vector_allele() = default;
+        sparse_vector_allele(sparse_vector_allele&&) = default;
+        sparse_vector_allele(const sparse_vector_allele&) = default;
+        sparse_vector_allele& operator=(const sparse_vector_allele&) = default;
+        sparse_vector_allele& operator=(sparse_vector_allele&&) = default;
         sparse_vector_allele(allele_status s, std::uint64_t o) : offset(o), status(s) {}
       };
 
@@ -86,6 +90,27 @@ namespace vc
           ++gt_beg;
           ++off;
         }
+        non_zero_haplotypes_.shrink_to_fit();
+      }
+
+      template <typename RandAccessSparseAlleleIterator>
+      marker(std::uint64_t position, const std::string& ref, const std::string& alt, RandAccessSparseAlleleIterator gt_beg, RandAccessSparseAlleleIterator gt_end, std::size_t total_haplotype_count) :
+        position_(position),
+        ref_(ref),
+        alt_(alt),
+        haplotype_count_(total_haplotype_count)
+      {
+        non_zero_haplotypes_.reserve(gt_end - gt_beg);
+        while (gt_beg != gt_end)
+        {
+          if (gt_beg->status != allele_status::has_ref)
+            non_zero_haplotypes_.emplace_back(*gt_beg);
+          else
+            throw new std::range_error("FOOBAR");
+          ++gt_beg;
+        }
+        if (haplotype_count_ < non_zero_haplotypes_.size())
+          throw new std::range_error("FOOBAR2");
         non_zero_haplotypes_.shrink_to_fit();
       }
 
@@ -162,6 +187,10 @@ namespace vc
       bool fail() const { return input_stream_.fail(); }
       bool bad() const { return input_stream_.bad(); }
       std::uint64_t sample_count() const { return this->sample_ids_.size(); }
+      std::vector<std::string>::const_iterator samples_begin() const { return sample_ids_.begin(); }
+      std::vector<std::string>::const_iterator samples_end() const { return sample_ids_.end(); }
+      const std::string& chromosome() const { return chromosome_; }
+      std::uint8_t ploidy() const { return ploidy_level_; }
     private:
       std::vector<std::string> sample_ids_;
       std::string chromosome_;
