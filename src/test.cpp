@@ -609,8 +609,8 @@ int main(int argc, char** argv)
   vc::open_marker_file("chr1.bcf", [](auto&& input_file_reader)
   {
     typedef typename std::remove_reference<decltype(input_file_reader)>::type R;
-    typename R::input_iterator::buffer buf;
-    typename R::input_iterator eof;
+    typename R::input_iterator::buffer buf{};
+    typename R::input_iterator eof{};
     typename R::input_iterator it(input_file_reader, buf);
 
     while (it != eof)
@@ -622,8 +622,10 @@ int main(int argc, char** argv)
   });
 
   vc::open_marker_file("chr1.bcf", file_handler_functor());
+  file_handler_functor f;
+  vc::open_marker_file("chr1.bcf", f);
 
-  vc::iterate_marker_file("chr1.bcf", marker_handler_functor());
+  //vc::iterate_marker_file("chr1.bcf", marker_handler_functor());
 
   return 0;
 }

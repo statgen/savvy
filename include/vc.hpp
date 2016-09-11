@@ -16,7 +16,7 @@ namespace vc
   }
 
   template <typename Fn>
-  void open_marker_file(const std::string& file_path, Fn&& handler)
+  void open_marker_file(const std::string& file_path, Fn& handler)
   {
     if (detail::has_extension(file_path, ".cvcf"))
     {
@@ -35,6 +35,12 @@ namespace vc
       vc::vcf::reader input(file_path);
       handler(std::move(input));
     }
+  }
+
+  template <typename Fn>
+  void open_marker_file(const std::string& file_path, Fn&& handler)
+  {
+    open_marker_file(file_path, handler);
   }
 
   class marker_reader_iterator
