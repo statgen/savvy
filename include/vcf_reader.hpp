@@ -174,6 +174,7 @@ namespace vc
       bool read_next_block(block& destination);
       char** samples_begin() const;
       char** samples_end() const;
+      std::uint64_t sample_count() const;
       static std::string get_chromosome(const reader& rdr, const marker& mkr);
     private:
       htsFile* hts_file_;

@@ -3,7 +3,7 @@ project(libvc)
 
 include(ExternalProject)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y")
 
 ExternalProject_Add(htslib
                     BUILD_IN_SOURCE 1
@@ -25,10 +25,10 @@ link_directories(${HTSLIB_SRC_DIR})
 
 
 set(HEADER_FILES
-    include/reader.hpp include/m3vcf_reader.hpp include/cvcf_reader.hpp include/allele_status.hpp include/vcf_reader.hpp include/varint.hpp)
+    include/vc.hpp include/reader.hpp include/m3vcf_reader.hpp include/cvcf_reader.hpp include/allele_status.hpp include/vcf_reader.hpp include/varint.hpp)
 
 set(SOURCE_FILES
-    src/reader.cpp src/m3vcf_reader.cpp include/cvcf_reader.hpp src/cvcf_reader.cpp include/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
+    src/vc.cpp src/reader.cpp src/m3vcf_reader.cpp include/cvcf_reader.hpp src/cvcf_reader.cpp include/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
 
 add_library(vc ${SOURCE_FILES} ${HEADER_FILES})
 add_dependencies(vc htslib)

@@ -174,6 +174,11 @@ namespace vc
       return hts_hdr_->samples + bcf_hdr_nsamples(hts_hdr_);
     }
 
+    std::uint64_t reader::sample_count() const
+    {
+      return bcf_hdr_nsamples(hts_hdr_);
+    }
+
     std::string reader::get_chromosome(const reader& rdr, const marker& mkr)
     {
       std::string ret(bcf_hdr_id2name(rdr.hts_hdr_, mkr.chrom_id()));

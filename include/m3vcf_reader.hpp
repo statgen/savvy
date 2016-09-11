@@ -186,6 +186,7 @@ namespace vc
       };
 
       reader(std::istream& input_stream);
+      std::uint64_t sample_count() const { return sample_ids_.size(); }
       bool read_next_block(block& destination);
     private:
       const std::string file_path_;

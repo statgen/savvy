@@ -4,6 +4,7 @@
 #include "vcf_reader.hpp"
 #include "test_class.hpp"
 #include "varint.hpp"
+#include "vc.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -11,6 +12,7 @@
 #include <numeric>
 #include <chrono>
 #include <sstream>
+#include <utility>
 
 bool has_extension(const std::string& fullString, const std::string& ext)
 {
@@ -556,6 +558,33 @@ private:
   R2& reader2_;
 };
 
+
+class file_handler_functor
+{
+public:
+  template <typename T>
+  void operator()(T&& input_file_reader)
+  {
+    input_file_reader.sample_count();
+  }
+};
+
+class marker_handler_functor
+{
+public:
+  template <typename T>
+  void operator()(const T& mrkr)
+  {
+    std::uint64_t pos = mrkr.pos();
+    std::string ref = mrkr.ref();
+    std::string alt = mrkr.alt();
+    std::for_each(mrkr.begin(), mrkr.end(), [](const vc::allele_status& s)
+    {
+
+    });
+  }
+};
+
 int main(int argc, char** argv)
 {
 //  {
@@ -576,6 +605,25 @@ int main(int argc, char** argv)
     std::cout << "Elapsed Time: " << timed_call.elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
   }
 
+
+  vc::open_marker_file("chr1.bcf", [](auto&& input_file_reader)
+  {
+    typedef typename std::remove_reference<decltype(input_file_reader)>::type R;
+    typename R::input_iterator::buffer buf;
+    typename R::input_iterator eof;
+    typename R::input_iterator it(input_file_reader, buf);
+
+    while (it != eof)
+    {
+
+      ++it;
+    }
+
+  });
+
+  vc::open_marker_file("chr1.bcf", file_handler_functor());
+
+  vc::iterate_marker_file("chr1.bcf", marker_handler_functor());
 
   return 0;
 }
