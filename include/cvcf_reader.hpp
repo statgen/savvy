@@ -179,6 +179,7 @@ namespace vc
       };
 
       reader(std::istream& input_stream);
+      reader(reader&& source) = default;
       reader(const reader&) = delete;
       reader& operator=(const reader&) = delete;
       reader& operator>>(marker& destination);

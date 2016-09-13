@@ -168,6 +168,7 @@ namespace vc
       };
 
       reader(const std::string& file_path);
+      reader(reader&& other);
       reader(const reader&) = delete;
       reader& operator=(const reader&) = delete;
       ~reader();

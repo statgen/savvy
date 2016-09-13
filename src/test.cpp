@@ -12,6 +12,8 @@
 #include <numeric>
 #include <chrono>
 #include <sstream>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 
 bool has_extension(const std::string& fullString, const std::string& ext)
@@ -569,6 +571,21 @@ public:
   }
 };
 
+class triple_file_handler_functor
+{
+public:
+  template <typename T, typename T2, typename T3>
+  void operator()(T&& input_file_reader, T2&& input_file_reader2, T3&& input_file_reader3)
+  {
+    input_file_reader.sample_count();
+    input_file_reader2.sample_count();
+    input_file_reader3.sample_count();
+
+    std::tuple<T, T2, T3> file_readers(std::move(input_file_reader), std::move(input_file_reader2), std::move(input_file_reader3));
+
+  }
+};
+
 class marker_handler_functor
 {
 public:
@@ -587,6 +604,72 @@ public:
 
 int main(int argc, char** argv)
 {
+
+  vc::open_marker_files(triple_file_handler_functor(), "chr1.bcf", "chr1.cvcf", "chr1.m3vcf");
+
+  vc::open_marker_files(std::make_tuple("chr1.cvcf", "chr1.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
+  {
+    typedef typename std::remove_reference<decltype(input_file_reader1)>::type R1;
+    typename R1::input_iterator::buffer buf{};
+    typename R1::input_iterator eof{};
+    typename R1::input_iterator it(input_file_reader1, buf);
+
+    typedef typename std::remove_reference<decltype(input_file_reader2)>::type R2;
+    typename R2::input_iterator::buffer buf2{};
+    typename R2::input_iterator eof2{};
+    typename R2::input_iterator it2(input_file_reader2, buf2);
+
+    while (it != eof)
+    {
+
+      ++it;
+    }
+
+    while (it2 != eof2)
+    {
+
+      ++it2;
+    }
+
+  });
+
+  vc::open_marker_file("chr1.bcf", [](auto&& input_file_reader1)
+  {
+    vc::open_marker_file("chr1.bcf", [&input_file_reader1](auto&& input_file_reader2)
+    {
+      typedef typename std::remove_reference<decltype(input_file_reader1)>::type R1;
+      typename R1::input_iterator::buffer buf{};
+      typename R1::input_iterator eof{};
+      typename R1::input_iterator it(input_file_reader1, buf);
+
+      typedef typename std::remove_reference<decltype(input_file_reader2)>::type R2;
+      typename R2::input_iterator::buffer buf2{};
+      typename R2::input_iterator eof2{};
+      typename R2::input_iterator it2(input_file_reader2, buf2);
+
+      while (it != eof)
+      {
+
+        ++it;
+      }
+
+      while (it2 != eof2)
+      {
+
+        ++it2;
+      }
+
+    });
+  });
+
+  vc::open_marker_file("chr1.bcf", file_handler_functor());
+  file_handler_functor f;
+  vc::open_marker_file("chr1.bcf", f);
+
+  vc::iterate_marker_file("chr1.bcf", marker_handler_functor());
+
+  return 0;
+
 //  {
 //    convert_file_test();
 //  }
@@ -604,28 +687,6 @@ int main(int argc, char** argv)
     std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
     std::cout << "Elapsed Time: " << timed_call.elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
   }
-
-
-  vc::open_marker_file("chr1.bcf", [](auto&& input_file_reader)
-  {
-    typedef typename std::remove_reference<decltype(input_file_reader)>::type R;
-    typename R::input_iterator::buffer buf{};
-    typename R::input_iterator eof{};
-    typename R::input_iterator it(input_file_reader, buf);
-
-    while (it != eof)
-    {
-
-      ++it;
-    }
-
-  });
-
-  vc::open_marker_file("chr1.bcf", file_handler_functor());
-  file_handler_functor f;
-  vc::open_marker_file("chr1.bcf", f);
-
-  //vc::iterate_marker_file("chr1.bcf", marker_handler_functor());
 
   return 0;
 }

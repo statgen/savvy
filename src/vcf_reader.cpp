@@ -66,7 +66,11 @@ namespace vc
 
     }
 
-    block::block(block&& source)
+    block::block(block&& source) :
+      hts_rec_(nullptr),
+      gt_(nullptr),
+      gt_sz_(0),
+      num_samples_(0)
     {
       operator=(std::move(source));
     }
@@ -142,6 +146,13 @@ namespace vc
       {
         hts_hdr_ = bcf_hdr_read(hts_file_);
       }
+    }
+
+    reader::reader(reader&& source) :
+      hts_file_(source.hts_file_), hts_hdr_(source.hts_hdr_)
+    {
+      source.hts_file_ = nullptr;
+      source.hts_hdr_ = nullptr;
     }
 
     reader::~reader()
