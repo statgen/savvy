@@ -560,6 +560,56 @@ private:
   R2& reader2_;
 };
 
+template <typename T1, typename T2>
+file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
+{
+  return file_checksum_test<T1, T2>(a, b);
+}
+
+void run_file_checksum_test()
+{
+
+  vc::open_marker_files(std::make_tuple("chr1.bcf", "chr1.cvcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
+  {
+    auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
+    std::cout << "Starting checksum test ..." << std::endl;
+    auto timed_call = time_procedure(t);
+    std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
+    std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
+  });
+}
+
+template <typename M>
+double inner_product(const M& mrkr, std::vector<double>& vec)
+{
+  double ret = 0;
+
+  std::size_t i = 0;
+  for (const vc::allele_status& gt : mrkr)
+  {
+    if (gt == vc::allele_status::has_alt)
+      ret += 1.0 * vec[i];
+    ++i;
+  }
+
+  return ret;
+}
+
+template <>
+double inner_product<vc::cvcf::marker>(const vc::cvcf::marker& mrkr, std::vector<double>& vec)
+{
+  double ret = 0;
+
+  for (auto it = mrkr.non_ref_begin(); it != mrkr.non_ref_end(); ++it)
+  {
+    if (it->status == vc::allele_status::has_alt)
+      ret += 1.0 * vec[it->offset];
+    else
+      ret += 0.04 * vec[it->offset];
+  }
+
+  return ret;
+}
 
 class file_handler_functor
 {
@@ -567,8 +617,16 @@ public:
   template <typename T>
   void operator()(T&& input_file_reader)
   {
-    input_file_reader.sample_count();
-  }
+    typedef typename T::input_iterator input_iterator_type;
+    typename T::input_iterator::buffer buf{};
+
+    for (auto it = input_iterator_type(input_file_reader, buf); it != input_iterator_type(); ++it)
+    {
+      inner_product(*it, phenotypes_);
+    }
+  };
+private:
+  std::vector<double> phenotypes_;
 };
 
 class triple_file_handler_functor
@@ -604,89 +662,90 @@ public:
 
 int main(int argc, char** argv)
 {
+  std::cout << "[0] Run all tests." << std::endl;
+  std::cout << "[1] Run varint test." << std::endl;
+  std::cout << "[2] Run file conversion test." << std::endl;
+  std::cout << "[3] Run checksum test." << std::endl;
 
-  vc::open_marker_files(triple_file_handler_functor(), "chr1.bcf", "chr1.cvcf", "chr1.m3vcf");
+  char t = '0';
+  std::cin >> t;
 
-  vc::open_marker_files(std::make_tuple("chr1.cvcf", "chr1.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
+  switch (t)
   {
-    typedef typename std::remove_reference<decltype(input_file_reader1)>::type R1;
-    typename R1::input_iterator::buffer buf{};
-    typename R1::input_iterator eof{};
-    typename R1::input_iterator it(input_file_reader1, buf);
-
-    typedef typename std::remove_reference<decltype(input_file_reader2)>::type R2;
-    typename R2::input_iterator::buffer buf2{};
-    typename R2::input_iterator eof2{};
-    typename R2::input_iterator it2(input_file_reader2, buf2);
-
-    while (it != eof)
-    {
-
-      ++it;
-    }
-
-    while (it2 != eof2)
-    {
-
-      ++it2;
-    }
-
-  });
-
-  vc::open_marker_file("chr1.bcf", [](auto&& input_file_reader1)
-  {
-    vc::open_marker_file("chr1.bcf", [&input_file_reader1](auto&& input_file_reader2)
-    {
-      typedef typename std::remove_reference<decltype(input_file_reader1)>::type R1;
-      typename R1::input_iterator::buffer buf{};
-      typename R1::input_iterator eof{};
-      typename R1::input_iterator it(input_file_reader1, buf);
-
-      typedef typename std::remove_reference<decltype(input_file_reader2)>::type R2;
-      typename R2::input_iterator::buffer buf2{};
-      typename R2::input_iterator eof2{};
-      typename R2::input_iterator it2(input_file_reader2, buf2);
-
-      while (it != eof)
-      {
-
-        ++it;
-      }
-
-      while (it2 != eof2)
-      {
-
-        ++it2;
-      }
-
-    });
-  });
-
-  vc::open_marker_file("chr1.bcf", file_handler_functor());
-  file_handler_functor f;
-  vc::open_marker_file("chr1.bcf", f);
-
-  vc::iterate_marker_file("chr1.bcf", marker_handler_functor());
-
-  return 0;
-
-//  {
-//    convert_file_test();
-//  }
-
-  {
-    vc::vcf::reader bcf_reader("chr1.bcf");
-
-    std::ifstream ifs("chr1.cvcf", std::ios::binary);
-    vc::cvcf::reader cvcf_reader(ifs);
-
-    file_checksum_test<vc::cvcf::reader, vc::vcf::reader> t(cvcf_reader, bcf_reader);
-
-    std::cout << "Starting checksum test ..." << std::endl;
-    auto timed_call = time_procedure(t);
-    std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
-    std::cout << "Elapsed Time: " << timed_call.elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
+    case '0':
+      varint_test();
+      convert_file_test();
+      run_file_checksum_test();
+      break;
+    case '1':
+      varint_test();
+      break;
+    case '2':
+      convert_file_test();
+      break;
+    case '3':
+      run_file_checksum_test();
+      break;
+    default:
+      std::cout << "Invalid Input" << std::endl;
   }
+
+
+
+//  vc::open_marker_files(triple_file_handler_functor(), "chr1.bcf", "chr1.cvcf", "chr1.m3vcf");
+//
+//  vc::open_marker_files(std::make_tuple("chr1.cvcf", "chr1.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
+//  {
+//    typedef typename std::remove_reference<decltype(input_file_reader1)>::type R1;
+//    typename R1::input_iterator::buffer buf{};
+//    typename R1::input_iterator eof{};
+//    typename R1::input_iterator it(input_file_reader1, buf);
+//
+//    typedef typename std::remove_reference<decltype(input_file_reader2)>::type R2;
+//    typename R2::input_iterator::buffer buf2{};
+//    typename R2::input_iterator eof2{};
+//    typename R2::input_iterator it2(input_file_reader2, buf2);
+//
+//    while (it != eof)
+//    {
+//
+//      ++it;
+//    }
+//
+//    while (it2 != eof2)
+//    {
+//
+//      ++it2;
+//    }
+//
+//  });
+//
+//  vc::open_marker_file("chr1.bcf", [](auto&& input_file_reader)
+//  {
+//    typedef typename std::remove_reference<decltype(input_file_reader)>::type R;
+//    typename R::input_iterator::buffer buf{};
+//    typename R::input_iterator eof{};
+//    typename R::input_iterator it(input_file_reader, buf);
+//
+//    while (it != eof)
+//    {
+//      it->pos();
+//      it->ref() + ":" + it->alt();
+//      for (const vc::allele_status& gt : *it)
+//      {
+//
+//      }
+//      ++it;
+//    }
+//  });
+//
+//  vc::open_marker_file("chr1.bcf", file_handler_functor());
+//  file_handler_functor f;
+//  vc::open_marker_file("chr1.bcf", f);
+//
+//  vc::iterate_marker_file("chr1.bcf", marker_handler_functor());
+
+
 
   return 0;
 }
