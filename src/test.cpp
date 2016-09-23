@@ -403,8 +403,6 @@ int varint_test()
 void convert_file_test()
 {
   {
-    std::ofstream ofs("chr1.cvcf", std::ios::binary);
-
     vc::vcf::block buff;
     vc::vcf::reader input("chr1.bcf");
     vc::vcf::reader::input_iterator eof;
@@ -421,8 +419,9 @@ void convert_file_test()
 
     std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
     std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-    vc::cvcf::writer compact_output(ofs, "1", 2, sample_ids.begin(), sample_ids.end());
-
+    std::ofstream ofs("chr1.m3vcf", std::ios::binary);
+    vc::m3vcf::writer compact_output(ofs, "1", 2, sample_ids.begin(), sample_ids.end());
+    vc::m3vcf::block output_buffer(sample_ids.size(), 2);
 
     while (cur != eof)
     {
@@ -443,10 +442,17 @@ void convert_file_test()
 //
 //      std::cout << std::endl;
 
-      compact_output << vc::cvcf::marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
+      if (!output_buffer.add_marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end()))
+      {
+        compact_output << output_buffer; //vc::cvcf::marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
+        output_buffer = vc::m3vcf::block(sample_ids.size(), 2);
+      }
 
       ++cur;
     }
+
+    if (output_buffer.marker_count())
+      compact_output << output_buffer;
   }
 
 //  {
@@ -542,6 +548,7 @@ private:
     typename ReaderType::input_iterator cur(reader, buff);
     typename ReaderType::input_iterator end;
 
+    std::size_t num_markers = 0;
     while (cur != end)
     {
       ret = std::hash<std::uint64_t>()(cur->pos()) ^ ret;
@@ -552,7 +559,9 @@ private:
         ret = hash_combine(ret, static_cast<int>(*gt));
 
       ++cur;
+      ++num_markers;
     }
+    std::cout << "Marker Count: " << num_markers << std::endl;
 
     return ret;
   }
@@ -569,7 +578,7 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 void run_file_checksum_test()
 {
 
-  vc::open_marker_files(std::make_tuple("chr1.bcf", "chr1.cvcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
+  vc::open_marker_files(std::make_tuple("chr1.bcf", "chr1.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
   {
     auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
     std::cout << "Starting checksum test ..." << std::endl;
@@ -658,6 +667,45 @@ public:
 
     });
   }
+};
+
+class marker_counter
+{
+public:
+  marker_counter() = default;
+  marker_counter(const marker_counter&) = delete;
+  marker_counter(marker_counter&&) = delete;
+  marker_counter& operator=(const marker_counter&) = delete;
+  marker_counter& operator=(marker_counter&&) = delete;
+  template <typename T, typename T2>
+  void operator()(T&& input_file_reader, T2&& input_file_reader2)
+  {
+    typename T::input_iterator::buffer buff;
+    typename T::input_iterator cur(input_file_reader, buff);
+    typename T::input_iterator end;
+
+    typename T2::input_iterator::buffer buff2;
+    typename T2::input_iterator cur2(input_file_reader2, buff2);
+    typename T2::input_iterator end2;
+
+    while (cur != end)
+    {
+      ++file1_cnt_;
+      ++cur;
+    }
+
+    while (cur2 != end2)
+    {
+      ++file2_cnt_;
+      ++cur2;
+    }
+
+  }
+  std::size_t file1_count() const { return file1_cnt_; }
+  std::size_t file2_count() const { return file2_cnt_; }
+private:
+  std::size_t file1_cnt_ = 0;
+  std::size_t file2_cnt_ = 0;
 };
 
 int main(int argc, char** argv)

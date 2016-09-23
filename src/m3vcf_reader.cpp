@@ -70,7 +70,7 @@ namespace vc
 
     const allele_status& block::sample_haplotype_at(std::uint32_t marker_off, std::uint64_t haplotype_off)
     {
-      switch (unique_haplotype_matrix_[(marker_off * unique_haplotype_cnt_) + sample_mappings_[haplotype_off]])
+      switch (unique_haplotype_matrix_[sample_mappings_[haplotype_off]][marker_off]) //unique_haplotype_matrix_[(marker_off * unique_haplotype_cnt_) + sample_mappings_[haplotype_off]])
       {
       case '0': return const_has_ref;
       case '1': return const_has_alt;
@@ -81,7 +81,7 @@ namespace vc
 
     const allele_status& block::unique_haplotype_at(std::uint32_t marker_offset, std::uint64_t unique_haplotype_offset)
     {
-      switch (unique_haplotype_matrix_[(marker_offset * unique_haplotype_cnt_) + unique_haplotype_offset])
+      switch (unique_haplotype_matrix_[unique_haplotype_offset][marker_offset]) //unique_haplotype_matrix_[(marker_offset * unique_haplotype_cnt_) + unique_haplotype_offset])
       {
       case '0': return const_has_ref;
       case '1': return const_has_alt;
@@ -97,7 +97,7 @@ namespace vc
 
       for (std::uint32_t i = 0; i < unique_haplotype_cnt_; ++i)
       {
-        char hap = unique_haplotype_matrix_[(marker_off * unique_haplotype_cnt_) + i];
+        char hap =  unique_haplotype_matrix_[i][marker_off]; //unique_haplotype_matrix_[(marker_off * unique_haplotype_cnt_) + i];
         if (hap == '1')
           allele_cnt += haplotype_weights_[i];
         else if (hap != '0') // missing
@@ -130,14 +130,14 @@ namespace vc
     bool block::read(block& destination, std::istream& source, std::uint64_t sample_count, std::uint8_t ploidy)
     {
       destination = block();
-      std::uint32_t row_length = 0;
-      std::uint32_t column_length = 0;
-      source.read((char*)&row_length, sizeof(row_length));
-      source.read((char*)&column_length, sizeof(column_length));
-      row_length = be32toh(row_length);
-      column_length = be32toh(column_length);
+      std::uint32_t num_rows = 0;
+      std::uint32_t num_columns = 0;
+      source.read((char*)&num_rows, sizeof(num_rows));
+      source.read((char*)&num_columns, sizeof(num_columns));
+      num_rows = be32toh(num_rows);
+      num_columns = be32toh(num_columns);
 
-      destination.unique_haplotype_cnt_ = column_length;
+      destination.unique_haplotype_cnt_ = num_columns;
 
 
       std::uint8_t byte_width_needed = 4;
@@ -185,10 +185,11 @@ namespace vc
         }
       }
 
-      destination.markers_.reserve(row_length);
-      destination.unique_haplotype_matrix_.resize(std::size_t(row_length) * std::size_t(column_length));
+      destination.markers_.reserve(num_rows);
+      //destination.unique_haplotype_matrix_.resize(std::size_t(num_rows) * std::size_t(num_columns));
+      destination.unique_haplotype_matrix_.resize(std::size_t(num_columns), std::vector<char>(std::size_t(num_rows), '\0'));
 
-      for (std::size_t i = 0; i < row_length; ++i)
+      for (std::size_t i = 0; i < num_rows; ++i)
       {
         std::uint64_t pos;
         source.read((char*)(&pos), 8);
@@ -223,7 +224,12 @@ namespace vc
 
         destination.markers_.emplace_back(destination, i, "[CHROM]", be64toh(pos), ref, alt);
 
-        source.read(&(destination.unique_haplotype_matrix_[i * column_length]), column_length);
+        //source.read(&(destination.unique_haplotype_matrix_[i * num_columns]), num_columns);
+        std::vector<char> tmp(num_columns);
+        source.read(tmp.data(), num_columns);
+        for (std::size_t j = 0; j < num_columns; ++j)
+          destination.unique_haplotype_matrix_[j][i] = tmp[j];
+
       }
 
       return source.good();
@@ -232,13 +238,13 @@ namespace vc
     bool block::write(std::ostream& destination, const block& source)
     {
 
-      std::uint32_t row_length;
-      std::uint32_t column_length;
+      std::uint32_t num_rows;
+      std::uint32_t num_columns;
       assert(source.markers_.size() <= 0xFFFFFFFF);
-      row_length = htobe32(source.markers_.size());
-      column_length = htobe32(source.unique_haplotype_cnt_);
-      destination.write((char*)&row_length, sizeof(row_length));
-      destination.write((char*)&column_length, sizeof(column_length));
+      num_rows = htobe32(source.markers_.size());
+      num_columns = htobe32(source.unique_haplotype_cnt_);
+      destination.write((char*)&num_rows, sizeof(num_rows));
+      destination.write((char*)&num_columns, sizeof(num_columns));
 
       //long byte_width_needed = static_cast<long>(std::ceil(std::log2(source.unique_haplotype_cnt_ + 1) / 8));
       std::uint8_t byte_width_needed = 4;
@@ -294,7 +300,11 @@ namespace vc
         destination.put(sz);
         destination.write(it->alt().data(), sz);
 
-        destination.write(&(source.unique_haplotype_matrix_[i * source.unique_haplotype_cnt_]), source.unique_haplotype_cnt_);
+        //destination.write(&(source.unique_haplotype_matrix_[i * source.unique_haplotype_cnt_]), source.unique_haplotype_cnt_);
+        std::vector<char> tmp(source.unique_haplotype_matrix_.size());
+        for (std::size_t j = 0; j < source.unique_haplotype_matrix_.size(); ++j)
+          tmp[j] = source.unique_haplotype_matrix_[j][i];
+        destination.write(tmp.data(), tmp.size());
       }
 
 

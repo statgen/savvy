@@ -137,7 +137,8 @@ namespace vc
       //---- GT Data ----//
       std::vector<std::uint64_t> haplotype_weights_;
       std::vector<std::uint32_t> sample_mappings_;
-      std::vector<char> unique_haplotype_matrix_;
+      //std::vector<char> unique_haplotype_matrix_;
+      std::vector<std::vector<char>> unique_haplotype_matrix_;
       std::uint64_t sample_size_;
       std::uint32_t unique_haplotype_cnt_;
       std::uint8_t ploidy_level_;
@@ -247,72 +248,203 @@ namespace vc
       bool ret = false;
 
       std::size_t hap_array_sz = hap_array_end - hap_array_beg;
-      if (markers_.size() == 0)
-        sample_mappings_.resize(hap_array_sz, 0xFFFFFFFF);
-      if (hap_array_sz == sample_mappings_.size())
+      if (hap_array_sz)
       {
-        std::int64_t current_savings = static_cast<std::int64_t>(hap_array_sz * markers_.size()) - static_cast<std::int64_t>(unique_haplotype_cnt_ * markers_.size() + hap_array_sz);
-
-        std::list<std::string> new_unique_haps;
-
-        std::string column_string(markers_.size() + 1, '\0');
-        std::vector<std::uint32_t> new_sample_mappings(hap_array_sz);
-
-        for (std::size_t i = 0; i < hap_array_sz; ++i)
+        if (markers_.size() == 0)
         {
-          std::size_t j = 0;
-          for (; j < markers_.size(); ++j)
-          {
-            column_string[j] = unique_haplotype_matrix_[(j * unique_haplotype_cnt_) + sample_mappings_[i]];
-          }
-          switch (*(hap_array_beg + i))
-          {
-            case allele_status::has_ref: column_string[j] = '0'; break;
-            case allele_status::has_alt: column_string[j] = '1'; break;
-            case allele_status::is_missing: column_string[j] = '.'; break;
-          }
+          sample_mappings_.resize(hap_array_sz, 0xFFFFFFFF);
 
-          std::uint32_t unique_hap_offset = 0;
-          auto find_it = new_unique_haps.begin();
-          while (find_it != new_unique_haps.end())
+          char hap;
+          switch (*hap_array_beg)
           {
-            if (*find_it == column_string)
+            case allele_status::has_ref:
+              hap = '0';
               break;
-            ++find_it;
-            ++unique_hap_offset;
+            case allele_status::has_alt:
+              hap = '1';
+              break;
+            case allele_status::is_missing:
+              hap = '.';
+              break;
           }
 
-          if (find_it == new_unique_haps.end())
-            new_unique_haps.push_back(column_string);
+          unique_haplotype_matrix_.emplace_back(1, hap);
+          sample_mappings_[0] = 0;
 
-          new_sample_mappings[i] = unique_hap_offset;
-        }
-
-        std::int64_t new_savings = static_cast<std::int64_t>(hap_array_sz * (markers_.size() + 1)) - static_cast<std::int64_t>(new_unique_haps.size() * (markers_.size() + 1) + hap_array_sz);
-        if (new_savings >= current_savings)
-        {
-          markers_.push_back(marker(*this, markers_.size(), "", position, ref, alt));
-          std::vector<char> new_unique_haplotype_matrix(new_unique_haps.size() * markers_.size());
-
-          std::size_t i = 0;
-          for (auto it = new_unique_haps.begin(); it != new_unique_haps.end(); ++it,++i)
+          for (std::size_t i = 1; i < hap_array_sz; ++i)
           {
-            for (std::size_t j = 0; j < it->size(); ++j)
+            switch (*(hap_array_beg + i))
             {
-              new_unique_haplotype_matrix[(j * new_unique_haps.size()) + i] = (*it)[j];
+              case allele_status::has_ref:
+                hap = '0';
+                break;
+              case allele_status::has_alt:
+                hap = '1';
+                break;
+              case allele_status::is_missing:
+                hap = '.';
+                break;
             }
+
+            std::size_t j = 0;
+            for (; j < unique_haplotype_matrix_.size(); ++j)
+            {
+              if (unique_haplotype_matrix_[j].back() == hap)
+                break;
+            }
+
+            if (j == unique_haplotype_matrix_.size())
+              unique_haplotype_matrix_.emplace_back(1, hap);
+
+            sample_mappings_[i] = static_cast<std::uint32_t>(j);
           }
 
-          unique_haplotype_cnt_ = new_unique_haps.size();
-          unique_haplotype_matrix_ = std::move(new_unique_haplotype_matrix);
-          sample_mappings_ = std::move(new_sample_mappings);
-
+          markers_.push_back(marker(*this, 0, "", position, ref, alt));
+          unique_haplotype_cnt_ = unique_haplotype_matrix_.size();
           ret = true;
+        }
+        else
+        {
+          const std::size_t old_marker_size = markers_.size();
+          const std::size_t new_marker_size = old_marker_size + 1;
+          const std::size_t old_haplotype_matrix_column_count = unique_haplotype_matrix_.size();
+
+          std::int64_t current_savings = static_cast<std::int64_t>(hap_array_sz * old_marker_size) - static_cast<std::int64_t>(old_haplotype_matrix_column_count * old_marker_size + hap_array_sz);
+
+          if (hap_array_sz == sample_mappings_.size())
+          {
+            for (std::size_t i = 0; i < hap_array_sz; ++i)
+            {
+              char hap;
+              switch (*(hap_array_beg + i))
+              {
+                case allele_status::has_ref:
+                  hap = '0';
+                  break;
+                case allele_status::has_alt:
+                  hap = '1';
+                  break;
+                case allele_status::is_missing:
+                  hap = '.';
+                  break;
+              }
+
+              if (unique_haplotype_matrix_[sample_mappings_[i]].size() == old_marker_size)
+              {
+                unique_haplotype_matrix_[sample_mappings_[i]].push_back(hap);
+              }
+              else
+              {
+                if (unique_haplotype_matrix_[sample_mappings_[i]][old_marker_size] != hap)
+                {
+                  std::size_t new_columns_index = old_haplotype_matrix_column_count;
+                  for (; new_columns_index < unique_haplotype_matrix_.size(); ++new_columns_index)
+                  {
+                    std::vector<char>& new_column_to_compare = unique_haplotype_matrix_[new_columns_index];
+
+                    if (memcmp(new_column_to_compare.data(), unique_haplotype_matrix_[sample_mappings_[i]].data(), old_marker_size) == 0 && new_column_to_compare.back() == hap)
+                      break;
+                  }
+
+                  if (new_columns_index == unique_haplotype_matrix_.size())
+                  {
+                    unique_haplotype_matrix_.emplace_back(unique_haplotype_matrix_[sample_mappings_[i]]);
+                    unique_haplotype_matrix_.back().back() = hap;
+                  }
+                  sample_mappings_[i] = static_cast<std::uint32_t>(new_columns_index); //TODO: Check if in 32-bit range.
+                }
+              }
+            }
+
+            markers_.push_back(marker(*this, markers_.size(), "", position, ref, alt));
+            unique_haplotype_cnt_ = unique_haplotype_matrix_.size();
+
+            std::int64_t new_savings = static_cast<std::int64_t>(hap_array_sz * new_marker_size) - static_cast<std::int64_t>(unique_haplotype_cnt_ * new_marker_size + hap_array_sz);
+
+            if (new_savings >= current_savings)
+              ret = true;
+            else
+              ret = false; // TODO: Remove last marker.
+
+          }
         }
       }
 
       return ret;
     }
+
+//    template <typename RandAccessAlleleStatusIt>
+//    bool block::add_marker(std::uint64_t position, const std::string& ref, const std::string& alt, RandAccessAlleleStatusIt hap_array_beg, RandAccessAlleleStatusIt hap_array_end)
+//    {
+//      bool ret = false;
+//
+//      std::size_t hap_array_sz = hap_array_end - hap_array_beg;
+//      if (markers_.size() == 0)
+//        sample_mappings_.resize(hap_array_sz, 0xFFFFFFFF);
+//      if (hap_array_sz == sample_mappings_.size())
+//      {
+//        std::int64_t current_savings = static_cast<std::int64_t>(hap_array_sz * markers_.size()) - static_cast<std::int64_t>(unique_haplotype_cnt_ * markers_.size() + hap_array_sz);
+//
+//        std::list<std::string> new_unique_haps;
+//
+//        std::string column_string(markers_.size() + 1, '\0');
+//        std::vector<std::uint32_t> new_sample_mappings(hap_array_sz);
+//
+//        for (std::size_t i = 0; i < hap_array_sz; ++i)
+//        {
+//          std::size_t j = 0;
+//          for (; j < markers_.size(); ++j)
+//          {
+//            column_string[j] = unique_haplotype_matrix_[(j * unique_haplotype_cnt_) + sample_mappings_[i]];
+//          }
+//          switch (*(hap_array_beg + i))
+//          {
+//            case allele_status::has_ref: column_string[j] = '0'; break;
+//            case allele_status::has_alt: column_string[j] = '1'; break;
+//            case allele_status::is_missing: column_string[j] = '.'; break;
+//          }
+//
+//          std::uint32_t unique_hap_offset = 0;
+//          auto find_it = new_unique_haps.begin();
+//          while (find_it != new_unique_haps.end())
+//          {
+//            if (*find_it == column_string)
+//              break;
+//            ++find_it;
+//            ++unique_hap_offset;
+//          }
+//
+//          if (find_it == new_unique_haps.end())
+//            new_unique_haps.push_back(column_string);
+//
+//          new_sample_mappings[i] = unique_hap_offset;
+//        }
+//
+//        std::int64_t new_savings = static_cast<std::int64_t>(hap_array_sz * (markers_.size() + 1)) - static_cast<std::int64_t>(new_unique_haps.size() * (markers_.size() + 1) + hap_array_sz);
+//        if (new_savings >= current_savings)
+//        {
+//          markers_.push_back(marker(*this, markers_.size(), "", position, ref, alt));
+//          std::vector<char> new_unique_haplotype_matrix(new_unique_haps.size() * markers_.size());
+//
+//          std::size_t i = 0;
+//          for (auto it = new_unique_haps.begin(); it != new_unique_haps.end(); ++it,++i)
+//          {
+//            for (std::size_t j = 0; j < it->size(); ++j)
+//            {
+//              new_unique_haplotype_matrix[(j * new_unique_haps.size()) + i] = (*it)[j];
+//            }
+//          }
+//
+//          unique_haplotype_cnt_ = new_unique_haps.size();
+//          unique_haplotype_matrix_ = std::move(new_unique_haplotype_matrix);
+//          sample_mappings_ = std::move(new_sample_mappings);
+//
+//          ret = true;
+//        }
+//      }
+//
+//      return ret;
+//    }
   }
 }
 

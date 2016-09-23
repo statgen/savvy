@@ -46,16 +46,16 @@ namespace vc
         if (detail::has_extension(file_path, ".cvcf"))
         {
           std::ifstream ifs(file_path);
-          variadic_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::cvcf::reader(ifs))), std::forward<Fn>(handler), addl_file_paths...);
+          variadic_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::cvcf::reader(ifs))), std::ref(handler), addl_file_paths...);
         }
         else if (detail::has_extension(file_path, ".m3vcf"))
         {
           std::ifstream ifs(file_path);
-          variadic_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::m3vcf::reader(ifs))), std::forward<Fn>(handler), addl_file_paths...);
+          variadic_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::m3vcf::reader(ifs))), std::ref(handler), addl_file_paths...);
         }
         else if (detail::has_extension(file_path, ".vcf") || detail::has_extension(file_path, "vcf.gz") || detail::has_extension(file_path, ".bcf"))
         {
-          variadic_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::vcf::reader(file_path))), std::forward<Fn>(handler), addl_file_paths...);
+          variadic_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::vcf::reader(file_path))), std::ref(handler), addl_file_paths...);
         }
       }
     };
@@ -70,11 +70,11 @@ namespace vc
   template <typename... TplArgs, typename Fn>
   void open_marker_files(const std::tuple<TplArgs...>& file_paths, Fn&& handler)
   {
-    detail::apply(detail::variadic_opener(), std::tuple_cat(std::make_tuple(std::tuple<>(), std::forward<Fn>(handler)), file_paths));
+    detail::apply(detail::variadic_opener(), std::tuple_cat(std::make_tuple(std::tuple<>(), std::ref(handler)), file_paths));
   }
 
   template <typename Fn>
-  void open_marker_file(const std::string& file_path, Fn& handler)
+  void open_marker_file(const std::string& file_path, Fn&& handler)
   {
     if (detail::has_extension(file_path, ".cvcf"))
     {
@@ -95,17 +95,19 @@ namespace vc
     }
   }
 
-  template <typename Fn>
-  void open_marker_file(const std::string& file_path, Fn&& handler)
-  {
-    open_marker_file(file_path, handler);
-  }
+//  template <typename Fn>
+//  void open_marker_file(const std::string& file_path, Fn&& handler)
+//  {
+//    open_marker_file(file_path, std::move(handler));
+//  }
 
+  template<typename Fn>
   class marker_reader_iterator
   {
   public:
-    template<typename Reader, typename Fn>
-    void operator()(Reader&& r, Fn&& handler)
+    marker_reader_iterator(Fn& fn) : handler_(fn) {}
+    template<typename Reader>
+    void operator()(Reader&& r)
     {
       typename Reader::input_iterator::buffer buf;
       typename Reader::input_iterator eof;
@@ -113,16 +115,19 @@ namespace vc
 
       while (it != eof)
       {
-        handler(*it);
+        handler_(*it);
         ++it;
       }
     }
+  private:
+    Fn& handler_;
   };
 
   template <typename Fn>
   void iterate_marker_file(const std::string& file_path, Fn&& handler)
   {
-    open_marker_file(file_path, std::bind(marker_reader_iterator(), std::placeholders::_1, std::forward<Fn>(handler)));
+    marker_reader_iterator<Fn> mrkr_iter_functor(handler);
+    open_marker_file(file_path, mrkr_iter_functor);
   }
 }
 #endif //LIBVC_VC_HPP
