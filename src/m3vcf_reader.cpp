@@ -13,6 +13,32 @@ namespace vc
 {
   namespace m3vcf
   {
+    namespace detail
+    {
+      void deserialize_string(std::string& output, std::istream& input)
+      {
+        std::size_t i = 0;
+        char cur = 0;
+        while (input.get(cur) && cur == (char)255)
+          ++i;
+        output.resize(i * 255 + (unsigned char)cur);
+        if (output.size())
+          input.read(&output[0], output.size());
+      }
+
+      void serialize_string(std::ostream& output, const std::string& input)
+      {
+        std::size_t string_size = input.size();
+        while (string_size >= 255)
+        {
+          output.put((char)255);
+          string_size -= 255;
+        }
+        output.put((char)string_size);
+        output.write(input.data(), input.size());
+      }
+    }
+
     //================================================================//
     marker::marker(block& parent, std::uint32_t offset, const std::string& chromosome, std::uint64_t position, const std::string& ref, const std::string& alt)
       :
@@ -194,33 +220,15 @@ namespace vc
         std::uint64_t pos;
         source.read((char*)(&pos), 8);
 
-        std::uint8_t sz = 0;
+
         std::string marker_id;
-        source.read((char*)&sz, 1);
-        if (sz)
-        {
-          marker_id.resize(sz);
-          source.read(&marker_id[0], sz);
-        }
+        detail::deserialize_string(marker_id, source);
 
-
-        sz = 0;
         std::string ref;
-        source.read((char*)&sz, 1);
-        if (sz)
-        {
-          ref.resize(sz);
-          source.read(&ref[0], sz);
-        }
+        detail::deserialize_string(ref, source);
 
-        sz = 0;
         std::string alt;
-        source.read((char*)&sz, 1);
-        if (sz)
-        {
-          alt.resize(sz);
-          source.read(&alt[0], sz);
-        }
+        detail::deserialize_string(alt, source);
 
         destination.markers_.emplace_back(destination, i, "[CHROM]", be64toh(pos), ref, alt);
 
@@ -291,14 +299,12 @@ namespace vc
       {
         std::uint64_t pos_nbo = htobe64(it->pos());
         destination.write((char*)(&pos_nbo), 8);
-        destination.put(0); // rsid
-        std::uint8_t sz = std::uint8_t(0xFF & it->ref().size());
-        destination.put(sz);
-        destination.write(it->ref().data(), sz);
 
-        sz = std::uint8_t(0xFF & it->alt().size());
-        destination.put(sz);
-        destination.write(it->alt().data(), sz);
+        detail::serialize_string(destination, ""); // rsid
+
+        detail::serialize_string(destination, it->ref());
+
+        detail::serialize_string(destination, it->alt());
 
         //destination.write(&(source.unique_haplotype_matrix_[i * source.unique_haplotype_cnt_]), source.unique_haplotype_cnt_);
         std::vector<char> tmp(source.unique_haplotype_matrix_.size());
@@ -320,15 +326,9 @@ namespace vc
       std::string version_string(9, '\0');
       input_stream_.read(&version_string[0], version_string.size());
 
-      std::uint8_t str_sz = 0;
-      std::string chromosome;
-      input_stream_.read((char*)&str_sz, 1);
-      if (str_sz)
-      {
-        chromosome.resize(str_sz);
-        input_stream_.read(&chromosome[0], str_sz);
-      }
 
+      std::string chromosome;
+      detail::deserialize_string(chromosome, input_stream_);
 
       input_stream_.read((char*)&ploidy_level_, 1);
 
@@ -338,13 +338,8 @@ namespace vc
       sample_ids_.reserve(sample_size);
       for (std::size_t i = 0; i < sample_size; ++i)
       {
-        std::uint8_t sz = 0;
-        input_stream_.read((char*)(&sz), 1);
-        sample_ids_.emplace_back(sz, '\0');
-        if (sz)
-        {
-          input_stream_.read(&sample_ids_.back()[0], sz);
-        }
+        sample_ids_.emplace_back();
+        detail::deserialize_string(sample_ids_.back(), input_stream_);
       }
     }
 

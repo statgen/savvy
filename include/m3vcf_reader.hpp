@@ -15,6 +15,12 @@ namespace vc
 {
   namespace m3vcf
   {
+    namespace detail
+    {
+      void deserialize_string(std::string& output, std::istream& input);
+      void serialize_string(std::ostream& output, const std::string& input);
+    }
+
     class block;
 
     class marker
@@ -208,9 +214,8 @@ namespace vc
         std::string version_string("m3vcf\x00\x01\x00\x00", 9);
         output_stream_.write(version_string.data(), version_string.size());
 
-        std::uint8_t str_sz = std::uint8_t(0xFF & chromosome.size());
-        output_stream_.put(str_sz);
-        output_stream_.write(chromosome.data(), str_sz);
+
+        detail::serialize_string(output_stream_, chromosome);
 
         output_stream_.put(ploidy_level_);
 
@@ -218,9 +223,7 @@ namespace vc
         output_stream_.write((char*)(&sample_size_nbo), 8);
         for (auto it = samples_beg; it != samples_end; ++it)
         {
-          std::uint8_t sz = std::uint8_t(0xFF & it->size());
-          output_stream_.put(sz);
-          output_stream_.write(it->data(), sz);
+          detail::serialize_string(output_stream_, *it);
         }
       }
 

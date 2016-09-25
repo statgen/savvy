@@ -2,10 +2,11 @@
 
 ## Variable Length String (VLS) Encoding
 ```
-+----------+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
-| SSSSSSSS |         STRING_DATA         |
-+----------+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
-* S: Size of string.
++----------+~~~~~~~~~~+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+| SSSSSSSS | AAAAAAAA |         STRING_DATA         |
++----------+~~~~~~~~~~+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+* S: Size of string byte.
+* A: Additional size of string bytes. All size bytes sum to total string size. An additional size byte can only be preceded by a size byte of 255.
 * STRING_DATA: String payload stored in S bytes.
 ```
 

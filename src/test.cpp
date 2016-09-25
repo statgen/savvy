@@ -404,7 +404,7 @@ void convert_file_test()
 {
   {
     vc::vcf::block buff;
-    vc::vcf::reader input("chr1.bcf");
+    vc::vcf::reader input("sample_file.vcf");
     vc::vcf::reader::input_iterator eof;
     vc::vcf::reader::input_iterator cur(input, buff);
 
@@ -419,7 +419,7 @@ void convert_file_test()
 
     std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
     std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-    std::ofstream ofs("chr1.m3vcf", std::ios::binary);
+    std::ofstream ofs("sample_file.m3vcf", std::ios::binary);
     vc::m3vcf::writer compact_output(ofs, "1", 2, sample_ids.begin(), sample_ids.end());
     vc::m3vcf::block output_buffer(sample_ids.size(), 2);
 
@@ -551,9 +551,9 @@ private:
     std::size_t num_markers = 0;
     while (cur != end)
     {
-      ret = std::hash<std::uint64_t>()(cur->pos()) ^ ret;
-      ret = std::hash<std::string>()(cur->ref()) ^ ret;
-      ret = std::hash<std::string>()(cur->alt()) ^ ret;
+      ret = hash_combine(ret, cur->pos());
+      ret = hash_combine(ret, cur->ref());
+      ret = hash_combine(ret, cur->alt());
 
       for (auto gt = cur->begin(); gt != cur->end(); ++gt)
         ret = hash_combine(ret, static_cast<int>(*gt));
@@ -578,7 +578,7 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 void run_file_checksum_test()
 {
 
-  vc::open_marker_files(std::make_tuple("chr1.bcf", "chr1.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
+  vc::open_marker_files(std::make_tuple("sample_file.vcf", "sample_file.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
   {
     auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
     std::cout << "Starting checksum test ..." << std::endl;
