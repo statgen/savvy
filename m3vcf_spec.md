@@ -20,9 +20,9 @@
 +-----------------------------------------------------------------------------------+
 
 
-+vvvvvvvvv+----------+-------------------------------------+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
-|  CHROM  | PPPPPPPP | SSSSSSSS SSSSSSSS SSSSSSSS SSSSSSSS |     SAMPLE_ID_ARRAY ...     |
-+vvvvvvvvv+----------+-------------------------------------+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
++vvvvvvvvv+-------------------------------------+-------------------------------------+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
+|  CHROM  | PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP | SSSSSSSS SSSSSSSS SSSSSSSS SSSSSSSS |     SAMPLE_ID_ARRAY ...     |
++vvvvvvvvv+-------------------------------------+-------------------------------------+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
 * CHROM: Chromosome string stored has VLS.
 * P: Ploidy level stored in 1 byte.
 * S: Number of samples stored in 4 bytes.

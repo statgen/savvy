@@ -330,11 +330,12 @@ namespace vc
       std::string chromosome;
       detail::deserialize_string(chromosome, input_stream_);
 
-      input_stream_.read((char*)&ploidy_level_, 1);
+      input_stream_.read((char*)(&ploidy_level_), 4);
+      ploidy_level_ = be32toh(ploidy_level_);
 
-      std::uint64_t sample_size = 0;
-      input_stream_.read((char*)(&sample_size), 8);
-      sample_size = be64toh(sample_size);
+      std::uint32_t sample_size = 0;
+      input_stream_.read((char*)(&sample_size), 4);
+      sample_size = be32toh(sample_size);
       sample_ids_.reserve(sample_size);
       for (std::size_t i = 0; i < sample_size; ++i)
       {

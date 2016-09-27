@@ -198,7 +198,7 @@ namespace vc
     private:
       const std::string file_path_;
       std::istream& input_stream_;
-      std::uint8_t ploidy_level_;
+      std::uint32_t ploidy_level_;
       std::vector<std::string> sample_ids_;
     };
 
@@ -206,7 +206,7 @@ namespace vc
     {
     public:
       template <typename RandAccessStringIterator>
-      writer(std::ostream& output_stream, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end) :
+      writer(std::ostream& output_stream, const std::string& chromosome, std::uint32_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end) :
         output_stream_(output_stream),
         sample_size_(samples_end - samples_beg),
         ploidy_level_(ploidy)
@@ -217,10 +217,10 @@ namespace vc
 
         detail::serialize_string(output_stream_, chromosome);
 
-        output_stream_.put(ploidy_level_);
-
-        std::uint64_t sample_size_nbo = htobe64(sample_size_);
-        output_stream_.write((char*)(&sample_size_nbo), 8);
+        std::uint32_t ploidy_nbo = htobe32(ploidy);
+        output_stream_.write((char*)(&ploidy_nbo), 4);
+        std::uint32_t sample_size_nbo = htobe32(sample_size_);
+        output_stream_.write((char*)(&sample_size_nbo), 4);
         for (auto it = samples_beg; it != samples_end; ++it)
         {
           detail::serialize_string(output_stream_, *it);
@@ -241,8 +241,8 @@ namespace vc
 
     private:
       std::ostream& output_stream_;
-      std::uint64_t sample_size_;
-      std::uint8_t ploidy_level_;
+      std::uint32_t sample_size_;
+      std::uint32_t ploidy_level_;
     };
 
     template <typename RandAccessAlleleStatusIt>
