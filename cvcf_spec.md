@@ -20,21 +20,26 @@ All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB12
 +-------------------------------------------------------------------------+
 | 01100011 01110110 01100011 01100110 XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX |
 +-------------------------------------------------------------------------+
-+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
-| SAMPLE_SIZE |     SAMPLE_ID_ARRAY ...     |
-+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
-+vvvvvvvvv+~~~~~~~~~~~~~~+
-|  CHROM  | PLOIDY_LEVEL |
-+vvvvvvvvv+~~~~~~~~~~~~~~+
++vvvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
+|  CHROM  | PLOIDY_LEVEL | SAMPLE_SIZE |     SAMPLE_ID_ARRAY ...     |
++vvvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
 * CHROM: Chromosome string stored has VLS.
 * PLOIDY_LEVEL: Ploidy level stored has VLI.
 * SAMPLE_SIZE: Number of samples stored has VLI.
 * SAMPLE_ID_ARRAY: Array of length SAMPLE_SIZE that stores sample ID's in VLS encoding.
 
++~~~~~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
+| META_FIELDS_CNT |     META_FIELDS_ARRAY ...   |
++~~~~~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
+* META_FIELDS_CNT: Number of metadata fields.
+* META_FIELDS_ARRAY: Array of length META_FIELDS_CNT that stores metadata fiels in VLS encoding.
+
 ```
 
 ## Haplotype Pairs
-Haplotype pairs are encoded in 1 or more bytes. The first bit of the first byte is determines whether the pair represents a missing or alternate allele. The next 7 bits and any additional bytes in the pair make up a VLI that represents an offset from the previous non-zero haplotype.
+Haplotype pairs are encoded in 1 or more bytes. The first bit of the first byte is determines whether the pair represents a missing or alternate allele. The next 7 bits and any additional bytes in the pair make up a VLI that represents a zero-based offset from the previous non-zero haplotype. 
+
+When run-length encoding is applied to the the marker, repeated haplotype pairs are compressed into one haplotype pair followed by a VLI that represents the number of repeats. The second bit of the first byte of the haplotype pair determines whether this repeat VLI exists.
 
 ### Example
 ```
@@ -47,19 +52,26 @@ A missing haplotype with an offset of 8000.
 +-+--------+ +---------+
 |0|100 0000| |0111 1101|
 +-+--------+ +---------+
+
+4 consecutive alleles with an offset of 1 (e.g., 0|1 0|1 0|1 0|1).
++-+-+-------+ +-+--------+
+|0|1|00 0001| |0|000 0100|
++-+-+-------+ +-+--------+
 ```
 
 ## Record Format
 ```
-+~~~~~~~~~+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVV+
-|   POS   |  MARKID  |   REF   |   ALT   |  HPA_SZ  | HAP_PAIR_ARRAY ... |
-+~~~~~~~~~+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVV+
++~~~~~~~~~+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+-+~~~~~~~~~+VVVVVVVVVVVVVVVVVVVV+
+|   POS   |   REF   |   ALT   | META_VALUE_ARRAY ... |R| HPA_SZ  | HAP_PAIR_ARRAY ... |
++~~~~~~~~~+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+-+~~~~~~~~~+VVVVVVVVVVVVVVVVVVVV+
 
 * POS: Chromosome pos stored has VLI.
 * MARKID: Marker ID string stored has VLS.
 * REF: Reference haplotype stored has VLS.
 * ALT: Alternate haplotype stored has VLS.
-* HPA_SZ: Size of paplotype pair array stored as VLI.
+* META_VALUE_ARRAY: Array of size META_FIELDS_CNT that stores metadata for each marker. Values correspond to META_FIELDS_ARRAY in header.
+* R: Run-length encoding bit. If set, HAP_PAIR_ARRAY has extra run-length encoding applied.
+* HPA_SZ: Size of haplotype pair array stored as VLI with on bit prefix.
 * HAP_PAIR_ARRAY: Array of size HPA_SZ that stores alleles or missing haplotypes in Haplotype Pair encoding.
 
 ```

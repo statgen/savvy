@@ -143,7 +143,8 @@ namespace vc
         input_iterator() : file_reader_(nullptr), buffer_(nullptr), i_(0) {}
         input_iterator(reader& file_reader, block& buffer) : file_reader_(&file_reader), buffer_(&buffer), i_(0)
         {
-          file_reader_->read_next_block(*buffer_);
+          if (!file_reader_->read_next_block(*buffer_))
+            file_reader_ = nullptr;
         }
         void increment()
         {

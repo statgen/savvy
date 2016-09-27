@@ -96,6 +96,8 @@ namespace vc
             if (destination.alt_.size())
               is.read(&destination.alt_[0], destination.alt_.size());
 
+            // TODO: Read metadata values.
+
             std::uint8_t rle = 0;
             one_bit_prefixed_varint::decode(in_it, end_it, rle, sz);
             if (rle)
@@ -195,9 +197,6 @@ namespace vc
           last_pos = it->offset + 1;
         }
 
-        std::uint8_t allele_repeat_prefix = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
-        if (number_of_repeats)
-          allele_repeat_prefix |= 0x40;
         ret_sz += two_bit_prefixed_varint::encoded_byte_width(offset);
 
         if (number_of_repeats)
@@ -283,48 +282,72 @@ namespace vc
       std::string version_string(8, '\0');
       input_stream_.read(&version_string[0], version_string.size());
 
-      std::uint64_t sample_size;
+
       std::istreambuf_iterator<char> in_it(input_stream_);
       std::istreambuf_iterator<char> end;
 
-      if (varint_decode(in_it, end, sample_size) != end)
+      std::uint64_t sz;
+      if (varint_decode(in_it, end, sz) != end)
       {
         ++in_it;
-        sample_ids_.reserve(sample_size);
-
-        std::uint64_t id_sz;
-        while (sample_size && varint_decode(in_it, end, id_sz) != end)
+        if (sz)
         {
-            ++in_it;
-            sample_ids_.emplace_back();
-            if (id_sz)
-            {
-              sample_ids_.back().resize(id_sz);
-              input_stream_.read(&sample_ids_.back()[0], id_sz);
-            }
-            --sample_size;
+          chromosome_.resize(sz);
+          input_stream_.read(&chromosome_[0], sz);
         }
 
-        if (sample_size == 0)
+        varint_decode(in_it, end, sz);
+        assert(sz < 256);
+        ploidy_level_ = static_cast<std::uint8_t>(sz);
+
+        if (in_it != end)
         {
-          std::uint64_t sz;
-          if (varint_decode(in_it, end, sz) != end)
+          std::uint64_t sample_size;
+          if (varint_decode(++in_it, end, sample_size) != end)
           {
             ++in_it;
-            if (sz)
+            sample_ids_.reserve(sample_size);
+
+            std::uint64_t id_sz;
+            while (sample_size && varint_decode(in_it, end, id_sz) != end)
             {
-              chromosome_.resize(sz);
-              input_stream_.read(&chromosome_[0], sz);
+              ++in_it;
+              sample_ids_.emplace_back();
+              if (id_sz)
+              {
+                sample_ids_.back().resize(id_sz);
+                input_stream_.read(&sample_ids_.back()[0], id_sz);
+              }
+              --sample_size;
             }
 
-            varint_decode(in_it, end, sz);
-            assert(sz < 256);
-            ploidy_level_ = static_cast<std::uint8_t>(sz);
+            std::uint64_t metadata_fields_cnt;
+            if (varint_decode(in_it, end, metadata_fields_cnt) != end)
+            {
+              ++in_it;
+              sample_ids_.reserve(sample_size);
+
+              std::uint64_t field_sz;
+              while (metadata_fields_cnt && varint_decode(in_it, end, field_sz) != end)
+              {
+                ++in_it;
+                metadata_fields_.emplace_back();
+                if (field_sz)
+                {
+                  metadata_fields_.back().resize(field_sz);
+                  input_stream_.read(&metadata_fields_.back()[0], field_sz);
+                }
+                --metadata_fields_cnt;
+              }
+
+              if (!metadata_fields_cnt)
+                return; //TODO: This is ugly. Consider not depending on on istream error handling.
+            }
           }
         }
       }
 
-      input_stream_.get();
+      input_stream_.peek();
     }
 
     reader& reader::operator>>(marker& destination)

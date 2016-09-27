@@ -197,6 +197,7 @@ namespace vc
       std::string chromosome_;
       std::istream& input_stream_;
       std::uint8_t ploidy_level_;
+      std::vector<std::string> metadata_fields_;
     };
 
     class writer
@@ -212,6 +213,11 @@ namespace vc
         output_stream_.write(version_string.data(), version_string.size());
 
         std::ostreambuf_iterator<char> out_it(output_stream_);
+
+        varint_encode(chromosome.size(), out_it);
+        std::copy(chromosome.begin(), chromosome.end(), out_it);
+        varint_encode(ploidy_level_, out_it);
+
         varint_encode(sample_size_, out_it);
         for (auto it = samples_beg; it != samples_end; ++it)
         {
@@ -219,9 +225,7 @@ namespace vc
           output_stream_.write(it->data(), it->size());
         }
 
-        varint_encode(chromosome.size(), out_it);
-        std::copy(chromosome.begin(), chromosome.end(), out_it);
-        varint_encode(ploidy_level_, out_it);
+        varint_encode(0, out_it); // TODO: metadata fields.
       }
 
       writer& operator<<(const marker& m)
@@ -240,6 +244,7 @@ namespace vc
       std::ostream& output_stream_;
       std::uint64_t sample_size_;
       std::uint8_t ploidy_level_;
+      std::uint32_t metadata_fields_cnt_;
     };
 
 
