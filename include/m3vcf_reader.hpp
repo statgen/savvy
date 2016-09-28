@@ -168,7 +168,7 @@ namespace vc
         input_iterator() : file_reader_(nullptr), buffer_(nullptr), i_(0) {}
         input_iterator(reader& file_reader, block& buffer) : file_reader_(&file_reader), buffer_(&buffer), i_(0)
         {
-          file_reader_->read_next_block(*buffer_);
+          *file_reader_ >> *buffer_;
         }
         void increment()
         {
@@ -176,7 +176,7 @@ namespace vc
           if (i_ >= buffer_->marker_count())
           {
             i_ = 0;
-            if (!file_reader_->read_next_block(*buffer_))
+            if (!(*file_reader_ >> *buffer_))
               file_reader_ = nullptr;
           }
         }
@@ -193,8 +193,12 @@ namespace vc
       };
 
       reader(std::istream& input_stream);
+      explicit operator bool() const { return input_stream_.good(); }
+      bool good() const { return input_stream_.good(); }
+      bool fail() const { return input_stream_.fail(); }
+      bool bad() const { return input_stream_.bad(); }
       std::uint64_t sample_count() const { return sample_ids_.size(); }
-      bool read_next_block(block& destination);
+      reader& operator>>(block& destination);
     private:
       const std::string file_path_;
       std::istream& input_stream_;

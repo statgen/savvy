@@ -344,9 +344,10 @@ namespace vc
       }
     }
 
-    bool reader::read_next_block(block& destination)
+    reader& reader::operator>>(block& destination)
     {
-      return block::read(destination, input_stream_, sample_ids_.size(), ploidy_level_);
+      block::read(destination, input_stream_, sample_ids_.size(), ploidy_level_);
+      return  *this;
     }
     //================================================================//
   }
