@@ -316,6 +316,7 @@ namespace vc
 
           if (hap_array_sz == sample_mappings_.size())
           {
+            std::vector<std::uint32_t> tmp_sample_mappings = sample_mappings_;
             for (std::size_t i = 0; i < hap_array_sz; ++i)
             {
               char hap;
@@ -332,43 +333,51 @@ namespace vc
                   break;
               }
 
-              if (unique_haplotype_matrix_[sample_mappings_[i]].size() == old_marker_size)
+              if (unique_haplotype_matrix_[tmp_sample_mappings[i]].size() == old_marker_size)
               {
-                unique_haplotype_matrix_[sample_mappings_[i]].push_back(hap);
+                unique_haplotype_matrix_[tmp_sample_mappings[i]].push_back(hap);
               }
               else
               {
-                if (unique_haplotype_matrix_[sample_mappings_[i]][old_marker_size] != hap)
+                if (unique_haplotype_matrix_[tmp_sample_mappings[i]][old_marker_size] != hap)
                 {
                   std::size_t new_columns_index = old_haplotype_matrix_column_count;
                   for (; new_columns_index < unique_haplotype_matrix_.size(); ++new_columns_index)
                   {
                     std::vector<char>& new_column_to_compare = unique_haplotype_matrix_[new_columns_index];
 
-                    if (memcmp(new_column_to_compare.data(), unique_haplotype_matrix_[sample_mappings_[i]].data(), old_marker_size) == 0 && new_column_to_compare.back() == hap)
+                    if (memcmp(new_column_to_compare.data(), unique_haplotype_matrix_[tmp_sample_mappings[i]].data(), old_marker_size) == 0 && new_column_to_compare.back() == hap)
                       break;
                   }
 
                   if (new_columns_index == unique_haplotype_matrix_.size())
                   {
-                    unique_haplotype_matrix_.emplace_back(unique_haplotype_matrix_[sample_mappings_[i]]);
+                    unique_haplotype_matrix_.emplace_back(unique_haplotype_matrix_[tmp_sample_mappings[i]]);
                     unique_haplotype_matrix_.back().back() = hap;
                   }
-                  sample_mappings_[i] = static_cast<std::uint32_t>(new_columns_index); //TODO: Check if in 32-bit range.
+                  tmp_sample_mappings[i] = static_cast<std::uint32_t>(new_columns_index); //TODO: Check if in 32-bit range.
                 }
               }
             }
 
-            markers_.push_back(marker(*this, markers_.size(), "", position, ref, alt));
-            unique_haplotype_cnt_ = unique_haplotype_matrix_.size();
 
-            std::int64_t new_savings = static_cast<std::int64_t>(hap_array_sz * new_marker_size) - static_cast<std::int64_t>(unique_haplotype_cnt_ * new_marker_size + hap_array_sz);
+
+            std::int64_t new_savings = static_cast<std::int64_t>(hap_array_sz * new_marker_size) - static_cast<std::int64_t>(unique_haplotype_matrix_.size() * new_marker_size + hap_array_sz);
 
             if (new_savings >= current_savings)
+            {
+              markers_.push_back(marker(*this, markers_.size(), "", position, ref, alt));
+              sample_mappings_ = std::move(tmp_sample_mappings);
+              unique_haplotype_cnt_ = unique_haplotype_matrix_.size();
               ret = true;
+            }
             else
-              ret = false; // TODO: Remove last marker.
-
+            {
+              // Undo unique_haplotype_matrix_ edits.
+              unique_haplotype_matrix_.erase(unique_haplotype_matrix_.begin() + old_haplotype_matrix_column_count, unique_haplotype_matrix_.end());
+              for (auto it = unique_haplotype_matrix_.begin(); it != unique_haplotype_matrix_.end(); ++it)
+                it->pop_back();
+            }
           }
         }
       }
