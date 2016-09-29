@@ -590,9 +590,9 @@ void run_file_checksum_test()
 }
 
 template <typename M>
-double inner_product(const M& mrkr, std::vector<double>& vec)
+double inner_product(const M& mrkr, std::vector<double>& vec, const double start_val = 0.0)
 {
-  double ret = 0;
+  double ret = start_val;
 
   std::size_t i = 0;
   for (const vc::allele_status& gt : mrkr)
@@ -606,9 +606,9 @@ double inner_product(const M& mrkr, std::vector<double>& vec)
 }
 
 template <>
-double inner_product<vc::cmf::marker>(const vc::cmf::marker& mrkr, std::vector<double>& vec)
+double inner_product<vc::cmf::marker>(const vc::cmf::marker& mrkr, std::vector<double>& vec, const double start_val)
 {
-  double ret = 0;
+  double ret = start_val;
 
   for (auto it = mrkr.non_ref_begin(); it != mrkr.non_ref_end(); ++it)
   {
@@ -689,6 +689,7 @@ public:
     typename T2::input_iterator cur2(input_file_reader2, buff2);
     typename T2::input_iterator end2;
 
+    inner_product(*cur2, *end2);
     while (cur != end)
     {
       ++file1_cnt_;

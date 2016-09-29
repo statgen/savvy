@@ -2,8 +2,8 @@
 Interface to various variant calling formats.
 
 
-#Examples
-Some of the functions/classes in these examples are not yet implemented but are here to show direction of where library is going.
+#Example Usage
+Some of the functions and classes in these examples are not yet implemented but are here to show direction of where library is going.
 
 ## Iterate Markers in Single File 
 ```c++
@@ -70,7 +70,7 @@ else
 ```c++
 template <typename T>
 std::vector<float> init_haplotypes(const T& marker,
-  const float missing_value = std::numeric_limits<float>::quiet_NaN()),
+  const float missing_value = std::numeric_limits<float>::quiet_NaN(),
   const float alt_value = 1.0,
   const float ref_value = 0.0)
 {
