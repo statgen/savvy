@@ -14,9 +14,9 @@
 ## Header Format
 ```
 +-----------------------------------------------------------------------------------+
-|             "m3vcf" string in binary + 4 bytes for version (1.0.0.0)              |
+|           "m3vcf" string in binary + 4 bytes for version (Major.minor)            |
 +-----------------------------------------------------------------------------------+
-| 01101101 00110011 01110110 01100011 01100110  XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX |
+| 01101101 00110011 01110110 01100011 01100110  MMMMMMMM MMMMMMMM mmmmmmmm mmmmmmmm |
 +-----------------------------------------------------------------------------------+
 
 
@@ -27,6 +27,12 @@
 * P: Ploidy level stored in 1 byte.
 * S: Number of samples stored in 4 bytes.
 * SAMPLE_ID_ARRAY: Array of length S that stores sample ID's in VLS encoding.
+
++----------+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
+| SSSSSSSS |     META_FIELDS_ARRAY ...   |
++----------+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
+* S: Number of metadata fields.
+* META_FIELDS_ARRAY: Array of length META_FIELDS_CNT that stores metadata fiels in VLS encoding.
 ```
 
 
@@ -35,9 +41,9 @@
 +-------------------------------------+---------------------------------------+VVVVVVVVVVVVVVVVVVVV+
 | MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM | NNNNNNNN  NNNNNNNN  NNNNNNNN NNNNNNNN | SAMPLE_MAPPING ... |
 +-------------------------------------+---------------------------------------+VVVVVVVVVVVVVVVVVVVV+
-+-------------------------------------------------------------------------+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVV+
-| PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP |  MARKID  |   REF   |   ALT   | UNIQUE_HAP_ROW ... |
-+-------------------------------------------------------------------------+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVV+
++-------------------------------------------------------------------------+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+VVVVVVVVVVVVVVVVVVVV+
+| PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP PPPPPPPP |  MARKID  |   REF   |   ALT   | META_VALUE_ARRAY ... | UNIQUE_HAP_ROW ... |
++-------------------------------------------------------------------------+vvvvvvvvvv+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+VVVVVVVVVVVVVVVVVVVV+
 ...
 
 
@@ -48,6 +54,7 @@
 * MARKID: Marker ID string stored has VLS.
 * REF: Reference haplotype stored has VLS.
 * ALT: Alternate haplotype stored has VLS.
+* META_VALUE_ARRAY: Array of VLS encoded strings that stores metadata for each marker. Values correspond to META_FIELDS_ARRAY in header.
 * UNIQUE_HAP_ROW: Array of '.', '0' or '1' bytes of size N.
 
 ```
