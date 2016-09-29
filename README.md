@@ -105,7 +105,7 @@ vc::open_marker_file(argv[1], [](auto&& file_reader)
   std::vector<float> phenotypes = init_phenotypes(file_reader.samples_begin(), file_reader.samples.end());
   for (const auto& marker: make_iterable_marker_stream(file_reader))
   {
-    std::vector<float> haplotypes = init_haplotypes(marker, std::numeric_limits<T>::epsilon());
+    std::vector<float> haplotypes = init_haplotypes(marker, std::numeric_limits<float>::epsilon());
     float avg = std::accumulate(haplotypes.begin(), haplotypes.end(), 0.0);
     float dot_product = std::inner_product(haplotypes.begin(), haplotypes.end(), phenotypes.begin(), 0.0);
   }
