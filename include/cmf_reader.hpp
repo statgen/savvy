@@ -13,7 +13,7 @@
 
 namespace vc
 {
-  namespace cvcf
+  namespace cmf
   {
     class marker
     {

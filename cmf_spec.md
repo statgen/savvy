@@ -1,7 +1,7 @@
-# CVCF Specification
+# Compact Marker Format Specification
 
 ## Variable Length Integer (VLI) Encoding
-All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB128). Encoded integers can start in the middle of a byte allowing 1 to 7 bits of data to prefix the integer. This prefixing is currently only being used with haplotype pairs.
+All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB128). Encoded integers can start in the middle of a byte allowing 1 to 7 bits of data to prefix the integer.
 
 ## Variable Length String (VLS) Encoding
 ```
@@ -15,11 +15,11 @@ All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB12
 
 ## Header Format
 ```
-+-------------------------------------------------------------------------+
-|        "cvcf" string in binary + 4 bytes for version (1.0.0.0)          |
-+-------------------------------------------------------------------------+
-| 01100011 01110110 01100011 01100110 XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX |
-+-------------------------------------------------------------------------+
++----------------------------------------------------------------+
+|   "cmf" string in binary + 4 bytes for version (Major.minor)   |
++----------------------------------------------------------------+
+| 01100011 01101101 01100110 MMMMMMMM MMMMMMMM mmmmmmmm mmmmmmmm |
++----------------------------------------------------------------+
 +vvvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
 |  CHROM  | PLOIDY_LEVEL | SAMPLE_SIZE |     SAMPLE_ID_ARRAY ...     |
 +vvvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+

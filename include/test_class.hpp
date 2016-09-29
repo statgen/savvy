@@ -1,7 +1,7 @@
 #ifndef LIBVC_TEST_CLASS_HPP
 #define LIBVC_TEST_CLASS_HPP
 
-#include "cvcf_reader.hpp"
+#include "cmf_reader.hpp"
 
 //================================================================//
 template <typename Reader>
@@ -52,7 +52,7 @@ void some_analysis<Reader>::handle_marker(const typename Reader::input_iterator:
 }
 
 template <>
-inline void some_analysis<vc::cvcf::reader>::handle_marker(const vc::cvcf::marker& m)
+inline void some_analysis<vc::cmf::reader>::handle_marker(const vc::cmf::marker& m)
 {
   for (auto jt = m.non_ref_begin(); jt != m.non_ref_end(); ++jt)
   {

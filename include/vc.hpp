@@ -2,7 +2,7 @@
 #define LIBVC_VC_HPP
 
 #include "vcf_reader.hpp"
-#include "cvcf_reader.hpp"
+#include "cmf_reader.hpp"
 #include "m3vcf_reader.hpp"
 
 #include <string>
@@ -46,7 +46,7 @@ namespace vc
         if (detail::has_extension(file_path, ".cvcf"))
         {
           std::ifstream ifs(file_path);
-          variadic_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::cvcf::reader(ifs))), std::ref(handler), addl_file_paths...);
+          variadic_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::cmf::reader(ifs))), std::ref(handler), addl_file_paths...);
         }
         else if (detail::has_extension(file_path, ".m3vcf"))
         {
@@ -79,7 +79,7 @@ namespace vc
     if (detail::has_extension(file_path, ".cvcf"))
     {
       std::ifstream ifs(file_path);
-      vc::cvcf::reader input(ifs);
+      vc::cmf::reader input(ifs);
       handler(std::move(input));
     }
     else if (detail::has_extension(file_path, ".m3vcf"))

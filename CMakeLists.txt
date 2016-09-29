@@ -25,10 +25,10 @@ link_directories(${HTSLIB_SRC_DIR})
 
 
 set(HEADER_FILES
-    include/vc.hpp include/reader.hpp include/m3vcf_reader.hpp include/cvcf_reader.hpp include/allele_status.hpp include/vcf_reader.hpp include/varint.hpp)
+    include/vc.hpp include/reader.hpp include/m3vcf_reader.hpp include/cmf_reader.hpp include/allele_status.hpp include/vcf_reader.hpp include/varint.hpp)
 
 set(SOURCE_FILES
-    src/vc.cpp src/reader.cpp src/m3vcf_reader.cpp include/cvcf_reader.hpp src/cvcf_reader.cpp include/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
+    src/vc.cpp src/reader.cpp src/m3vcf_reader.cpp include/cmf_reader.hpp src/cmf_reader.cpp include/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
 
 add_library(vc ${SOURCE_FILES} ${HEADER_FILES})
 add_dependencies(vc htslib)
@@ -49,7 +49,7 @@ target_link_libraries(bcf2cvcf "hts")
 target_link_libraries(bcf2cvcf "z")
 
 
-add_executable(cvcf-sample-sort src/cvcf_sample_sort.cpp)
+add_executable(cvcf-sample-sort src/cmf_sample_sort.cpp)
 target_link_libraries(cvcf-sample-sort vc)
 target_link_libraries(cvcf-sample-sort "hts")
 target_link_libraries(cvcf-sample-sort "z")

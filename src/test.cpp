@@ -1,5 +1,5 @@
 
-#include "cvcf_reader.hpp"
+#include "cmf_reader.hpp"
 #include "m3vcf_reader.hpp"
 #include "vcf_reader.hpp"
 #include "test_class.hpp"
@@ -53,11 +53,11 @@ int reader_tests()
 {
   //----------------------------------------------------------------//
   {
-    std::string file_path = "/foobar.cvcf";
-    if (has_extension(file_path, ".cvcf"))
+    std::string file_path = "/foobar.cmf";
+    if (has_extension(file_path, ".cmf"))
     {
-      std::ifstream ifs("/foobar.cvcf");
-      vc::cvcf::reader input(ifs);
+      std::ifstream ifs("/foobar.cmf");
+      vc::cmf::reader input(ifs);
       handle_file_reader(input);
     }
     else if (has_extension(file_path, ".m3vcf"))
@@ -81,11 +81,11 @@ int reader_tests()
 
   //----------------------------------------------------------------//
   {
-    std::string file_path = "/foobar.cvcf";
-    if (has_extension(file_path, ".cvcf"))
+    std::string file_path = "/foobar.cmf";
+    if (has_extension(file_path, ".cmf"))
     {
-      std::ifstream ifs("/foobar.cvcf");
-      vc::cvcf::reader input(ifs);
+      std::ifstream ifs("/foobar.cmf");
+      vc::cmf::reader input(ifs);
       auto analysis = make_analysis(input);
       analysis.run();
     }
@@ -101,11 +101,11 @@ int reader_tests()
 
   //----------------------------------------------------------------//
   {
-    std::ifstream ifs("/foobar.cvcf");
-    vc::cvcf::reader input(ifs);
-    vc::cvcf::marker buff;
+    std::ifstream ifs("/foobar.cmf");
+    vc::cmf::reader input(ifs);
+    vc::cmf::marker buff;
 
-    for (vc::cvcf::reader::input_iterator i(input, buff), eof; i != eof; ++i)
+    for (vc::cmf::reader::input_iterator i(input, buff), eof; i != eof; ++i)
     {
       for (auto j = i->begin(); j != i->end(); ++j)
       {
@@ -132,12 +132,12 @@ int reader_tests()
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  vc::cvcf::marker m;
+  vc::cmf::marker m;
   std::uint64_t ploidy_level = 2;
   std::uint64_t sample_size = 1000;
   std::vector<int> zero_one_two_vec(sample_size, 0);
 
-  std::for_each(m.non_ref_begin(), m.non_ref_end(), [&zero_one_two_vec, ploidy_level](const vc::cvcf::marker::sparse_vector_allele& a)
+  std::for_each(m.non_ref_begin(), m.non_ref_end(), [&zero_one_two_vec, ploidy_level](const vc::cmf::marker::sparse_vector_allele& a)
   {
     if (a.status == vc::allele_status::has_alt)
       ++(zero_one_two_vec[a.offset / ploidy_level]);
@@ -404,7 +404,7 @@ void convert_file_test()
 {
   {
     vc::vcf::block buff;
-    vc::vcf::reader input("sample_file.vcf");
+    vc::vcf::reader input("chr1.bcf");
     vc::vcf::reader::input_iterator eof;
     vc::vcf::reader::input_iterator cur(input, buff);
 
@@ -419,7 +419,7 @@ void convert_file_test()
 
     std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
     std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-    std::ofstream ofs("sample_file.m3vcf", std::ios::binary);
+    std::ofstream ofs("chr1.m3vcf", std::ios::binary);
     vc::m3vcf::writer compact_output(ofs, "1", 2, sample_ids.begin(), sample_ids.end());
     vc::m3vcf::block output_buffer(sample_ids.size(), 2);
 
@@ -444,8 +444,9 @@ void convert_file_test()
 
       if (!output_buffer.add_marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end()))
       {
-        compact_output << output_buffer; //vc::cvcf::marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
+        compact_output << output_buffer; //vc::cmf::marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
         output_buffer = vc::m3vcf::block(sample_ids.size(), 2);
+        output_buffer.add_marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
       }
 
       ++cur;
@@ -578,7 +579,7 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 void run_file_checksum_test()
 {
 
-  vc::open_marker_files(std::make_tuple("sample_file.vcf", "sample_file.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
+  vc::open_marker_files(std::make_tuple("chr1.bcf", "chr1.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
   {
     auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
     std::cout << "Starting checksum test ..." << std::endl;
@@ -605,7 +606,7 @@ double inner_product(const M& mrkr, std::vector<double>& vec)
 }
 
 template <>
-double inner_product<vc::cvcf::marker>(const vc::cvcf::marker& mrkr, std::vector<double>& vec)
+double inner_product<vc::cmf::marker>(const vc::cmf::marker& mrkr, std::vector<double>& vec)
 {
   double ret = 0;
 
@@ -740,9 +741,9 @@ int main(int argc, char** argv)
 
 
 
-//  vc::open_marker_files(triple_file_handler_functor(), "chr1.bcf", "chr1.cvcf", "chr1.m3vcf");
+//  vc::open_marker_files(triple_file_handler_functor(), "chr1.bcf", "chr1.cmf", "chr1.m3vcf");
 //
-//  vc::open_marker_files(std::make_tuple("chr1.cvcf", "chr1.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
+//  vc::open_marker_files(std::make_tuple("chr1.cmf", "chr1.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
 //  {
 //    typedef typename std::remove_reference<decltype(input_file_reader1)>::type R1;
 //    typename R1::input_iterator::buffer buf{};

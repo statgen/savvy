@@ -1,6 +1,6 @@
 
 #include "vcf_reader.hpp"
-#include "cvcf_reader.hpp"
+#include "cmf_reader.hpp"
 
 #include <fstream>
 
@@ -16,11 +16,11 @@ int main(int argc, char** argv)
 
   std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
   std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-  vc::cvcf::writer compact_output(ofs, "20", 2, sample_ids.begin(), sample_ids.end());
+  vc::cmf::writer compact_output(ofs, "20", 2, sample_ids.begin(), sample_ids.end());
 
   while (cur != eof)
   {
-    compact_output << vc::cvcf::marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
+    compact_output << vc::cmf::marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
 
     ++cur;
   }

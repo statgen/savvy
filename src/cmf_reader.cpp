@@ -1,4 +1,4 @@
-#include "cvcf_reader.hpp"
+#include "cmf_reader.hpp"
 
 #include <assert.h>
 #include <algorithm>
@@ -7,7 +7,7 @@
 
 namespace vc
 {
-  namespace cvcf
+  namespace cmf
   {
     //================================================================//
     const marker::const_iterator::value_type marker::const_iterator::const_is_missing = allele_status::is_missing;
