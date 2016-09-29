@@ -94,12 +94,7 @@ std::vector<float> init_haplotypes<vc::cmf::marker>(const vc::cmf::marker& marke
   std::vector<float> ret(marker.haplotype_count(), ref_value);
   
   for (auto it = marker.non_ref_begin(); it != marker.non_ref_end(); ++it)
-  {
-    if (it->status == vc::allele_status::has_alt)
-      ret[it->offset] = alt_value
-    else if (it->status == vc::allele_status::is_missing)
-      ret[i] = missing_value;
-  }
+    ret[it->offset] = (it->status == vc::allele_status::has_alt ? alt_value : missing_value);
   
   return ret;
 }
