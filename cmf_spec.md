@@ -53,7 +53,7 @@ A missing haplotype with an offset of 8000.
 |0|100 0000| |0111 1101|
 +-+--------+ +---------+
 
-4 consecutive alleles with an offset of 1 (e.g., 0|1 0|1 0|1 0|1).
+Run-length encoding of 4 consecutive alleles with an offset of 1 (e.g., 0|1 0|1 0|1 0|1).
 +-+-+-------+ +-+--------+
 |0|1|00 0001| |0|000 0100|
 +-+-+-------+ +-+--------+
@@ -71,7 +71,7 @@ A missing haplotype with an offset of 8000.
 * ALT: Alternate haplotype stored has VLS.
 * META_VALUE_ARRAY: Array of size META_FIELDS_CNT that stores metadata for each marker. Values correspond to META_FIELDS_ARRAY in header.
 * R: Run-length encoding bit. If set, HAP_PAIR_ARRAY has extra run-length encoding applied.
-* HPA_SZ: Size of haplotype pair array stored as VLI with on bit prefix.
+* HPA_SZ: Size of haplotype pair array stored as VLI with one bit prefix.
 * HAP_PAIR_ARRAY: Array of size HPA_SZ that stores alleles or missing haplotypes in Haplotype Pair encoding.
 
 ```
