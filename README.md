@@ -11,7 +11,7 @@ vc::open_marker_file("chr1.bcf", [](auto&& file_reader)
 {
   for (const auto& marker: make_iterable_marker_stream(file_reader))
   {
-    for (const auto& hap: marker)
+    for (const vc::allele_status& haplotype: marker)
     {
         
     }
@@ -51,6 +51,20 @@ vc::open_marker_files(std::make_tuple("chr1.bcf", "chr1.m3vcf", "chr1.cmf"), [](
     auto it = std::find_if(markers.begin(), markers.end(), has_low_af_filter(0.0001));
   }
 });
+```
+
+## Alternate Variadic Syntax for Multiple Files
+```c++
+struct file_handler
+{
+  template <typename T, typename T2>
+  void operator()(T&& input_file_reader, T2&& input_file_reader2)
+  {
+
+  }
+};
+
+vc::open_marker_files(triple_file_handler(), "chr1.bcf", "chr1.m3vcf");
 ```
 
 ## Converting Files
@@ -110,5 +124,40 @@ vc::open_marker_file(argv[1], [](auto&& file_reader)
     float dot_product = std::inner_product(haplotypes.begin(), haplotypes.end(), phenotypes.begin(), 0.0);
   }
 });
+```
 
+## Indexed Files
+```c++
+vc::open_indexed_marker_file(argv[1], [](auto&& indexed_file_reader)
+{
+  std::size_t start_pos = 100000;
+  std::size_t end_pos = 200000;
+
+  {
+    // Iterate chromosome position range with range_query class.
+    auto marker_range = vc::make_range_query(indexed_file_reader, start_pos, end_pos);
+    std::for_each(marker_range.begin(), marker_range.end(), [](const auto& marker)
+    {
+      std::for_each(marker.begin(), marker.end(), [](const vc::allele_status& haplotype)
+      {
+
+      });
+    });
+  }
+
+  {
+    // Seek to lower bound of chromosome position and iterate from there.
+    indexed_file_reader.lower_bound_seek(start_pos);
+    for (const auto& marker: make_iterable_marker_stream(indexed_file_reader))
+    {
+      for (const vc::allele_status& hap: marker)
+      {
+
+      }
+
+      if (marker.pos() >= end_pos)
+        break;
+    }
+  }
+});
 ```
