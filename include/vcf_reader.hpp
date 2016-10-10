@@ -6,6 +6,7 @@
 #include <iterator>
 #include <string>
 #include <vector>
+#include <iostream>
 
 
 //namespace vc
@@ -13,6 +14,7 @@
 //namespace vcf
 //{
 #include "vcf.h"
+#include <synced_bcf_reader.h>
 //}
 //}
 
@@ -117,7 +119,8 @@ namespace vc
       int sample_count() const { return num_samples_; }
       int ploidy() const { return gt_sz_ / num_samples_; }
 
-      static bool read_block(block& destination, htsFile* hts_file_, bcf_hdr_t* hts_hdr_);
+      static bool read_block(block& destination, htsFile* hts_file, bcf_hdr_t* hts_hdr);
+      static bool read_block(block& destination, bcf_srs_t* sr);
     private:
       std::vector<marker> markers_;
       bcf1_t* hts_rec_;
@@ -126,7 +129,7 @@ namespace vc
       int num_samples_;
     };
 
-    class reader
+    class reader_base
     {
     public:
       class input_iterator
@@ -141,9 +144,9 @@ namespace vc
         typedef block buffer;
 
         input_iterator() : file_reader_(nullptr), buffer_(nullptr), i_(0) {}
-        input_iterator(reader& file_reader, block& buffer) : file_reader_(&file_reader), buffer_(&buffer), i_(0)
+        input_iterator(reader_base& file_reader, block& buffer) : file_reader_(&file_reader), buffer_(&buffer), i_(0)
         {
-          if (!file_reader_->read_next_block(*buffer_))
+          if (!(*file_reader_ >> *buffer_))
             file_reader_ = nullptr;
         }
         void increment()
@@ -152,7 +155,7 @@ namespace vc
           if (i_ >= buffer_->marker_count())
           {
             i_ = 0;
-            if (!file_reader_->read_next_block(*buffer_))
+            if (!(*file_reader_ >> *buffer_))
               file_reader_ = nullptr;
           }
         }
@@ -163,24 +166,66 @@ namespace vc
         bool operator==(const self_type& rhs) { return (file_reader_ == rhs.file_reader_); }
         bool operator!=(const self_type& rhs) { return (file_reader_ != rhs.file_reader_); }
       private:
-        reader* file_reader_;
+        reader_base* file_reader_;
         block* buffer_;
         std::uint32_t i_;
       };
 
+      reader_base() : state_(std::ios::goodbit) {}
+      virtual ~reader_base() {}
+
+      virtual reader_base& operator>>(block& destination) = 0;
+
+      explicit operator bool() const { return good(); }
+      bool good() const { return state_ == std::ios::goodbit; }
+      bool fail() const { return (state_ & std::ios::failbit) != 0; }
+      bool bad() const { return (state_ & std::ios::badbit) != 0; }
+
+      char** samples_begin() const;
+      char** samples_end() const;
+      std::uint64_t sample_count() const;
+    protected:
+      std::ios::iostate state_;
+
+      virtual const bcf_hdr_t*const hts_hdr() const = 0;
+    };
+
+    class reader : public reader_base
+    {
+    public:
+      typedef reader_base::input_iterator input_iterator;
       reader(const std::string& file_path);
       reader(reader&& other);
       reader(const reader&) = delete;
       reader& operator=(const reader&) = delete;
       ~reader();
-      bool read_next_block(block& destination);
-      char** samples_begin() const;
-      char** samples_end() const;
-      std::uint64_t sample_count() const;
+
+      reader& operator>>(block& destination);
+
       static std::string get_chromosome(const reader& rdr, const marker& mkr);
     private:
       htsFile* hts_file_;
       bcf_hdr_t* hts_hdr_;
+
+      const bcf_hdr_t*const hts_hdr() const { return hts_hdr_; }
+    };
+
+    class index_reader : public reader_base
+    {
+    public:
+      typedef reader_base::input_iterator input_iterator;
+
+      index_reader(const std::string& file_path);
+      ~index_reader();
+      index_reader& operator>>(block& destination);
+      index_reader& seek(const std::string& chromosome, std::uint64_t position);
+
+      static std::string get_chromosome(const index_reader& rdr, const marker& mkr);
+    private:
+      bcf_srs_t* synced_readers_;
+      std::ios::iostate state_;
+
+      const bcf_hdr_t*const hts_hdr() const { return bcf_sr_get_header(synced_readers_, 0); }
     };
   }
 }

@@ -1,8 +1,9 @@
 
 #include "vcf_reader.hpp"
 
+
+#include <sstream>
 #include <assert.h>
-#include <vcf.h>
 
 namespace vc
 {
@@ -139,6 +140,50 @@ namespace vc
       return false;
     }
 
+    bool block::read_block(block& destination, bcf_srs_t* sr)
+    {
+      destination = block();
+      bcf1_t* rec;
+      bcf_hdr_t* hdr = bcf_sr_get_header(sr, 0);
+      if (bcf_sr_next_line(sr) && (rec = bcf_sr_get_line(sr, 0)))
+      {
+        bcf_copy(destination.hts_rec_, rec);
+        bcf_unpack(destination.hts_rec_, BCF_UN_ALL); //BCF_UN_STR | BCF_UN_FMT);
+        bcf_get_genotypes(hdr, destination.hts_rec_, &(destination.gt_), &(destination.gt_sz_));
+        destination.num_samples_ = hdr->n[BCF_DT_SAMPLE];
+        if (destination.gt_sz_ % destination.num_samples_ != 0)
+        {
+          // TODO: mixed ploidy at site error.
+        }
+        else
+        {
+          std::uint16_t i = 1;
+          do
+          {
+            destination.markers_.emplace_back(destination.hts_rec_, destination.gt_, destination.gt_sz_, i);
+            ++i;
+          } while (i < destination.hts_rec_->n_allele);
+          return true;
+        }
+      }
+      return false;
+    }
+
+    char** reader_base::samples_begin() const
+    {
+      return hts_hdr() ? hts_hdr()->samples : nullptr;
+    }
+
+    char** reader_base::samples_end() const
+    {
+      return hts_hdr() ? hts_hdr()->samples + bcf_hdr_nsamples(hts_hdr()) : nullptr;
+    }
+
+    std::uint64_t reader_base::sample_count() const
+    {
+      return bcf_hdr_nsamples(hts_hdr());
+    }
+
     reader::reader(const std::string& file_path) :
       hts_file_(bcf_open(file_path.c_str(), "r")), hts_hdr_(nullptr)
     {
@@ -149,10 +194,11 @@ namespace vc
     }
 
     reader::reader(reader&& source) :
-      hts_file_(source.hts_file_), hts_hdr_(source.hts_hdr_)
+      reader_base(std::move(source)), hts_file_(source.hts_file_), hts_hdr_(source.hts_hdr_)
     {
       source.hts_file_ = nullptr;
       source.hts_hdr_ = nullptr;
+      source.state_ = std::ios::badbit;
     }
 
     reader::~reader()
@@ -170,29 +216,80 @@ namespace vc
       }
     }
 
-    bool reader::read_next_block(block& destination)
+    reader& reader::operator>>(block& destination)
     {
-      return block::read_block(destination, hts_file_, hts_hdr_);
-    }
-
-    char** reader::samples_begin() const
-    {
-      return hts_hdr_->samples;
-    }
-
-    char** reader::samples_end() const
-    {
-      return hts_hdr_->samples + bcf_hdr_nsamples(hts_hdr_);
-    }
-
-    std::uint64_t reader::sample_count() const
-    {
-      return bcf_hdr_nsamples(hts_hdr_);
+      if (!block::read_block(destination, hts_file_, hts_hdr_))
+        this->state_ = std::ios::failbit;
+      return *this;
     }
 
     std::string reader::get_chromosome(const reader& rdr, const marker& mkr)
     {
-      std::string ret(bcf_hdr_id2name(rdr.hts_hdr_, mkr.chrom_id()));
+      std::string ret(bcf_hdr_id2name(rdr.hts_hdr(), mkr.chrom_id()));
+      return ret;
+    }
+
+    index_reader::index_reader(const std::string& file_path)
+    {
+      htsFile* f = bcf_open(file_path.c_str(), "r");
+      if (!f)
+      {
+        this->state_ |= std::ios::badbit;
+      }
+      else
+      {
+        bcf_hdr_t* hdr = bcf_hdr_read(f);
+        if (!hdr)
+        {
+          this->state_ |= std::ios::badbit;
+        }
+        else
+        {
+          std::stringstream contigs;
+          for (int i = 0; i < hdr->n[BCF_DT_CTG]; ++i)
+          {
+            if (i > 0)
+              contigs << ",";
+            contigs << hdr->id[BCF_DT_CTG][i].key;
+          }
+
+          synced_readers_ = bcf_sr_init();
+
+          bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0);
+          bcf_sr_add_reader(synced_readers_, file_path.c_str());
+          bcf_sr_seek(synced_readers_, "", -1);
+
+
+
+          bcf_hdr_destroy(hdr);
+        }
+        bcf_close(f);
+      }
+    }
+
+    index_reader::~index_reader()
+    {
+
+      if (synced_readers_)
+        bcf_sr_destroy(synced_readers_);
+    }
+
+    index_reader& index_reader::operator>>(block& destination)
+    {
+      if (!block::read_block(destination, synced_readers_))
+        this->state_ = std::ios::failbit;
+      return *this;
+    }
+
+    index_reader& index_reader::seek(const std::string& chromosome, std::uint64_t position)
+    {
+      bcf_sr_seek(synced_readers_, chromosome.c_str(), static_cast<int>(position & std::numeric_limits<int>::max()) - 1);
+      return *this;
+    }
+
+    std::string index_reader::get_chromosome(const index_reader& rdr, const marker& mkr)
+    {
+      std::string ret(bcf_hdr_id2name(rdr.hts_hdr(), mkr.chrom_id()));
       return ret;
     }
   }
