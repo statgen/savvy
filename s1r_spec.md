@@ -1,4 +1,4 @@
-# Sort-tile-recursive One-dimensional R-Tree Specification
+# Sort-tile-recursive One-dimensional R-tree Specification
 
 ## Header Format
 ```
