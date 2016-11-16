@@ -12,7 +12,7 @@
 | RRRRRRBB | NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN | PADDING |
 +------------------------------------------------------------------------------------+~~~~~~~~~+
 R: Reserved bits.
-B: The size of each node in bytes is specified as 8^(B+2). Possible bucket sizes are 64, 512, 4096 and 32,768.
+B: The size of each node in bytes is specified as 8^(B+2). Possible bucket sizes are 64, 512, 4,096 and 32,768.
 N: Record count.
 P: Padding to end of current block.
 ```
