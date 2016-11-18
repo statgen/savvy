@@ -9,7 +9,7 @@
 #include <vector>
 #include <fstream>
 #include <functional>
-#include <portable_endian.h>
+#include <portable_endian.hpp>
 
 namespace vc
 {

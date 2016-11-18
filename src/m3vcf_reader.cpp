@@ -4,17 +4,17 @@
 #include <assert.h>
 #include <cstring>
 
-std::uint64_t ceil_divide(std::uint64_t dividend, std::uint64_t divisor)
-{
-  return (std::uint64_t)(1) + ((dividend - (std::uint64_t)(1)) / divisor);
-}
-
 namespace vc
 {
   namespace m3vcf
   {
     namespace detail
     {
+      std::uint64_t ceil_divide(std::uint64_t dividend, std::uint64_t divisor)
+      {
+        return (std::uint64_t)(1) + ((dividend - (std::uint64_t)(1)) / divisor);
+      }
+
       void deserialize_string(std::string& output, std::istream& input)
       {
         std::size_t i = 0;
