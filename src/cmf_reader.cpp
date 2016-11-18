@@ -276,8 +276,9 @@ namespace vc
     //================================================================//
 
     //================================================================//
-    reader::reader(std::istream& input_stream) :
-      input_stream_(input_stream)
+    reader::reader(const std::string& file_path) :
+      input_stream_(file_path, std::ios::binary),
+      file_path_(file_path)
     {
       std::string version_string(8, '\0');
       input_stream_.read(&version_string[0], version_string.size());

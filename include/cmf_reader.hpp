@@ -1,14 +1,15 @@
-#ifndef LIBVC_CVCF_READER_HPP
-#define LIBVC_CVCF_READER_HPP
+#ifndef LIBVC_CMF_READER_HPP
+#define LIBVC_CMF_READER_HPP
 
 #include "allele_status.hpp"
 #include "varint.hpp"
+#include "s1r.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 #include <functional>
-#include <iostream>
+#include <fstream>
 #include <tuple>
 
 namespace vc
@@ -178,7 +179,7 @@ namespace vc
         marker* buffer_;
       };
 
-      reader(std::istream& input_stream);
+      reader(const std::string& file_path);
       reader(reader&& source) = default;
       reader(const reader&) = delete;
       reader& operator=(const reader&) = delete;
@@ -192,24 +193,124 @@ namespace vc
       std::vector<std::string>::const_iterator samples_end() const { return sample_ids_.end(); }
       const std::string& chromosome() const { return chromosome_; }
       std::uint8_t ploidy() const { return ploidy_level_; }
-    private:
+      const std::string& file_path() const { return file_path_; }
+    protected:
       std::vector<std::string> sample_ids_;
       std::string chromosome_;
-      std::istream& input_stream_;
+      std::ifstream input_stream_;
+      std::string file_path_;
       std::uint8_t ploidy_level_;
       std::vector<std::string> metadata_fields_;
+    };
+
+    class indexed_reader : public reader
+    {
+    public:
+      class region_query
+      {
+      public:
+        class iterator
+        {
+        public:
+          typedef iterator self_type;
+          typedef std::ptrdiff_t difference_type;
+          typedef marker value_type;
+          typedef const value_type& reference;
+          typedef const value_type* pointer;
+          typedef std::bidirectional_iterator_tag iterator_category;
+          typedef marker buffer;
+
+          iterator(region_query& parent, std::istream& is, s1r::reader::query::iterator&& idx_it) :
+            parent_query_(&parent),
+            ifs_(&is),
+            i_(idx_it)
+          {
+            read_marker();
+          }
+
+          self_type& operator++()
+          {
+            ++i_;
+            read_marker();
+            return *this;
+          }
+
+          self_type operator++(int)
+          {
+            self_type r = *this;
+            ++(*this);
+            return r;
+          }
+          reference operator*() { return m_; }
+          pointer operator->() { return &m_; }
+          bool operator==(const self_type& rhs) { return (i_ == rhs.i_); }
+          bool operator!=(const self_type& rhs) { return (i_ != rhs.i_); }
+        private:
+          region_query* parent_query_;
+          std::istream* ifs_;
+          s1r::reader::query::iterator i_;
+          marker m_;
+
+          void read_marker()
+          {
+            ifs_->seekg(std::streampos(i_->value().first));
+            parent_query_->parent_reader() >> m_;
+            if (!parent_query_->parent_reader().good())
+              *this = parent_query_->end();
+          }
+        };
+
+        region_query(reader& rdr, std::istream& is, s1r::reader::query&& idx_query) :
+          reader_(&rdr),
+          ifs_(&is),
+          index_query_(std::move(idx_query))
+        {
+
+        }
+
+        reader& parent_reader() { return *reader_; }
+
+        iterator begin() { return iterator(*this, *ifs_, index_query_.begin()); }
+        iterator end() { return iterator(*this, *ifs_, index_query_.end()); }
+      private:
+        reader* reader_;
+        std::istream* ifs_;
+        s1r::reader::query index_query_;
+      };
+
+      indexed_reader(const std::string& file_path, const std::string& index_file_path = "") :
+        reader(file_path),
+        index_(index_file_path.size() ? index_file_path : file_path + ".s1r")
+      {
+      }
+
+      region_query create_query(std::uint64_t start, std::uint64_t end = std::numeric_limits<std::uint64_t>::max())
+      {
+        return region_query(*this, this->input_stream_, index_.create_query(start, end));
+      }
+
+      region_query create_query(const std::string& chromosome, std::uint64_t start, std::uint64_t end = std::numeric_limits<std::uint64_t>::max())
+      {
+        if (chromosome == this->chromosome())
+          return this->create_query(start, end);
+        else
+          return region_query(*this, this->input_stream_, index_.create_query((std::uint64_t)-1, 0));
+      }
+    private:
+      s1r::reader index_;
     };
 
     class writer
     {
     public:
       template <typename RandAccessStringIterator>
-      writer(std::ostream& output_stream, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end) :
-        output_stream_(output_stream),
+      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end) :
+        output_stream_(file_path, std::ios::binary),
+        file_path_(file_path),
         sample_size_(samples_end - samples_beg),
         ploidy_level_(ploidy)
       {
-        std::string version_string("cvcf\x00\x01\x00\x00", 8);
+        std::string version_string("cmf\x00\x01\x00\x00", 7);
         output_stream_.write(version_string.data(), version_string.size());
 
         std::ostreambuf_iterator<char> out_it(output_stream_);
@@ -240,8 +341,11 @@ namespace vc
         return *this;
       }
 
+      static bool create_index(const std::string& input_file_path, const std::string& output_file_path = "");
+
     private:
-      std::ostream& output_stream_;
+      std::ofstream output_stream_;
+      std::string file_path_;
       std::uint64_t sample_size_;
       std::uint8_t ploidy_level_;
       std::uint32_t metadata_fields_cnt_;
@@ -251,4 +355,4 @@ namespace vc
   }
 }
 
-#endif //LIBVC_CVCF_READER_HPP
+#endif //LIBVC_CMF_READER_HPP

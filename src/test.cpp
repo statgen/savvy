@@ -60,8 +60,7 @@ int reader_tests()
     std::string file_path = "/foobar.cmf";
     if (has_extension(file_path, ".cmf"))
     {
-      std::ifstream ifs("/foobar.cmf");
-      vc::cmf::reader input(ifs);
+      vc::cmf::reader input("/foobar.cmf");
       handle_file_reader(input);
     }
     else if (has_extension(file_path, ".m3vcf"))
@@ -88,8 +87,7 @@ int reader_tests()
     std::string file_path = "/foobar.cmf";
     if (has_extension(file_path, ".cmf"))
     {
-      std::ifstream ifs("/foobar.cmf");
-      vc::cmf::reader input(ifs);
+      vc::cmf::reader input("/foobar.cmf");
       auto analysis = make_analysis(input);
       analysis.run();
     }
@@ -105,8 +103,7 @@ int reader_tests()
 
   //----------------------------------------------------------------//
   {
-    std::ifstream ifs("/foobar.cmf");
-    vc::cmf::reader input(ifs);
+    vc::cmf::reader input("/foobar.cmf");
     vc::cmf::marker buff;
 
     for (vc::cmf::reader::input_iterator i(input, buff), eof; i != eof; ++i)
