@@ -7,6 +7,8 @@
 #include <stack>
 #include <vector>
 #include <algorithm>
+#include <iostream>
+#include <errno.h>
 
 namespace vc
 {
@@ -46,9 +48,20 @@ namespace vc
       {
       public:
         std::pair<std::uint64_t, std::uint64_t> value() const { return std::make_pair(be64toh(value1_), be64toh(value2_)); }
+
+        entry() :
+          value1_(0),
+          value2_(0)
+        { }
+
+        entry(std::uint64_t beg, std::uint64_t end, std::uint64_t val1, std::uint64_t val2) :
+          internal_entry(beg, end),
+          value1_(htobe64(val1)),
+          value2_(htobe64(val2))
+        { }
       private:
-        std::uint64_t value1_ = htobe64(0x03);
-        std::uint64_t value2_ = htobe64(0x04);
+        std::uint64_t value1_;
+        std::uint64_t value2_;
       };
 
       struct node_position
@@ -161,20 +174,26 @@ namespace vc
             beg_(beg),
             end_(end),
             leaf_node_(reader_->entries_per_leaf_node()),
-            position_(0, 0, 0)
+            position_(pos)
           {
-
-            const std::uint64_t leaf_level = reader_->tree_height() - 1;
-            ifs_->seekg(reader_->calculate_file_position(position_));
-            if (position_.level == leaf_level)
-              ifs_->read((char*) leaf_node_.data(), reader_->block_size_);
-            else
+            if (position_ != end_tree_position())
             {
-              traversal_chain_.emplace(reader_->entries_per_internal_node());
-              ifs_->read((char*) (traversal_chain_.top().data()), reader_->block_size_);
-            }
+              const std::uint64_t leaf_level = reader_->tree_height() - 1;
+              ifs_->seekg(reader_->calculate_file_position(position_));
+              if (ifs_->eof())
+              {
+                std::cout << ifs_->good() << std::endl;
+              }
+              if (position_.level == leaf_level)
+                ifs_->read((char*) leaf_node_.data(), reader_->block_size_);
+              else
+              {
+                traversal_chain_.emplace(reader_->entries_per_internal_node());
+                ifs_->read((char*) (traversal_chain_.top().data()), reader_->block_size_);
+              }
 
-            traverse_right();
+              traverse_right();
+            }
           }
 
           void traverse_right()
@@ -310,7 +329,8 @@ namespace vc
     class writer : public index_base
     {
     public:
-      writer(const std::string& file_path, EntryIter beg, EntryIter end, block_size bs = block_size::bs_4096)
+      writer(const std::string& file_path, EntryIter beg, EntryIter end, block_size bs = block_size::bs_4096) :
+        ofs_(file_path, std::ios::binary)
       {
         std::sort(beg, end, [](const reader::entry& a, const reader::entry& b)
         {
@@ -349,7 +369,6 @@ namespace vc
 
         index_base::init();
 
-        std::ofstream ofs(file_path, std::ios::binary);
         std::string header_block(16, '\0');
         std::memcpy(&header_block[0], "s1r\0x00\0x01\0x00\0x00", 7);
         std::memcpy(&header_block[7], &block_size_exponent, 1);
@@ -380,7 +399,7 @@ namespace vc
 
             std::uint64_t node_range_min = (std::uint64_t)-1;
             std::uint64_t node_range_max = 0;
-            for (std::size_t i = 0; i >= current_leaf_position.entry_offset; ++i)
+            for (std::size_t i = 0; i <= current_leaf_position.entry_offset; ++i)
             {
               node_range_min = std::min(node_range_min, current_leaf_node[i].region_start());
               node_range_max = std::max(node_range_max, current_leaf_node[i].region_end());
