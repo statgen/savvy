@@ -194,6 +194,7 @@ namespace vc
       const std::string& chromosome() const { return chromosome_; }
       std::uint8_t ploidy() const { return ploidy_level_; }
       const std::string& file_path() const { return file_path_; }
+      std::streampos tellg() { return this->input_stream_.tellg(); }
     protected:
       std::vector<std::string> sample_ids_;
       std::string chromosome_;
@@ -341,7 +342,7 @@ namespace vc
         return *this;
       }
 
-      static bool create_index(const std::string& input_file_path, const std::string& output_file_path = "");
+      static bool create_index(const std::string& input_file_path, std::string output_file_path = "");
 
     private:
       std::ofstream output_stream_;
