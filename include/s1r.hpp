@@ -101,15 +101,21 @@ namespace vc
       {
         std::uint64_t ret = block_count_needed_for_header_ * block_size_;
 
-        for (auto it = entry_counts_per_level_.begin(); it != entry_counts_per_level_.end(); ++it)
+        if (input.level > 0)
         {
-          if (std::distance(entry_counts_per_level_.begin(), it) < input.level)
+          ret += block_size_; // for root node
+
+          for (auto it = entry_counts_per_level_.begin(); it != entry_counts_per_level_.end(); ++it)
           {
-            ret += *it * block_size_;
-          }
-          else
-          {
-            ret += input.node_offset * block_size_;
+            if (1 + std::distance(entry_counts_per_level_.begin(), it) < input.level)
+            {
+              ret += *it * block_size_;
+            }
+            else
+            {
+              ret += input.node_offset * block_size_;
+              break;
+            }
           }
         }
 
@@ -352,12 +358,10 @@ namespace vc
             block_size_exponent = 3;
             break;
           case block_size::bs_4096:
-
             block_size_ = 4096;
             block_size_exponent = 4;
             break;
           case block_size::bs_32768:
-
             block_size_ = 32768;
             block_size_exponent = 5;
             break;
@@ -385,6 +389,7 @@ namespace vc
         std::vector<entry> current_leaf_node(this->entries_per_leaf_node());
         tree_position current_leaf_position(this->tree_height() - 1, 0, 0);
 
+        std::size_t node_counter = 0;
         for (auto entry_it = beg; entry_it != end; ++entry_it)
         {
           const bool last_entry = entry_it + 1 == end;
@@ -396,6 +401,7 @@ namespace vc
           {
             ofs_.seekp(this->calculate_file_position(current_leaf_position));
             ofs_.write((char*)(current_leaf_node.data()), block_size_);
+            ++node_counter;
 
             std::uint64_t node_range_min = (std::uint64_t)-1;
             std::uint64_t node_range_max = 0;
@@ -415,7 +421,7 @@ namespace vc
               {
                 ofs_.seekp(this->calculate_file_position(rit->second));
                 ofs_.write((char*)(rit->first.data()), block_size_);
-
+                ++node_counter;
 
                 node_range_min = (std::uint64_t)-1;
                 node_range_max = 0;
@@ -445,6 +451,7 @@ namespace vc
             ++(current_leaf_position.entry_offset);
           }
         }
+        std::cout << "Node Count: " << node_counter << std::endl;
       }
 
       bool flush()
