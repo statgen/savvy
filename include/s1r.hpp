@@ -213,7 +213,7 @@ namespace vc
                 auto entry_it = leaf_node_.begin() + position_.entry_offset;
                 for (; entry_it != leaf_node_.end(); ++entry_it)
                 {
-                  if (entry_it->region_start() < end_ && entry_it->region_end() > beg_)
+                  if (entry_it->region_start() <= end_ && entry_it->region_end() >= beg_)
                     break;
                 }
 
@@ -233,7 +233,7 @@ namespace vc
                 auto entry_it = traversal_chain_.top().begin() + position_.entry_offset;
                 for (; entry_it != traversal_chain_.top().end(); ++entry_it)
                 {
-                  if (entry_it->region_start() < end_ && entry_it->region_end() > beg_)
+                  if (entry_it->region_start() <= end_ && entry_it->region_end() >= beg_)
                     break;
                 }
 
