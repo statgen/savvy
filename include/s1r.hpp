@@ -87,6 +87,23 @@ namespace vc
       std::uint16_t entries_per_leaf_node() const { return block_size_ / std::uint16_t(32); }
       std::uint16_t entries_per_internal_node() const { return block_size_ / std::uint16_t(16); }
 
+      std::uint64_t calculate_node_size(node_position input) const
+      {
+        std::uint64_t ret = 0;
+
+        if (input.level < entry_counts_per_level_.size())
+        {
+          std::uint64_t entries_per_node = (input.level + 1 ==  entry_counts_per_level_.size() ? this->entries_per_leaf_node() : this->entries_per_internal_node());
+
+          if (input.node_offset < entry_counts_per_level_[input.level] / entries_per_node)
+            ret = entries_per_node;
+          else
+            ret = entry_counts_per_level_[input.level] % entries_per_node;
+        }
+
+        return ret;
+      }
+
       tree_position calculate_parent_position(node_position input) const
       {
         return tree_position(input.level - 1, input.node_offset / this->entries_per_internal_node(), input.node_offset % this->entries_per_internal_node());
@@ -211,13 +228,14 @@ namespace vc
               if (position_.level == leaf_level)
               {
                 auto entry_it = leaf_node_.begin() + position_.entry_offset;
-                for (; entry_it != leaf_node_.end(); ++entry_it)
+                const auto entry_end_it = leaf_node_.begin() + reader_->calculate_node_size(position_);
+                for (; entry_it != entry_end_it; ++entry_it)
                 {
                   if (entry_it->region_start() <= end_ && entry_it->region_end() >= beg_)
                     break;
                 }
 
-                if (entry_it == leaf_node_.end())
+                if (entry_it == entry_end_it)
                 {
                   position_ = reader_->calculate_parent_position(position_);
                   position_ = tree_position(position_, position_.entry_offset + 1);
@@ -231,13 +249,14 @@ namespace vc
               else
               {
                 auto entry_it = traversal_chain_.top().begin() + position_.entry_offset;
-                for (; entry_it != traversal_chain_.top().end(); ++entry_it)
+                const auto entry_end_it = traversal_chain_.top().begin() + reader_->calculate_node_size(position_);
+                for (; entry_it != entry_end_it; ++entry_it)
                 {
                   if (entry_it->region_start() <= end_ && entry_it->region_end() >= beg_)
                     break;
                 }
 
-                if (entry_it == traversal_chain_.top().end())
+                if (entry_it == entry_end_it)
                 {
                   position_ = reader_->calculate_parent_position(position_);
                   position_ = tree_position(position_, position_.entry_offset + 1);
