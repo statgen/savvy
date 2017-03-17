@@ -15,6 +15,7 @@
 //{
 #include "vcf.h"
 #include <synced_bcf_reader.h>
+#include <vcf.h>
 //}
 //}
 
@@ -62,6 +63,7 @@ namespace vc
 
       const allele_status& operator[](std::size_t i) const;
       std::uint64_t haplotype_count() const { return static_cast<std::uint64_t>(num_gt_); }
+      int ploidy() const { return num_gt_ / hts_rec_->n_sample; }
       std::int32_t chrom_id() const;
       std::uint64_t pos() const;
       std::string ref() const;

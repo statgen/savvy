@@ -86,15 +86,17 @@ namespace vc
         {
           ++in_it;
           destination.ref_.resize(sz);
-          if (destination.ref_.size())
-            is.read(&destination.ref_[0], destination.ref_.size());
+          if (sz)
+            std::copy_n(in_it, sz, destination.ref_.begin());
+            //is.read(&destination.ref_[0], destination.ref_.size());
 
           if (varint_decode(in_it, end_it, sz) != end_it)
           {
             ++in_it;
             destination.alt_.resize(sz);
-            if (destination.alt_.size())
-              is.read(&destination.alt_[0], destination.alt_.size());
+            if (sz)
+              std::copy_n(in_it, sz, destination.alt_.begin());
+              //is.read(&destination.alt_[0], destination.alt_.size());
 
             // TODO: Read metadata values.
 
@@ -211,54 +213,56 @@ namespace vc
 
     void marker::write(std::ostream& os, const marker& source)
     {
-      std::ostreambuf_iterator<char> os_it(os);
+      std::ostreambuf_iterator<char> os_it(os.rdbuf());
       varint_encode(source.position_, os_it);
 
       varint_encode(source.ref_.size(), os_it);
       if (source.ref_.size())
-        os.write(&source.ref_[0], source.ref_.size());
+        std::copy(source.ref_.begin(), source.ref_.end(), os_it);
+        //os.write(&source.ref_[0], source.ref_.size());
 
       varint_encode(source.alt_.size(), os_it);
       if (source.alt_.size())
-        os.write(&source.alt_[0], source.alt_.size());
+        std::copy(source.alt_.begin(), source.alt_.end(), os_it);
+        //os.write(&source.alt_[0], source.alt_.size());
 
 
-      std::uint64_t normal_sz = source.calculate_serialized_gt_size();
-      std::uint64_t rle_size, rle_cnt;
-      std::tie(rle_size, rle_cnt) = source.calculate_rle_serialized_gt_size_and_count();
-      if (rle_size < normal_sz)
-      {
-        std::uint8_t rle = 0x80;
-        one_bit_prefixed_varint::encode(rle, rle_cnt, os_it);
-
-        std::uint64_t last_pos = 0;
-        for (auto it = source.non_zero_haplotypes_.begin(); it != source.non_zero_haplotypes_.end(); ++it)
-        {
-          std::uint64_t offset = it->offset - last_pos;
-          last_pos = it->offset + 1;
-
-          std::size_t number_of_repeats = 0;
-          while (it + 1 != source.non_zero_haplotypes_.end())
-          {
-            auto next_it = (it + 1);
-            if (offset != next_it->offset - last_pos || it->status != next_it->status)
-              break;
-
-            ++number_of_repeats;
-            ++it;
-            last_pos = it->offset + 1;
-          }
-
-          std::uint8_t allele_repeat_prefix = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
-          if (number_of_repeats)
-            allele_repeat_prefix |= 0x40;
-          two_bit_prefixed_varint::encode(allele_repeat_prefix, offset, os_it);
-
-          if (number_of_repeats)
-            varint_encode(number_of_repeats, os_it);
-        }
-      }
-      else
+//      std::uint64_t normal_sz = source.calculate_serialized_gt_size();
+//      std::uint64_t rle_size, rle_cnt;
+//      std::tie(rle_size, rle_cnt) = source.calculate_rle_serialized_gt_size_and_count();
+//      if (rle_size < normal_sz)
+//      {
+//        std::uint8_t rle = 0x80;
+//        one_bit_prefixed_varint::encode(rle, rle_cnt, os_it);
+//
+//        std::uint64_t last_pos = 0;
+//        for (auto it = source.non_zero_haplotypes_.begin(); it != source.non_zero_haplotypes_.end(); ++it)
+//        {
+//          std::uint64_t offset = it->offset - last_pos;
+//          last_pos = it->offset + 1;
+//
+//          std::size_t number_of_repeats = 0;
+//          while (it + 1 != source.non_zero_haplotypes_.end())
+//          {
+//            auto next_it = (it + 1);
+//            if (offset != next_it->offset - last_pos || it->status != next_it->status)
+//              break;
+//
+//            ++number_of_repeats;
+//            ++it;
+//            last_pos = it->offset + 1;
+//          }
+//
+//          std::uint8_t allele_repeat_prefix = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
+//          if (number_of_repeats)
+//            allele_repeat_prefix |= 0x40;
+//          two_bit_prefixed_varint::encode(allele_repeat_prefix, offset, os_it);
+//
+//          if (number_of_repeats)
+//            varint_encode(number_of_repeats, os_it);
+//        }
+//      }
+//      else
       {
         std::uint8_t rle = 0x00;
         one_bit_prefixed_varint::encode(rle, source.non_zero_haplotypes_.size(), os_it);

@@ -15,11 +15,9 @@ int main(int argc, char** argv)
 {
   const std::uint8_t sort_weight_coefficient = 0;
 
-  std::ofstream ofs(argv[2], std::ios::binary);
 
   vc::cmf::marker buff;
-  std::ifstream ifs(argv[1], std::ios::binary);
-  vc::cmf::reader input(ifs);
+  vc::cmf::reader input(argv[1]);
 
   const std::size_t sample_count = input.sample_count();
   const std::size_t ploidy_level = input.ploidy();
@@ -59,9 +57,8 @@ int main(int argc, char** argv)
 
   }
 
-  vc::cmf::writer compact_output(ofs, input.chromosome(), input.ploidy(), sample_ids.begin(), sample_ids.end());
-  std::ifstream ifs2(argv[1], std::ios::binary);
-  vc::cmf::reader input2(ifs2);
+  vc::cmf::writer compact_output(argv[2], input.chromosome(), input.ploidy(), sample_ids.begin(), sample_ids.end());
+  vc::cmf::reader input2(argv[1]);
   std::for_each(vc::cmf::reader::input_iterator(input2, buff), vc::cmf::reader::input_iterator(), [&old_order_to_new_order_mapping, &compact_output, haplotype_count, ploidy_level](const vc::cmf::marker& mrkr)
   {
     auto gt_beg = mrkr.non_ref_begin();

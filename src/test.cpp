@@ -403,92 +403,28 @@ int varint_test()
 
 void convert_file_test()
 {
+  vc::vcf::block buff;
+  vc::vcf::reader input("test_file.vcf");
+  vc::vcf::reader::input_iterator eof;
+  vc::vcf::reader::input_iterator cur(input, buff);
+  const std::string chrom = cur != eof ? vc::vcf::reader::get_chromosome(input, *cur) : "";
+  const int ploidy =  cur != eof ? cur->ploidy() : 0;
+
+  std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
+  std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
+  vc::cmf::writer compact_output("test_file.cmf", vc::vcf::reader::get_chromosome(input, *cur), ploidy, sample_ids.begin(), sample_ids.end());
+
+  while (cur != eof)
   {
-    vc::vcf::block buff;
-    vc::vcf::reader input("chr1.bcf");
-    vc::vcf::reader::input_iterator eof;
-    vc::vcf::reader::input_iterator cur(input, buff);
-
-//    std::cout << "CHROM\tPOS\tREF\tALT\t";
-//    for (auto it = input.samples_begin(); it != input.samples_end(); ++it)
-//    {
-//      std::cout << *it << "_1" << "\t" << *it << "_2";
-//      if (it + 1 < input.samples_end())
-//        std::cout << "\t";
-//    }
-//    std::cout << std::endl;
-
-    std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
-    std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-    std::ofstream ofs("chr1.m3vcf", std::ios::binary);
-    vc::m3vcf::writer compact_output(ofs, "1", 2, sample_ids.begin(), sample_ids.end());
-    vc::m3vcf::block output_buffer(sample_ids.size(), 2);
-
-    while (cur != eof)
+    if (vc::vcf::reader::get_chromosome(input, *cur) != chrom)
     {
-//      std::cout << vc::vcf::reader::get_chromosome(input, *cur) << "\t" << cur->pos() << "\t" << cur->ref() << "\t" << cur->alt() << "\t";
-//      for (auto gt = cur->begin(); gt != cur->end(); )
-//      {
-//        if (*gt == vc::allele_status::has_ref)
-//          std::cout << "0";
-//        else if (*gt == vc::allele_status::has_alt)
-//          std::cout << "1";
-//        else
-//          std::cout << ".";
-//
-//        ++gt;
-//        if (gt != cur->end())
-//          std::cout << "\t";
-//      }
-//
-//      std::cout << std::endl;
-
-      if (!output_buffer.add_marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end()))
-      {
-        compact_output << output_buffer; //vc::cmf::marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
-        output_buffer = vc::m3vcf::block(sample_ids.size(), 2);
-        output_buffer.add_marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
-      }
-
-      ++cur;
+      std::cerr << "Multiple chromosomes encountered. CMF files can only contain one chromosome." << std::endl;
+      break;
     }
+    compact_output << vc::cmf::marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
 
-    if (output_buffer.marker_count())
-      compact_output << output_buffer;
+    ++cur;
   }
-
-//  {
-//    std::cout << std::endl << std::endl;
-//    std::ifstream ifs("sample_conversion.m3vcf", std::ios::binary);
-//    vc::m3vcf::reader compact_input(ifs);
-//    vc::m3vcf::block buff;
-//    vc::m3vcf::reader::input_iterator cur(compact_input, buff);
-//    vc::m3vcf::reader::input_iterator end;
-//
-//    while (cur != end)
-//    {
-//      std::cout << "22" << "\t" << cur->pos() << "\t" << cur->ref() << "\t" << cur->alt() << "\t";
-//
-//      for (auto gt = cur->begin(); gt != cur->end(); )
-//      {
-//        if (*gt == vc::allele_status::has_ref)
-//          std::cout << "0";
-//        else if (*gt == vc::allele_status::has_alt)
-//          std::cout << "1";
-//        else
-//          std::cout << ".";
-//
-//        ++gt;
-//        if (gt != cur->end())
-//          std::cout << "\t";
-//      }
-//
-//      std::cout << std::endl;
-//
-//      ++cur;
-//    }
-//  }
-
 }
 
 template <typename Proc>
