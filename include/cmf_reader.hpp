@@ -313,7 +313,9 @@ namespace vc
         output_stream_(file_path),
         file_path_(file_path),
         sample_size_(samples_end - samples_beg),
-        ploidy_level_(ploidy)
+        ploidy_level_(ploidy),
+        record_count_(0),
+        block_size_(8)
       {
         std::string version_string("cmf\x00\x01\x00\x00", 7);
         output_stream_.write(version_string.data(), version_string.size());
@@ -339,9 +341,16 @@ namespace vc
         if (output_stream_.good())
         {
           if (m.haplotype_count() != sample_size_ * ploidy_level_)
+          {
             output_stream_.setstate(std::ios::failbit);
+          }
           else
+          {
+            if ((record_count_ % block_size_) == 0)
+              output_stream_.flush();
             marker::write(output_stream_, m);
+            ++record_count_;
+          }
         }
         return *this;
       }
@@ -354,6 +363,8 @@ namespace vc
       std::uint64_t sample_size_;
       std::uint8_t ploidy_level_;
       std::uint32_t metadata_fields_cnt_;
+      std::size_t record_count_;
+      std::size_t block_size_;
     };
 
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.2)
-project(foo)
-message("Dep ROOT: ${CMAKE_ROOT}")
+project(dependencies)
+
 include(ExternalProject)
 
 
