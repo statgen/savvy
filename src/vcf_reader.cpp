@@ -4,6 +4,7 @@
 
 #include <sstream>
 #include <assert.h>
+#include <limits>
 
 namespace vc
 {
@@ -224,7 +225,7 @@ namespace vc
     }
 
     std::string reader::get_chromosome(const reader& rdr, const marker& mkr)
-    {
+    {\
       std::string ret(bcf_hdr_id2name(rdr.hts_hdr(), mkr.chrom_id()));
       return ret;
     }

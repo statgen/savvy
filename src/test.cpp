@@ -516,7 +516,7 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 void run_file_checksum_test()
 {
 
-  vc::open_files(std::make_tuple("chr1.bcf", "chr1.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
+  vc::open_files(std::make_tuple("test_file.vcf", "test_file.cmf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
   {
     auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
     std::cout << "Starting checksum test ..." << std::endl;

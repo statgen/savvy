@@ -75,6 +75,7 @@ namespace vc
     void marker::read(marker& destination, std::uint64_t haplotype_count, std::istream& is)
     {
       destination.haplotype_count_ = haplotype_count;
+
       std::istreambuf_iterator<char> in_it(is);
       std::istreambuf_iterator<char> end_it;
 
@@ -87,73 +88,86 @@ namespace vc
           ++in_it;
           destination.ref_.resize(sz);
           if (sz)
-            std::copy_n(in_it, sz, destination.ref_.begin());
-            //is.read(&destination.ref_[0], destination.ref_.size());
+            is.read(&destination.ref_[0], destination.ref_.size());
+
 
           if (varint_decode(in_it, end_it, sz) != end_it)
           {
             ++in_it;
             destination.alt_.resize(sz);
             if (sz)
-              std::copy_n(in_it, sz, destination.alt_.begin());
-              //is.read(&destination.alt_[0], destination.alt_.size());
+              is.read(&destination.alt_[0], destination.alt_.size());
 
             // TODO: Read metadata values.
 
-            std::uint8_t rle = 0;
-            one_bit_prefixed_varint::decode(in_it, end_it, rle, sz);
-            if (rle)
+            varint_decode(in_it, end_it, sz);
+            destination.non_zero_haplotypes_.resize(sz);
+
+            std::uint64_t total_offset = 0;
+            for (auto it = destination.non_zero_haplotypes_.begin(); it != destination.non_zero_haplotypes_.end() && in_it != end_it; ++it,++total_offset)
             {
-              std::vector<std::pair<sparse_vector_allele, std::uint64_t>> rle_non_zero_haplotypes(sz);
-              std::uint64_t total_repeat_bytes = 0;
-              for (auto it = rle_non_zero_haplotypes.begin(); it != rle_non_zero_haplotypes.end() && in_it != end_it; ++it)
-              {
-                std::uint8_t allele_repeat_prefix;
-                two_bit_prefixed_varint::decode(++in_it, end_it, allele_repeat_prefix, it->first.offset);
-                it->first.status = (allele_repeat_prefix & 0x80 ? allele_status::has_alt : allele_status::is_missing);
-
-                if (allele_repeat_prefix & 0x40 && in_it != end_it)
-                {
-                  // Read repeat byte.
-                  varint_decode(++in_it, end_it, it->second);
-                  total_repeat_bytes += it->second;
-                }
-                else
-                {
-                  it->second = 0;
-                }
-              }
-
-              std::uint64_t total_offset = 0;
-              destination.non_zero_haplotypes_.clear();
-              destination.non_zero_haplotypes_.reserve(sz + total_repeat_bytes);
-              for (auto it = rle_non_zero_haplotypes.begin(); it != rle_non_zero_haplotypes.end(); ++it,++total_offset)
-              {
-                total_offset += it->first.offset;
-                destination.non_zero_haplotypes_.emplace_back(it->first.status, total_offset);
-                while (it->second)
-                {
-                  total_offset += (it->first.offset + 1);
-                  destination.non_zero_haplotypes_.emplace_back(it->first.status, total_offset);
-                  --(it->second);
-                }
-              }
+              std::uint8_t allele;
+              std::uint64_t offset;
+              one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
+              total_offset += offset;
+              it->offset = total_offset;
+              it->status = (allele ? allele_status::has_alt : allele_status::is_missing);
             }
-            else
-            {
-              destination.non_zero_haplotypes_.resize(sz);
 
-              std::uint64_t total_offset = 0;
-              for (auto it = destination.non_zero_haplotypes_.begin(); it != destination.non_zero_haplotypes_.end() && in_it != end_it; ++it,++total_offset)
-              {
-                std::uint8_t allele;
-                std::uint64_t offset;
-                one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
-                total_offset += offset;
-                it->offset = total_offset;
-                it->status = (allele ? allele_status::has_alt : allele_status::is_missing);
-              }
-            }
+//            std::uint8_t rle = 0;
+//            one_bit_prefixed_varint::decode(in_it, end_it, rle, sz);
+//            if (rle)
+//            {
+//              std::vector<std::pair<sparse_vector_allele, std::uint64_t>> rle_non_zero_haplotypes(sz);
+//              std::uint64_t total_repeat_bytes = 0;
+//              for (auto it = rle_non_zero_haplotypes.begin(); it != rle_non_zero_haplotypes.end() && in_it != end_it; ++it)
+//              {
+//                std::uint8_t allele_repeat_prefix;
+//                two_bit_prefixed_varint::decode(++in_it, end_it, allele_repeat_prefix, it->first.offset);
+//                it->first.status = (allele_repeat_prefix & 0x80 ? allele_status::has_alt : allele_status::is_missing);
+//
+//                if (allele_repeat_prefix & 0x40 && in_it != end_it)
+//                {
+//                  // Read repeat byte.
+//                  varint_decode(++in_it, end_it, it->second);
+//                  total_repeat_bytes += it->second;
+//                }
+//                else
+//                {
+//                  it->second = 0;
+//                }
+//              }
+//
+//              std::uint64_t total_offset = 0;
+//              destination.non_zero_haplotypes_.clear();
+//              destination.non_zero_haplotypes_.reserve(sz + total_repeat_bytes);
+//              for (auto it = rle_non_zero_haplotypes.begin(); it != rle_non_zero_haplotypes.end(); ++it,++total_offset)
+//              {
+//                total_offset += it->first.offset;
+//                destination.non_zero_haplotypes_.emplace_back(it->first.status, total_offset);
+//                while (it->second)
+//                {
+//                  total_offset += (it->first.offset + 1);
+//                  destination.non_zero_haplotypes_.emplace_back(it->first.status, total_offset);
+//                  --(it->second);
+//                }
+//              }
+//            }
+//            else
+//            {
+//              destination.non_zero_haplotypes_.resize(sz);
+//
+//              std::uint64_t total_offset = 0;
+//              for (auto it = destination.non_zero_haplotypes_.begin(); it != destination.non_zero_haplotypes_.end() && in_it != end_it; ++it,++total_offset)
+//              {
+//                std::uint8_t allele;
+//                std::uint64_t offset;
+//                one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
+//                total_offset += offset;
+//                it->offset = total_offset;
+//                it->status = (allele ? allele_status::has_alt : allele_status::is_missing);
+//              }
+//            }
           }
         }
       }
@@ -226,6 +240,15 @@ namespace vc
         std::copy(source.alt_.begin(), source.alt_.end(), os_it);
         //os.write(&source.alt_[0], source.alt_.size());
 
+      varint_encode(source.non_zero_haplotypes_.size(), os_it);
+      std::uint64_t last_pos = 0;
+      for (auto it = source.non_zero_haplotypes_.begin(); it != source.non_zero_haplotypes_.end(); ++it)
+      {
+        std::uint64_t offset = it->offset - last_pos;
+        last_pos = it->offset + 1;
+        std::uint8_t allele = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
+        one_bit_prefixed_varint::encode(allele, offset, os_it);
+      }
 
 //      std::uint64_t normal_sz = source.calculate_serialized_gt_size();
 //      std::uint64_t rle_size, rle_cnt;
@@ -263,25 +286,26 @@ namespace vc
 //        }
 //      }
 //      else
-      {
-        std::uint8_t rle = 0x00;
-        one_bit_prefixed_varint::encode(rle, source.non_zero_haplotypes_.size(), os_it);
-
-        std::uint64_t last_pos = 0;
-        for (auto it = source.non_zero_haplotypes_.begin(); it != source.non_zero_haplotypes_.end(); ++it)
-        {
-          std::uint64_t offset = it->offset - last_pos;
-          last_pos = it->offset + 1;
-          std::uint8_t allele = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
-          one_bit_prefixed_varint::encode(allele, offset, os_it);
-        }
-      }
+//      {
+//        std::uint8_t rle = 0x00;
+//        one_bit_prefixed_varint::encode(rle, source.non_zero_haplotypes_.size(), os_it);
+//
+//        std::uint64_t last_pos = 0;
+//        for (auto it = source.non_zero_haplotypes_.begin(); it != source.non_zero_haplotypes_.end(); ++it)
+//        {
+//          std::uint64_t offset = it->offset - last_pos;
+//          last_pos = it->offset + 1;
+//          std::uint8_t allele = (it->status == allele_status::has_alt ? std::uint8_t(0x80) : std::uint8_t(0x00));
+//          one_bit_prefixed_varint::encode(allele, offset, os_it);
+//        }
+//      }
     }
     //================================================================//
 
     //================================================================//
     reader::reader(const std::string& file_path) :
-      input_stream_(file_path, std::ios::binary),
+      sbuf_(file_path),
+      input_stream_(&sbuf_),
       file_path_(file_path)
     {
       std::string version_string(7, '\0');
@@ -330,7 +354,7 @@ namespace vc
             if (varint_decode(in_it, end, metadata_fields_cnt) != end)
             {
               ++in_it;
-              sample_ids_.reserve(sample_size);
+              metadata_fields_.reserve(metadata_fields_cnt);
 
               std::uint64_t field_sz;
               while (metadata_fields_cnt && varint_decode(in_it, end, field_sz) != end)
@@ -353,6 +377,32 @@ namespace vc
       }
 
       input_stream_.peek();
+    }
+
+    reader::reader(reader&& source) :
+      sample_ids_(std::move(source.sample_ids_)),
+      chromosome_(std::move(source.chromosome_)),
+      sbuf_(std::move(source.sbuf_)),
+      input_stream_(&sbuf_),
+      file_path_(std::move(source.file_path_)),
+      ploidy_level_(source.ploidy_level_),
+      metadata_fields_(std::move(source.metadata_fields_))
+    {
+    }
+
+    reader& reader::operator=(reader&& source)
+    {
+      if (&source != this)
+      {
+        sample_ids_ = std::move(source.sample_ids_);
+        chromosome_ = std::move(source.chromosome_);
+        sbuf_ = std::move(source.sbuf_);
+        input_stream_.rdbuf(&sbuf_);
+        file_path_ = std::move(source.file_path_);
+        ploidy_level_ = source.ploidy_level_;
+        metadata_fields_ = std::move(source.metadata_fields_);
+      }
+      return *this;
     }
 
     reader& reader::operator>>(marker& destination)

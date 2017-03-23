@@ -43,7 +43,7 @@ namespace vc
       template<typename... TupleArgs, typename Fn, typename File, typename... AddlFiles>
       void operator()(std::tuple<TupleArgs...>&& readers, Fn&& handler, const File& file_path, const AddlFiles& ... addl_file_paths)
       {
-        if (detail::has_extension(file_path, ".cvcf"))
+        if (detail::has_extension(file_path, ".cmf"))
         {
           variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::cmf::reader(file_path))), std::ref(handler), addl_file_paths...);
         }
@@ -74,7 +74,7 @@ namespace vc
         {
           variadic_indexed_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::vcf::index_reader(file_path))), std::ref(handler), addl_file_paths...);
         }
-//        else if (detail::has_extension(file_path, ".cvcf"))
+//        else if (detail::has_extension(file_path, ".cmf"))
 //        {
 //          std::ifstream ifs(file_path);
 //          variadic_indexed_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::cmf::reader(ifs))), std::ref(handler), addl_file_paths...);
@@ -103,7 +103,7 @@ namespace vc
   template <typename Fn>
   void open_file(const std::string& file_path, Fn&& handler)
   {
-    if (detail::has_extension(file_path, ".cvcf"))
+    if (detail::has_extension(file_path, ".cmf"))
     {
       vc::cmf::reader input(file_path);
       handler(std::move(input));
@@ -141,7 +141,7 @@ namespace vc
       vc::vcf::index_reader input(file_path);
       handler(std::move(input));
     }
-//    else if (detail::has_extension(file_path, ".cvcf"))
+//    else if (detail::has_extension(file_path, ".cmf"))
 //    {
 //      std::ifstream ifs(file_path);
 //      vc::cmf::reader input(ifs);

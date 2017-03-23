@@ -3,7 +3,8 @@ project(libvc)
 
 include(ExternalProject)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y")
+set(CMAKE_CXX_STANDARD 14)
 
 message("Installing dependencies ... ")
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dep)

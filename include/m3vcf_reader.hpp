@@ -5,6 +5,7 @@
 
 #include <list>
 #include <string>
+#include <cstring>
 #include <cstdint>
 #include <vector>
 #include <fstream>
@@ -350,7 +351,7 @@ namespace vc
                   {
                     std::vector<char>& new_column_to_compare = unique_haplotype_matrix_[new_columns_index];
 
-                    if (memcmp(new_column_to_compare.data(), unique_haplotype_matrix_[tmp_sample_mappings[i]].data(), old_marker_size) == 0 && new_column_to_compare.back() == hap)
+                    if (std::memcmp(new_column_to_compare.data(), unique_haplotype_matrix_[tmp_sample_mappings[i]].data(), old_marker_size) == 0 && new_column_to_compare.back() == hap)
                       break;
                   }
 

@@ -4,6 +4,7 @@
 #include "portable_endian.hpp"
 
 #include <fstream>
+#include <cstring>
 #include <stack>
 #include <vector>
 #include <algorithm>

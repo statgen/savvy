@@ -5,6 +5,8 @@
 #include "varint.hpp"
 #include "s1r.hpp"
 
+#include <xzbuf.hpp>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -180,9 +182,10 @@ namespace vc
       };
 
       reader(const std::string& file_path);
-      reader(reader&& source) = default;
-      reader(const reader&) = delete;
-      reader& operator=(const reader&) = delete;
+      reader(reader&& source);
+      reader& operator=(reader&& source);
+      //reader(const reader&) = delete;
+      //reader& operator=(const reader&) = delete;
       reader& operator>>(marker& destination);
       explicit operator bool() const { return input_stream_.good(); }
       bool good() const { return input_stream_.good(); }
@@ -198,7 +201,8 @@ namespace vc
     protected:
       std::vector<std::string> sample_ids_;
       std::string chromosome_;
-      std::ifstream input_stream_;
+      ixzbuf sbuf_;
+      std::istream input_stream_;
       std::string file_path_;
       std::uint8_t ploidy_level_;
       std::vector<std::string> metadata_fields_;
@@ -306,7 +310,7 @@ namespace vc
     public:
       template <typename RandAccessStringIterator>
       writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end) :
-        output_stream_(file_path, std::ios::binary),
+        output_stream_(file_path),
         file_path_(file_path),
         sample_size_(samples_end - samples_beg),
         ploidy_level_(ploidy)
@@ -345,7 +349,7 @@ namespace vc
       static bool create_index(const std::string& input_file_path, std::string output_file_path = "");
 
     private:
-      std::ofstream output_stream_;
+      oxzstream output_stream_;
       std::string file_path_;
       std::uint64_t sample_size_;
       std::uint8_t ploidy_level_;
