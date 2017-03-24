@@ -5,6 +5,8 @@
 #include "test_class.hpp"
 #include "varint.hpp"
 #include "vc.hpp"
+#include "variant_iterator.hpp"
+#include "reader.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -53,113 +55,113 @@ void handle_file_reader(T& reader)
 
 }
 
-int reader_tests()
-{
-  //----------------------------------------------------------------//
-  {
-    std::string file_path = "/foobar.cmf";
-    if (has_extension(file_path, ".cmf"))
-    {
-      vc::cmf::reader input("/foobar.cmf");
-      handle_file_reader(input);
-    }
-    else if (has_extension(file_path, ".m3vcf"))
-    {
-      std::ifstream ifs("/foobar.m3vcf");
-      vc::m3vcf::reader input(ifs);
-      handle_file_reader(input);
-    }
-    else if (has_extension(file_path, ".vcf") || has_extension(file_path, "vcf.gz") || has_extension(file_path, ".bcf"))
-    {
-      vc::vcf::block buff;
-      vc::vcf::reader input(file_path);
-      vc::vcf::reader::input_iterator eof;
-      vc::vcf::reader::input_iterator cur(input, buff);
-
-      while (cur != eof)
-        ++cur;
-    }
-  }
-  //----------------------------------------------------------------//
-
-  //----------------------------------------------------------------//
-  {
-    std::string file_path = "/foobar.cmf";
-    if (has_extension(file_path, ".cmf"))
-    {
-      vc::cmf::reader input("/foobar.cmf");
-      auto analysis = make_analysis(input);
-      analysis.run();
-    }
-    else
-    {
-      std::ifstream ifs("/foobar.m3vcf");
-      vc::m3vcf::reader input(ifs);
-      some_analysis<vc::m3vcf::reader> analysis(input);
-      analysis.run();
-    }
-  }
-  //----------------------------------------------------------------//
-
-  //----------------------------------------------------------------//
-  {
-    vc::cmf::reader input("/foobar.cmf");
-    vc::cmf::marker buff;
-
-    for (vc::cmf::reader::input_iterator i(input, buff), eof; i != eof; ++i)
-    {
-      for (auto j = i->begin(); j != i->end(); ++j)
-      {
-
-      }
-    }
-  }
-  //----------------------------------------------------------------//
-
-  //----------------------------------------------------------------//
-  {
-    std::ifstream ifs("/foobar.m3vcf");
-    vc::m3vcf::reader input(ifs);
-    vc::m3vcf::block buff;
-
-    std::for_each(vc::m3vcf::reader::input_iterator(input, buff), vc::m3vcf::reader::input_iterator(), [](const vc::m3vcf::marker& m)
-    {
-      std::for_each(m.begin(), m.end(), [](const vc::allele_status& s)
-      {
-
-      });
-    });
-  }
-  //----------------------------------------------------------------//
-
-  //----------------------------------------------------------------//
-  vc::cmf::marker m;
-  std::uint64_t ploidy_level = 2;
-  std::uint64_t sample_size = 1000;
-  std::vector<int> zero_one_two_vec(sample_size, 0);
-
-  std::for_each(m.non_ref_begin(), m.non_ref_end(), [&zero_one_two_vec, ploidy_level](const vc::cmf::marker::sparse_vector_allele& a)
-  {
-    if (a.status == vc::allele_status::has_alt)
-      ++(zero_one_two_vec[a.offset / ploidy_level]);
-  });
-
-  std::size_t i = 0;
-  std::for_each(m.begin(), m.end(), [&zero_one_two_vec, &i, ploidy_level](const vc::allele_status& s)
-  {
-    if (s == vc::allele_status::has_alt)
-      ++(zero_one_two_vec[i / ploidy_level]);
-  });
-
-  i = 0;
-  for (const auto& s : m)
-  {
-    if (s == vc::allele_status::has_alt)
-      ++(zero_one_two_vec[i / ploidy_level]);
-  }
-  //----------------------------------------------------------------//
-  return 0;
-}
+//int reader_tests()
+//{
+//  //----------------------------------------------------------------//
+//  {
+//    std::string file_path = "/foobar.cmf";
+//    if (has_extension(file_path, ".cmf"))
+//    {
+//      vc::cmf::reader input("/foobar.cmf");
+//      handle_file_reader(input);
+//    }
+//    else if (has_extension(file_path, ".m3vcf"))
+//    {
+//      std::ifstream ifs("/foobar.m3vcf");
+//      vc::m3vcf::reader input(ifs);
+//      handle_file_reader(input);
+//    }
+//    else if (has_extension(file_path, ".vcf") || has_extension(file_path, "vcf.gz") || has_extension(file_path, ".bcf"))
+//    {
+//      vc::vcf::block buff;
+//      vc::vcf::reader input(file_path);
+//      vc::vcf::reader::input_iterator eof;
+//      vc::vcf::reader::input_iterator cur(input, buff);
+//
+//      while (cur != eof)
+//        ++cur;
+//    }
+//  }
+//  //----------------------------------------------------------------//
+//
+//  //----------------------------------------------------------------//
+//  {
+//    std::string file_path = "/foobar.cmf";
+//    if (has_extension(file_path, ".cmf"))
+//    {
+//      vc::cmf::reader input("/foobar.cmf");
+//      auto analysis = make_analysis(input);
+//      analysis.run();
+//    }
+//    else
+//    {
+//      std::ifstream ifs("/foobar.m3vcf");
+//      vc::m3vcf::reader input(ifs);
+//      some_analysis<vc::m3vcf::reader> analysis(input);
+//      analysis.run();
+//    }
+//  }
+//  //----------------------------------------------------------------//
+//
+//  //----------------------------------------------------------------//
+//  {
+//    vc::cmf::reader input("/foobar.cmf");
+//    vc::cmf::marker buff;
+//
+//    for (vc::cmf::reader::input_iterator i(input, buff), eof; i != eof; ++i)
+//    {
+//      for (auto j = i->begin(); j != i->end(); ++j)
+//      {
+//
+//      }
+//    }
+//  }
+//  //----------------------------------------------------------------//
+//
+//  //----------------------------------------------------------------//
+//  {
+//    std::ifstream ifs("/foobar.m3vcf");
+//    vc::m3vcf::reader input(ifs);
+//    vc::m3vcf::block buff;
+//
+//    std::for_each(vc::m3vcf::reader::input_iterator(input, buff), vc::m3vcf::reader::input_iterator(), [](const vc::m3vcf::marker& m)
+//    {
+//      std::for_each(m.begin(), m.end(), [](const vc::allele_status& s)
+//      {
+//
+//      });
+//    });
+//  }
+//  //----------------------------------------------------------------//
+//
+//  //----------------------------------------------------------------//
+//  vc::cmf::marker m;
+//  std::uint64_t ploidy_level = 2;
+//  std::uint64_t sample_size = 1000;
+//  std::vector<int> zero_one_two_vec(sample_size, 0);
+//
+//  std::for_each(m.non_ref_begin(), m.non_ref_end(), [&zero_one_two_vec, ploidy_level](const vc::cmf::marker::sparse_vector_allele& a)
+//  {
+//    if (a.status == vc::allele_status::has_alt)
+//      ++(zero_one_two_vec[a.offset / ploidy_level]);
+//  });
+//
+//  std::size_t i = 0;
+//  std::for_each(m.begin(), m.end(), [&zero_one_two_vec, &i, ploidy_level](const vc::allele_status& s)
+//  {
+//    if (s == vc::allele_status::has_alt)
+//      ++(zero_one_two_vec[i / ploidy_level]);
+//  });
+//
+//  i = 0;
+//  for (const auto& s : m)
+//  {
+//    if (s == vc::allele_status::has_alt)
+//      ++(zero_one_two_vec[i / ploidy_level]);
+//  }
+//  //----------------------------------------------------------------//
+//  return 0;
+//}
 
 int varint_test()
 {
@@ -401,32 +403,6 @@ int varint_test()
   return 0;
 }
 
-void convert_file_test()
-{
-  vc::vcf::block buff;
-  vc::vcf::reader input("test_file.vcf");
-  vc::vcf::reader::input_iterator eof;
-  vc::vcf::reader::input_iterator cur(input, buff);
-  const std::string chrom = cur != eof ? vc::vcf::reader::get_chromosome(input, *cur) : "";
-  const int ploidy =  cur != eof ? cur->ploidy() : 0;
-
-  std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
-  std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-  vc::cmf::writer compact_output("test_file.cmf", vc::vcf::reader::get_chromosome(input, *cur), ploidy, sample_ids.begin(), sample_ids.end());
-
-  while (cur != eof)
-  {
-    if (vc::vcf::reader::get_chromosome(input, *cur) != chrom)
-    {
-      std::cerr << "Multiple chromosomes encountered. CMF files can only contain one chromosome." << std::endl;
-      break;
-    }
-    compact_output << vc::cmf::marker(cur->pos(), cur->ref(), cur->alt(), cur->begin(), cur->end());
-
-    ++cur;
-  }
-}
-
 template <typename Proc>
 class timed_procedure_call
 {
@@ -482,14 +458,13 @@ private:
   {
     std::size_t ret = 0;
 
-    typename ReaderType::input_iterator::buffer buff;
-    typename ReaderType::input_iterator cur(reader, buff);
-    typename ReaderType::input_iterator end;
+    vc::variant_iterator<ReaderType, std::vector<float>> cur(reader);
+    vc::variant_iterator<ReaderType, std::vector<float>> end;
 
     std::size_t num_markers = 0;
     while (cur != end)
     {
-      ret = hash_combine(ret, cur->pos());
+      ret = hash_combine(ret, cur->locus());
       ret = hash_combine(ret, cur->ref());
       ret = hash_combine(ret, cur->alt());
 
@@ -526,55 +501,99 @@ void run_file_checksum_test()
   });
 }
 
-template <typename M>
-double inner_product(const M& mrkr, std::vector<double>& vec, const double start_val = 0.0)
+void convert_file_test()
 {
-  double ret = start_val;
-
-  std::size_t i = 0;
-  for (const vc::allele_status& gt : mrkr)
   {
-    if (gt == vc::allele_status::has_alt)
-      ret += 1.0 * vec[i];
-    ++i;
-  }
+    vc::vcf::reader input("test_file.vcf");
+    vc::variant_iterator<vc::vcf::reader, std::vector<float>> cur(input);
+    vc::variant_iterator<vc::vcf::reader, std::vector<float>> eof;
+    const std::string chrom = cur != eof ? cur->chromosome() : "";
+    const int ploidy = cur != eof ? cur->ploidy() : 0;
 
-  return ret;
-}
+    std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
+    std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
+    vc::cmf::writer compact_output("test_file.cmf", chrom, ploidy, sample_ids.begin(), sample_ids.end());
 
-template <>
-double inner_product<vc::cmf::marker>(const vc::cmf::marker& mrkr, std::vector<double>& vec, const double start_val)
-{
-  double ret = start_val;
-
-  for (auto it = mrkr.non_ref_begin(); it != mrkr.non_ref_end(); ++it)
-  {
-    if (it->status == vc::allele_status::has_alt)
-      ret += 1.0 * vec[it->offset];
-    else
-      ret += 0.04 * vec[it->offset];
-  }
-
-  return ret;
-}
-
-class file_handler_functor
-{
-public:
-  template <typename T>
-  void operator()(T&& input_file_reader)
-  {
-    typedef typename T::input_iterator input_iterator_type;
-    typename T::input_iterator::buffer buf{};
-
-    for (auto it = input_iterator_type(input_file_reader, buf); it != input_iterator_type(); ++it)
+    while (cur != eof)
     {
-      inner_product(*it, phenotypes_);
+      if (cur->chromosome() != chrom)
+      {
+        std::cerr << "Multiple chromosomes encountered. CMF files can only contain one chromosome." << std::endl;
+        break;
+      }
+
+  //    vc::haplotype_vector<std::vector<float>> m(std::string(chrom), cur->locus(), std::string(cur->ref()), std::string(cur->alt()), sample_ids.size(), ploidy, std::vector<float>());
+  //    for (auto it = cur->begin(); it != cur->end(); ++it)
+  //    {
+  //      switch (*it)
+  //      {
+  //        case vc::allele_status::has_alt:
+  //          m[std::distance(cur->begin(), it)] = 1.0;
+  //          break;
+  //        case vc::allele_status::is_missing:
+  //          m[std::distance(cur->begin(), it)] = std::numeric_limits<float>::quiet_NaN();
+  //          break;
+  //      }
+  //    }
+
+      compact_output << *cur;
+
+      ++cur;
     }
-  };
-private:
-  std::vector<double> phenotypes_;
-};
+  }
+
+  run_file_checksum_test();
+}
+
+//template <typename M>
+//double inner_product(const M& mrkr, std::vector<double>& vec, const double start_val = 0.0)
+//{
+//  double ret = start_val;
+//
+//  std::size_t i = 0;
+//  for (const vc::allele_status& gt : mrkr)
+//  {
+//    if (gt == vc::allele_status::has_alt)
+//      ret += 1.0 * vec[i];
+//    ++i;
+//  }
+//
+//  return ret;
+//}
+//
+//template <>
+//double inner_product<vc::cmf::marker>(const vc::cmf::marker& mrkr, std::vector<double>& vec, const double start_val)
+//{
+//  double ret = start_val;
+//
+//  for (auto it = mrkr.non_ref_begin(); it != mrkr.non_ref_end(); ++it)
+//  {
+//    if (it->status == vc::allele_status::has_alt)
+//      ret += 1.0 * vec[it->offset];
+//    else
+//      ret += 0.04 * vec[it->offset];
+//  }
+//
+//  return ret;
+//}
+
+//class file_handler_functor
+//{
+//public:
+//  template <typename T>
+//  void operator()(T&& input_file_reader)
+//  {
+//    typedef typename T::input_iterator input_iterator_type;
+//    typename T::input_iterator::buffer buf{};
+//
+//    for (auto it = input_iterator_type(input_file_reader, buf); it != input_iterator_type(); ++it)
+//    {
+//      inner_product(*it, phenotypes_);
+//    }
+//  };
+//private:
+//  std::vector<double> phenotypes_;
+//};
 
 class triple_file_handler_functor
 {
@@ -607,52 +626,77 @@ public:
   }
 };
 
-class marker_counter
+//class marker_counter
+//{
+//public:
+//  marker_counter() = default;
+//  marker_counter(const marker_counter&) = delete;
+//  marker_counter(marker_counter&&) = delete;
+//  marker_counter& operator=(const marker_counter&) = delete;
+//  marker_counter& operator=(marker_counter&&) = delete;
+//  template <typename T, typename T2>
+//  void operator()(T&& input_file_reader, T2&& input_file_reader2)
+//  {
+//    typename T::input_iterator::buffer buff;
+//    typename T::input_iterator cur(input_file_reader, buff);
+//    typename T::input_iterator end;
+//
+//    typename T2::input_iterator::buffer buff2;
+//    typename T2::input_iterator cur2(input_file_reader2, buff2);
+//    typename T2::input_iterator end2;
+//
+//    inner_product(*cur2, *end2);
+//    while (cur != end)
+//    {
+//      ++file1_cnt_;
+//      ++cur;
+//    }
+//
+//    while (cur2 != end2)
+//    {
+//      ++file2_cnt_;
+//      ++cur2;
+//    }
+//
+//  }
+//  std::size_t file1_count() const { return file1_cnt_; }
+//  std::size_t file2_count() const { return file2_cnt_; }
+//private:
+//  std::size_t file1_cnt_ = 0;
+//  std::size_t file2_cnt_ = 0;
+//};
+
+void random_access_test()
 {
-public:
-  marker_counter() = default;
-  marker_counter(const marker_counter&) = delete;
-  marker_counter(marker_counter&&) = delete;
-  marker_counter& operator=(const marker_counter&) = delete;
-  marker_counter& operator=(marker_counter&&) = delete;
-  template <typename T, typename T2>
-  void operator()(T&& input_file_reader, T2&& input_file_reader2)
-  {
-    typename T::input_iterator::buffer buff;
-    typename T::input_iterator cur(input_file_reader, buff);
-    typename T::input_iterator end;
+//  vc::cmf::writer::create_index("test_file.cmf");
+//
+//  vc::cmf::indexed_reader rdr("test_file.cmf");
+//  auto query = rdr.create_query(17000, 1120000);
+//  for (const auto& mkr: query)
+//  {
+//    std::cout << mkr.pos() << std::endl;
+//  }
+}
 
-    typename T2::input_iterator::buffer buff2;
-    typename T2::input_iterator cur2(input_file_reader2, buff2);
-    typename T2::input_iterator end2;
+void generic_reader_test()
+{
+  vc::reader rdr1("test_file.cmf");
+  vc::reader rdr2("test_file.vcf");
 
-    inner_product(*cur2, *end2);
-    while (cur != end)
-    {
-      ++file1_cnt_;
-      ++cur;
-    }
-
-    while (cur2 != end2)
-    {
-      ++file2_cnt_;
-      ++cur2;
-    }
-
-  }
-  std::size_t file1_count() const { return file1_cnt_; }
-  std::size_t file2_count() const { return file2_cnt_; }
-private:
-  std::size_t file1_cnt_ = 0;
-  std::size_t file2_cnt_ = 0;
-};
+  auto t = make_file_checksum_test(rdr1, rdr2);
+  std::cout << "Starting checksum test ..." << std::endl;
+  auto timed_call = time_procedure(t);
+  std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
+  std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
+}
 
 int main(int argc, char** argv)
 {
   std::cout << "[0] Run all tests." << std::endl;
   std::cout << "[1] Run varint test." << std::endl;
   std::cout << "[2] Run file conversion test." << std::endl;
-  std::cout << "[3] Run checksum test." << std::endl;
+  std::cout << "[3] Run generic reader test." << std::endl;
+  std::cout << "[4] Run random access test." << std::endl;
 
   char t = '0';
   std::cin >> t;
@@ -662,7 +706,6 @@ int main(int argc, char** argv)
     case '0':
       varint_test();
       convert_file_test();
-      run_file_checksum_test();
       break;
     case '1':
       varint_test();
@@ -671,7 +714,10 @@ int main(int argc, char** argv)
       convert_file_test();
       break;
     case '3':
-      run_file_checksum_test();
+      generic_reader_test();
+      break;
+    case '4':
+      random_access_test();
       break;
     default:
       std::cout << "Invalid Input" << std::endl;

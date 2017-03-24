@@ -471,7 +471,6 @@ namespace vc
             ++(current_leaf_position.entry_offset);
           }
         }
-        std::cout << "Node Count: " << node_counter << std::endl;
       }
 
       bool flush()
