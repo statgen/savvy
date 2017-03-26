@@ -6,6 +6,7 @@
 #include "s1r.hpp"
 #include "haplotype_vector.hpp"
 #include "genotype_vector.hpp"
+#include "region.hpp"
 
 #include <xzbuf.hpp>
 
@@ -145,7 +146,7 @@ namespace vc
 //      std::tuple<std::size_t, std::size_t> calculate_rle_serialized_gt_size_and_count() const;
 //    };
 
-    class reader
+    class reader_base
     {
     public:
 //      class input_iterator
@@ -184,58 +185,68 @@ namespace vc
 //        marker* buffer_;
 //      };
 
-      reader(const std::string& file_path);
-      reader(reader&& source);
-      reader& operator=(reader&& source);
+      reader_base(const std::string& file_path);
+      reader_base(reader_base&& source);
+      reader_base& operator=(reader_base&& source);
       //reader(const reader&) = delete;
       //reader& operator=(const reader&) = delete;
+      virtual ~reader_base() {}
+
       template <typename T>
-      reader& operator>>(haplotype_vector<T>& destination)
+      void read_vector(haplotype_vector<T>& destination)
       {
-        std::istreambuf_iterator<char> in_it(input_stream_);
-        std::istreambuf_iterator<char> end_it;
-
-        std::uint64_t locus;
-        if (varint_decode(in_it, end_it, locus) != end_it)
+        if (good())
         {
-          ++in_it;
-          std::uint64_t sz;
-          if (varint_decode(in_it, end_it, sz) != end_it)
+          if (!this->update_file_position())
           {
-            ++in_it;
-            std::string ref;
-            ref.resize(sz);
-            if (sz)
-              input_stream_.read(&ref[0], ref.size());
+            this->input_stream_.setstate(std::ios::failbit);
+          }
+          else
+          {
+            std::istreambuf_iterator<char> in_it(input_stream_);
+            std::istreambuf_iterator<char> end_it;
 
-            if (varint_decode(in_it, end_it, sz) != end_it)
+            std::uint64_t locus;
+            if (varint_decode(in_it, end_it, locus) != end_it)
             {
               ++in_it;
-              std::string alt;
-              alt.resize(sz);
-              if (sz)
-                input_stream_.read(&alt[0], alt.size());
-
-              // TODO: Read metadata values.
-
-              destination = haplotype_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), sample_count(), ploidy(), std::move(destination));
-
-              varint_decode(in_it, end_it, sz);
-              std::uint64_t total_offset = 0;
-              for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+              std::uint64_t sz;
+              if (varint_decode(in_it, end_it, sz) != end_it)
               {
-                std::uint8_t allele;
-                std::uint64_t offset;
-                one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
-                total_offset += offset;
-                destination[total_offset] = (allele ? std::numeric_limits<typename T::value_type>::quiet_NaN() : 1.0);
+                ++in_it;
+                std::string ref;
+                ref.resize(sz);
+                if (sz)
+                  input_stream_.read(&ref[0], ref.size());
+
+                if (varint_decode(in_it, end_it, sz) != end_it)
+                {
+                  ++in_it;
+                  std::string alt;
+                  alt.resize(sz);
+                  if (sz)
+                    input_stream_.read(&alt[0], alt.size());
+
+                  // TODO: Read metadata values.
+
+                  destination = haplotype_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), sample_count(), ploidy(), std::move(destination));
+
+                  varint_decode(in_it, end_it, sz);
+                  std::uint64_t total_offset = 0;
+                  for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+                  {
+                    std::uint8_t allele;
+                    std::uint64_t offset;
+                    one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
+                    total_offset += offset;
+                    destination[total_offset] = (allele ? std::numeric_limits<typename T::value_type>::quiet_NaN() : 1.0);
+                  }
+                }
               }
             }
+            input_stream_.get();
           }
         }
-        input_stream_.get();
-
-        return *this;
       }
       explicit operator bool() const { return input_stream_.good(); }
       bool good() const { return input_stream_.good(); }
@@ -250,6 +261,8 @@ namespace vc
       const std::string& file_path() const { return file_path_; }
       std::streampos tellg() { return this->input_stream_.tellg(); }
     protected:
+      virtual bool update_file_position() { return true; }
+    protected:
       std::vector<std::string> sample_ids_;
       std::string chromosome_;
       ixzbuf sbuf_;
@@ -259,9 +272,22 @@ namespace vc
       std::vector<std::string> metadata_fields_;
     };
 
-//    class indexed_reader : public reader
-//    {
-//    public:
+    class reader : public reader_base
+    {
+    public:
+      using reader_base::reader_base;
+
+      template <typename T>
+      reader& operator>>(haplotype_vector<T>& destination)
+      {
+        read_vector(destination);
+        return *this;
+      }
+    };
+
+    class region_reader : public reader_base
+    {
+    public:
 //      class region_query
 //      {
 //      public:
@@ -341,11 +367,41 @@ namespace vc
 //        s1r::reader::query index_query_;
 //      };
 //
-//      indexed_reader(const std::string& file_path, const std::string& index_file_path = "") :
-//        reader(file_path),
-//        index_(index_file_path.size() ? index_file_path : file_path + ".s1r")
-//      {
-//      }
+
+      region_reader(const std::string& file_path, std::uint64_t from, std::uint64_t to, const std::string& index_file_path = "") :
+        reader_base(file_path),
+        index_(index_file_path.size() ? index_file_path : file_path + ".s1r"),
+        query_(index_.create_query(from, to)),
+        i_(query_.begin())
+      {
+        if (!index_.good())
+          this->input_stream_.setstate(std::ios::badbit);
+      }
+
+      region_reader(const std::string& file_path, region reg, const std::string& index_file_path = "") :
+        region_reader(file_path, reg.from(), reg.to(), index_file_path)
+      {
+        if (this->chromosome() != reg.chromosome())
+          this->input_stream_.setstate(std::ios::badbit);
+      }
+
+      template <typename T>
+      region_reader& operator>>(haplotype_vector<T>& destination)
+      {
+        read_vector(destination);
+        return *this;
+      }
+
+    private:
+      bool update_file_position()
+      {
+        if (i_ == query_.end())
+          return false;
+        input_stream_.seekg(std::streampos(i_->value().first));
+        ++i_;
+        return true;
+      }
+
 //
 //      region_query create_query(std::uint64_t start, std::uint64_t end = std::numeric_limits<std::uint64_t>::max())
 //      {
@@ -359,10 +415,12 @@ namespace vc
 //        else
 //          return region_query(*this, this->input_stream_, index_.create_query((std::uint64_t)-1, 0));
 //      }
-//    private:
-//      s1r::reader index_;
-//    };
-//
+    private:
+      s1r::reader index_;
+      s1r::reader::query query_;
+      s1r::reader::query::iterator i_;
+    };
+
     class writer
     {
     public:

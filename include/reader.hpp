@@ -12,29 +12,14 @@
 
 namespace vc
 {
-
-  class reader
+  template <typename CMFType, typename VCFType>
+  class reader_base
   {
   public:
-    reader(const std::string& file_path)
+    operator bool() const
     {
-      if (vc::detail::has_extension(file_path, ".cmf"))
-        cmf_reader_ = std::make_unique<cmf::reader>(file_path);
-      else if (detail::has_extension(file_path, ".vcf") || detail::has_extension(file_path, ".vcf.gz") || detail::has_extension(file_path, ".bcf"))
-        vcf_reader_ = std::make_unique<vcf::reader>(file_path);
+      return this->good();
     }
-
-    template <typename T>
-    reader& operator>>(haplotype_vector<T>& destination)
-    {
-      if (cmf_reader_)
-        (*cmf_reader_) >> destination;
-      else if (vcf_reader_)
-        (*vcf_reader_) >> destination;
-      return *this;
-    }
-
-    explicit operator bool() const { return this->good(); }
 
     bool good() const
     {
@@ -53,6 +38,7 @@ namespace vc
         return vcf_reader_->fail();
       return true;
     }
+
     bool bad() const
     {
       if (cmf_reader_)
@@ -61,12 +47,53 @@ namespace vc
         return vcf_reader_->bad();
       return true;
     }
-  private:
-    std::unique_ptr<cmf::reader> cmf_reader_;
-    std::unique_ptr<vcf::reader> vcf_reader_;
+  protected:
+    template <typename T>
+    void read_vector(haplotype_vector<T>& destination)
+    {
+      if (cmf_reader_)
+        (*cmf_reader_) >> destination;
+      else if (vcf_reader_)
+        (*vcf_reader_) >> destination;
+    }
+  protected:
+    std::unique_ptr<CMFType> cmf_reader_;
+    std::unique_ptr<VCFType> vcf_reader_;
   };
 
+  class reader : public reader_base<cmf::reader, vcf::reader>
+  {
+  public:
+    reader(const std::string& file_path);
+    ~reader() {}
 
+    template <typename T>
+    reader& operator>>(haplotype_vector<T>& destination);
+  };
 
+  class region_reader : public reader_base<cmf::region_reader, vcf::region_reader>
+  {
+  public:
+    region_reader(const std::string& file_path, region reg);
+
+    template <typename T>
+    region_reader& operator>>(haplotype_vector<T>& destination);
+  private:
+
+  };
+
+  template <typename T>
+  reader& reader::operator>>(haplotype_vector<T>& destination)
+  {
+    read_vector(destination);
+    return *this;
+  }
+
+  template <typename T>
+  region_reader& region_reader::operator>>(haplotype_vector<T>& destination)
+  {
+    read_vector(destination);
+    return *this;
+  }
 }
 #endif //VC_READER_HPP

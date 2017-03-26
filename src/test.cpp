@@ -668,14 +668,15 @@ public:
 
 void random_access_test()
 {
-//  vc::cmf::writer::create_index("test_file.cmf");
-//
-//  vc::cmf::indexed_reader rdr("test_file.cmf");
-//  auto query = rdr.create_query(17000, 1120000);
-//  for (const auto& mkr: query)
-//  {
-//    std::cout << mkr.pos() << std::endl;
-//  }
+  vc::cmf::writer::create_index("test_file.cmf");
+
+  vc::cmf::region_reader rdr("test_file.cmf", 17000, 1120000);
+  auto it = vc::variant_iterator<vc::cmf::region_reader, std::vector<float>>(rdr);
+  auto end = vc::variant_iterator<vc::cmf::region_reader, std::vector<float>>{};
+  for ( ; it != end; ++it)
+  {
+    std::cout << it->locus() << std::endl;
+  }
 }
 
 void generic_reader_test()

@@ -303,7 +303,7 @@ namespace vc
     //================================================================//
 
     //================================================================//
-    reader::reader(const std::string& file_path) :
+    reader_base::reader_base(const std::string& file_path) :
       sbuf_(file_path),
       input_stream_(&sbuf_),
       file_path_(file_path)
@@ -379,7 +379,7 @@ namespace vc
       input_stream_.peek();
     }
 
-    reader::reader(reader&& source) :
+    reader_base::reader_base(reader_base&& source) :
       sample_ids_(std::move(source.sample_ids_)),
       chromosome_(std::move(source.chromosome_)),
       sbuf_(std::move(source.sbuf_)),
@@ -390,7 +390,7 @@ namespace vc
     {
     }
 
-    reader& reader::operator=(reader&& source)
+    reader_base& reader_base::operator=(reader_base&& source)
     {
       if (&source != this)
       {
@@ -405,7 +405,7 @@ namespace vc
       return *this;
     }
 
-//    reader& reader::operator>>(marker& destination)
+//    reader& reader_base::operator>>(marker& destination)
 //    {
 //      marker::read(destination, sample_ids_.size() * ploidy_level_, input_stream_);
 //      return *this;

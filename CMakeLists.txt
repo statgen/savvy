@@ -24,7 +24,7 @@ find_package(xzbuf)
 
 
 set(HEADER_FILES
-    include/vc.hpp include/reader.hpp include/m3vcf_reader.hpp include/cmf_reader.hpp include/allele_status.hpp include/vcf_reader.hpp include/varint.hpp include/s1r.hpp include/haplotype_vector.hpp include/genotype_vector.hpp include/variant_iterator.hpp include/portable_endian.hpp)
+    include/vc.hpp include/reader.hpp include/m3vcf_reader.hpp include/cmf_reader.hpp include/allele_status.hpp include/vcf_reader.hpp include/varint.hpp include/s1r.hpp include/haplotype_vector.hpp include/genotype_vector.hpp include/variant_iterator.hpp include/portable_endian.hpp include/region.hpp)
 
 set(SOURCE_FILES
     src/vc.cpp src/reader.cpp src/m3vcf_reader.cpp include/cmf_reader.hpp src/cmf_reader.cpp include/test_class.hpp src/vcf_reader.cpp src/varint.cpp)

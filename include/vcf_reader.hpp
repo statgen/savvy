@@ -3,12 +3,14 @@
 
 #include "allele_status.hpp"
 #include "haplotype_vector.hpp"
+#include "region.hpp"
 
 #include <iterator>
 #include <string>
 #include <vector>
 #include <iostream>
 #include <limits>
+#include <sstream>
 
 
 //namespace vc
@@ -176,8 +178,27 @@ namespace vc
 //        std::uint32_t i_;
 //      };
 
-      reader_base() : state_(std::ios::goodbit) {}
-      virtual ~reader_base() {}
+      reader_base() :
+        state_(std::ios::goodbit),
+        gt_(nullptr),
+        gt_sz_(0),
+        allele_index_(0)
+      {}
+
+      reader_base(reader_base&& source) :
+        state_(source.state_),
+        gt_(source.gt_),
+        gt_sz_(source.gt_sz_),
+        allele_index_(source.allele_index_)
+      {
+        source.gt_ = nullptr;
+      }
+
+      virtual ~reader_base()
+      {
+        if (gt_)
+          free(gt_);
+      }
 
       //virtual reader_base& operator>>(block& destination) = 0;
 
@@ -191,9 +212,51 @@ namespace vc
       std::uint64_t sample_count() const;
     protected:
       std::ios::iostate state_;
+      int* gt_;
+      int gt_sz_;
+      int allele_index_;
+
 
       virtual const bcf_hdr_t*const hts_hdr() const = 0;
+      virtual const bcf1_t*const hts_rec() const = 0;
+      virtual bool read_hts_record() = 0;
+      template <typename VecType>
+      bool read_block(haplotype_vector<VecType>& destination);
     };
+
+    template <typename VecType>
+    bool reader_base::read_block(haplotype_vector<VecType>& destination)
+    {
+      bool ret = true;
+
+      ++allele_index_;
+      if (allele_index_ >= hts_rec()->n_allele)
+      {
+        ret = read_hts_record();
+      }
+
+      if (ret)
+      {
+        destination = haplotype_vector<VecType>(
+          std::string(bcf_hdr_id2name(hts_hdr(), hts_rec()->rid)),
+          static_cast<std::uint64_t>(hts_rec()->pos + 1),
+          std::string(hts_rec()->d.allele[0]),
+          std::string(hts_rec()->n_allele > 1 ? hts_rec()->d.allele[allele_index_] : ""),
+          sample_count(),
+          (gt_sz_ / hts_rec()->n_sample),
+          std::move(destination));
+
+        for (std::size_t i = 0; i < gt_sz_; ++i)
+        {
+          if (gt_[i] == bcf_gt_missing)
+            destination[i] = std::numeric_limits<typename VecType::value_type>::quiet_NaN();
+          else if (bcf_gt_allele(gt_[i]) == allele_index_)
+            destination[i] = 1.0;
+        }
+      }
+
+      return ret;
+    }
 
     class reader : public reader_base
     {
@@ -215,93 +278,101 @@ namespace vc
 
 //      static std::string get_chromosome(const reader& rdr, const marker& mkr);
     private:
-      template <typename VecType>
-      bool read_block(haplotype_vector<VecType>& destination)
-      {
-        bool ret = true;
+//      template <typename VecType>
+//      bool read_block(haplotype_vector<VecType>& destination)
+//      {
+//        bool ret = true;
+//
+//        ++allele_index_;
+//        if (allele_index_ >= hts_rec_->n_allele)
+//        {
+//          ret = read_hts_record();
+//        }
+//
+//        if (ret)
+//        {
+//          destination = haplotype_vector<VecType>(
+//            std::string(bcf_hdr_id2name(hts_hdr_, hts_rec_->rid)),
+//            static_cast<std::uint64_t>(hts_rec_->pos + 1),
+//            std::string(hts_rec_->d.allele[0]),
+//            std::string(hts_rec_->n_allele > 1 ? hts_rec_->d.allele[allele_index_] : ""),
+//            sample_count(),
+//            (gt_sz_ / hts_rec_->n_sample),
+//            std::move(destination));
+//
+//          for (std::size_t i = 0; i < gt_sz_; ++i)
+//          {
+//            if (gt_[i] == bcf_gt_missing)
+//              destination[i] = std::numeric_limits<typename VecType::value_type>::quiet_NaN();
+//            else if (bcf_gt_allele(gt_[i]) == allele_index_)
+//              destination[i] = 1.0;
+//          }
+//        }
+//
+//        return ret;
+//      }
 
-        ++allele_index_;
-        if (allele_index_ >= hts_rec_->n_allele)
-        {
-          ret = read_hts_record();
-        }
-
-        if (ret)
-        {
-          destination = haplotype_vector<VecType>(
-            std::string(bcf_hdr_id2name(hts_hdr_, hts_rec_->rid)),
-            static_cast<std::uint64_t>(hts_rec_->pos + 1),
-            std::string(hts_rec_->d.allele[0]),
-            std::string(hts_rec_->n_allele > 1 ? hts_rec_->d.allele[allele_index_] : ""),
-            sample_count(),
-            (gt_sz_ / hts_rec_->n_sample),
-            std::move(destination));
-
-          for (std::size_t i = 0; i < gt_sz_; ++i)
-          {
-            if (gt_[i] == bcf_gt_missing)
-              destination[i] = std::numeric_limits<typename VecType::value_type>::quiet_NaN();
-            else if (bcf_gt_allele(gt_[i]) == allele_index_)
-              destination[i] = 1.0;
-          }
-        }
-
-        return ret;
-      }
-
-      bool read_hts_record()
-      {
-        if (bcf_read(hts_file_, hts_hdr_, hts_rec_) >= 0)
-        {
-          bcf_unpack(hts_rec_, BCF_UN_ALL); //BCF_UN_STR | BCF_UN_FMT);
-          bcf_get_genotypes(hts_hdr_, hts_rec_, &(gt_), &(gt_sz_));
-          int num_samples = hts_hdr_->n[BCF_DT_SAMPLE];
-          if (gt_sz_ % num_samples != 0)
-          {
-            // TODO: mixed ploidy at site error.
-          }
-          else
-          {
-            this->allele_index_ = 1;
-//            std::uint16_t i = 1;
-//            do
-//            {
-//              destination.markers_.emplace_back(destination.hts_rec_, destination.gt_, destination.gt_sz_, i);
-//              ++i;
-//            } while (i < destination.hts_rec_->n_allele);
-            return true;
-          }
-        }
-        return false;
-      }
+      bool read_hts_record();
 
       const bcf_hdr_t* const hts_hdr() const { return hts_hdr_; }
+      const bcf1_t* const hts_rec() const { return hts_rec_; }
     private:
       htsFile* hts_file_;
       bcf_hdr_t* hts_hdr_;
       bcf1_t* hts_rec_;
-      int* gt_;
-      int gt_sz_;
-      int allele_index_;
     };
 
-//    class index_reader : public reader_base
-//    {
-//    public:
-//      typedef reader_base::input_iterator input_iterator;
-//
-//      index_reader(const std::string& file_path);
-//      ~index_reader();
-//      index_reader& operator>>(block& destination);
+    class region_reader : public reader_base
+    {
+    public:
+      region_reader(const std::string& file_path, region reg);
+      //template <typename PathItr, typename RegionItr>
+      //region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end);
+      ~region_reader();
+      template <typename VecType>
+      region_reader& operator>>(haplotype_vector<VecType>& destination);
+    private:
+      bool read_hts_record();
 //      index_reader& seek(const std::string& chromosome, std::uint64_t position);
 //
 //      static std::string get_chromosome(const index_reader& rdr, const marker& mkr);
-//    private:
-//      bcf_srs_t* synced_readers_;
-//      std::ios::iostate state_;
+      const bcf_hdr_t*const hts_hdr() const { return bcf_sr_get_header(synced_readers_, 0); }
+      const bcf1_t*const hts_rec() const { return hts_rec_; }
+    private:
+      bcf_srs_t* synced_readers_;
+      bcf1_t* hts_rec_;
+    };
+
+    template <typename VecType>
+    region_reader& region_reader::operator>>(haplotype_vector<VecType>& destination)
+    {
+      if (!read_block(destination))
+        this->state_ = std::ios::failbit;
+      return *this;
+    }
+
+//    template <typename PathItr, typename RegionItr>
+//    region_reader::region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end) :
+//      synced_readers_(bcf_sr_init())
+//    {
+//      std::stringstream contigs;
+//      for (auto it = regions_beg; it != regions_end; )
+//      {
+//        contigs << it->chromosome();
+//        if (it->from() > 1 || it->to() != std::numeric_limits<std::uint64_t>::max())
+//          contigs << ":" << it->from() << "-" << it->to();
 //
-//      const bcf_hdr_t*const hts_hdr() const { return bcf_sr_get_header(synced_readers_, 0); }
-//    };
+//        ++it;
+//        if (it != regions_end)
+//          contigs << ",";
+//      }
+//      bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0);
+//
+//      for (auto it = file_paths_beg; it != file_paths_end; ++it)
+//      {
+//        bcf_sr_add_reader(synced_readers_, it->c_str());
+//      }
+//    }
   }
 }
 

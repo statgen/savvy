@@ -342,6 +342,8 @@ namespace vc
         index_base::init();
       }
 
+      bool good() const { return ifs_.good(); }
+
       query create_query(std::uint64_t beg, std::uint64_t end)
       {
         query ret(*this, ifs_, beg, end);

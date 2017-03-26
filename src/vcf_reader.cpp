@@ -188,10 +188,7 @@ namespace vc
     reader::reader(const std::string& file_path) :
       hts_file_(bcf_open(file_path.c_str(), "r")),
       hts_hdr_(nullptr),
-      hts_rec_(bcf_init1()),
-      gt_(nullptr),
-      gt_sz_(0),
-      allele_index_(0)
+      hts_rec_(bcf_init1())
     {
       if (!hts_file_ || !hts_rec_)
       {
@@ -207,10 +204,7 @@ namespace vc
       reader_base(std::move(source)),
       hts_file_(source.hts_file_),
       hts_hdr_(source.hts_hdr_),
-      hts_rec_(source.hts_rec_),
-      gt_(source.gt_),
-      gt_sz_(source.gt_sz_),
-      allele_index_(source.allele_index_)
+      hts_rec_(source.hts_rec_)
     {
       source.hts_file_ = nullptr;
       source.hts_hdr_ = nullptr;
@@ -229,13 +223,82 @@ namespace vc
           bcf_close(hts_file_);
         if (hts_rec_)
           bcf_destroy1(hts_rec_);
-        if (gt_)
-          free(gt_);
       }
       catch (...)
       {
         assert(!"bcf_hdr_destroy or bcf_close threw exception!");
       }
+    }
+
+    bool reader::read_hts_record()
+    {
+      if (bcf_read(hts_file_, hts_hdr_, hts_rec_) >= 0)
+      {
+        bcf_unpack(hts_rec_, BCF_UN_ALL); //BCF_UN_STR | BCF_UN_FMT);
+        bcf_get_genotypes(hts_hdr_, hts_rec_, &(gt_), &(gt_sz_));
+        int num_samples = hts_hdr_->n[BCF_DT_SAMPLE];
+        if (gt_sz_ % num_samples != 0)
+        {
+          // TODO: mixed ploidy at site error.
+        }
+        else
+        {
+          this->allele_index_ = 1;
+//            std::uint16_t i = 1;
+//            do
+//            {
+//              destination.markers_.emplace_back(destination.hts_rec_, destination.gt_, destination.gt_sz_, i);
+//              ++i;
+//            } while (i < destination.hts_rec_->n_allele);
+          return true;
+        }
+      }
+      return false;
+    }
+
+    region_reader::region_reader(const std::string& file_path, region reg) :
+      synced_readers_(bcf_sr_init()),
+      hts_rec_(nullptr)
+    {
+      std::stringstream contigs;
+      contigs << reg.chromosome();
+      if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())
+        contigs << ":" << reg.from() << "-" << reg.to();
+
+      bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0);
+      bcf_sr_add_reader(synced_readers_, file_path.c_str());
+    }
+
+    region_reader::~region_reader()
+    {
+      if (synced_readers_)
+        bcf_sr_destroy(synced_readers_);
+    }
+
+    bool region_reader::read_hts_record()
+    {
+      if (bcf_sr_next_line(synced_readers_) && (hts_rec_ = bcf_sr_get_line(synced_readers_, 0)))
+      {
+        bcf_unpack(hts_rec_, BCF_UN_ALL); //BCF_UN_STR | BCF_UN_FMT);
+        bcf_get_genotypes(hts_hdr(), hts_rec_, &(gt_), &(gt_sz_));
+        int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
+        if (gt_sz_ % num_samples != 0)
+        {
+          // TODO: mixed ploidy at site error.
+        }
+        else
+        {
+          this->allele_index_ = 1;
+//            std::uint16_t i = 1;
+//            do
+//            {
+//              destination.markers_.emplace_back(destination.hts_rec_, destination.gt_, destination.gt_sz_, i);
+//              ++i;
+//            } while (i < destination.hts_rec_->n_allele);
+          return true;
+        }
+      }
+      return false;
     }
 
 //    reader& reader::operator>>(block& destination)
