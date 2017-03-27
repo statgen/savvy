@@ -429,8 +429,8 @@ namespace vc
       std::int64_t start_pos = r.tellg();
 
 
-      variant_iterator<reader, std::vector<float>> it(r);
-      variant_iterator<reader, std::vector<float>> end;
+      variant_iterator<std::vector<float>> it(r);
+      variant_iterator<std::vector<float>> end;
       while (it != end && start_pos >= 0)
       {
         std::int64_t end_pos = r.tellg();

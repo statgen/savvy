@@ -9,18 +9,18 @@
 namespace vc
 {
   template <typename ReaderType, typename VectorType>
-  class variant_iterator
+  class basic_variant_iterator
   {
   public:
-    typedef variant_iterator self_type;
+    typedef basic_variant_iterator self_type;
     typedef std::ptrdiff_t difference_type;
     typedef haplotype_vector<VectorType> value_type;
     typedef const value_type& reference;
     typedef const value_type* pointer;
     typedef std::input_iterator_tag iterator_category;
 
-    variant_iterator() : file_reader_(nullptr) {}
-    variant_iterator(ReaderType& file_reader) :
+    basic_variant_iterator() : file_reader_(nullptr) {}
+    basic_variant_iterator(ReaderType& file_reader) :
       file_reader_(&file_reader)
     {
       increment();
@@ -29,7 +29,8 @@ namespace vc
     void increment()
     {
       bool b = file_reader_->good();
-      if (!(*file_reader_ >> m_))
+      file_reader_->read(m_);
+      if (!file_reader_->good())
         file_reader_ = nullptr;
     }
     self_type& operator++(){ increment(); return *this; }

@@ -4,6 +4,7 @@
 #include "allele_status.hpp"
 #include "haplotype_vector.hpp"
 #include "region.hpp"
+#include "variant_iterator.hpp"
 
 #include <iterator>
 #include <string>
@@ -210,6 +211,9 @@ namespace vc
       char** samples_begin() const;
       char** samples_end() const;
       std::uint64_t sample_count() const;
+
+      template <typename VecType>
+      bool read(haplotype_vector<VecType>& destination);
     protected:
       std::ios::iostate state_;
       int* gt_;
@@ -220,12 +224,10 @@ namespace vc
       virtual const bcf_hdr_t*const hts_hdr() const = 0;
       virtual const bcf1_t*const hts_rec() const = 0;
       virtual bool read_hts_record() = 0;
-      template <typename VecType>
-      bool read_block(haplotype_vector<VecType>& destination);
     };
 
     template <typename VecType>
-    bool reader_base::read_block(haplotype_vector<VecType>& destination)
+    bool reader_base::read(haplotype_vector<VecType>& destination)
     {
       bool ret = true;
 
@@ -255,6 +257,9 @@ namespace vc
         }
       }
 
+      if (!ret)
+        this->state_ = std::ios::failbit;
+
       return ret;
     }
 
@@ -271,8 +276,7 @@ namespace vc
       template <typename VecType>
       reader& operator>>(haplotype_vector<VecType>& destination)
       {
-        if (!read_block(destination))
-          this->state_ = std::ios::failbit;
+        read(destination);
         return *this;
       }
 
@@ -346,10 +350,12 @@ namespace vc
     template <typename VecType>
     region_reader& region_reader::operator>>(haplotype_vector<VecType>& destination)
     {
-      if (!read_block(destination))
-        this->state_ = std::ios::failbit;
+      read(destination);
       return *this;
     }
+
+    template <typename VecType>
+    using variant_iterator =  basic_variant_iterator<reader_base, VecType>;
 
 //    template <typename PathItr, typename RegionItr>
 //    region_reader::region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end) :

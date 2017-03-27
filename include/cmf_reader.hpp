@@ -7,6 +7,7 @@
 #include "haplotype_vector.hpp"
 #include "genotype_vector.hpp"
 #include "region.hpp"
+#include "variant_iterator.hpp"
 
 #include <xzbuf.hpp>
 
@@ -193,7 +194,7 @@ namespace vc
       virtual ~reader_base() {}
 
       template <typename T>
-      void read_vector(haplotype_vector<T>& destination)
+      void read(haplotype_vector<T>& destination)
       {
         if (good())
         {
@@ -280,7 +281,7 @@ namespace vc
       template <typename T>
       reader& operator>>(haplotype_vector<T>& destination)
       {
-        read_vector(destination);
+        read(destination);
         return *this;
       }
     };
@@ -388,7 +389,7 @@ namespace vc
       template <typename T>
       region_reader& operator>>(haplotype_vector<T>& destination)
       {
-        read_vector(destination);
+        read(destination);
         return *this;
       }
 
@@ -518,7 +519,8 @@ namespace vc
       std::size_t block_size_;
     };
 
-
+    template <typename VecType>
+    using variant_iterator =  basic_variant_iterator<reader_base, VecType>;
   }
 }
 
