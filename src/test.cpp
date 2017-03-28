@@ -431,15 +431,15 @@ timed_procedure_call<Proc> time_procedure(Proc& p)
   return timed_procedure_call<Proc>(p);
 }
 
-template <typename V1, typename V2, typename R1, typename R2>
+template <typename R1, typename R2>
 class file_checksum_test
 {
 public:
   file_checksum_test(R1& reader1, R2& reader2) : reader1_(reader1), reader2_(reader2) {}
   bool operator()() const
   {
-    std::size_t checksum1 = get_checksum<V1>(reader1_);
-    std::size_t checksum2 = get_checksum<V2>(reader2_);
+    std::size_t checksum1 = get_checksum(reader1_);
+    std::size_t checksum2 = get_checksum(reader2_);
 
     std::cout << checksum1 << " " << checksum2 << std::endl;
 
@@ -453,13 +453,13 @@ private:
     return seed;
   }
 
-  template <typename VecType, typename ReaderType>
+  template <typename ReaderType>
   static std::size_t get_checksum(ReaderType& reader)
   {
     std::size_t ret = 0;
 
-    vc::basic_variant_iterator<ReaderType, VecType> cur(reader);
-    vc::basic_variant_iterator<ReaderType, VecType> end;
+    vc::basic_variant_iterator<ReaderType, std::vector<float>> cur(reader);
+    vc::basic_variant_iterator<ReaderType, std::vector<float>> end;
 
     std::size_t num_markers = 0;
     while (cur != end)
@@ -482,10 +482,10 @@ private:
   R2& reader2_;
 };
 
-template <typename V1, typename V2, typename T1, typename T2>
-file_checksum_test<V1, V2, T1, T2> make_file_checksum_test(T1& a, T2& b)
+template <typename T1, typename T2>
+file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 {
-  return file_checksum_test<V1, V2, T1, T2>(a, b);
+  return file_checksum_test<T1, T2>(a, b);
 }
 
 void run_file_checksum_test()
@@ -493,7 +493,7 @@ void run_file_checksum_test()
 
   vc::open_files(std::make_tuple("test_file.vcf", "test_file.cmf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
   {
-    auto t = make_file_checksum_test<std::vector<float>, std::vector<float>>(input_file_reader1, input_file_reader2);
+    auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
     std::cout << "Starting checksum test ..." << std::endl;
     auto timed_call = time_procedure(t);
     std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
@@ -508,7 +508,7 @@ void convert_file_test()
     vc::vcf::variant_iterator<std::vector<float>> cur(input);
     vc::vcf::variant_iterator<std::vector<float>> eof;
     const std::string chrom = cur != eof ? cur->chromosome() : "";
-    const int ploidy = cur != eof ? cur->ploidy() : 0;
+    const std::size_t ploidy = cur != eof ? (cur->size() / input.sample_count()) : 0;
 
     std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
     std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
@@ -522,19 +522,19 @@ void convert_file_test()
         break;
       }
 
-  //    vc::haplotype_vector<std::vector<float>> m(std::string(chrom), cur->locus(), std::string(cur->ref()), std::string(cur->alt()), sample_ids.size(), ploidy, std::vector<float>());
-  //    for (auto it = cur->begin(); it != cur->end(); ++it)
-  //    {
-  //      switch (*it)
-  //      {
-  //        case vc::allele_status::has_alt:
-  //          m[std::distance(cur->begin(), it)] = 1.0;
-  //          break;
-  //        case vc::allele_status::is_missing:
-  //          m[std::distance(cur->begin(), it)] = std::numeric_limits<float>::quiet_NaN();
-  //          break;
-  //      }
-  //    }
+      //    vc::haplotype_vector<std::vector<float>> m(std::string(chrom), cur->locus(), std::string(cur->ref()), std::string(cur->alt()), sample_ids.size(), ploidy, std::vector<float>());
+      //    for (auto it = cur->begin(); it != cur->end(); ++it)
+      //    {
+      //      switch (*it)
+      //      {
+      //        case vc::allele_status::has_alt:
+      //          m[std::distance(cur->begin(), it)] = 1.0;
+      //          break;
+      //        case vc::allele_status::is_missing:
+      //          m[std::distance(cur->begin(), it)] = std::numeric_limits<float>::quiet_NaN();
+      //          break;
+      //      }
+      //    }
 
       compact_output << *cur;
 
@@ -684,15 +684,29 @@ void generic_reader_test()
   vc::reader rdr1("test_file.cmf");
   vc::reader rdr2("test_file.vcf");
 
-  auto t = make_file_checksum_test<std::vector<float>, std::vector<float>>(rdr1, rdr2);
+
+  auto t = make_file_checksum_test(rdr1, rdr2);
   std::cout << "Starting checksum test ..." << std::endl;
   auto timed_call = time_procedure(t);
   std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
   std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
 }
 
+//#include <boost/numeric/ublas/vector_sparse.hpp>
+
 int main(int argc, char** argv)
 {
+//  using namespace boost::numeric;
+//  ublas::compressed_vector<float> v(10);
+//  v[3] = 0;
+//  v[5] = 3;
+//  std::cout << v.nnz() << std::endl;
+//  vc::haplotype_vector<ublas::compressed_vector<float>> v2;
+//
+//  std::cout << std::endl;
+//  return 0;
+
+
   std::cout << "[0] Run all tests." << std::endl;
   std::cout << "[1] Run varint test." << std::endl;
   std::cout << "[2] Run file conversion test." << std::endl;
@@ -783,5 +797,4 @@ int main(int argc, char** argv)
 
   return 0;
 }
-
 

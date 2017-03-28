@@ -197,80 +197,93 @@ namespace vc
     open_file(file_path, mrkr_iter_functor);
   }
 
-  template <typename R>
-  class region_query
+  template <typename ReaderType, typename VecType>
+  std::uint8_t get_ploidy(const ReaderType& r, const VecType& v)
   {
-  public:
-    class const_iterator
-    {
-    public:
-      typedef const_iterator self_type;
-      typedef std::ptrdiff_t difference_type;
-      typedef typename R::input_iterator::value_type value_type;
-      typedef const value_type& reference;
-      typedef const value_type* pointer;
-      typedef std::input_iterator_tag iterator_category;
+    return static_cast<std::uint8_t>(v.size() / r.sample_count());
+  }
 
-      const_iterator(region_query& parent, typename R::input_iterator&& beg_itr) :
-        parent_query_(&parent),
-        itr_(std::move(beg_itr))
-      {
-      }
-      
-      void increment()
-      {
-        ++itr_;
-        if (*this == parent_query_->end() || itr_->pos() > parent_query_->end_pos() || R::get_chromosome(parent_query_->reader(), *itr_) != parent_query_->chromosome())
-        {
-          itr_ = typename R::input_iterator();
-        }
-      }
-
-      self_type& operator++(){ increment(); return *this; }
-      void operator++(int) { increment(); }
-      reference operator*() { return *itr_; }
-      pointer operator->() { return &(*itr_); }
-      bool operator==(const self_type& rhs) { return (itr_ == rhs.itr_); }
-      bool operator!=(const self_type& rhs) { return (itr_ != rhs.itr_); }
-    private:
-      region_query* parent_query_;
-      typename R::input_iterator itr_;
-    };
-
-    region_query(R& index_reader, const std::string& chromosome, std::uint64_t start_pos, std::uint64_t end_pos) :
-      reader_(index_reader),
-      chromosome_(chromosome),
-      start_pos_(start_pos),
-      end_pos_(end_pos)
-    {
-
-    }
-
-    const_iterator begin()
-    {
-      reader_.seek(chromosome_, start_pos_);
-      const_iterator ret(*this, typename R::input_iterator(reader_, buf_));
-      return ret;
-    }
-
-    const_iterator end() { return const_iterator(*this, typename R::input_iterator()); }
-    const R& reader() const { return reader_; }
-    const std::string& chromosome() { return chromosome_; }
-    std::uint64_t end_pos() const { return end_pos_; }
-  private:
-    R& reader_;
-    typename R::input_iterator::buffer buf_;
-
-    std::string chromosome_;
-    std::uint64_t start_pos_;
-    std::uint64_t end_pos_;
-  };
-
-  template <typename R>
-  region_query<R> make_region_query(R& index_reader, const std::string& chromosome, std::uint64_t start_pos, std::uint64_t end_pos)
+  template <typename ReaderType, typename VecType>
+  std::tuple<std::uint8_t, bool> get_validated_ploidy(const ReaderType& r, const VecType& v)
   {
-    region_query<R> ret(index_reader, chromosome, start_pos, end_pos);
+    std::tuple<std::uint8_t, bool> ret(static_cast<std::uint8_t>(v.size() / r.sample_count()), (v.size() % r.sample_count()) == 0);
     return ret;
   }
+
+//  template <typename R>
+//  class region_query
+//  {
+//  public:
+//    class const_iterator
+//    {
+//    public:
+//      typedef const_iterator self_type;
+//      typedef std::ptrdiff_t difference_type;
+//      typedef typename R::input_iterator::value_type value_type;
+//      typedef const value_type& reference;
+//      typedef const value_type* pointer;
+//      typedef std::input_iterator_tag iterator_category;
+//
+//      const_iterator(region_query& parent, typename R::input_iterator&& beg_itr) :
+//        parent_query_(&parent),
+//        itr_(std::move(beg_itr))
+//      {
+//      }
+//
+//      void increment()
+//      {
+//        ++itr_;
+//        if (*this == parent_query_->end() || itr_->pos() > parent_query_->end_pos() || R::get_chromosome(parent_query_->reader(), *itr_) != parent_query_->chromosome())
+//        {
+//          itr_ = typename R::input_iterator();
+//        }
+//      }
+//
+//      self_type& operator++(){ increment(); return *this; }
+//      void operator++(int) { increment(); }
+//      reference operator*() { return *itr_; }
+//      pointer operator->() { return &(*itr_); }
+//      bool operator==(const self_type& rhs) { return (itr_ == rhs.itr_); }
+//      bool operator!=(const self_type& rhs) { return (itr_ != rhs.itr_); }
+//    private:
+//      region_query* parent_query_;
+//      typename R::input_iterator itr_;
+//    };
+//
+//    region_query(R& index_reader, const std::string& chromosome, std::uint64_t start_pos, std::uint64_t end_pos) :
+//      reader_(index_reader),
+//      chromosome_(chromosome),
+//      start_pos_(start_pos),
+//      end_pos_(end_pos)
+//    {
+//
+//    }
+//
+//    const_iterator begin()
+//    {
+//      reader_.seek(chromosome_, start_pos_);
+//      const_iterator ret(*this, typename R::input_iterator(reader_, buf_));
+//      return ret;
+//    }
+//
+//    const_iterator end() { return const_iterator(*this, typename R::input_iterator()); }
+//    const R& reader() const { return reader_; }
+//    const std::string& chromosome() { return chromosome_; }
+//    std::uint64_t end_pos() const { return end_pos_; }
+//  private:
+//    R& reader_;
+//    typename R::input_iterator::buffer buf_;
+//
+//    std::string chromosome_;
+//    std::uint64_t start_pos_;
+//    std::uint64_t end_pos_;
+//  };
+//
+//  template <typename R>
+//  region_query<R> make_region_query(R& index_reader, const std::string& chromosome, std::uint64_t start_pos, std::uint64_t end_pos)
+//  {
+//    region_query<R> ret(index_reader, chromosome, start_pos, end_pos);
+//    return ret;
+//  }
 };
 #endif //LIBVC_VC_HPP

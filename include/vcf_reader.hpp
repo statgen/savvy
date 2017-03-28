@@ -213,7 +213,7 @@ namespace vc
       std::uint64_t sample_count() const;
 
       template <typename VecType>
-      bool read(haplotype_vector<VecType>& destination);
+      bool read(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value = std::numeric_limits<typename VecType::value_type>::quiet_NaN(), const typename VecType::value_type alt_value = 1.0, const typename VecType::value_type ref_value = 0.0);
     protected:
       std::ios::iostate state_;
       int* gt_;
@@ -227,7 +227,7 @@ namespace vc
     };
 
     template <typename VecType>
-    bool reader_base::read(haplotype_vector<VecType>& destination)
+    bool reader_base::read(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value)
     {
       bool ret = true;
 
@@ -244,16 +244,16 @@ namespace vc
           static_cast<std::uint64_t>(hts_rec()->pos + 1),
           std::string(hts_rec()->d.allele[0]),
           std::string(hts_rec()->n_allele > 1 ? hts_rec()->d.allele[allele_index_] : ""),
-          sample_count(),
-          (gt_sz_ / hts_rec()->n_sample),
           std::move(destination));
+        destination.resize(0);
+        destination.resize(sample_count() * (gt_sz_ / hts_rec()->n_sample), ref_value);
 
         for (std::size_t i = 0; i < gt_sz_; ++i)
         {
           if (gt_[i] == bcf_gt_missing)
-            destination[i] = std::numeric_limits<typename VecType::value_type>::quiet_NaN();
+            destination[i] = missing_value;
           else if (bcf_gt_allele(gt_[i]) == allele_index_)
-            destination[i] = 1.0;
+            destination[i] = alt_value;
         }
       }
 
@@ -356,6 +356,9 @@ namespace vc
 
     template <typename VecType>
     using variant_iterator =  basic_variant_iterator<reader_base, VecType>;
+
+    template <typename ValType>
+    using dense_variant_iterator =  basic_variant_iterator<reader_base, std::vector<ValType>>;
 
 //    template <typename PathItr, typename RegionItr>
 //    region_reader::region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end) :

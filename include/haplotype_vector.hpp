@@ -19,20 +19,15 @@ namespace vc
       std::uint64_t locus,
       std::string&& ref,
       std::string&& alt,
-      std::uint64_t sample_count,
-      std::uint8_t ploidy,
       T&& mixin_vector)
       :
       T(std::move(mixin_vector)),
-      chromosome_(chromosome),
+      chromosome_(std::move(chromosome)),
       locus_(locus),
-      ref_(ref),
-      alt_(alt),
-      sample_count_(sample_count),
-      ploidy_(ploidy)
+      ref_(std::move(ref)),
+      alt_(std::move(alt))
     {
-      T::clear();
-      T::resize(sample_count_ * ploidy_, 0.0);
+
     }
 
 //    template <typename RandAccessIterType>
@@ -68,9 +63,6 @@ namespace vc
     const std::string& ref() const { return ref_; }
     const std::string& alt() const { return alt_; }
     std::uint64_t locus() const { return locus_; }
-    std::uint64_t sample_count() const { return sample_count_; }
-    std::uint8_t ploidy() const { return ploidy_; }
-    std::uint64_t haplotype_count() const { return sample_count_ * ploidy_; }
 
   private:
     std::string chromosome_;

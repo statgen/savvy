@@ -194,7 +194,7 @@ namespace vc
       virtual ~reader_base() {}
 
       template <typename T>
-      void read(haplotype_vector<T>& destination)
+      void read(haplotype_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1.0, const typename T::value_type ref_value = 0.0)
       {
         if (good())
         {
@@ -230,7 +230,11 @@ namespace vc
 
                   // TODO: Read metadata values.
 
-                  destination = haplotype_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), sample_count(), ploidy(), std::move(destination));
+                  destination = haplotype_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), std::move(destination));
+                  destination.resize(0);
+                  destination.resize(sample_count() * ploidy(), ref_value);
+                  auto sc = sample_count();
+                  auto p = ploidy();
 
                   varint_decode(in_it, end_it, sz);
                   std::uint64_t total_offset = 0;
@@ -240,7 +244,7 @@ namespace vc
                     std::uint64_t offset;
                     one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
                     total_offset += offset;
-                    destination[total_offset] = (allele ? std::numeric_limits<typename T::value_type>::quiet_NaN() : 1.0);
+                    destination[total_offset] = (allele ? missing_value : alt_value);
                   }
                 }
               }
@@ -458,7 +462,7 @@ namespace vc
       {
         if (output_stream_.good())
         {
-          if (m.haplotype_count() != sample_size_ * ploidy_level_)
+          if (m.size() != sample_size_ * ploidy_level_)
           {
             output_stream_.setstate(std::ios::failbit);
           }
@@ -466,18 +470,15 @@ namespace vc
           {
             if ((record_count_ % block_size_) == 0)
               output_stream_.flush();
-            write_marker<T>(m);
+            write<T>(m);
             ++record_count_;
           }
         }
         return *this;
       }
 
-      static bool create_index(const std::string& input_file_path, std::string output_file_path = "");
-
-    private:
       template <typename T>
-      void write_marker(const haplotype_vector<T>& m)
+      void write(const haplotype_vector<T>& m, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1.0, const typename T::value_type ref_value = 0.0)
       {
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
         varint_encode(m.locus(), os_it);
@@ -485,31 +486,34 @@ namespace vc
         varint_encode(m.ref().size(), os_it);
         if (m.ref().size())
           std::copy(m.ref().begin(), m.ref().end(), os_it);
-          //os.write(&source.ref_[0], source.ref_.size());
+        //os.write(&source.ref_[0], source.ref_.size());
 
         varint_encode(m.alt().size(), os_it);
         if (m.alt().size())
           std::copy(m.alt().begin(), m.alt().end(), os_it);
-          //os.write(&source.alt_[0], source.alt_.size());
+        //os.write(&source.alt_[0], source.alt_.size());
 
-        std::uint64_t non_zero_count =  m.size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), 0.0));
+        std::uint64_t non_zero_count =  m.size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), ref_value));
 
         varint_encode(non_zero_count, os_it);
         std::uint64_t last_pos = 0;
         auto beg = m.begin();
         for (auto it = beg; it != m.end(); ++it)
         {
-          if (*it != 0.0)
+          if (*it != ref_value)
           {
             std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
             std::uint64_t offset = dist - last_pos;
             last_pos = dist + 1;
-            std::uint8_t allele = (std::isnan(*it) ? std::uint8_t(0x80) : std::uint8_t(0x00));
+            std::uint8_t allele = (*it != *it || *it == missing_value ? std::uint8_t(0x80) : std::uint8_t(0x00));
             one_bit_prefixed_varint::encode(allele, offset, os_it);
           }
         }
       }
 
+      static bool create_index(const std::string& input_file_path, std::string output_file_path = "");
+
+    private:
       oxzstream output_stream_;
       std::string file_path_;
       std::uint64_t sample_size_;
@@ -521,6 +525,9 @@ namespace vc
 
     template <typename VecType>
     using variant_iterator =  basic_variant_iterator<reader_base, VecType>;
+
+    template <typename ValType>
+    using dense_variant_iterator =  basic_variant_iterator<reader_base, std::vector<ValType>>;
   }
 }
 
