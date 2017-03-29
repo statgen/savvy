@@ -21,13 +21,22 @@ namespace vc
 
     value_type& operator[](std::size_t pos)
     {
-      auto it = std::upper_bound(offsets_.begin(), offsets_.end(), pos);
-      if (it == offsets_.end() || *it != pos)
+      if (offsets_.size() && offsets_.back() < pos)
       {
-        it = offsets_.insert(it, pos);
-        return *(values_.insert(values_.begin() + std::distance(offsets_.begin(), it), value_type()));
+        offsets_.emplace_back(pos);
+        values_.emplace_back();
+        return values_.back();
       }
-      return values_[it - offsets_.begin()];
+      else
+      {
+        auto it = std::upper_bound(offsets_.begin(), offsets_.end(), pos);
+        if (it == offsets_.end() || *it != pos)
+        {
+          it = offsets_.insert(it, pos);
+          return *(values_.insert(values_.begin() + std::distance(offsets_.begin(), it), value_type()));
+        }
+        return values_[it - offsets_.begin()];
+      }
     }
 
     const value_type& operator[](std::size_t pos) const

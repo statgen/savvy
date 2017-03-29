@@ -69,8 +69,6 @@ namespace vc
     std::string ref_;
     std::string alt_;
     std::uint64_t locus_;
-    std::uint64_t sample_count_;
-    std::uint8_t ploidy_;
   };
 }
 #endif //LIBVC_HAPLOTYPE_VECTOR_HPP
