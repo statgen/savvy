@@ -359,6 +359,8 @@ namespace vc
 
     template <typename ValType>
     using dense_variant_iterator =  basic_variant_iterator<reader_base, std::vector<ValType>>;
+    template <typename ValType>
+    using sparse_variant_iterator =  basic_variant_iterator<reader_base, compressed_vector<ValType>>;
 
 //    template <typename PathItr, typename RegionItr>
 //    region_reader::region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end) :

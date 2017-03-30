@@ -15,7 +15,8 @@ namespace vc
     typedef compressed_vector<T> self_type;
     static constexpr T const_value_type = value_type();
 
-    compressed_vector()
+    compressed_vector() :
+      size_(0)
     {
     }
 
@@ -49,15 +50,25 @@ namespace vc
 
     void resize(std::size_t sz, value_type val = value_type())
     {
-      if (val != value_type())
+      if (sz < size_)
+      {
+        auto it = std::lower_bound(offsets_.begin(), offsets_.end(), sz);
+        offsets_.erase(it, offsets_.end());
+        values_.resize(offsets_.size());
+      }
+      else if (val != value_type())
       {
         values_.resize(sz, val);
         offsets_.resize(sz);
         for (std::size_t i = 0; i < sz; ++i)
           offsets_[i] = i;
       }
+
+      size_ = sz;
     }
 
+    const std::size_t* const index_data() const { return offsets_.data(); }
+    const value_type* const value_data() const { return values_.data(); }
     std::size_t size() const { return size_; }
     std::size_t non_zero_size() const { return values_.size(); }
   private:

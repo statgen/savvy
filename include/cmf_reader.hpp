@@ -528,6 +528,8 @@ namespace vc
 
     template <typename ValType>
     using dense_variant_iterator =  basic_variant_iterator<reader_base, std::vector<ValType>>;
+    template <typename ValType>
+    using sparse_variant_iterator =  basic_variant_iterator<reader_base, compressed_vector<ValType>>;
   }
 }
 

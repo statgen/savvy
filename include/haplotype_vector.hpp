@@ -2,7 +2,10 @@
 #ifndef LIBVC_HAPLOTYPE_VECTOR_HPP
 #define LIBVC_HAPLOTYPE_VECTOR_HPP
 
+#include "compressed_vector.hpp"
+
 #include <string>
+#include <vector>
 
 namespace vc
 {
@@ -70,5 +73,10 @@ namespace vc
     std::string alt_;
     std::uint64_t locus_;
   };
+
+  template <typename T>
+  using dense_haplotype_vector = haplotype_vector<std::vector<T>>;
+  template <typename T>
+  using sparse_haplotype_vector = haplotype_vector<compressed_vector<T>>;
 }
 #endif //LIBVC_HAPLOTYPE_VECTOR_HPP
