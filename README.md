@@ -5,14 +5,14 @@ Interface to various variant calling formats.
 ## Read Variants from File 
 ```c++
 vc::reader f("chr1.cmf");
-vc::sparse_haplotype_vector<float> marker;
-while (f >> marker)
+vc::sparse_haplotype_vector<float> variant;
+while (f >> variant)
 {
-  marker.locus();
-  marker.chromosome();
-  marker.ref();
-  marker.alt();
-  for (const float& haplotype : marker)
+  variant.locus();
+  variant.chromosome();
+  variant.ref();
+  variant.alt();
+  for (const float& haplotype : variant)
   {
     ...
   }
@@ -22,14 +22,14 @@ while (f >> marker)
 ## Indexed Files
 ```c++
 vc::region_reader f("chr1.cmf", "X", 100000, 199999);
-vc::dense_haplotype_vector<float> marker;
-while (f >> marker)
+vc::dense_haplotype_vector<float> variant;
+while (f >> variant)
 {
   ...
 }
 
 f.reset_region("X", 200000, 299999);
-while (f >> marker)
+while (f >> variant)
 {
   ...
 }
@@ -54,6 +54,7 @@ while (it != vc::sparse_variant_iterator<float>{})
 ```
 
 ## Custom Haplotype Vectors
+The variant container utilizes the "mixin" pattern to efficiently support 3rd-party linear algebra libraries. 
 ```c++
 vc::hapotype_vector<std::vector<float>> std_vector;
 vc::hapotype_vector<vc::compressed_vector<double>> vc_sparse_vector;
@@ -68,7 +69,8 @@ vc::cmf::writer cmf_file("file.cmf");
 vc::cmf::output_iterator out_it(cmf_file);
 
 if (subset_file)
-  std::copy_if(vc::vcf::dense_variant_iterator{bcf_file}, vc::vcf::dense_variant_iterator{}, out_it, [](const vc::vcf::marker& m) { return (vc::calculate_allele_frequency(m) < 0.1); });
+  std::copy_if(vc::vcf::dense_variant_iterator{bcf_file}, vc::vcf::dense_variant_iterator{}, out_it, 
+    [](const auto& v) { return (vc::calculate_allele_frequency(v) < 0.1); });
 else
   std::copy(vc::vcf::dense_variant_iterator{bcf_file}, vc::vcf::dense_variant_iterator{}, out_it);
 ```
