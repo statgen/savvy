@@ -54,7 +54,7 @@ while (it != vc::sparse_variant_iterator<float>{})
 ```
 
 ## Custom Haplotype Vectors
-The variant container utilizes the "mixin" pattern to efficiently support 3rd-party linear algebra libraries. 
+The hapotype_vector class utilizes the "mixin" pattern to efficiently support 3rd-party linear algebra libraries. 
 ```c++
 vc::hapotype_vector<std::vector<float>> std_vector;
 vc::hapotype_vector<vc::compressed_vector<double>> vc_sparse_vector;
