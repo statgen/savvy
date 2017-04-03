@@ -21,7 +21,7 @@ while (f >> variant)
 
 ## Indexed Files
 ```c++
-vc::region_reader f("chr1.cmf", "X", 100000, 199999);
+vc::indexed_reader f("chr1.cmf", "X", 100000, 199999);
 vc::dense_haplotype_vector<float> variant;
 while (f >> variant)
 {

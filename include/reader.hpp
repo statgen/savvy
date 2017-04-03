@@ -70,13 +70,14 @@ namespace vc
     reader& operator>>(haplotype_vector<T>& destination);
   };
 
-  class region_reader : public reader_base
+  class indexed_reader : public reader_base
   {
   public:
-    region_reader(const std::string& file_path, region reg);
+    indexed_reader(const std::string& file_path, const region& reg);
+    void reset_region(const region& reg);
 
     template <typename T>
-    region_reader& operator>>(haplotype_vector<T>& destination);
+    indexed_reader& operator>>(haplotype_vector<T>& destination);
   private:
 
   };
@@ -89,7 +90,7 @@ namespace vc
   }
 
   template <typename T>
-  region_reader& region_reader::operator>>(haplotype_vector<T>& destination)
+  indexed_reader& indexed_reader::operator>>(haplotype_vector<T>& destination)
   {
     read(destination);
     return *this;

@@ -670,12 +670,19 @@ void random_access_test()
 {
   vc::cmf::writer::create_index("test_file.cmf");
 
-  vc::cmf::region_reader rdr("test_file.cmf", 17000, 1120000);
-  auto it = vc::cmf::variant_iterator<std::vector<float>>(rdr);
-  auto end = vc::cmf::variant_iterator<std::vector<float>>{};
+  vc::indexed_reader rdr("test_file.cmf", {"20", 17000, 1120000});
+  auto it = vc::variant_iterator<std::vector<float>>(rdr);
+  auto end = vc::variant_iterator<std::vector<float>>{};
   for ( ; it != end; ++it)
   {
     std::cout << it->locus() << std::endl;
+  }
+
+  rdr.reset_region({"20", 17000, 1120000});
+  vc::dense_haplotype_vector<float> v;
+  while (rdr >> v)
+  {
+    std::cout << v.locus() << std::endl;
   }
 }
 
@@ -705,8 +712,6 @@ int main(int argc, char** argv)
 //
 //  std::cout << std::endl;
 //  return 0;
-
-
   std::cout << "[0] Run all tests." << std::endl;
   std::cout << "[1] Run varint test." << std::endl;
   std::cout << "[2] Run file conversion test." << std::endl;

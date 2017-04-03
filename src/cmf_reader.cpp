@@ -304,8 +304,7 @@ namespace vc
 
     //================================================================//
     reader_base::reader_base(const std::string& file_path) :
-      sbuf_(file_path),
-      input_stream_(&sbuf_),
+      input_stream_(file_path),
       file_path_(file_path)
     {
       std::string version_string(7, '\0');
@@ -382,8 +381,9 @@ namespace vc
     reader_base::reader_base(reader_base&& source) :
       sample_ids_(std::move(source.sample_ids_)),
       chromosome_(std::move(source.chromosome_)),
-      sbuf_(std::move(source.sbuf_)),
-      input_stream_(&sbuf_),
+      //sbuf_(std::move(source.sbuf_)),
+      //input_stream_(&sbuf_),
+      input_stream_(std::move(source.input_stream_)),
       file_path_(std::move(source.file_path_)),
       ploidy_level_(source.ploidy_level_),
       metadata_fields_(std::move(source.metadata_fields_))
@@ -396,8 +396,9 @@ namespace vc
       {
         sample_ids_ = std::move(source.sample_ids_);
         chromosome_ = std::move(source.chromosome_);
-        sbuf_ = std::move(source.sbuf_);
-        input_stream_.rdbuf(&sbuf_);
+        //sbuf_ = std::move(source.sbuf_);
+        //input_stream_.rdbuf(&sbuf_);
+        input_stream_ = std::move(source.input_stream_);
         file_path_ = std::move(source.file_path_);
         ploidy_level_ = source.ploidy_level_;
         metadata_fields_ = std::move(source.metadata_fields_);

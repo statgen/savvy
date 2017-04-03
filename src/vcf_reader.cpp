@@ -256,7 +256,8 @@ namespace vc
       return false;
     }
 
-    region_reader::region_reader(const std::string& file_path, region reg) :
+    indexed_reader::indexed_reader(const std::string& file_path, const region& reg) :
+      file_path_(file_path),
       synced_readers_(bcf_sr_init()),
       hts_rec_(nullptr)
     {
@@ -266,16 +267,32 @@ namespace vc
         contigs << ":" << reg.from() << "-" << reg.to();
 
       bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0);
-      bcf_sr_add_reader(synced_readers_, file_path.c_str());
+      bcf_sr_add_reader(synced_readers_, file_path_.c_str());
     }
 
-    region_reader::~region_reader()
+    indexed_reader::~indexed_reader()
     {
       if (synced_readers_)
         bcf_sr_destroy(synced_readers_);
     }
 
-    bool region_reader::read_hts_record()
+    void indexed_reader::reset_region(const region& reg)
+    {
+      if (synced_readers_)
+        bcf_sr_destroy(synced_readers_);
+      synced_readers_ = bcf_sr_init();
+      state_ = std::ios::goodbit;
+
+      std::stringstream contigs;
+      contigs << reg.chromosome();
+      if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())
+        contigs << ":" << reg.from() << "-" << reg.to();
+
+      bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0);
+      bcf_sr_add_reader(synced_readers_, file_path_.c_str());
+    }
+
+    bool indexed_reader::read_hts_record()
     {
       if (bcf_sr_next_line(synced_readers_) && (hts_rec_ = bcf_sr_get_line(synced_readers_, 0)))
       {

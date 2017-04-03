@@ -213,7 +213,7 @@ namespace vc
       std::uint64_t sample_count() const;
 
       template <typename VecType>
-      bool read(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value = std::numeric_limits<typename VecType::value_type>::quiet_NaN(), const typename VecType::value_type alt_value = 1.0, const typename VecType::value_type ref_value = 0.0);
+      bool read(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value = std::numeric_limits<typename VecType::value_type>::quiet_NaN(), const typename VecType::value_type alt_value = 1, const typename VecType::value_type ref_value = 0);
     protected:
       std::ios::iostate state_;
       int* gt_;
@@ -232,7 +232,7 @@ namespace vc
       bool ret = true;
 
       ++allele_index_;
-      if (allele_index_ >= hts_rec()->n_allele)
+      if (!hts_rec() || allele_index_ >= hts_rec()->n_allele)
       {
         ret = read_hts_record();
       }
@@ -326,15 +326,16 @@ namespace vc
       bcf1_t* hts_rec_;
     };
 
-    class region_reader : public reader_base
+    class indexed_reader : public reader_base
     {
     public:
-      region_reader(const std::string& file_path, region reg);
+      indexed_reader(const std::string& file_path, const region& reg);
       //template <typename PathItr, typename RegionItr>
       //region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end);
-      ~region_reader();
+      ~indexed_reader();
+      void reset_region(const region& reg);
       template <typename VecType>
-      region_reader& operator>>(haplotype_vector<VecType>& destination);
+      indexed_reader& operator>>(haplotype_vector<VecType>& destination);
     private:
       bool read_hts_record();
 //      index_reader& seek(const std::string& chromosome, std::uint64_t position);
@@ -345,10 +346,11 @@ namespace vc
     private:
       bcf_srs_t* synced_readers_;
       bcf1_t* hts_rec_;
+      std::string file_path_;
     };
 
     template <typename VecType>
-    region_reader& region_reader::operator>>(haplotype_vector<VecType>& destination)
+    indexed_reader& indexed_reader::operator>>(haplotype_vector<VecType>& destination)
     {
       read(destination);
       return *this;

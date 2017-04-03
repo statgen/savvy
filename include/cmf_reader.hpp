@@ -194,7 +194,7 @@ namespace vc
       virtual ~reader_base() {}
 
       template <typename T>
-      void read(haplotype_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1.0, const typename T::value_type ref_value = 0.0)
+      void read(haplotype_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0)
       {
         if (good())
         {
@@ -270,8 +270,8 @@ namespace vc
     protected:
       std::vector<std::string> sample_ids_;
       std::string chromosome_;
-      ixzbuf sbuf_;
-      std::istream input_stream_;
+      //ixzbuf sbuf_;
+      ixzstream input_stream_;
       std::string file_path_;
       std::uint8_t ploidy_level_;
       std::vector<std::string> metadata_fields_;
@@ -290,7 +290,7 @@ namespace vc
       }
     };
 
-    class region_reader : public reader_base
+    class indexed_reader : public reader_base
     {
     public:
 //      class region_query
@@ -373,7 +373,7 @@ namespace vc
 //      };
 //
 
-      region_reader(const std::string& file_path, std::uint64_t from, std::uint64_t to, const std::string& index_file_path = "") :
+      indexed_reader(const std::string& file_path, std::uint64_t from, std::uint64_t to, const std::string& index_file_path = "") :
         reader_base(file_path),
         index_(index_file_path.size() ? index_file_path : file_path + ".s1r"),
         query_(index_.create_query(from, to)),
@@ -383,18 +383,35 @@ namespace vc
           this->input_stream_.setstate(std::ios::badbit);
       }
 
-      region_reader(const std::string& file_path, region reg, const std::string& index_file_path = "") :
-        region_reader(file_path, reg.from(), reg.to(), index_file_path)
+      indexed_reader(const std::string& file_path, const region& reg, const std::string& index_file_path = "") :
+        indexed_reader(file_path, reg.from(), reg.to(), index_file_path)
       {
         if (this->chromosome() != reg.chromosome())
           this->input_stream_.setstate(std::ios::badbit);
       }
 
       template <typename T>
-      region_reader& operator>>(haplotype_vector<T>& destination)
+      indexed_reader& operator>>(haplotype_vector<T>& destination)
       {
         read(destination);
         return *this;
+      }
+
+      void reset_region(std::uint64_t from, std::uint64_t to)
+      {
+        input_stream_.clear();
+        query_ = index_.create_query(from, to);
+        i_ = query_.begin();
+        if (!index_.good())
+          this->input_stream_.setstate(std::ios::badbit);
+      }
+
+      void reset_region(const region& reg)
+      {
+        input_stream_.clear();
+        reset_region(reg.from(), reg.to());
+        if (this->chromosome() != reg.chromosome())
+          this->input_stream_.setstate(std::ios::badbit);
       }
 
     private:
