@@ -18,6 +18,7 @@
 #include <fstream>
 #include <tuple>
 #include <cmath>
+#include <unordered_map>
 
 namespace vc
 {
@@ -248,7 +249,7 @@ namespace vc
                 std::string ref;
                 ref.resize(sz);
                 if (sz)
-                  input_stream_.read(&ref[0], ref.size());
+                  input_stream_.read(&ref[0], sz);
 
                 if (varint_decode(in_it, end_it, sz) == end_it)
                 {
@@ -260,11 +261,28 @@ namespace vc
                   std::string alt;
                   alt.resize(sz);
                   if (sz)
-                    input_stream_.read(&alt[0], alt.size());
+                    input_stream_.read(&alt[0], sz);
 
-                  // TODO: Read metadata values.
+                  std::unordered_map<std::string, std::string> props;
+                  props.reserve(this->metadata_fields_.size());
+                  std::string prop_val;
+                  for (const std::string& key : metadata_fields_)
+                  {
+                    if (varint_decode(in_it, end_it, sz) == end_it)
+                    {
+                      this->input_stream_.setstate(std::ios::badbit);
+                      break;
+                    }
+                    else
+                    {
+                      prop_val.resize(sz);
+                      if (sz)
+                        input_stream_.read(&prop_val[0], sz);
+                      props[key] = prop_val;
+                    }
+                  }
 
-                  destination = haplotype_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), std::move(destination));
+                  destination = haplotype_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), std::move(props), std::move(destination));
                   destination.resize(0);
                 }
               }

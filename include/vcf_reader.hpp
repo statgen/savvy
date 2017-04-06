@@ -257,11 +257,40 @@ namespace vc
         if (res)
         {
           bcf_unpack(hts_rec(), BCF_UN_SHR);
+
+          std::unordered_map<std::string, std::string> props;
+          std::size_t n_info = hts_rec()->n_info;
+          bcf_info_t* info = hts_rec()->d.info;
+          for (std::size_t i = 0; i < n_info; ++i)
+          {
+            // bcf_hdr_t::id[BCF_DT_ID][$key].key
+            const char* key = hts_hdr()->id[BCF_DT_ID][info[i].key].key;
+            if (key)
+            {
+              switch (info[i].type)
+              {
+                case BCF_BT_NULL:
+                  props[key];
+                  break;
+                case BCF_BT_INT8:
+                case BCF_BT_INT16:
+                case BCF_BT_INT32:
+                  props[key] = std::to_string(info[i].v1.i);
+                  break;
+                case BCF_BT_FLOAT:
+                  props[key] = std::to_string(info[i].v1.f);
+                  break;
+                //case BCF_BT_CHAR:
+              }
+            }
+          }
+
           destination = haplotype_vector<VecType>(
             std::string(bcf_hdr_id2name(hts_hdr(), hts_rec()->rid)),
             static_cast<std::uint64_t>(hts_rec()->pos + 1),
             std::string(hts_rec()->d.allele[0]),
             std::string(hts_rec()->n_allele > 1 ? hts_rec()->d.allele[allele_index_] : ""),
+            std::move(props),
             std::move(destination));
           destination.resize(0);
         }
