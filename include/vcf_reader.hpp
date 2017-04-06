@@ -221,46 +221,85 @@ namespace vc
       int allele_index_;
 
 
-      virtual const bcf_hdr_t*const hts_hdr() const = 0;
-      virtual const bcf1_t*const hts_rec() const = 0;
+
+      virtual bcf_hdr_t* hts_hdr() const = 0;
+      virtual bcf1_t* hts_rec() const = 0;
       virtual bool read_hts_record() = 0;
+
+      template <typename VecType>
+      void read_variant_details(haplotype_vector<VecType>& destination);
+      template <typename VecType>
+      void read_genotype(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value);
     };
 
     template <typename VecType>
     bool reader_base::read(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value)
     {
-      bool ret = true;
+      read_variant_details(destination);
+      read_genotype(destination, missing_value, alt_value, ref_value);
 
-      ++allele_index_;
-      if (!hts_rec() || allele_index_ >= hts_rec()->n_allele)
+      return good();
+    }
+
+    template <typename VecType>
+    void reader_base::read_variant_details(haplotype_vector<VecType>& destination)
+    {
+      if (good())
       {
-        ret = read_hts_record();
-      }
-
-      if (ret)
-      {
-        destination = haplotype_vector<VecType>(
-          std::string(bcf_hdr_id2name(hts_hdr(), hts_rec()->rid)),
-          static_cast<std::uint64_t>(hts_rec()->pos + 1),
-          std::string(hts_rec()->d.allele[0]),
-          std::string(hts_rec()->n_allele > 1 ? hts_rec()->d.allele[allele_index_] : ""),
-          std::move(destination));
-        destination.resize(0);
-        destination.resize(sample_count() * (gt_sz_ / hts_rec()->n_sample), ref_value);
-
-        for (std::size_t i = 0; i < gt_sz_; ++i)
+        bool res = true;
+        ++allele_index_;
+        if (!hts_rec() || allele_index_ >= hts_rec()->n_allele)
         {
-          if (gt_[i] == bcf_gt_missing)
-            destination[i] = missing_value;
-          else if (bcf_gt_allele(gt_[i]) == allele_index_)
-            destination[i] = alt_value;
+          res = read_hts_record();
+          this->allele_index_ = 1;
         }
+
+        if (res)
+        {
+          bcf_unpack(hts_rec(), BCF_UN_SHR);
+          destination = haplotype_vector<VecType>(
+            std::string(bcf_hdr_id2name(hts_hdr(), hts_rec()->rid)),
+            static_cast<std::uint64_t>(hts_rec()->pos + 1),
+            std::string(hts_rec()->d.allele[0]),
+            std::string(hts_rec()->n_allele > 1 ? hts_rec()->d.allele[allele_index_] : ""),
+            std::move(destination));
+          destination.resize(0);
+        }
+
+        if (!res)
+          this->state_ = std::ios::failbit;
+
       }
+    }
 
-      if (!ret)
+    template <typename VecType>
+    void reader_base::read_genotype(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value)
+    {
+      if (good())
+      {
+        bcf_unpack(hts_rec(), BCF_UN_ALL);
+        bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_));
+        int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
+        if (gt_sz_ % num_samples != 0)
+        {
+          // TODO: mixed ploidy at site error.
+        }
+        else
+        {
+          destination.resize(sample_count() * (gt_sz_ / hts_rec()->n_sample), ref_value);
+
+          for (std::size_t i = 0; i < gt_sz_; ++i)
+          {
+            if (gt_[i] == bcf_gt_missing)
+              destination[i] = missing_value;
+            else if (bcf_gt_allele(gt_[i]) == allele_index_)
+              destination[i] = alt_value;
+          }
+          return;
+        }
+
         this->state_ = std::ios::failbit;
-
-      return ret;
+      }
     }
 
     class reader : public reader_base
@@ -318,8 +357,8 @@ namespace vc
 
       bool read_hts_record();
 
-      const bcf_hdr_t* const hts_hdr() const { return hts_hdr_; }
-      const bcf1_t* const hts_rec() const { return hts_rec_; }
+      bcf_hdr_t* hts_hdr() const { return hts_hdr_; }
+      bcf1_t* hts_rec() const { return hts_rec_; }
     private:
       htsFile* hts_file_;
       bcf_hdr_t* hts_hdr_;
@@ -336,13 +375,15 @@ namespace vc
       void reset_region(const region& reg);
       template <typename VecType>
       indexed_reader& operator>>(haplotype_vector<VecType>& destination);
+      template <typename T, typename Pred>
+      indexed_reader& read_if(haplotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0);
     private:
       bool read_hts_record();
 //      index_reader& seek(const std::string& chromosome, std::uint64_t position);
 //
 //      static std::string get_chromosome(const index_reader& rdr, const marker& mkr);
-      const bcf_hdr_t*const hts_hdr() const { return bcf_sr_get_header(synced_readers_, 0); }
-      const bcf1_t*const hts_rec() const { return hts_rec_; }
+      bcf_hdr_t* hts_hdr() const { return bcf_sr_get_header(synced_readers_, 0); }
+      bcf1_t* hts_rec() const { return hts_rec_; }
     private:
       bcf_srs_t* synced_readers_;
       bcf1_t* hts_rec_;
@@ -353,6 +394,26 @@ namespace vc
     indexed_reader& indexed_reader::operator>>(haplotype_vector<VecType>& destination)
     {
       read(destination);
+      return *this;
+    }
+
+    template <typename T, typename Pred>
+    indexed_reader& indexed_reader::read_if(haplotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
+    {
+      bool predicate_failed = true;
+      while (good() && predicate_failed)
+      {
+        read_variant_details(destination);
+        if (good())
+        {
+          predicate_failed = !fn(destination);
+          if (!predicate_failed)
+          {
+            read_genotype(destination, missing_value, alt_value, ref_value);
+          }
+        }
+      }
+
       return *this;
     }
 

@@ -61,16 +61,57 @@ vc::hapotype_vector<vc::compressed_vector<double>> vc_sparse_vector;
 vc::hapotype_vector<boost::numeric::ublas::compressed_vector<float>> ublas_sparse_vector;
 ```
 
+## Read Predicates
+Reading genotypes can be bypassed when using a read predicate.
+```c++
+vc::indexed_reader f("chr1.cmf");
+vc::sparse_haplotype_vector<float> variant;
+
+while (f.read_if(variant, [](const auto& v) { return std::stof(v.prop("AF")) < 0.1; }))
+{
+  ...
+}
+```
+```c++
+vc::indexed_reader f("chr1.cmf");
+vc::dense_haplotype_vector<float> buf;
+
+{
+  struct file_statistics_functor
+  {
+    template <typename T>
+    bool operator()(const T& v)
+    {
+      ++variant_count;
+      genotype_count += v.prop("NS");
+      return false;
+    }
+    
+    std::size_t variant_count = 0;
+    std::size_t genotype_count = 0;
+  } file_statistics;
+  
+  while (f.read_if(buf, file_statistics)) { }
+  
+  // Consume file statisicts ...
+}
+```
+
 ## Converting Files
 ```c++
 vc::vcf::reader bcf_file("file.bcf");
+vc::vcf::dense_variant_iterator it(bcf_file);
+vc::vcf::dense_variant_iterator eof;
 
-vc::cmf::writer cmf_file("file.cmf");
-vc::cmf::output_iterator out_it(cmf_file);
-
-if (subset_file)
-  std::copy_if(vc::vcf::dense_variant_iterator{bcf_file}, vc::vcf::dense_variant_iterator{}, out_it, 
-    [](const auto& v) { return (vc::calculate_allele_frequency(v) < 0.1); });
-else
-  std::copy(vc::vcf::dense_variant_iterator{bcf_file}, vc::vcf::dense_variant_iterator{}, out_it);
+if (it != eof)
+{
+  vc::cmf::writer output("file.cmf", it->chromosome(), vc::get_ploidy(bcf_file, *it), bcf_file.samples_begin(), bcf_file.samples_end());
+  vc::cmf::output_iterator out_it(cmf_file);
+  
+  if (subset_file)
+    std::copy_if(std::move(it), eof, out_it, 
+      [](const auto& v) { return (vc::calculate_allele_frequency(v) < 0.1); });
+  else
+    std::copy(std::move(it), eof, out_it);
+}
 ```

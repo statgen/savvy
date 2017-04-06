@@ -234,24 +234,7 @@ namespace vc
     {
       if (bcf_read(hts_file_, hts_hdr_, hts_rec_) >= 0)
       {
-        bcf_unpack(hts_rec_, BCF_UN_ALL); //BCF_UN_STR | BCF_UN_FMT);
-        bcf_get_genotypes(hts_hdr_, hts_rec_, &(gt_), &(gt_sz_));
-        int num_samples = hts_hdr_->n[BCF_DT_SAMPLE];
-        if (gt_sz_ % num_samples != 0)
-        {
-          // TODO: mixed ploidy at site error.
-        }
-        else
-        {
-          this->allele_index_ = 1;
-//            std::uint16_t i = 1;
-//            do
-//            {
-//              destination.markers_.emplace_back(destination.hts_rec_, destination.gt_, destination.gt_sz_, i);
-//              ++i;
-//            } while (i < destination.hts_rec_->n_allele);
-          return true;
-        }
+        return true;
       }
       return false;
     }
@@ -296,24 +279,7 @@ namespace vc
     {
       if (bcf_sr_next_line(synced_readers_) && (hts_rec_ = bcf_sr_get_line(synced_readers_, 0)))
       {
-        bcf_unpack(hts_rec_, BCF_UN_ALL); //BCF_UN_STR | BCF_UN_FMT);
-        bcf_get_genotypes(hts_hdr(), hts_rec_, &(gt_), &(gt_sz_));
-        int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
-        if (gt_sz_ % num_samples != 0)
-        {
-          // TODO: mixed ploidy at site error.
-        }
-        else
-        {
-          this->allele_index_ = 1;
-//            std::uint16_t i = 1;
-//            do
-//            {
-//              destination.markers_.emplace_back(destination.hts_rec_, destination.gt_, destination.gt_sz_, i);
-//              ++i;
-//            } while (i < destination.hts_rec_->n_allele);
-          return true;
-        }
+        return true;
       }
       return false;
     }

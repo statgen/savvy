@@ -194,64 +194,12 @@ namespace vc
       virtual ~reader_base() {}
 
       template <typename T>
-      void read(haplotype_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0)
+      bool read(haplotype_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0)
       {
-        if (good())
-        {
-          if (!this->update_file_position())
-          {
-            this->input_stream_.setstate(std::ios::failbit);
-          }
-          else
-          {
-            std::istreambuf_iterator<char> in_it(input_stream_);
-            std::istreambuf_iterator<char> end_it;
+        read_variant_details(destination);
+        read_genotype(destination, missing_value, alt_value, ref_value);
 
-            std::uint64_t locus;
-            if (varint_decode(in_it, end_it, locus) != end_it)
-            {
-              ++in_it;
-              std::uint64_t sz;
-              if (varint_decode(in_it, end_it, sz) != end_it)
-              {
-                ++in_it;
-                std::string ref;
-                ref.resize(sz);
-                if (sz)
-                  input_stream_.read(&ref[0], ref.size());
-
-                if (varint_decode(in_it, end_it, sz) != end_it)
-                {
-                  ++in_it;
-                  std::string alt;
-                  alt.resize(sz);
-                  if (sz)
-                    input_stream_.read(&alt[0], alt.size());
-
-                  // TODO: Read metadata values.
-
-                  destination = haplotype_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), std::move(destination));
-                  destination.resize(0);
-                  destination.resize(sample_count() * ploidy(), ref_value);
-                  auto sc = sample_count();
-                  auto p = ploidy();
-
-                  varint_decode(in_it, end_it, sz);
-                  std::uint64_t total_offset = 0;
-                  for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
-                  {
-                    std::uint8_t allele;
-                    std::uint64_t offset;
-                    one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
-                    total_offset += offset;
-                    destination[total_offset] = (allele ? missing_value : alt_value);
-                  }
-                }
-              }
-            }
-            input_stream_.get();
-          }
-        }
+        return good();
       }
       explicit operator bool() const { return input_stream_.good(); }
       bool good() const { return input_stream_.good(); }
@@ -267,6 +215,89 @@ namespace vc
       std::streampos tellg() { return this->input_stream_.tellg(); }
     protected:
       virtual bool update_file_position() { return true; }
+      template <typename T>
+      void read_variant_details(haplotype_vector<T>& destination)
+      {
+        if (good())
+        {
+          if (!this->update_file_position())
+          {
+            this->input_stream_.setstate(std::ios::failbit);
+          }
+          else
+          {
+            std::istreambuf_iterator<char> in_it(input_stream_);
+            std::istreambuf_iterator<char> end_it;
+
+            std::uint64_t locus;
+            if (varint_decode(in_it, end_it, locus) == end_it)
+            {
+              this->input_stream_.setstate(std::ios::badbit);
+            }
+            else
+            {
+              ++in_it;
+              std::uint64_t sz;
+              if (varint_decode(in_it, end_it, sz) == end_it)
+              {
+                this->input_stream_.setstate(std::ios::badbit);
+              }
+              else
+              {
+                ++in_it;
+                std::string ref;
+                ref.resize(sz);
+                if (sz)
+                  input_stream_.read(&ref[0], ref.size());
+
+                if (varint_decode(in_it, end_it, sz) == end_it)
+                {
+                  this->input_stream_.setstate(std::ios::badbit);
+                }
+                else
+                {
+                  ++in_it;
+                  std::string alt;
+                  alt.resize(sz);
+                  if (sz)
+                    input_stream_.read(&alt[0], alt.size());
+
+                  // TODO: Read metadata values.
+
+                  destination = haplotype_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), std::move(destination));
+                  destination.resize(0);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      template <typename T>
+      void read_genotype(haplotype_vector<T>& destination, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
+      {
+        if (good())
+        {
+          std::istreambuf_iterator<char> in_it(input_stream_);
+          std::istreambuf_iterator<char> end_it;
+
+          destination.resize(sample_count() * ploidy(), ref_value);
+
+          std::uint64_t sz;
+          varint_decode(in_it, end_it, sz);
+          std::uint64_t total_offset = 0;
+          for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+          {
+            std::uint8_t allele;
+            std::uint64_t offset;
+            one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
+            total_offset += offset;
+            destination[total_offset] = (allele ? missing_value : alt_value);
+          }
+
+          input_stream_.get();
+        }
+      }
     protected:
       std::vector<std::string> sample_ids_;
       std::string chromosome_;
@@ -394,6 +425,26 @@ namespace vc
       indexed_reader& operator>>(haplotype_vector<T>& destination)
       {
         read(destination);
+        return *this;
+      }
+
+      template <typename T, typename Pred>
+      indexed_reader& read_if(haplotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0)
+      {
+        bool predicate_failed = true;
+        while (good() && predicate_failed)
+        {
+          read_variant_details(destination);
+          if (good())
+          {
+            predicate_failed = !fn(destination);
+            if (!predicate_failed)
+            {
+              read_genotype(destination, missing_value, alt_value, ref_value);
+            }
+          }
+        }
+
         return *this;
       }
 
