@@ -83,7 +83,7 @@ vc::dense_haplotype_vector<float> buf;
     bool operator()(const T& v)
     {
       ++variant_count;
-      genotype_count += v.prop("NS");
+      genotype_count += std::stoi(v.prop("NS"));
       return false;
     }
     
