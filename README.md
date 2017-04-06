@@ -83,12 +83,15 @@ vc::dense_haplotype_vector<float> buf;
     bool operator()(const T& v)
     {
       ++variant_count;
+      if (v.ref().size() == v.alt().size())
+        ++snp_count;
       genotype_count += std::stoi(v.prop("NS"));
       return false;
     }
     
     std::size_t variant_count = 0;
     std::size_t genotype_count = 0;
+    std::size_t snp_count = 0;
   } file_statistics;
   
   while (f.read_if(buf, file_statistics)) { }
