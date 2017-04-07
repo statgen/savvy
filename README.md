@@ -100,6 +100,22 @@ vc::dense_haplotype_vector<float> buf;
 }
 ```
 
+## Custom Allele Status Values
+Values used to load vectors can be customized.
+```c++
+vc::reader f("chr1.cmf");
+vc::dense_haplotype_vector<float> variant;
+
+const float is_missing = std::numeric_values<float>::epsilon();
+const float has_alt = 1;
+const float has_ref = 0;
+
+while (f.read(variant, is_missing, has_alt, has_ref))
+{
+  ...
+}
+```
+
 ## Converting Files
 ```c++
 vc::vcf::reader bcf_file("file.bcf");
