@@ -190,7 +190,8 @@ namespace vc
         state_(source.state_),
         gt_(source.gt_),
         gt_sz_(source.gt_sz_),
-        allele_index_(source.allele_index_)
+        allele_index_(source.allele_index_),
+        property_fields_(std::move(source.property_fields_))
       {
         source.gt_ = nullptr;
       }
@@ -208,21 +209,15 @@ namespace vc
       bool fail() const { return (state_ & std::ios::failbit) != 0; }
       bool bad() const { return (state_ & std::ios::badbit) != 0; }
 
-      char** samples_begin() const;
-      char** samples_end() const;
+      const char** samples_begin() const;
+      const char** samples_end() const;
+      std::vector<std::string>::const_iterator prop_fields_begin() const { return property_fields_.begin(); }
+      std::vector<std::string>::const_iterator prop_fields_end() const { return property_fields_.end(); }
       std::uint64_t sample_count() const;
 
       template <typename VecType>
       bool read(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value = std::numeric_limits<typename VecType::value_type>::quiet_NaN(), const typename VecType::value_type alt_value = 1, const typename VecType::value_type ref_value = 0);
     protected:
-      std::ios::iostate state_;
-      int* gt_;
-      int gt_sz_;
-      int allele_index_;
-      std::vector<std::string> property_fields_;
-
-
-
       virtual bcf_hdr_t* hts_hdr() const = 0;
       virtual bcf1_t* hts_rec() const = 0;
       virtual bool read_hts_record() = 0;
@@ -232,6 +227,12 @@ namespace vc
       void read_variant_details(haplotype_vector<VecType>& destination);
       template <typename VecType>
       void read_genotype(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value);
+    protected:
+      std::ios::iostate state_;
+      int* gt_;
+      int gt_sz_;
+      int allele_index_;
+      std::vector<std::string> property_fields_;
     };
 
     template <typename VecType>
@@ -266,16 +267,22 @@ namespace vc
           std::unordered_map<std::string, std::string> props;
           props.reserve(n_info + 2);
 
-          props["QUAL"] = std::to_string(hts_rec()->qual);
+          std::string qual(std::to_string(hts_rec()->qual));
+          qual.erase(qual.find_last_not_of(".0") + 1); // rtrim zeros.
+          props["QUAL"] = std::move(qual);
 
-          std::stringstream fltr;
+          std::stringstream ss;
           for (std::size_t i = 0; i < n_flt; ++i)
           {
             if (i > 0)
-              fltr << ";";
-            fltr << bcf_hdr_int2id(hts_hdr(), BCF_DT_ID, hts_rec()->d.flt[i]);
+              ss << ";";
+            ss << bcf_hdr_int2id(hts_hdr(), BCF_DT_ID, hts_rec()->d.flt[i]);
           }
-          props["FILTER"] = fltr.str();
+          std::string fltr(ss.str());
+          if (fltr == "." || fltr == "PASS")
+            fltr.clear();
+          props["FILTER"] = std::move(fltr);
+
 
           for (std::size_t i = 0; i < n_info; ++i)
           {
@@ -286,7 +293,7 @@ namespace vc
               switch (info[i].type)
               {
                 case BCF_BT_NULL:
-                  props[key];
+                  props[key] = "1"; // Flag present so should be true.
                   break;
                 case BCF_BT_INT8:
                 case BCF_BT_INT16:
@@ -295,8 +302,11 @@ namespace vc
                   break;
                 case BCF_BT_FLOAT:
                   props[key] = std::to_string(info[i].v1.f);
+                  props[key].erase(props[key].find_last_not_of(".0") + 1); // rtrim zeros.
                   break;
-                //case BCF_BT_CHAR:
+                case BCF_BT_CHAR:
+                  props[key] = std::string((char*)info[i].vptr, info[i].vptr_len);
+                  break;
               }
             }
           }

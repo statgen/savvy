@@ -414,6 +414,8 @@ namespace vc
     //================================================================//
 
     //================================================================//
+    const std::array<std::string, 0> writer::empty_string_array = {};
+
     bool writer::create_index(const std::string& input_file_path, std::string output_file_path)
     {
       bool ret = false;

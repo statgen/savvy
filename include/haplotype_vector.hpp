@@ -73,12 +73,8 @@ namespace vc
     {
       auto it = properties_.find(key);
       if (it == properties_.end())
-        return empty_string_;
+        return empty_string;
       return it->second;
-    }
-    bool prop_exists(const std::string& key) const
-    {
-      return (properties_.find(key) != properties_.end());
     }
   private:
     std::string chromosome_;
@@ -86,8 +82,11 @@ namespace vc
     std::string alt_;
     std::unordered_map<std::string, std::string> properties_;
     std::uint64_t locus_;
-    static const std::string empty_string_;
+    static const std::string empty_string;
   };
+
+  template<typename T>
+  const std::string haplotype_vector<T>::empty_string = {};
 
   template <typename T>
   using dense_haplotype_vector = haplotype_vector<std::vector<T>>;

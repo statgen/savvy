@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <array>
 #include <functional>
 #include <fstream>
 #include <tuple>
@@ -210,6 +211,8 @@ namespace vc
       std::uint64_t haplotype_count() const { return this->sample_count() * this->ploidy(); }
       std::vector<std::string>::const_iterator samples_begin() const { return sample_ids_.begin(); }
       std::vector<std::string>::const_iterator samples_end() const { return sample_ids_.end(); }
+      std::vector<std::string>::const_iterator prop_fields_begin() const { return metadata_fields_.begin(); }
+      std::vector<std::string>::const_iterator prop_fields_end() const { return metadata_fields_.end(); }
       const std::string& chromosome() const { return chromosome_; }
       std::uint8_t ploidy() const { return ploidy_level_; }
       const std::string& file_path() const { return file_path_; }
@@ -275,10 +278,13 @@ namespace vc
                     }
                     else
                     {
-                      prop_val.resize(sz);
+                      ++in_it;
                       if (sz)
+                      {
+                        prop_val.resize(sz);
                         input_stream_.read(&prop_val[0], sz);
-                      props[key] = prop_val;
+                        props[key] = prop_val;
+                      }
                     }
                   }
 
@@ -515,8 +521,8 @@ namespace vc
     class writer
     {
     public:
-      template <typename RandAccessStringIterator>
-      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end) :
+      template <typename RandAccessStringIterator, typename RandAccessStringIterator2>
+      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessStringIterator2 property_fields_beg, RandAccessStringIterator2 property_fields_end) :
         output_stream_(file_path),
         file_path_(file_path),
         sample_size_(samples_end - samples_beg),
@@ -536,11 +542,29 @@ namespace vc
         varint_encode(sample_size_, out_it);
         for (auto it = samples_beg; it != samples_end; ++it)
         {
-          varint_encode(it->size(), out_it);
-          output_stream_.write(it->data(), it->size());
+          std::size_t str_sz = get_string_size(*it);
+          varint_encode(str_sz, out_it);
+          if (str_sz)
+            output_stream_.write(&(*it)[0], str_sz);
         }
 
-        varint_encode(0, out_it); // TODO: metadata fields.
+        property_fields_.assign(property_fields_beg, property_fields_end);
+        varint_encode(property_fields_.size(), out_it);
+        for (auto it = property_fields_.begin(); it != property_fields_.end(); ++it)
+        {
+          std::size_t str_sz = get_string_size(*it);
+          varint_encode(str_sz, out_it);
+          if (str_sz)
+            output_stream_.write(&(*it)[0], str_sz);
+        }
+      }
+
+
+      template <typename RandAccessStringIterator>
+      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end) :
+        writer(file_path, chromosome, ploidy, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_array.end(), empty_string_array.end())
+      {
+
       }
 
       template <typename T>
@@ -579,8 +603,15 @@ namespace vc
           std::copy(m.alt().begin(), m.alt().end(), os_it);
         //os.write(&source.alt_[0], source.alt_.size());
 
-        std::uint64_t non_zero_count =  m.size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), ref_value));
+        for (const std::string& key : property_fields_)
+        {
+          std::string value(m.prop(key));
+          varint_encode(value.size(), os_it);
+          if (value.size())
+            std::copy(value.begin(), value.end(), os_it);
+        }
 
+        std::uint64_t non_zero_count =  m.size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), ref_value));
         varint_encode(non_zero_count, os_it);
         std::uint64_t last_pos = 0;
         auto beg = m.begin();
@@ -598,9 +629,14 @@ namespace vc
       }
 
       static bool create_index(const std::string& input_file_path, std::string output_file_path = "");
-
+    private:
+      template <typename T>
+      static std::size_t get_string_size(T str);
+    private:
+      static const std::array<std::string, 0> empty_string_array;
     private:
       oxzstream output_stream_;
+      std::vector<std::string> property_fields_;
       std::string file_path_;
       std::uint64_t sample_size_;
       std::uint8_t ploidy_level_;
@@ -608,6 +644,24 @@ namespace vc
       std::size_t record_count_;
       std::size_t block_size_;
     };
+
+    template <typename T>
+    std::size_t writer::get_string_size(T str)
+    {
+      return str.size();
+    }
+
+    template <>
+    inline std::size_t writer::get_string_size<const char*>(const char* str)
+    {
+      return std::strlen(str);
+    }
+
+//    template <>
+//    inline std::size_t writer::get_string_size(char* str)
+//    {
+//      return std::strlen(str);
+//    }
 
     template <typename VecType>
     using variant_iterator =  basic_variant_iterator<reader_base, VecType>;

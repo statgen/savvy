@@ -171,14 +171,14 @@ namespace vc
 //      return false;
 //    }
 
-    char** reader_base::samples_begin() const
+    const char** reader_base::samples_begin() const
     {
-      return hts_hdr() ? hts_hdr()->samples : nullptr;
+      return hts_hdr() ? (const char**)hts_hdr()->samples : nullptr;
     }
 
-    char** reader_base::samples_end() const
+    const char** reader_base::samples_end() const
     {
-      return hts_hdr() ? hts_hdr()->samples + bcf_hdr_nsamples(hts_hdr()) : nullptr;
+      return hts_hdr() ? (const char**)((hts_hdr()->samples) + bcf_hdr_nsamples(hts_hdr())) : nullptr;
     }
 
     std::uint64_t reader_base::sample_count() const

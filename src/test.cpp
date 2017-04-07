@@ -510,9 +510,7 @@ void convert_file_test()
     const std::string chrom = cur != eof ? cur->chromosome() : "";
     const std::size_t ploidy = cur != eof ? (cur->size() / input.sample_count()) : 0;
 
-    std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
-    std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-    vc::cmf::writer compact_output("test_file.cmf", chrom, ploidy, sample_ids.begin(), sample_ids.end());
+    vc::cmf::writer compact_output("test_file.cmf", chrom, ploidy, input.samples_begin(), input.samples_end(), input.prop_fields_begin(), input.prop_fields_end());
 
     while (cur != eof)
     {
