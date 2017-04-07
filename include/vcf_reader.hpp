@@ -219,12 +219,14 @@ namespace vc
       int* gt_;
       int gt_sz_;
       int allele_index_;
+      std::vector<std::string> property_fields_;
 
 
 
       virtual bcf_hdr_t* hts_hdr() const = 0;
       virtual bcf1_t* hts_rec() const = 0;
       virtual bool read_hts_record() = 0;
+      void init_property_fields();
 
       template <typename VecType>
       void read_variant_details(haplotype_vector<VecType>& destination);
@@ -258,9 +260,23 @@ namespace vc
         {
           bcf_unpack(hts_rec(), BCF_UN_SHR);
 
-          std::unordered_map<std::string, std::string> props;
           std::size_t n_info = hts_rec()->n_info;
+          std::size_t n_flt = hts_rec()->d.n_flt;
           bcf_info_t* info = hts_rec()->d.info;
+          std::unordered_map<std::string, std::string> props;
+          props.reserve(n_info + 2);
+
+          props["QUAL"] = std::to_string(hts_rec()->qual);
+
+          std::stringstream fltr;
+          for (std::size_t i = 0; i < n_flt; ++i)
+          {
+            if (i > 0)
+              fltr << ";";
+            fltr << bcf_hdr_int2id(hts_hdr(), BCF_DT_ID, hts_rec()->d.flt[i]);
+          }
+          props["FILTER"] = fltr.str();
+
           for (std::size_t i = 0; i < n_info; ++i)
           {
             // bcf_hdr_t::id[BCF_DT_ID][$key].key

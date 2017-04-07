@@ -5,6 +5,7 @@
 #include <sstream>
 #include <assert.h>
 #include <limits>
+#include <dep/htslib_project-prefix/src/htslib_project/htslib/vcf.h>
 
 namespace vc
 {
@@ -185,6 +186,31 @@ namespace vc
       return static_cast<std::uint64_t>(bcf_hdr_nsamples(hts_hdr()));
     }
 
+    void reader_base::init_property_fields()
+    {
+      bcf_hdr_t* hdr = hts_hdr();
+      if (hdr)
+      {
+        this->property_fields_ = {"QUAL", "FILTER"};
+        for (int i = 0; i < hdr->nhrec; ++i)
+        {
+          if (hdr->hrec[i]->type == BCF_HL_INFO)
+          {
+            bcf_hrec_t* r = hdr->hrec[i];
+            for (int j = 0; j < r->nkeys; ++j)
+            {
+              if (strcmp(r->keys[j], "ID") == 0)
+              {
+                const char* inf = r->vals[j];
+                if (inf)
+                  this->property_fields_.emplace_back(inf);
+              }
+            }
+          }
+        }
+      }
+    }
+
     reader::reader(const std::string& file_path) :
       hts_file_(bcf_open(file_path.c_str(), "r")),
       hts_hdr_(nullptr),
@@ -197,6 +223,7 @@ namespace vc
       else
       {
         hts_hdr_ = bcf_hdr_read(hts_file_);
+        this->init_property_fields();
       }
     }
 
@@ -251,6 +278,7 @@ namespace vc
 
       bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0);
       bcf_sr_add_reader(synced_readers_, file_path_.c_str());
+      this->init_property_fields();
     }
 
     indexed_reader::~indexed_reader()
