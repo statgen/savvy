@@ -77,7 +77,7 @@ vc::indexed_reader f("chr1.cmf");
 vc::dense_haplotype_vector<float> buf;
 
 {
-  struct file_statistics_functor
+  struct 
   {
     template <typename T>
     bool operator()(const T& v)
