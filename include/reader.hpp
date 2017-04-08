@@ -22,8 +22,8 @@ namespace vc
 
     bool good() const
     {
-      if (cmf_reader_)
-        return cmf_reader_->good();
+      if (sav_reader_)
+        return sav_reader_->good();
       else if (vcf_reader_)
         return vcf_reader_->good();
       return false;
@@ -31,8 +31,8 @@ namespace vc
 
     bool fail() const
     {
-      if (cmf_reader_)
-        return cmf_reader_->fail();
+      if (sav_reader_)
+        return sav_reader_->fail();
       else if (vcf_reader_)
         return vcf_reader_->fail();
       return true;
@@ -40,8 +40,8 @@ namespace vc
 
     bool bad() const
     {
-      if (cmf_reader_)
-        return cmf_reader_->bad();
+      if (sav_reader_)
+        return sav_reader_->bad();
       else if (vcf_reader_)
         return vcf_reader_->bad();
       return true;
@@ -50,15 +50,15 @@ namespace vc
     template <typename T>
     bool read(haplotype_vector<T>& destination)
     {
-      if (cmf_reader_)
-        cmf_reader_->read(destination);
+      if (sav_reader_)
+        sav_reader_->read(destination);
       else if (vcf_reader_)
         vcf_reader_->read(destination);
 
       return good();
     }
   protected:
-    std::unique_ptr<sav::reader_base> cmf_reader_;
+    std::unique_ptr<sav::reader_base> sav_reader_;
     std::unique_ptr<vcf::reader_base> vcf_reader_;
   };
 
@@ -103,8 +103,8 @@ namespace vc
   template <typename T, typename Pred>
   indexed_reader& indexed_reader::read_if(haplotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
   {
-    if (cmf_reader_)
-      dynamic_cast<sav::indexed_reader*>(cmf_reader_.get())->read_if(destination, fn, missing_value, alt_value, ref_value);
+    if (sav_reader_)
+      dynamic_cast<sav::indexed_reader*>(sav_reader_.get())->read_if(destination, fn, missing_value, alt_value, ref_value);
     else if (vcf_reader_)
       dynamic_cast<vcf::indexed_reader*>(vcf_reader_.get())->read_if(destination, fn, missing_value, alt_value, ref_value);
 

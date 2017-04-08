@@ -491,7 +491,7 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 void run_file_checksum_test()
 {
 
-  vc::open_files(std::make_tuple("test_file.vcf", "test_file.cmf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
+  vc::open_files(std::make_tuple("test_file.vcf", "test_file.sav"), [](auto&& input_file_reader1, auto&& input_file_reader2)
   {
     auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
     std::cout << "Starting checksum test ..." << std::endl;
@@ -510,7 +510,7 @@ void convert_file_test()
     const std::string chrom = cur != eof ? cur->chromosome() : "";
     const std::size_t ploidy = cur != eof ? (cur->size() / input.sample_count()) : 0;
 
-    vc::sav::writer compact_output("test_file.cmf", chrom, ploidy, input.samples_begin(), input.samples_end(), input.prop_fields_begin(), input.prop_fields_end());
+    vc::sav::writer compact_output("test_file.sav", chrom, ploidy, input.samples_begin(), input.samples_end(), input.prop_fields_begin(), input.prop_fields_end());
 
     while (cur != eof)
     {
@@ -666,9 +666,9 @@ public:
 
 void random_access_test()
 {
-  vc::sav::writer::create_index("test_file.cmf");
+  vc::sav::writer::create_index("test_file.sav");
 
-  vc::indexed_reader rdr("test_file.cmf", {"20", 17000, 1120000});
+  vc::indexed_reader rdr("test_file.sav", {"20", 17000, 1120000});
   auto it = vc::variant_iterator<std::vector<float>>(rdr);
   auto end = vc::variant_iterator<std::vector<float>>{};
   for ( ; it != end; ++it)
@@ -686,7 +686,7 @@ void random_access_test()
 
 void generic_reader_test()
 {
-  vc::reader rdr1("test_file.cmf");
+  vc::reader rdr1("test_file.sav");
   vc::reader rdr2("test_file.vcf");
 
 
