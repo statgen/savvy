@@ -62,7 +62,7 @@ void handle_file_reader(T& reader)
 //    std::string file_path = "/foobar.cmf";
 //    if (has_extension(file_path, ".cmf"))
 //    {
-//      vc::cmf::reader input("/foobar.cmf");
+//      vc::sav::reader input("/foobar.cmf");
 //      handle_file_reader(input);
 //    }
 //    else if (has_extension(file_path, ".m3vcf"))
@@ -89,7 +89,7 @@ void handle_file_reader(T& reader)
 //    std::string file_path = "/foobar.cmf";
 //    if (has_extension(file_path, ".cmf"))
 //    {
-//      vc::cmf::reader input("/foobar.cmf");
+//      vc::sav::reader input("/foobar.cmf");
 //      auto analysis = make_analysis(input);
 //      analysis.run();
 //    }
@@ -105,10 +105,10 @@ void handle_file_reader(T& reader)
 //
 //  //----------------------------------------------------------------//
 //  {
-//    vc::cmf::reader input("/foobar.cmf");
-//    vc::cmf::marker buff;
+//    vc::sav::reader input("/foobar.cmf");
+//    vc::sav::marker buff;
 //
-//    for (vc::cmf::reader::input_iterator i(input, buff), eof; i != eof; ++i)
+//    for (vc::sav::reader::input_iterator i(input, buff), eof; i != eof; ++i)
 //    {
 //      for (auto j = i->begin(); j != i->end(); ++j)
 //      {
@@ -135,12 +135,12 @@ void handle_file_reader(T& reader)
 //  //----------------------------------------------------------------//
 //
 //  //----------------------------------------------------------------//
-//  vc::cmf::marker m;
+//  vc::sav::marker m;
 //  std::uint64_t ploidy_level = 2;
 //  std::uint64_t sample_size = 1000;
 //  std::vector<int> zero_one_two_vec(sample_size, 0);
 //
-//  std::for_each(m.non_ref_begin(), m.non_ref_end(), [&zero_one_two_vec, ploidy_level](const vc::cmf::marker::sparse_vector_allele& a)
+//  std::for_each(m.non_ref_begin(), m.non_ref_end(), [&zero_one_two_vec, ploidy_level](const vc::sav::marker::sparse_vector_allele& a)
 //  {
 //    if (a.status == vc::allele_status::has_alt)
 //      ++(zero_one_two_vec[a.offset / ploidy_level]);
@@ -510,7 +510,7 @@ void convert_file_test()
     const std::string chrom = cur != eof ? cur->chromosome() : "";
     const std::size_t ploidy = cur != eof ? (cur->size() / input.sample_count()) : 0;
 
-    vc::cmf::writer compact_output("test_file.cmf", chrom, ploidy, input.samples_begin(), input.samples_end(), input.prop_fields_begin(), input.prop_fields_end());
+    vc::sav::writer compact_output("test_file.cmf", chrom, ploidy, input.samples_begin(), input.samples_end(), input.prop_fields_begin(), input.prop_fields_end());
 
     while (cur != eof)
     {
@@ -560,7 +560,7 @@ void convert_file_test()
 //}
 //
 //template <>
-//double inner_product<vc::cmf::marker>(const vc::cmf::marker& mrkr, std::vector<double>& vec, const double start_val)
+//double inner_product<vc::sav::marker>(const vc::sav::marker& mrkr, std::vector<double>& vec, const double start_val)
 //{
 //  double ret = start_val;
 //
@@ -666,7 +666,7 @@ public:
 
 void random_access_test()
 {
-  vc::cmf::writer::create_index("test_file.cmf");
+  vc::sav::writer::create_index("test_file.cmf");
 
   vc::indexed_reader rdr("test_file.cmf", {"20", 17000, 1120000});
   auto it = vc::variant_iterator<std::vector<float>>(rdr);

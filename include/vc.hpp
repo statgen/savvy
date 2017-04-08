@@ -45,7 +45,7 @@ namespace vc
       {
         if (detail::has_extension(file_path, ".cmf"))
         {
-          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::cmf::reader(file_path))), std::ref(handler), addl_file_paths...);
+          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::sav::reader(file_path))), std::ref(handler), addl_file_paths...);
         }
 //        else if (detail::has_extension(file_path, ".m3vcf"))
 //        {
@@ -77,7 +77,7 @@ namespace vc
 ////        else if (detail::has_extension(file_path, ".cmf"))
 ////        {
 ////          std::ifstream ifs(file_path);
-////          variadic_indexed_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::cmf::reader(ifs))), std::ref(handler), addl_file_paths...);
+////          variadic_indexed_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::sav::reader(ifs))), std::ref(handler), addl_file_paths...);
 ////        }
 ////        else if (detail::has_extension(file_path, ".m3vcf"))
 ////        {
@@ -105,7 +105,7 @@ namespace vc
   {
     if (detail::has_extension(file_path, ".cmf"))
     {
-      vc::cmf::reader input(file_path);
+      vc::sav::reader input(file_path);
       handler(std::move(input));
     }
 //    else if (detail::has_extension(file_path, ".m3vcf"))
@@ -144,7 +144,7 @@ namespace vc
 ////    else if (detail::has_extension(file_path, ".cmf"))
 ////    {
 ////      std::ifstream ifs(file_path);
-////      vc::cmf::reader input(ifs);
+////      vc::sav::reader input(ifs);
 ////      handler(std::move(input));
 ////    }
 ////    else if (detail::has_extension(file_path, ".m3vcf"))

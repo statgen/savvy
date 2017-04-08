@@ -34,7 +34,7 @@
 //}
 //
 //template <>
-//void some_analysis<vc::cmf::reader>::handle_marker(const vc::cmf::marker& m)
+//void some_analysis<vc::sav::reader>::handle_marker(const vc::sav::marker& m)
 //{
 //  for (auto jt = m.non_ref_begin(); jt != m.non_ref_end(); ++jt)
 //  {
@@ -50,9 +50,9 @@
 //  return ret;
 //}
 
-//template class some_analysis<vc::cmf::reader>;
+//template class some_analysis<vc::sav::reader>;
 //template class some_analysis<vc::m3vcf::reader>;
-//template some_analysis<vc::cmf::reader> make_analysis<vc::cmf::reader>(vc::cmf::reader&);
+//template some_analysis<vc::sav::reader> make_analysis<vc::sav::reader>(vc::sav::reader&);
 //template some_analysis<vc::m3vcf::reader> make_analysis<vc::m3vcf::reader>(vc::m3vcf::reader&);
 
 

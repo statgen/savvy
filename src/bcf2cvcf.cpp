@@ -15,7 +15,7 @@ int main(int argc, char** argv)
 
   std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
   std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-  vc::cmf::writer compact_output(argv[2], chrom, ploidy, sample_ids.begin(), sample_ids.end());
+  vc::sav::writer compact_output(argv[2], chrom, ploidy, sample_ids.begin(), sample_ids.end());
 
   while (cur != eof)
   {

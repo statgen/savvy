@@ -7,7 +7,7 @@
 
 namespace vc
 {
-  namespace cmf
+  namespace sav
   {
     //================================================================//
 //    const marker::const_iterator::value_type marker::const_iterator::const_is_missing = allele_status::is_missing;

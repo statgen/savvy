@@ -1,4 +1,4 @@
-# Compact Marker Format Specification
+# Sparse Allele Vectors Specification
 
 ## Variable Length Integer (VLI) Encoding
 All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB128). Encoded integers can start in the middle of a byte allowing 1 to 7 bits of data to prefix the integer.
@@ -16,9 +16,9 @@ All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB12
 ## Header Format
 ```
 +----------------------------------------------------------------+
-|   "cmf" string in binary + 4 bytes for version (Major.minor)   |
+|   "sav" string in binary + 4 bytes for version (Major.minor)   |
 +----------------------------------------------------------------+
-| 01100011 01101101 01100110 MMMMMMMM MMMMMMMM mmmmmmmm mmmmmmmm |
+| 01110011 01100001 01110110 MMMMMMMM MMMMMMMM mmmmmmmm mmmmmmmm |
 +----------------------------------------------------------------+
 +vvvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
 |  CHROM  | PLOIDY_LEVEL | SAMPLE_SIZE |     SAMPLE_ID_ARRAY ...     |
@@ -37,18 +37,18 @@ All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB12
 ```
 
 ## Haplotype Pairs
-Haplotype pairs are encoded in 1 or more bytes. The first bit of the first byte is determines whether the pair represents a missing or alternate allele. The next 7 bits and any additional bytes in the pair make up a VLI that represents a zero-based offset from the previous non-zero haplotype.
+Haplotype pairs are encoded in 1 or more bytes. The first bit of the first byte determines whether the pair represents a missing or alternate allele. The next 7 bits and any additional bytes in the pair make up a VLI that represents a zero-based offset from the previous non-zero haplotype.
 
 ### Example
 ```
 An allele with an offset of 25.
 +-+--------+
-|1|001 1001|
+|0|001 1001|
 +-+--------+
 
 A missing haplotype with an offset of 8000.
 +-+--------+ +---------+
-|0|100 0000| |0111 1101|
+|1|100 0000| |0111 1101|
 +-+--------+ +---------+
 ```
 

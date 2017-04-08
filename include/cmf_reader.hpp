@@ -23,7 +23,7 @@
 
 namespace vc
 {
-  namespace cmf
+  namespace sav
   {
 //    class marker
 //    {
@@ -530,7 +530,7 @@ namespace vc
         record_count_(0),
         block_size_(8)
       {
-        std::string version_string("cmf\x00\x01\x00\x00", 7);
+        std::string version_string("sav\x00\x01\x00\x00", 7);
         output_stream_.write(version_string.data(), version_string.size());
 
         std::ostreambuf_iterator<char> out_it(output_stream_);

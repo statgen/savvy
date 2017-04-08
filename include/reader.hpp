@@ -58,7 +58,7 @@ namespace vc
       return good();
     }
   protected:
-    std::unique_ptr<cmf::reader_base> cmf_reader_;
+    std::unique_ptr<sav::reader_base> cmf_reader_;
     std::unique_ptr<vcf::reader_base> vcf_reader_;
   };
 
@@ -104,7 +104,7 @@ namespace vc
   indexed_reader& indexed_reader::read_if(haplotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
   {
     if (cmf_reader_)
-      dynamic_cast<cmf::indexed_reader*>(cmf_reader_.get())->read_if(destination, fn, missing_value, alt_value, ref_value);
+      dynamic_cast<sav::indexed_reader*>(cmf_reader_.get())->read_if(destination, fn, missing_value, alt_value, ref_value);
     else if (vcf_reader_)
       dynamic_cast<vcf::indexed_reader*>(vcf_reader_.get())->read_if(destination, fn, missing_value, alt_value, ref_value);
 

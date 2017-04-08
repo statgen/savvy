@@ -52,7 +52,7 @@
 //}
 //
 //template <>
-//inline void some_analysis<vc::cmf::reader>::handle_marker(const vc::cmf::marker& m)
+//inline void some_analysis<vc::sav::reader>::handle_marker(const vc::sav::marker& m)
 //{
 //  for (auto jt = m.non_ref_begin(); jt != m.non_ref_end(); ++jt)
 //  {
