@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(libvc)
+project(libsavvy)
 
 include(ExternalProject)
 
@@ -24,23 +24,23 @@ find_package(xzbuf)
 
 
 set(HEADER_FILES
-    include/savvy.hpp include/reader.hpp include/m3vcf_reader.hpp include/cmf_reader.hpp include/allele_status.hpp include/vcf_reader.hpp include/varint.hpp include/s1r.hpp include/allele_vector.hpp include/genotype_vector.hpp include/variant_iterator.hpp include/portable_endian.hpp include/region.hpp include/compressed_vector.hpp)
+    include/savvy.hpp include/reader.hpp include/m3vcf_reader.hpp include/sav_reader.hpp include/allele_status.hpp include/vcf_reader.hpp include/varint.hpp include/s1r.hpp include/allele_vector.hpp include/genotype_vector.hpp include/variant_iterator.hpp include/portable_endian.hpp include/region.hpp include/compressed_vector.hpp)
 
 set(SOURCE_FILES
-    src/savvy.cpp src/reader.cpp src/m3vcf_reader.cpp include/cmf_reader.hpp src/cmf_reader.cpp include/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
+    src/savvy.cpp src/reader.cpp src/m3vcf_reader.cpp include/sav_reader.hpp src/sav_reader.cpp include/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
 
-add_library(vc ${SOURCE_FILES} ${HEADER_FILES})
-target_link_libraries(vc hts z xzbuf)
-target_include_directories(vc PUBLIC include)
+add_library(savvy ${SOURCE_FILES} ${HEADER_FILES})
+target_link_libraries(savvy hts z xzbuf)
+target_include_directories(savvy PUBLIC include)
 
-add_executable(vc-test src/test.cpp src/test_class.cpp include/test_class.hpp)
-target_link_libraries(vc-test vc)
+add_executable(savvy-test src/test.cpp src/test_class.cpp include/test_class.hpp)
+target_link_libraries(savvy-test savvy)
 
 add_executable(bcf2m3vcf src/bcf2m3vcf.cpp)
-target_link_libraries(bcf2m3vcf vc)
+target_link_libraries(bcf2m3vcf savvy)
 
-add_executable(bcf2cvcf src/bcf2cvcf.cpp)
-target_link_libraries(bcf2cvcf vc)
+add_executable(bcf2sav src/bcf2sav.cpp)
+target_link_libraries(bcf2sav savvy)
 
-add_executable(cvcf-sample-sort src/cmf_sample_sort.cpp)
-target_link_libraries(cvcf-sample-sort vc)
+add_executable(sav-sample-sort src/sav_sample_sort.cpp)
+target_link_libraries(sav-sample-sort savvy)

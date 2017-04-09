@@ -2,7 +2,7 @@
 #define VC_READER_HPP
 
 #include "allele_vector.hpp"
-#include "cmf_reader.hpp"
+#include "sav_reader.hpp"
 #include "vcf_reader.hpp"
 #include "savvy.hpp"
 
