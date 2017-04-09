@@ -1,9 +1,9 @@
-#ifndef LIBVC_VC_HPP
-#define LIBVC_VC_HPP
+#ifndef LIBSAVVY_VC_HPP
+#define LIBSAVVY_VC_HPP
 
-#include "vcf_reader.hpp"
-#include "cmf_reader.hpp"
+#include "reader.hpp"
 #include "m3vcf_reader.hpp"
+
 
 #include <string>
 #include <functional>
@@ -286,4 +286,4 @@ namespace savvy
 //    return ret;
 //  }
 };
-#endif //LIBVC_VC_HPP
+#endif //LIBSAVVY_VC_HPP

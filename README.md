@@ -5,7 +5,7 @@ Interface to various variant calling formats.
 ## Read Variants from File 
 ```c++
 vc::reader f("chr1.cmf");
-vc::sparse_haplotype_vector<float> variant;
+vc::sparse_allele_vector<float> variant;
 while (f >> variant)
 {
   variant.locus();
@@ -22,7 +22,7 @@ while (f >> variant)
 ## Indexed Files
 ```c++
 vc::indexed_reader f("chr1.cmf", {"X", 100000, 199999});
-vc::dense_haplotype_vector<float> variant;
+vc::dense_allele_vector<float> variant;
 while (f >> variant)
 {
   ...
@@ -53,7 +53,7 @@ while (it != vc::sparse_variant_iterator<float>{})
 }
 ```
 
-## Custom Haplotype Vectors
+## Custom Allele Vectors
 The hapotype_vector class utilizes the "mixin" pattern to efficiently support 3rd-party linear algebra libraries. 
 ```c++
 vc::hapotype_vector<std::vector<float>> std_vector;
@@ -65,7 +65,7 @@ vc::hapotype_vector<boost::numeric::ublas::compressed_vector<float>> ublas_spars
 Reading genotypes can be bypassed when using a read predicate.
 ```c++
 vc::indexed_reader f("chr1.cmf");
-vc::sparse_haplotype_vector<float> variant;
+vc::sparse_allele_vector<float> variant;
 
 while (f.read_if(variant, [](const auto& v) { return std::stof(v.prop("AF")) < 0.1; }))
 {
@@ -74,7 +74,7 @@ while (f.read_if(variant, [](const auto& v) { return std::stof(v.prop("AF")) < 0
 ```
 ```c++
 vc::indexed_reader f("chr1.cmf");
-vc::dense_haplotype_vector<float> buf;
+vc::dense_allele_vector<float> buf;
 
 {
   struct 
@@ -104,7 +104,7 @@ vc::dense_haplotype_vector<float> buf;
 Values used to load vectors can be customized.
 ```c++
 vc::reader f("chr1.cmf");
-vc::dense_haplotype_vector<float> variant;
+vc::dense_allele_vector<float> variant;
 
 const float is_missing = std::numeric_values<float>::epsilon();
 const float has_alt = 1;

@@ -1,5 +1,5 @@
-#ifndef VC_M3VCF_READER_HPP
-#define VC_M3VCF_READER_HPP
+#ifndef LIBSAVVY_M3VCF_READER_HPP
+#define LIBSAVVY_M3VCF_READER_HPP
 
 #include "allele_status.hpp"
 

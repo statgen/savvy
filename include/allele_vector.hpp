@@ -1,6 +1,6 @@
 
-#ifndef LIBVC_HAPLOTYPE_VECTOR_HPP
-#define LIBVC_HAPLOTYPE_VECTOR_HPP
+#ifndef LIBSAVVY_ALLELE_VECTOR_HPP
+#define LIBSAVVY_ALLELE_VECTOR_HPP
 
 #include "compressed_vector.hpp"
 
@@ -11,14 +11,14 @@
 namespace savvy
 {
   template<typename T>
-  class haplotype_vector : public T
+  class allele_vector : public T
   {
   public:
-    haplotype_vector()
+    allele_vector()
     {
     }
 
-    haplotype_vector(
+    allele_vector(
       std::string&& chromosome,
       std::uint64_t locus,
       std::string&& ref,
@@ -37,7 +37,7 @@ namespace savvy
     }
 
 //    template <typename RandAccessIterType>
-//    haplotype_vector(
+//    allele_vector(
 //      const std::string& chromosome,
 //      std::uint64_t locus,
 //      const std::string& ref,
@@ -86,11 +86,11 @@ namespace savvy
   };
 
   template<typename T>
-  const std::string haplotype_vector<T>::empty_string = {};
+  const std::string allele_vector<T>::empty_string = {};
 
   template <typename T>
-  using dense_haplotype_vector = haplotype_vector<std::vector<T>>;
+  using dense_allele_vector = allele_vector<std::vector<T>>;
   template <typename T>
-  using sparse_haplotype_vector = haplotype_vector<compressed_vector<T>>;
+  using sparse_allele_vector = allele_vector<compressed_vector<T>>;
 }
-#endif //LIBVC_HAPLOTYPE_VECTOR_HPP
+#endif //LIBSAVVY_ALLELE_VECTOR_HPP

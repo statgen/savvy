@@ -1,10 +1,10 @@
 #ifndef VC_READER_HPP
 #define VC_READER_HPP
 
-#include "haplotype_vector.hpp"
+#include "allele_vector.hpp"
 #include "cmf_reader.hpp"
 #include "vcf_reader.hpp"
-#include "vc.hpp"
+#include "savvy.hpp"
 
 #include <string>
 #include <memory>
@@ -48,7 +48,7 @@ namespace savvy
     }
 
     template <typename T>
-    bool read(haplotype_vector<T>& destination)
+    bool read(allele_vector<T>& destination)
     {
       if (sav_reader_)
         sav_reader_->read(destination);
@@ -69,7 +69,7 @@ namespace savvy
     ~reader() {}
 
     template <typename T>
-    reader& operator>>(haplotype_vector<T>& destination);
+    reader& operator>>(allele_vector<T>& destination);
   };
 
   class indexed_reader : public reader_base
@@ -79,29 +79,29 @@ namespace savvy
     void reset_region(const region& reg);
 
     template <typename T>
-    indexed_reader& operator>>(haplotype_vector<T>& destination);
+    indexed_reader& operator>>(allele_vector<T>& destination);
     template <typename T, typename Pred>
-    indexed_reader& read_if(haplotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0);
+    indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0);
   private:
 
   };
 
   template <typename T>
-  reader& reader::operator>>(haplotype_vector<T>& destination)
+  reader& reader::operator>>(allele_vector<T>& destination)
   {
     read(destination);
     return *this;
   }
 
   template <typename T>
-  indexed_reader& indexed_reader::operator>>(haplotype_vector<T>& destination)
+  indexed_reader& indexed_reader::operator>>(allele_vector<T>& destination)
   {
     read(destination);
     return *this;
   }
 
   template <typename T, typename Pred>
-  indexed_reader& indexed_reader::read_if(haplotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
+  indexed_reader& indexed_reader::read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
   {
     if (sav_reader_)
       dynamic_cast<sav::indexed_reader*>(sav_reader_.get())->read_if(destination, fn, missing_value, alt_value, ref_value);

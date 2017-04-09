@@ -1,6 +1,6 @@
 
-#ifndef LIBVC_SPARSE_VECTOR_HPP
-#define LIBVC_SPARSE_VECTOR_HPP
+#ifndef LIBSAVVY_SPARSE_VECTOR_HPP
+#define LIBSAVVY_SPARSE_VECTOR_HPP
 
 #include <vector>
 #include <algorithm>
@@ -78,4 +78,4 @@ namespace savvy
   };
 }
 
-#endif //LIBVC_SPARSE_VECTOR_HPP
+#endif //LIBSAVVY_SPARSE_VECTOR_HPP

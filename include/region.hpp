@@ -1,6 +1,6 @@
 
-#ifndef LIBVC_REGION_HPP
-#define LIBVC_REGION_HPP
+#ifndef LIBSAVVY_REGION_HPP
+#define LIBSAVVY_REGION_HPP
 
 #include <cstdint>
 #include <string>
@@ -27,4 +27,4 @@ namespace savvy
   };
 }
 
-#endif //LIBVC_REGION_HPP
+#endif //LIBSAVVY_REGION_HPP

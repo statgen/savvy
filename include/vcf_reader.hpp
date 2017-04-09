@@ -1,8 +1,8 @@
-#ifndef LIBVC_VCF_READER_HPP
-#define LIBVC_VCF_READER_HPP
+#ifndef LIBSAVVY_VCF_READER_HPP
+#define LIBSAVVY_VCF_READER_HPP
 
 #include "allele_status.hpp"
-#include "haplotype_vector.hpp"
+#include "allele_vector.hpp"
 #include "region.hpp"
 #include "variant_iterator.hpp"
 
@@ -216,7 +216,7 @@ namespace savvy
       std::uint64_t sample_count() const;
 
       template <typename VecType>
-      bool read(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value = std::numeric_limits<typename VecType::value_type>::quiet_NaN(), const typename VecType::value_type alt_value = 1, const typename VecType::value_type ref_value = 0);
+      bool read(allele_vector<VecType>& destination, const typename VecType::value_type missing_value = std::numeric_limits<typename VecType::value_type>::quiet_NaN(), const typename VecType::value_type alt_value = 1, const typename VecType::value_type ref_value = 0);
     protected:
       virtual bcf_hdr_t* hts_hdr() const = 0;
       virtual bcf1_t* hts_rec() const = 0;
@@ -224,9 +224,9 @@ namespace savvy
       void init_property_fields();
 
       template <typename VecType>
-      void read_variant_details(haplotype_vector<VecType>& destination);
+      void read_variant_details(allele_vector<VecType>& destination);
       template <typename VecType>
-      void read_genotype(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value);
+      void read_genotype(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value);
     protected:
       std::ios::iostate state_;
       int* gt_;
@@ -236,7 +236,7 @@ namespace savvy
     };
 
     template <typename VecType>
-    bool reader_base::read(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value)
+    bool reader_base::read(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value)
     {
       read_variant_details(destination);
       read_genotype(destination, missing_value, alt_value, ref_value);
@@ -245,7 +245,7 @@ namespace savvy
     }
 
     template <typename VecType>
-    void reader_base::read_variant_details(haplotype_vector<VecType>& destination)
+    void reader_base::read_variant_details(allele_vector<VecType>& destination)
     {
       if (good())
       {
@@ -311,7 +311,7 @@ namespace savvy
             }
           }
 
-          destination = haplotype_vector<VecType>(
+          destination = allele_vector<VecType>(
             std::string(bcf_hdr_id2name(hts_hdr(), hts_rec()->rid)),
             static_cast<std::uint64_t>(hts_rec()->pos + 1),
             std::string(hts_rec()->d.allele[0]),
@@ -328,7 +328,7 @@ namespace savvy
     }
 
     template <typename VecType>
-    void reader_base::read_genotype(haplotype_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value)
+    void reader_base::read_genotype(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value)
     {
       if (good())
       {
@@ -368,7 +368,7 @@ namespace savvy
       ~reader();
 
       template <typename VecType>
-      reader& operator>>(haplotype_vector<VecType>& destination)
+      reader& operator>>(allele_vector<VecType>& destination)
       {
         read(destination);
         return *this;
@@ -377,7 +377,7 @@ namespace savvy
 //      static std::string get_chromosome(const reader& rdr, const marker& mkr);
     private:
 //      template <typename VecType>
-//      bool read_block(haplotype_vector<VecType>& destination)
+//      bool read_block(allele_vector<VecType>& destination)
 //      {
 //        bool ret = true;
 //
@@ -389,7 +389,7 @@ namespace savvy
 //
 //        if (ret)
 //        {
-//          destination = haplotype_vector<VecType>(
+//          destination = allele_vector<VecType>(
 //            std::string(bcf_hdr_id2name(hts_hdr_, hts_rec_->rid)),
 //            static_cast<std::uint64_t>(hts_rec_->pos + 1),
 //            std::string(hts_rec_->d.allele[0]),
@@ -429,9 +429,9 @@ namespace savvy
       ~indexed_reader();
       void reset_region(const region& reg);
       template <typename VecType>
-      indexed_reader& operator>>(haplotype_vector<VecType>& destination);
+      indexed_reader& operator>>(allele_vector<VecType>& destination);
       template <typename T, typename Pred>
-      indexed_reader& read_if(haplotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0);
+      indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0);
     private:
       bool read_hts_record();
 //      index_reader& seek(const std::string& chromosome, std::uint64_t position);
@@ -446,14 +446,14 @@ namespace savvy
     };
 
     template <typename VecType>
-    indexed_reader& indexed_reader::operator>>(haplotype_vector<VecType>& destination)
+    indexed_reader& indexed_reader::operator>>(allele_vector<VecType>& destination)
     {
       read(destination);
       return *this;
     }
 
     template <typename T, typename Pred>
-    indexed_reader& indexed_reader::read_if(haplotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
+    indexed_reader& indexed_reader::read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
     {
       bool predicate_failed = true;
       while (good() && predicate_failed)
@@ -510,4 +510,4 @@ namespace savvy
 //inline savvy::vcf::marker::const_iterator operator+(const savvy::vcf::marker::const_iterator& a, savvy::vcf::marker::const_iterator::difference_type n);
 //inline savvy::vcf::marker::const_iterator operator+(savvy::vcf::marker::const_iterator::difference_type n, const savvy::vcf::marker::const_iterator& a);
 
-#endif //LIBVC_VCF_READER_HPP
+#endif //LIBSAVVY_VCF_READER_HPP

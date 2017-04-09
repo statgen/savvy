@@ -1,5 +1,5 @@
-//#ifndef LIBVC_TEST_CLASS_HPP
-//#define LIBVC_TEST_CLASS_HPP
+//#ifndef LIBSAVVY_TEST_CLASS_HPP
+//#define LIBSAVVY_TEST_CLASS_HPP
 //
 //#include "cmf_reader.hpp"
 //
@@ -69,4 +69,4 @@
 //}
 ////================================================================//
 //
-//#endif //LIBVC_TEST_CLASS_HPP
+//#endif //LIBSAVVY_TEST_CLASS_HPP

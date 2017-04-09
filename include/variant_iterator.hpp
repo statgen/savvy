@@ -1,8 +1,8 @@
 
-#ifndef LIBVC_VARIANT_ITERATOR_HPP
-#define LIBVC_VARIANT_ITERATOR_HPP
+#ifndef LIBSAVVY_VARIANT_ITERATOR_HPP
+#define LIBSAVVY_VARIANT_ITERATOR_HPP
 
-#include "haplotype_vector.hpp"
+#include "allele_vector.hpp"
 
 #include <iterator>
 
@@ -14,7 +14,7 @@ namespace savvy
   public:
     typedef basic_variant_iterator self_type;
     typedef std::ptrdiff_t difference_type;
-    typedef haplotype_vector<VectorType> value_type;
+    typedef allele_vector<VectorType> value_type;
     typedef const value_type& reference;
     typedef const value_type* pointer;
     typedef std::input_iterator_tag iterator_category;
@@ -45,4 +45,4 @@ namespace savvy
   };
 }
 
-#endif //LIBVC_VARIANT_ITERATOR_HPP
+#endif //LIBSAVVY_VARIANT_ITERATOR_HPP

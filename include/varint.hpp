@@ -1,5 +1,5 @@
-#ifndef LIBVC_VARINT_HPP
-#define LIBVC_VARINT_HPP
+#ifndef LIBSAVVY_VARINT_HPP
+#define LIBSAVVY_VARINT_HPP
 
 #include <cstdint>
 #include <string>
@@ -142,4 +142,4 @@ namespace savvy
   //----------------------------------------------------------------//
 }
 
-#endif //LIBVC_VARINT_HPP
+#endif //LIBSAVVY_VARINT_HPP

@@ -4,7 +4,7 @@
 #include "vcf_reader.hpp"
 #include "test_class.hpp"
 #include "varint.hpp"
-#include "vc.hpp"
+#include "savvy.hpp"
 #include "variant_iterator.hpp"
 #include "reader.hpp"
 
@@ -22,38 +22,38 @@
 #include <tbx.h>
 #include <hts.h>
 
-bool has_extension(const std::string& fullString, const std::string& ext)
-{
-  if (fullString.length() >= ext.length())
-    return (0 == fullString.compare (fullString.length() - ext.length(), ext.length(), ext));
-  else
-    return false;
-}
-
-template <typename T>
-void handle_file_reader(T& reader)
-{
-  typename T::input_iterator::buffer buff;
-  typename T::input_iterator end;
-  typename T::input_iterator it(reader, buff);
-
-  while (it != end)
-  {
-    double af = it->calculate_allele_frequency();
-    for (auto jt = it->begin(); jt != it->end(); ++jt)
-    {
-      savvy::allele_status foo = *jt;
-    }
-
-    std::for_each(it->begin(), it->end(), [](const typename savvy::allele_status& s)
-    {
-      savvy::allele_status foo = s;
-    });
-
-    ++it;
-  }
-
-}
+//bool has_extension(const std::string& fullString, const std::string& ext)
+//{
+//  if (fullString.length() >= ext.length())
+//    return (0 == fullString.compare (fullString.length() - ext.length(), ext.length(), ext));
+//  else
+//    return false;
+//}
+//
+//template <typename T>
+//void handle_file_reader(T& reader)
+//{
+//  typename T::input_iterator::buffer buff;
+//  typename T::input_iterator end;
+//  typename T::input_iterator it(reader, buff);
+//
+//  while (it != end)
+//  {
+//    double af = it->calculate_allele_frequency();
+//    for (auto jt = it->begin(); jt != it->end(); ++jt)
+//    {
+//      savvy::allele_status foo = *jt;
+//    }
+//
+//    std::for_each(it->begin(), it->end(), [](const typename savvy::allele_status& s)
+//    {
+//      savvy::allele_status foo = s;
+//    });
+//
+//    ++it;
+//  }
+//
+//}
 
 //int reader_tests()
 //{
@@ -520,7 +520,7 @@ void convert_file_test()
         break;
       }
 
-      //    savvy::haplotype_vector<std::vector<float>> m(std::string(chrom), cur->locus(), std::string(cur->ref()), std::string(cur->alt()), sample_ids.size(), ploidy, std::vector<float>());
+      //    savvy::allele_vector<std::vector<float>> m(std::string(chrom), cur->locus(), std::string(cur->ref()), std::string(cur->alt()), sample_ids.size(), ploidy, std::vector<float>());
       //    for (auto it = cur->begin(); it != cur->end(); ++it)
       //    {
       //      switch (*it)
@@ -677,7 +677,7 @@ void random_access_test()
   }
 
   rdr.reset_region({"20", 17000, 1120000});
-  savvy::dense_haplotype_vector<float> v;
+  savvy::dense_allele_vector<float> v;
   while (rdr >> v)
   {
     std::cout << v.locus() << std::endl;
@@ -706,7 +706,7 @@ int main(int argc, char** argv)
 //  v[3] = 0;
 //  v[5] = 3;
 //  std::cout << v.nnz() << std::endl;
-//  savvy::haplotype_vector<ublas::compressed_vector<float>> v2;
+//  savvy::allele_vector<ublas::compressed_vector<float>> v2;
 //
 //  std::cout << std::endl;
 //  return 0;

@@ -1,6 +1,6 @@
 
-#ifndef LIBVC_GENOTYPE_VECTOR_HPP
-#define LIBVC_GENOTYPE_VECTOR_HPP
+#ifndef LIBSAVVY_GENOTYPE_VECTOR_HPP
+#define LIBSAVVY_GENOTYPE_VECTOR_HPP
 
 //namespace savvy
 //{
@@ -21,4 +21,4 @@
 //    std::uint64_t haplotype_count_;
 //  };
 //}
-#endif //LIBVC_GENOTYPE_VECTOR_HPP
+#endif //LIBSAVVY_GENOTYPE_VECTOR_HPP

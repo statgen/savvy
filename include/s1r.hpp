@@ -1,5 +1,5 @@
-#ifndef LIBVC_CMF_INDEX_READER_HPP
-#define LIBVC_CMF_INDEX_READER_HPP
+#ifndef LIBSAVVY_CMF_INDEX_READER_HPP
+#define LIBSAVVY_CMF_INDEX_READER_HPP
 
 #include "portable_endian.hpp"
 
@@ -492,4 +492,4 @@ namespace savvy
   }
 }
 
-#endif //LIBVC_CMF_INDEX_READER_HPP
+#endif //LIBSAVVY_CMF_INDEX_READER_HPP

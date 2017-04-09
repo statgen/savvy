@@ -1,10 +1,10 @@
-#ifndef LIBVC_CMF_READER_HPP
-#define LIBVC_CMF_READER_HPP
+#ifndef LIBSAVVY_CMF_READER_HPP
+#define LIBSAVVY_CMF_READER_HPP
 
 #include "allele_status.hpp"
 #include "varint.hpp"
 #include "s1r.hpp"
-#include "haplotype_vector.hpp"
+#include "allele_vector.hpp"
 #include "genotype_vector.hpp"
 #include "region.hpp"
 #include "variant_iterator.hpp"
@@ -196,7 +196,7 @@ namespace savvy
       virtual ~reader_base() {}
 
       template <typename T>
-      bool read(haplotype_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0)
+      bool read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0)
       {
         read_variant_details(destination);
         read_genotype(destination, missing_value, alt_value, ref_value);
@@ -220,7 +220,7 @@ namespace savvy
     protected:
       virtual bool update_file_position() { return true; }
       template <typename T>
-      void read_variant_details(haplotype_vector<T>& destination)
+      void read_variant_details(allele_vector<T>& destination)
       {
         if (good())
         {
@@ -288,7 +288,7 @@ namespace savvy
                     }
                   }
 
-                  destination = haplotype_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), std::move(props), std::move(destination));
+                  destination = allele_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), std::move(props), std::move(destination));
                   destination.resize(0);
                 }
               }
@@ -298,7 +298,7 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotype(haplotype_vector<T>& destination, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
+      void read_genotype(allele_vector<T>& destination, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
       {
         if (good())
         {
@@ -338,7 +338,7 @@ namespace savvy
       using reader_base::reader_base;
 
       template <typename T>
-      reader& operator>>(haplotype_vector<T>& destination)
+      reader& operator>>(allele_vector<T>& destination)
       {
         read(destination);
         return *this;
@@ -446,14 +446,14 @@ namespace savvy
       }
 
       template <typename T>
-      indexed_reader& operator>>(haplotype_vector<T>& destination)
+      indexed_reader& operator>>(allele_vector<T>& destination)
       {
         read(destination);
         return *this;
       }
 
       template <typename T, typename Pred>
-      indexed_reader& read_if(haplotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0)
+      indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0)
       {
         bool predicate_failed = true;
         while (good() && predicate_failed)
@@ -568,7 +568,7 @@ namespace savvy
       }
 
       template <typename T>
-      writer& operator<<(const haplotype_vector<T>& m)
+      writer& operator<<(const allele_vector<T>& m)
       {
         if (output_stream_.good())
         {
@@ -588,7 +588,7 @@ namespace savvy
       }
 
       template <typename T>
-      void write(const haplotype_vector<T>& m, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1.0, const typename T::value_type ref_value = 0.0)
+      void write(const allele_vector<T>& m, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1.0, const typename T::value_type ref_value = 0.0)
       {
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
         varint_encode(m.locus(), os_it);
@@ -673,4 +673,4 @@ namespace savvy
   }
 }
 
-#endif //LIBVC_CMF_READER_HPP
+#endif //LIBSAVVY_CMF_READER_HPP
