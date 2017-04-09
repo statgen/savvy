@@ -47,17 +47,17 @@
 //{
 //  for (auto jt = m.begin(); jt != m.end(); ++jt)
 //  {
-//    vc::allele_status foo = *jt;
+//    savvy::allele_status foo = *jt;
 //  }
 //}
 //
 //template <>
-//inline void some_analysis<vc::sav::reader>::handle_marker(const vc::sav::marker& m)
+//inline void some_analysis<savvy::sav::reader>::handle_marker(const savvy::sav::marker& m)
 //{
 //  for (auto jt = m.non_ref_begin(); jt != m.non_ref_end(); ++jt)
 //  {
 //    std::uint64_t foo = jt->offset;
-//    vc::allele_status bar = jt->status;
+//    savvy::allele_status bar = jt->status;
 //  }
 //}
 //

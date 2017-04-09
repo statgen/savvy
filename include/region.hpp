@@ -6,7 +6,7 @@
 #include <string>
 #include <limits>
 
-namespace vc
+namespace savvy
 {
   class region
   {

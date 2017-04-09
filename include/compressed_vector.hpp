@@ -5,7 +5,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace vc
+namespace savvy
 {
   template<typename T>
   class compressed_vector

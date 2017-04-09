@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <cstring>
 
-namespace vc
+namespace savvy
 {
   namespace m3vcf
   {

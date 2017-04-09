@@ -10,7 +10,7 @@
 #include <memory>
 #include <stdexcept>
 
-namespace vc
+namespace savvy
 {
   class reader_base
   {

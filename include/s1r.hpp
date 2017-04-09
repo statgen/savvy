@@ -11,7 +11,7 @@
 #include <iostream>
 #include <errno.h>
 
-namespace vc
+namespace savvy
 {
   namespace s1r
   {

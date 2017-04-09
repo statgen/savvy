@@ -12,7 +12,7 @@
 #include <functional>
 #include <portable_endian.hpp>
 
-namespace vc
+namespace savvy
 {
   namespace m3vcf
   {

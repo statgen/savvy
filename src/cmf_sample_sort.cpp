@@ -16,8 +16,8 @@ int main(int argc, char** argv)
   const std::uint8_t sort_weight_coefficient = 0;
 
 
-  vc::sav::marker buff;
-  vc::sav::reader input(argv[1]);
+  savvy::sav::marker buff;
+  savvy::sav::reader input(argv[1]);
 
   const std::size_t sample_count = input.sample_count();
   const std::size_t ploidy_level = input.ploidy();
@@ -28,7 +28,7 @@ int main(int argc, char** argv)
   for (std::size_t i = 0; i < sample_count; ++i)
     alt_cnts.emplace_back(i);
 
-  std::for_each(vc::sav::reader::input_iterator(input, buff), vc::sav::reader::input_iterator(), [&alt_cnts, ploidy_level](const vc::sav::marker& mkr)
+  std::for_each(savvy::sav::reader::input_iterator(input, buff), savvy::sav::reader::input_iterator(), [&alt_cnts, ploidy_level](const savvy::sav::marker& mkr)
   {
 
     const double af = mkr.calculate_allele_frequency();
@@ -57,21 +57,21 @@ int main(int argc, char** argv)
 
   }
 
-  vc::sav::writer compact_output(argv[2], input.chromosome(), input.ploidy(), sample_ids.begin(), sample_ids.end());
-  vc::sav::reader input2(argv[1]);
-  std::for_each(vc::sav::reader::input_iterator(input2, buff), vc::sav::reader::input_iterator(), [&old_order_to_new_order_mapping, &compact_output, haplotype_count, ploidy_level](const vc::sav::marker& mrkr)
+  savvy::sav::writer compact_output(argv[2], input.chromosome(), input.ploidy(), sample_ids.begin(), sample_ids.end());
+  savvy::sav::reader input2(argv[1]);
+  std::for_each(savvy::sav::reader::input_iterator(input2, buff), savvy::sav::reader::input_iterator(), [&old_order_to_new_order_mapping, &compact_output, haplotype_count, ploidy_level](const savvy::sav::marker& mrkr)
   {
     auto gt_beg = mrkr.non_ref_begin();
     auto gt_end = mrkr.non_ref_end();
 
-    std::vector<vc::sav::marker::sparse_vector_allele> sparse_alleles;
+    std::vector<savvy::sav::marker::sparse_vector_allele> sparse_alleles;
     sparse_alleles.reserve(gt_end - gt_beg);
 
     for (std::size_t i = 0; gt_beg != gt_end; ++i,++gt_beg)
     {
-      vc::sav::marker::sparse_vector_allele tmp(gt_beg->status, (old_order_to_new_order_mapping[gt_beg->offset / ploidy_level] * ploidy_level) + (gt_beg->offset % ploidy_level));
+      savvy::sav::marker::sparse_vector_allele tmp(gt_beg->status, (old_order_to_new_order_mapping[gt_beg->offset / ploidy_level] * ploidy_level) + (gt_beg->offset % ploidy_level));
 
-      auto find_res = std::upper_bound( sparse_alleles.begin(), sparse_alleles.end(), tmp, [](const vc::sav::marker::sparse_vector_allele& a, const vc::sav::marker::sparse_vector_allele& b)
+      auto find_res = std::upper_bound( sparse_alleles.begin(), sparse_alleles.end(), tmp, [](const savvy::sav::marker::sparse_vector_allele& a, const savvy::sav::marker::sparse_vector_allele& b)
       {
         return (a.offset < b.offset);
       });
@@ -79,7 +79,7 @@ int main(int argc, char** argv)
       sparse_alleles.emplace(find_res, std::move(tmp));
     }
 
-    compact_output << vc::sav::marker(mrkr.pos(), mrkr.ref(), mrkr.alt(), sparse_alleles.begin(), sparse_alleles.end(), haplotype_count);
+    compact_output << savvy::sav::marker(mrkr.pos(), mrkr.ref(), mrkr.alt(), sparse_alleles.begin(), sparse_alleles.end(), haplotype_count);
   });
 
   return 0;

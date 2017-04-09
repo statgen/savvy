@@ -2,7 +2,7 @@
 #ifndef LIBVC_GENOTYPE_VECTOR_HPP
 #define LIBVC_GENOTYPE_VECTOR_HPP
 
-//namespace vc
+//namespace savvy
 //{
 //  template <typename T>
 //  class genotype_vector : public T

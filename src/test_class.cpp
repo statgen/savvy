@@ -29,17 +29,17 @@
 //{
 //  for (auto jt = m.begin(); jt != m.end(); ++jt)
 //  {
-//    vc::allele_status foo = *jt;
+//    savvy::allele_status foo = *jt;
 //  }
 //}
 //
 //template <>
-//void some_analysis<vc::sav::reader>::handle_marker(const vc::sav::marker& m)
+//void some_analysis<savvy::sav::reader>::handle_marker(const savvy::sav::marker& m)
 //{
 //  for (auto jt = m.non_ref_begin(); jt != m.non_ref_end(); ++jt)
 //  {
 //    std::uint64_t foo = jt->offset;
-//    vc::allele_status bar = jt->status;
+//    savvy::allele_status bar = jt->status;
 //  }
 //}
 //
@@ -50,9 +50,9 @@
 //  return ret;
 //}
 
-//template class some_analysis<vc::sav::reader>;
-//template class some_analysis<vc::m3vcf::reader>;
-//template some_analysis<vc::sav::reader> make_analysis<vc::sav::reader>(vc::sav::reader&);
-//template some_analysis<vc::m3vcf::reader> make_analysis<vc::m3vcf::reader>(vc::m3vcf::reader&);
+//template class some_analysis<savvy::sav::reader>;
+//template class some_analysis<savvy::m3vcf::reader>;
+//template some_analysis<savvy::sav::reader> make_analysis<savvy::sav::reader>(savvy::sav::reader&);
+//template some_analysis<savvy::m3vcf::reader> make_analysis<savvy::m3vcf::reader>(savvy::m3vcf::reader&);
 
 

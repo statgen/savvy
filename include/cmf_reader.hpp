@@ -21,7 +21,7 @@
 #include <cmath>
 #include <unordered_map>
 
-namespace vc
+namespace savvy
 {
   namespace sav
   {

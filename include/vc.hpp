@@ -8,7 +8,7 @@
 #include <string>
 #include <functional>
 
-namespace vc
+namespace savvy
 {
   namespace detail
   {
@@ -45,16 +45,16 @@ namespace vc
       {
         if (detail::has_extension(file_path, ".sav"))
         {
-          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::sav::reader(file_path))), std::ref(handler), addl_file_paths...);
+          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::sav::reader(file_path))), std::ref(handler), addl_file_paths...);
         }
 //        else if (detail::has_extension(file_path, ".m3vcf"))
 //        {
 //          std::ifstream ifs(file_path);
-//          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::m3vcf::reader(ifs))), std::ref(handler), addl_file_paths...);
+//          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::m3vcf::reader(ifs))), std::ref(handler), addl_file_paths...);
 //        }
         else if (detail::has_extension(file_path, ".vcf") || detail::has_extension(file_path, "vcf.gz") || detail::has_extension(file_path, ".bcf"))
         {
-          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::vcf::reader(file_path))), std::ref(handler), addl_file_paths...);
+          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::vcf::reader(file_path))), std::ref(handler), addl_file_paths...);
         }
       }
     };
@@ -72,17 +72,17 @@ namespace vc
 //      {
 //        if (detail::has_extension(file_path, ".vcf") || detail::has_extension(file_path, "vcf.gz") || detail::has_extension(file_path, ".bcf"))
 //        {
-//          variadic_indexed_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::vcf::index_reader(file_path))), std::ref(handler), addl_file_paths...);
+//          variadic_indexed_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::vcf::index_reader(file_path))), std::ref(handler), addl_file_paths...);
 //        }
 ////        else if (detail::has_extension(file_path, ".sav"))
 ////        {
 ////          std::ifstream ifs(file_path);
-////          variadic_indexed_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::sav::reader(ifs))), std::ref(handler), addl_file_paths...);
+////          variadic_indexed_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::sav::reader(ifs))), std::ref(handler), addl_file_paths...);
 ////        }
 ////        else if (detail::has_extension(file_path, ".m3vcf"))
 ////        {
 ////          std::ifstream ifs(file_path);
-////          variadic_indexed_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(vc::m3vcf::reader(ifs))), std::ref(handler), addl_file_paths...);
+////          variadic_indexed_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::m3vcf::reader(ifs))), std::ref(handler), addl_file_paths...);
 ////        }
 //      }
 //    };
@@ -105,18 +105,18 @@ namespace vc
   {
     if (detail::has_extension(file_path, ".sav"))
     {
-      vc::sav::reader input(file_path);
+      savvy::sav::reader input(file_path);
       handler(std::move(input));
     }
 //    else if (detail::has_extension(file_path, ".m3vcf"))
 //    {
 //      std::ifstream ifs(file_path);
-//      vc::m3vcf::reader input(ifs);
+//      savvy::m3vcf::reader input(ifs);
 //      handler(std::move(input));
 //    }
     else if (detail::has_extension(file_path, ".vcf") || detail::has_extension(file_path, ".vcf.gz") || detail::has_extension(file_path, ".bcf"))
     {
-      vc::vcf::reader input(file_path);
+      savvy::vcf::reader input(file_path);
       handler(std::move(input));
     }
   }
@@ -138,19 +138,19 @@ namespace vc
 //  {
 //    if (detail::has_extension(file_path, ".vcf") || detail::has_extension(file_path, "vcf.gz") || detail::has_extension(file_path, ".bcf"))
 //    {
-//      vc::vcf::index_reader input(file_path);
+//      savvy::vcf::index_reader input(file_path);
 //      handler(std::move(input));
 //    }
 ////    else if (detail::has_extension(file_path, ".sav"))
 ////    {
 ////      std::ifstream ifs(file_path);
-////      vc::sav::reader input(ifs);
+////      savvy::sav::reader input(ifs);
 ////      handler(std::move(input));
 ////    }
 ////    else if (detail::has_extension(file_path, ".m3vcf"))
 ////    {
 ////      std::ifstream ifs(file_path);
-////      vc::m3vcf::reader input(ifs);
+////      savvy::m3vcf::reader input(ifs);
 ////      handler(std::move(input));
 ////    }
 //  }

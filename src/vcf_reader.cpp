@@ -7,7 +7,7 @@
 #include <limits>
 #include <dep/htslib_project-prefix/src/htslib_project/htslib/vcf.h>
 
-namespace vc
+namespace savvy
 {
   namespace vcf
   {
@@ -391,8 +391,8 @@ namespace vc
   }
 }
 
-//vc::vcf::marker::const_iterator operator+(vc::vcf::marker::const_iterator::difference_type n, const vc::vcf::marker::const_iterator& a)
+//savvy::vcf::marker::const_iterator operator+(savvy::vcf::marker::const_iterator::difference_type n, const savvy::vcf::marker::const_iterator& a)
 //{
-//  vc::vcf::marker::const_iterator ret(a);
+//  savvy::vcf::marker::const_iterator ret(a);
 //  return (ret += n);
 //}

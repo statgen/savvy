@@ -1,6 +1,6 @@
 
 #include "vc.hpp"
-namespace vc
+namespace savvy
 {
   namespace detail
   {

@@ -7,7 +7,7 @@
 #include <cmath>
 
 
-namespace vc
+namespace savvy
 {
   //----------------------------------------------------------------//
   template <std::uint8_t PrefixMask, std::uint8_t ContinueFlagForFirstByte>

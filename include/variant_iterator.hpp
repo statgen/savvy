@@ -6,7 +6,7 @@
 
 #include <iterator>
 
-namespace vc
+namespace savvy
 {
   template <typename ReaderType, typename VectorType>
   class basic_variant_iterator

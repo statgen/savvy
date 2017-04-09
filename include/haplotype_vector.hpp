@@ -8,7 +8,7 @@
 #include <vector>
 #include <unordered_map>
 
-namespace vc
+namespace savvy
 {
   template<typename T>
   class haplotype_vector : public T
