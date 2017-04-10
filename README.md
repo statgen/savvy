@@ -53,12 +53,12 @@ while (it != vc::sparse_variant_iterator<float>{})
 }
 ```
 
-## Custom Allele Vectors
-The hapotype_vector class utilizes the "mixin" pattern to efficiently support 3rd-party linear algebra libraries. 
+## Custom Vectors
+The allele_vector class utilizes the "mixin" pattern to efficiently support 3rd-party linear algebra libraries. 
 ```c++
-vc::hapotype_vector<std::vector<float>> std_vector;
-vc::hapotype_vector<vc::compressed_vector<double>> vc_sparse_vector;
-vc::hapotype_vector<boost::numeric::ublas::compressed_vector<float>> ublas_sparse_vector;
+vc::allele_vector<std::vector<float>> std_vector;
+vc::allele_vector<vc::compressed_vector<double>> vc_sparse_vector;
+vc::allele_vector<boost::numeric::ublas::compressed_vector<float>> ublas_sparse_vector;
 ```
 
 ## Read Predicates
