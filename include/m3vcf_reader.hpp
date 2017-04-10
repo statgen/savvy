@@ -263,7 +263,7 @@ namespace savvy
           sample_mappings_.resize(hap_array_sz, 0xFFFFFFFF);
 
           char hap;
-          switch (*hap_array_beg)
+          switch ((allele_status)((int)(*hap_array_beg)))
           {
             case allele_status::has_ref:
               hap = '0';
@@ -281,7 +281,7 @@ namespace savvy
 
           for (std::size_t i = 1; i < hap_array_sz; ++i)
           {
-            switch (*(hap_array_beg + i))
+            switch ((allele_status)(int)(*(hap_array_beg + i)))
             {
               case allele_status::has_ref:
                 hap = '0';
@@ -325,7 +325,7 @@ namespace savvy
             for (std::size_t i = 0; i < hap_array_sz; ++i)
             {
               char hap;
-              switch (*(hap_array_beg + i))
+              switch ((allele_status)((int)(*(hap_array_beg + i))))
               {
                 case allele_status::has_ref:
                   hap = '0';

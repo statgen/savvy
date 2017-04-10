@@ -13,8 +13,8 @@
 //  sorting_info(std::size_t index) : sort_weight(0), original_index(index) {}
 //};
 //
-//int main(int argc, char** argv)
-//{
+int main(int argc, char** argv)
+{
 //  const std::uint8_t sort_weight_coefficient = 0;
 //
 //  savvy::sav::reader input(argv[1]);
@@ -82,5 +82,5 @@
 //    compact_output << savvy::sav::marker(mrkr.pos(), mrkr.ref(), mrkr.alt(), sparse_alleles.begin(), sparse_alleles.end(), haplotype_count);
 //  });
 //
-//  return 0;
-//}
+  return 0;
+}
