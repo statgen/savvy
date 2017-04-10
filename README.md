@@ -1,11 +1,11 @@
-# libvc
+# libsavvy
 Interface to various variant calling formats.
 
 
 ## Read Variants from File 
 ```c++
-vc::reader f("chr1.cmf");
-vc::sparse_allele_vector<float> variant;
+savvy::reader f("chr1.cmf");
+savvy::sparse_allele_vector<float> variant;
 while (f >> variant)
 {
   variant.locus();
@@ -21,8 +21,8 @@ while (f >> variant)
 
 ## Indexed Files
 ```c++
-vc::indexed_reader f("chr1.cmf", {"X", 100000, 199999});
-vc::dense_allele_vector<float> variant;
+savvy::indexed_reader f("chr1.cmf", {"X", 100000, 199999});
+savvy::dense_allele_vector<float> variant;
 while (f >> variant)
 {
   ...
@@ -37,9 +37,9 @@ while (f >> variant)
 
 ## Input Iterators 
 ```c++
-vc::reader f("chr1.cmf");
-vc::sparse_variant_iterator<float> it(f);
-while (it != vc::sparse_variant_iterator<float>{})
+savvy::reader f("chr1.cmf");
+savvy::sparse_variant_iterator<float> it(f);
+while (it != savvy::sparse_variant_iterator<float>{})
 {
   it->locus();
   it->chromosome();
@@ -56,16 +56,16 @@ while (it != vc::sparse_variant_iterator<float>{})
 ## Custom Vectors
 The allele_vector class utilizes the "mixin" pattern to efficiently support 3rd-party linear algebra libraries. 
 ```c++
-vc::allele_vector<std::vector<float>> std_vector;
-vc::allele_vector<vc::compressed_vector<double>> vc_sparse_vector;
-vc::allele_vector<boost::numeric::ublas::compressed_vector<float>> ublas_sparse_vector;
+savvy::allele_vector<std::vector<float>> std_vector;
+savvy::allele_vector<savvy::compressed_vector<double>> savvy_sparse_vector;
+savvy::allele_vector<boost::numeric::ublas::compressed_vector<float>> ublas_sparse_vector;
 ```
 
 ## Read Predicates
 Reading genotypes can be bypassed when using a read predicate.
 ```c++
-vc::indexed_reader f("chr1.cmf");
-vc::sparse_allele_vector<float> variant;
+savvy::indexed_reader f("chr1.cmf");
+savvy::sparse_allele_vector<float> variant;
 
 while (f.read_if(variant, [](const auto& v) { return std::stof(v.prop("AF")) < 0.1; }))
 {
@@ -73,8 +73,8 @@ while (f.read_if(variant, [](const auto& v) { return std::stof(v.prop("AF")) < 0
 }
 ```
 ```c++
-vc::indexed_reader f("chr1.cmf");
-vc::dense_allele_vector<float> buf;
+savvy::indexed_reader f("chr1.cmf");
+savvy::dense_allele_vector<float> buf;
 
 {
   struct 
@@ -103,8 +103,8 @@ vc::dense_allele_vector<float> buf;
 ## Custom Allele Status Values
 Values used to load vectors can be customized.
 ```c++
-vc::reader f("chr1.cmf");
-vc::dense_allele_vector<float> variant;
+savvy::reader f("chr1.cmf");
+savvy::dense_allele_vector<float> variant;
 
 const float is_missing = std::numeric_values<float>::epsilon();
 const float has_alt = 1;
@@ -118,18 +118,18 @@ while (f.read(variant, is_missing, has_alt, has_ref))
 
 ## Converting Files
 ```c++
-vc::vcf::reader bcf_file("file.bcf");
-vc::vcf::dense_variant_iterator it(bcf_file);
-vc::vcf::dense_variant_iterator eof;
+savvy::vcf::reader bcf_file("file.bcf");
+savvy::vcf::dense_variant_iterator it(bcf_file);
+savvy::vcf::dense_variant_iterator eof;
 
 if (it != eof)
 {
-  vc::cmf::writer output("file.cmf", it->chromosome(), vc::get_ploidy(bcf_file, *it), bcf_file.samples_begin(), bcf_file.samples_end());
-  vc::cmf::output_iterator out_it(cmf_file);
+  savvy::cmf::writer output("file.cmf", it->chromosome(), savvy::get_ploidy(bcf_file, *it), bcf_file.samples_begin(), bcf_file.samples_end());
+  savvy::cmf::output_iterator out_it(cmf_file);
   
   if (subset_file)
     std::copy_if(std::move(it), eof, out_it, 
-      [](const auto& v) { return (vc::calculate_allele_frequency(v) < 0.1); });
+      [](const auto& v) { return (savvy::calculate_allele_frequency(v) < 0.1); });
   else
     std::copy(std::move(it), eof, out_it);
 }
