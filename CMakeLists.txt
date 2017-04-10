@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
-project(libsavvy)
-
+project(libsavvy VERSION 1.0.0)
+include(CMakePackageConfigHelpers)
 include(ExternalProject)
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y")
@@ -31,7 +31,7 @@ set(SOURCE_FILES
 
 add_library(savvy ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(savvy hts z xzbuf)
-target_include_directories(savvy PUBLIC include)
+target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 add_executable(savvy-test src/test.cpp src/test_class.cpp include/test_class.hpp)
 target_link_libraries(savvy-test savvy)
@@ -44,3 +44,14 @@ target_link_libraries(bcf2sav savvy)
 
 add_executable(sav-sample-sort src/sav_sample_sort.cpp)
 target_link_libraries(sav-sample-sort savvy)
+
+install(FILES $<TARGET_PROPERTY:savvy,INTERFACE_SOURCES> DESTINATION include)
+install(TARGETS savvy EXPORT ${PROJECT_NAME}-config
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib)
+
+install(EXPORT ${PROJECT_NAME}-config DESTINATION share/${PROJECT_NAME})
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPATIBILITY SameMajorVersion)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake DESTINATION share/${PROJECT_NAME})
+
+export(EXPORT ${PROJECT_NAME}-config)
