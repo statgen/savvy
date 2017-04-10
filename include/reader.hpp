@@ -65,6 +65,7 @@ namespace savvy
   class reader : public reader_base
   {
   public:
+    reader() {}
     reader(const std::string& file_path);
     ~reader() {}
 
@@ -75,6 +76,7 @@ namespace savvy
   class indexed_reader : public reader_base
   {
   public:
+    indexed_reader() {}
     indexed_reader(const std::string& file_path, const region& reg);
     void reset_region(const region& reg);
 
