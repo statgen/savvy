@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 message("Installing dependencies ... ")
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dep)
-execute_process(COMMAND ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR}/dep WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/dep)
+execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX} ${CMAKE_SOURCE_DIR}/dep WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/dep)
 execute_process(COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/dep WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/dep RESULT_VARIABLE build_result)
 if(build_result)
     message(FATAL_ERROR "Dependency installation failed.")
@@ -16,11 +16,11 @@ endif()
 message("Done installing dependencies ... ")
 
 add_library(hts STATIC IMPORTED)
-set_property(TARGET hts PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/dep/htslib_project-prefix/src/htslib_project/libhts.a)
-set_property(TARGET hts APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_BINARY_DIR}/dep/htslib_project-prefix/src/htslib_project/htslib)
+set_property(TARGET hts PROPERTY IMPORTED_LOCATION ${CMAKE_INSTALL_PREFIX}/lib/libhts.a)
+set_property(TARGET hts APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_INSTALL_PREFIX}/include/htslib)
 
-list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR}/dep/xzbuf_project-prefix/src/xzbuf_project-build)
-find_package(xzbuf)
+#list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX})
+find_package(xzbuf REQUIRED)
 
 
 set(HEADER_FILES
