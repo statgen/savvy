@@ -11,7 +11,7 @@ ExternalProject_Add(htslib_project
                     #GIT_REPOSITORY "https://github.com/samtools/htslib"
                     #GIT_TAG "1.3.1"
                     UPDATE_COMMAND ""
-                    CONFIGURE_COMMAND autoconf && ./configure "--prefix=${CMAKE_INSTALL_PREFIX}"
+                    CONFIGURE_COMMAND ./configure "--prefix=${CMAKE_INSTALL_PREFIX}"
                     BUILD_COMMAND make
                     INSTALL_COMMAND make install)
 
