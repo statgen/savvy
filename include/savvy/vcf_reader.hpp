@@ -62,9 +62,12 @@ namespace savvy
 
       const char** samples_begin() const;
       const char** samples_end() const;
-      std::vector<std::string>::const_iterator prop_fields_begin() const { return property_fields_.begin(); }
-      std::vector<std::string>::const_iterator prop_fields_end() const { return property_fields_.end(); }
+
+      std::vector<std::string> prop_fields() const;
+//      std::vector<std::string>::const_iterator prop_fields_begin() const { return property_fields_.begin(); }
+//      std::vector<std::string>::const_iterator prop_fields_end() const { return property_fields_.end(); }
       std::uint64_t sample_count() const;
+
 
       template <typename VecType>
       bool read(allele_vector<VecType>& destination, const typename VecType::value_type missing_value = std::numeric_limits<typename VecType::value_type>::quiet_NaN(), const typename VecType::value_type alt_value = 1, const typename VecType::value_type ref_value = 0);
@@ -83,7 +86,7 @@ namespace savvy
       int* gt_;
       int gt_sz_;
       int allele_index_;
-      std::vector<std::string> property_fields_;
+      std::vector<std::string> property_fields_; // TODO: This member is no longer necessary not that prop_fields_{begin,end}() methods are gone. Eventually remove this and init_property_fileds()
     };
 
     template <typename VecType>
@@ -217,6 +220,8 @@ namespace savvy
       reader(const reader&) = delete;
       reader& operator=(const reader&) = delete;
       ~reader();
+
+      std::vector<std::string> chromosomes() const;
 
       template <typename VecType>
       reader& operator>>(allele_vector<VecType>& destination)

@@ -15,6 +15,85 @@ namespace savvy
   class reader_base
   {
   public:
+    class sample_iterator
+    {
+    public:
+      typedef sample_iterator self_type;
+      typedef std::ptrdiff_t difference_type;
+      typedef std::string value_type;
+      typedef const value_type& reference;
+      typedef const value_type* pointer;
+      typedef std::bidirectional_iterator_tag iterator_category;
+    public:
+      sample_iterator() : cstring_itr_(nullptr), stdstring_itr_{} {}
+      sample_iterator(const char** cstring_itr) : cstring_itr_(cstring_itr), stdstring_itr_{} {}
+      sample_iterator(std::vector<std::string>::const_iterator stdstring_itr) : cstring_itr_(nullptr), stdstring_itr_(stdstring_itr) {}
+
+      self_type& operator+=(difference_type n)
+      {
+        if (cstring_itr_)
+          cstring_itr_ += n;
+        else
+          stdstring_itr_ += n;
+        return *this;
+      }
+      self_type operator+(difference_type n) const { self_type ret(*this); return (ret += n); }
+      self_type& operator-=(difference_type n)
+      {
+        if (cstring_itr_)
+          cstring_itr_ -= n;
+        else
+          stdstring_itr_ -= n;
+        return *this;
+      }
+      self_type operator-(difference_type n) const { self_type ret(*this); return (ret -= n); }
+      difference_type operator-(const self_type& b) const
+      {
+        if (cstring_itr_)
+          return cstring_itr_ - b.cstring_itr_;
+        return stdstring_itr_ - b.stdstring_itr_;
+      }
+
+      self_type& operator--()
+      {
+        if (cstring_itr_)
+          --cstring_itr_;
+        else
+          --stdstring_itr_;
+        return *this;
+      }
+      self_type operator--(int) { self_type r = *this; --(*this); return r; }
+      self_type& operator++()
+      {
+        if (cstring_itr_)
+          ++cstring_itr_;
+        else
+          ++stdstring_itr_;
+        return *this;
+      }
+      self_type operator++(int) { self_type r = *this; ++(*this); return r; }
+      reference operator*()
+      {
+        if (cstring_itr_)
+        {
+          tmp_ = *cstring_itr_;
+          return tmp_;
+        }
+        return *stdstring_itr_;
+      }
+      pointer operator->() { return &(operator*()); }
+      bool operator==(const self_type& rhs)
+      {
+        if (cstring_itr_)
+          return cstring_itr_ == rhs.cstring_itr_;
+        return stdstring_itr_ == rhs.stdstring_itr_;
+      }
+      bool operator!=(const self_type& rhs) { return !(*this == rhs); }
+    private:
+      const char** cstring_itr_;
+      std::vector<std::string>::const_iterator stdstring_itr_;
+      std::string tmp_;
+    };
     operator bool() const
     {
       return this->good();
@@ -57,6 +136,10 @@ namespace savvy
 
       return good();
     }
+
+    std::vector<std::string> prop_fields() const;
+    sample_iterator samples_begin() const;
+    sample_iterator samples_end() const;
   protected:
     std::unique_ptr<sav::reader_base> sav_reader_;
     std::unique_ptr<vcf::reader_base> vcf_reader_;
@@ -71,6 +154,7 @@ namespace savvy
 
     template <typename T>
     reader& operator>>(allele_vector<T>& destination);
+    std::vector<std::string> chromosomes() const;
   };
 
   class indexed_reader : public reader_base

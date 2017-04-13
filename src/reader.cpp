@@ -3,6 +3,44 @@
 
 namespace savvy
 {
+  std::vector<std::string> reader_base::prop_fields() const
+  {
+    if (sav_reader_)
+      return sav_reader_->prop_fields();
+    else if (vcf_reader_)
+      return vcf_reader_->prop_fields();
+    return {};
+  }
+
+  reader_base::sample_iterator reader_base::samples_begin() const
+  {
+    reader_base::sample_iterator ret;
+    if (sav_reader_)
+      ret = reader_base::sample_iterator(sav_reader_->samples_begin());
+    else if (vcf_reader_)
+      ret = reader_base::sample_iterator(vcf_reader_->samples_begin());
+    return ret;
+  }
+
+  reader_base::sample_iterator reader_base::samples_end() const
+  {
+    reader_base::sample_iterator ret;
+    if (sav_reader_)
+      ret = reader_base::sample_iterator(sav_reader_->samples_end());
+    else if (vcf_reader_)
+      ret = reader_base::sample_iterator(vcf_reader_->samples_end());
+    return ret;
+  }
+
+  std::vector<std::string> reader::chromosomes() const
+  {
+    if (sav_reader_)
+      return dynamic_cast<sav::reader*>(sav_reader_.get())->chromosomes();
+    else if (vcf_reader_)
+      return dynamic_cast<vcf::reader*>(vcf_reader_.get())->chromosomes();
+    return {};
+  }
+
   reader::reader(const std::string& file_path)
   {
     if (savvy::detail::has_extension(file_path, ".sav"))

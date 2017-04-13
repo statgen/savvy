@@ -53,9 +53,11 @@ namespace savvy
       std::uint64_t haplotype_count() const { return this->sample_count() * this->ploidy(); }
       std::vector<std::string>::const_iterator samples_begin() const { return sample_ids_.begin(); }
       std::vector<std::string>::const_iterator samples_end() const { return sample_ids_.end(); }
-      std::vector<std::string>::const_iterator prop_fields_begin() const { return metadata_fields_.begin(); }
-      std::vector<std::string>::const_iterator prop_fields_end() const { return metadata_fields_.end(); }
+//      std::vector<std::string>::const_iterator prop_fields_begin() const { return metadata_fields_.begin(); }
+//      std::vector<std::string>::const_iterator prop_fields_end() const { return metadata_fields_.end(); }
       const std::string& chromosome() const { return chromosome_; }
+      std::vector<std::string> chromosomes() const { return {chromosome_}; }
+      std::vector<std::string> prop_fields() const { return std::vector<std::string>(metadata_fields_); }
       std::uint8_t ploidy() const { return ploidy_level_; }
       const std::string& file_path() const { return file_path_; }
       std::streampos tellg() { return this->input_stream_.tellg(); }

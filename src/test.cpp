@@ -510,7 +510,8 @@ void convert_file_test()
     const std::string chrom = cur != eof ? cur->chromosome() : "";
     const std::size_t ploidy = cur != eof ? (cur->size() / input.sample_count()) : 0;
 
-    savvy::sav::writer compact_output("test_file.sav", chrom, ploidy, input.samples_begin(), input.samples_end(), input.prop_fields_begin(), input.prop_fields_end());
+    auto prop_fields = input.prop_fields();
+    savvy::sav::writer compact_output("test_file.sav", chrom, ploidy, input.samples_begin(), input.samples_end(), prop_fields.begin(), prop_fields.end());
 
     while (cur != eof)
     {
@@ -668,7 +669,7 @@ void random_access_test()
 {
   savvy::sav::writer::create_index("test_file.sav");
 
-  savvy::indexed_reader rdr("test_file.sav", {"20", 17000, 1120000});
+  savvy::indexed_reader rdr("test_file.vcf.gz", {"20", 17000, 1120000});
   auto it = savvy::variant_iterator<std::vector<float>>(rdr);
   auto end = savvy::variant_iterator<std::vector<float>>{};
   for ( ; it != end; ++it)

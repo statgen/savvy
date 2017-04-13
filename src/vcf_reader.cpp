@@ -28,6 +28,12 @@ namespace savvy
       return static_cast<std::uint64_t>(bcf_hdr_nsamples(hts_hdr()));
     }
 
+    std::vector<std::string> reader_base::prop_fields() const
+    {
+      std::vector<std::string> ret(property_fields_);
+      return ret;
+    }
+
     void reader_base::init_property_fields()
     {
       bcf_hdr_t* hdr = hts_hdr();
@@ -66,6 +72,12 @@ namespace savvy
       {
         hts_hdr_ = bcf_hdr_read(hts_file_);
         this->init_property_fields();
+
+        for (int i = 0; i < hts_hdr_->n[BCF_DT_CTG]; ++i)
+        {
+          auto a = hts_hdr_->id[BCF_DT_CTG][i].key;
+          auto b = a;
+        }
       }
     }
 
@@ -98,6 +110,17 @@ namespace savvy
         assert(!"bcf_hdr_destroy or bcf_close threw exception!");
       }
     }
+
+    std::vector<std::string> reader::chromosomes() const
+    {
+      std::vector<std::string> ret(hts_hdr_->n[BCF_DT_CTG] > 0 ? (unsigned)hts_hdr_->n[BCF_DT_CTG] : 0);
+      for (int i = 0; i < ret.size(); ++i)
+      {
+        ret[i] = hts_hdr()->id[BCF_DT_CTG][i].key;
+      }
+      return ret;
+    }
+
 
     bool reader::read_hts_record()
     {
