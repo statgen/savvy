@@ -1,11 +1,12 @@
 
-#include "vcf_reader.hpp"
+#include "savvy/vcf_reader.hpp"
 
+
+#include <htslib/vcf.h>
 
 #include <sstream>
 #include <assert.h>
 #include <limits>
-#include <dep/htslib_project-prefix/src/htslib_project/htslib/vcf.h>
 
 namespace savvy
 {

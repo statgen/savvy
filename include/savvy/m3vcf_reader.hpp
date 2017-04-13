@@ -10,7 +10,7 @@
 #include <vector>
 #include <fstream>
 #include <functional>
-#include <portable_endian.hpp>
+#include <savvy/portable_endian.hpp>
 
 namespace savvy
 {

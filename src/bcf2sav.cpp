@@ -1,7 +1,7 @@
 
-#include "vcf_reader.hpp"
-#include "sav_reader.hpp"
-#include "savvy.hpp"
+#include "savvy/vcf_reader.hpp"
+#include "savvy/sav_reader.hpp"
+#include "savvy/savvy.hpp"
 
 #include <fstream>
 

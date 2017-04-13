@@ -24,16 +24,16 @@ find_package(xzbuf REQUIRED)
 
 
 set(HEADER_FILES
-    include/savvy.hpp include/reader.hpp include/m3vcf_reader.hpp include/sav_reader.hpp include/allele_status.hpp include/vcf_reader.hpp include/varint.hpp include/s1r.hpp include/allele_vector.hpp include/genotype_vector.hpp include/variant_iterator.hpp include/portable_endian.hpp include/region.hpp include/compressed_vector.hpp)
+    include/savvy/savvy.hpp include/savvy/reader.hpp include/savvy/m3vcf_reader.hpp include/savvy/sav_reader.hpp include/savvy/allele_status.hpp include/savvy/vcf_reader.hpp include/savvy/varint.hpp include/savvy/s1r.hpp include/savvy/allele_vector.hpp include/savvy/genotype_vector.hpp include/savvy/variant_iterator.hpp include/savvy/portable_endian.hpp include/savvy/region.hpp include/savvy/compressed_vector.hpp)
 
 set(SOURCE_FILES
-    src/savvy.cpp src/reader.cpp src/m3vcf_reader.cpp include/sav_reader.hpp src/sav_reader.cpp include/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
+    src/savvy.cpp src/reader.cpp src/m3vcf_reader.cpp include/savvy/sav_reader.hpp src/sav_reader.cpp include/savvy/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
 
 add_library(savvy ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(savvy hts z xzbuf)
 target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
-add_executable(savvy-test src/test.cpp src/test_class.cpp include/test_class.hpp)
+add_executable(savvy-test src/test.cpp src/test_class.cpp include/savvy/test_class.hpp)
 target_link_libraries(savvy-test savvy)
 
 add_executable(bcf2m3vcf src/bcf2m3vcf.cpp)
@@ -45,7 +45,7 @@ target_link_libraries(bcf2sav savvy)
 add_executable(sav-sample-sort src/sav_sample_sort.cpp)
 target_link_libraries(sav-sample-sort savvy)
 
-install(FILES $<TARGET_PROPERTY:savvy,INTERFACE_SOURCES> DESTINATION include)
+install(DIRECTORY include/savvy DESTINATION include)
 install(TARGETS savvy EXPORT ${PROJECT_NAME}-config
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)

@@ -1,7 +1,7 @@
 
-#include <reader.hpp>
-#include "vcf_reader.hpp"
-#include "m3vcf_reader.hpp"
+#include <savvy/reader.hpp>
+#include "savvy/vcf_reader.hpp"
+#include "savvy/m3vcf_reader.hpp"
 
 int main(int argc, char** argv)
 {

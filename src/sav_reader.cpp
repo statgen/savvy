@@ -1,8 +1,8 @@
-#include "sav_reader.hpp"
+#include "savvy/sav_reader.hpp"
+#include "savvy/variant_iterator.hpp"
 
 #include <assert.h>
 #include <algorithm>
-#include <variant_iterator.hpp>
 
 
 namespace savvy

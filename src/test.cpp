@@ -1,12 +1,12 @@
 
-#include "sav_reader.hpp"
-#include "m3vcf_reader.hpp"
-#include "vcf_reader.hpp"
-#include "test_class.hpp"
-#include "varint.hpp"
-#include "savvy.hpp"
-#include "variant_iterator.hpp"
-#include "reader.hpp"
+#include "savvy/sav_reader.hpp"
+#include "savvy/m3vcf_reader.hpp"
+#include "savvy/vcf_reader.hpp"
+#include "savvy/test_class.hpp"
+#include "savvy/varint.hpp"
+#include "savvy/savvy.hpp"
+#include "savvy/variant_iterator.hpp"
+#include "savvy/reader.hpp"
 
 #include <iostream>
 #include <fstream>

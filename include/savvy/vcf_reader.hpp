@@ -6,22 +6,21 @@
 #include "region.hpp"
 #include "variant_iterator.hpp"
 
+//namespace savvy
+//{
+//namespace vcf
+//{
+#include <htslib/synced_bcf_reader.h>
+#include <htslib/vcf.h>
+//}
+//}
+
 #include <iterator>
 #include <string>
 #include <vector>
 #include <iostream>
 #include <limits>
 #include <sstream>
-
-
-//namespace savvy
-//{
-//namespace vcf
-//{
-#include <synced_bcf_reader.h>
-#include <vcf.h>
-//}
-//}
 
 namespace savvy
 {
