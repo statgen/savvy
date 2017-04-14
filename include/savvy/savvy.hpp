@@ -200,13 +200,14 @@ namespace savvy
   template <typename ReaderType, typename VecType>
   std::uint8_t get_ploidy(const ReaderType& r, const VecType& v)
   {
-    return static_cast<std::uint8_t>(v.size() / r.sample_count());
+    return static_cast<std::uint8_t>(v.size() / (r.samples_end() - r.samples_begin()));
   }
 
   template <typename ReaderType, typename VecType>
   std::tuple<std::uint8_t, bool> get_validated_ploidy(const ReaderType& r, const VecType& v)
   {
-    std::tuple<std::uint8_t, bool> ret(static_cast<std::uint8_t>(v.size() / r.sample_count()), (v.size() % r.sample_count()) == 0);
+    const std::uint64_t sample_count = (r.samples_end() - r.samples_begin());
+    std::tuple<std::uint8_t, bool> ret(static_cast<std::uint8_t>(v.size() / sample_count), (v.size() % sample_count) == 0);
     return ret;
   }
 
