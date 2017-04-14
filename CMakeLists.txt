@@ -17,11 +17,11 @@ message("Done installing dependencies ... ")
 
 add_library(hts STATIC IMPORTED)
 set_property(TARGET hts PROPERTY IMPORTED_LOCATION ${CMAKE_INSTALL_PREFIX}/lib/libhts.a)
-set_property(TARGET hts APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_INSTALL_PREFIX}/include/htslib)
+set_property(TARGET hts APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_INSTALL_PREFIX}/include)
 
 #list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX})
 find_package(xzbuf REQUIRED)
-
+get_target_property(XZBUF_LIBS xzbuf INTERFACE_LINK_LIBRARIES)
 
 set(HEADER_FILES
     include/savvy/savvy.hpp include/savvy/reader.hpp include/savvy/m3vcf_reader.hpp include/savvy/sav_reader.hpp include/savvy/allele_status.hpp include/savvy/vcf_reader.hpp include/savvy/varint.hpp include/savvy/s1r.hpp include/savvy/allele_vector.hpp include/savvy/genotype_vector.hpp include/savvy/variant_iterator.hpp include/savvy/portable_endian.hpp include/savvy/region.hpp include/savvy/compressed_vector.hpp)
@@ -30,7 +30,7 @@ set(SOURCE_FILES
     src/savvy.cpp src/reader.cpp src/m3vcf_reader.cpp include/savvy/sav_reader.hpp src/sav_reader.cpp include/savvy/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
 
 add_library(savvy ${SOURCE_FILES} ${HEADER_FILES})
-target_link_libraries(savvy hts z xzbuf)
+target_link_libraries(savvy hts z ${XZBUF_LIBS})
 target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 add_executable(savvy-test src/test.cpp src/test_class.cpp include/savvy/test_class.hpp)

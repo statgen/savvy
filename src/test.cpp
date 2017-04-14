@@ -18,9 +18,9 @@
 #include <type_traits>
 #include <utility>
 
-#include <synced_bcf_reader.h>
-#include <tbx.h>
-#include <hts.h>
+#include <htslib/synced_bcf_reader.h>
+#include <htslib/tbx.h>
+#include <htslib/hts.h>
 
 //bool has_extension(const std::string& fullString, const std::string& ext)
 //{
