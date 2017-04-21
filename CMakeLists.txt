@@ -8,8 +8,17 @@ set(CMAKE_CXX_STANDARD 14)
 #set_property(TARGET hts PROPERTY IMPORTED_LOCATION ${CMAKE_INSTALL_PREFIX}/lib/libhts.a)
 #set_property(TARGET hts APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_INSTALL_PREFIX}/include)
 
+if(CGET_PREFIX)
+    include_directories(${CGET_PREFIX}/include)
+    link_directories(${CGET_PREFIX}/lib)
+endif()
+
 #list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX})
 find_package(xzbuf CONFIG REQUIRED)
+find_library(HTS_LIBRARY hts)
+find_library(ZLIB_LIBRARY z)
+
+
 get_target_property(XZBUF_LIBS xzbuf INTERFACE_LINK_LIBRARIES)
 
 set(HEADER_FILES
@@ -19,7 +28,7 @@ set(SOURCE_FILES
     src/savvy.cpp src/reader.cpp src/m3vcf_reader.cpp include/savvy/sav_reader.hpp src/sav_reader.cpp include/savvy/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
 
 add_library(savvy ${SOURCE_FILES} ${HEADER_FILES})
-target_link_libraries(savvy hts z ${XZBUF_LIBS})
+target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${XZBUF_LIBS})
 target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 add_executable(savvy-test src/test.cpp src/test_class.cpp include/savvy/test_class.hpp)
