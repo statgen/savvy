@@ -70,7 +70,7 @@ namespace savvy
 
 
       template <typename VecType>
-      bool read(allele_vector<VecType>& destination, const typename VecType::value_type missing_value = std::numeric_limits<typename VecType::value_type>::quiet_NaN(), const typename VecType::value_type alt_value = 1, const typename VecType::value_type ref_value = 0);
+      bool read(allele_vector<VecType>& destination, const typename VecType::value_type missing_value = std::numeric_limits<typename VecType::value_type>::quiet_NaN(), const typename VecType::value_type alt_value = 1);
     protected:
       virtual bcf_hdr_t* hts_hdr() const = 0;
       virtual bcf1_t* hts_rec() const = 0;
@@ -80,7 +80,7 @@ namespace savvy
       template <typename VecType>
       void read_variant_details(allele_vector<VecType>& destination);
       template <typename VecType>
-      void read_genotype(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value);
+      void read_genotype(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value);
     protected:
       std::ios::iostate state_;
       int* gt_;
@@ -90,10 +90,10 @@ namespace savvy
     };
 
     template <typename VecType>
-    bool reader_base::read(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value)
+    bool reader_base::read(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value)
     {
       read_variant_details(destination);
-      read_genotype(destination, missing_value, alt_value, ref_value);
+      read_genotype(destination, missing_value, alt_value);
 
       return good();
     }
@@ -182,7 +182,7 @@ namespace savvy
     }
 
     template <typename VecType>
-    void reader_base::read_genotype(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value, const typename VecType::value_type ref_value)
+    void reader_base::read_genotype(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value)
     {
       if (good())
       {
@@ -195,7 +195,7 @@ namespace savvy
         }
         else
         {
-          destination.resize(sample_count() * (gt_sz_ / hts_rec()->n_sample), ref_value);
+          destination.resize(sample_count() * (gt_sz_ / hts_rec()->n_sample));
 
           for (std::size_t i = 0; i < gt_sz_; ++i)
           {
@@ -287,7 +287,7 @@ namespace savvy
       template <typename VecType>
       indexed_reader& operator>>(allele_vector<VecType>& destination);
       template <typename T, typename Pred>
-      indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0);
+      indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1);
     private:
       bool read_hts_record();
 //      index_reader& seek(const std::string& chromosome, std::uint64_t position);
@@ -309,7 +309,7 @@ namespace savvy
     }
 
     template <typename T, typename Pred>
-    indexed_reader& indexed_reader::read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
+    indexed_reader& indexed_reader::read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value)
     {
       bool predicate_failed = true;
       while (good() && predicate_failed)
@@ -320,7 +320,7 @@ namespace savvy
           predicate_failed = !fn(destination);
           if (!predicate_failed)
           {
-            read_genotype(destination, missing_value, alt_value, ref_value);
+            read_genotype(destination, missing_value, alt_value);
           }
         }
       }

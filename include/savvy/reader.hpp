@@ -127,12 +127,12 @@ namespace savvy
     }
 
     template <typename T>
-    bool read(allele_vector<T>& destination)
+    bool read(allele_vector<T>& destination,  const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1)
     {
       if (sav_reader_)
-        sav_reader_->read(destination);
+        sav_reader_->read(destination, missing_value, alt_value);
       else if (vcf_reader_)
-        vcf_reader_->read(destination);
+        vcf_reader_->read(destination, missing_value, alt_value);
 
       return good();
     }
@@ -167,7 +167,7 @@ namespace savvy
     template <typename T>
     indexed_reader& operator>>(allele_vector<T>& destination);
     template <typename T, typename Pred>
-    indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0);
+    indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1);
   private:
 
   };
@@ -187,12 +187,12 @@ namespace savvy
   }
 
   template <typename T, typename Pred>
-  indexed_reader& indexed_reader::read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
+  indexed_reader& indexed_reader::read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value)
   {
     if (sav_reader_)
-      dynamic_cast<sav::indexed_reader*>(sav_reader_.get())->read_if(destination, fn, missing_value, alt_value, ref_value);
+      dynamic_cast<sav::indexed_reader*>(sav_reader_.get())->read_if(destination, fn, missing_value, alt_value);
     else if (vcf_reader_)
-      dynamic_cast<vcf::indexed_reader*>(vcf_reader_.get())->read_if(destination, fn, missing_value, alt_value, ref_value);
+      dynamic_cast<vcf::indexed_reader*>(vcf_reader_.get())->read_if(destination, fn, missing_value, alt_value);
 
     return *this;
   }

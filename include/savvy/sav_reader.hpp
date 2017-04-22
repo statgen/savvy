@@ -38,10 +38,10 @@ namespace savvy
       virtual ~reader_base() {}
 
       template <typename T>
-      bool read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0)
+      bool read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1)
       {
         read_variant_details(destination);
-        read_genotype(destination, missing_value, alt_value, ref_value);
+        read_genotype(destination, missing_value, alt_value);
 
         return good();
       }
@@ -142,14 +142,14 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotype(allele_vector<T>& destination, const typename T::value_type missing_value, const typename T::value_type alt_value, const typename T::value_type ref_value)
+      void read_genotype(allele_vector<T>& destination, const typename T::value_type missing_value, const typename T::value_type alt_value)
       {
         if (good())
         {
           std::istreambuf_iterator<char> in_it(input_stream_);
           std::istreambuf_iterator<char> end_it;
 
-          destination.resize(sample_count() * ploidy(), ref_value);
+          destination.resize(sample_count() * ploidy());
 
           std::uint64_t sz;
           varint_decode(in_it, end_it, sz);
@@ -217,7 +217,7 @@ namespace savvy
       }
 
       template <typename T, typename Pred>
-      indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1, const typename T::value_type ref_value = 0)
+      indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1)
       {
         bool predicate_failed = true;
         while (good() && predicate_failed)
@@ -228,7 +228,7 @@ namespace savvy
             predicate_failed = !fn(destination);
             if (!predicate_failed)
             {
-              read_genotype(destination, missing_value, alt_value, ref_value);
+              read_genotype(destination, missing_value, alt_value);
             }
           }
         }
