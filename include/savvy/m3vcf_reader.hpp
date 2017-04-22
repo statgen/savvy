@@ -2,6 +2,7 @@
 #define LIBSAVVY_M3VCF_READER_HPP
 
 #include "allele_status.hpp"
+#include "portable_endian.hpp"
 
 #include <list>
 #include <string>
@@ -10,7 +11,6 @@
 #include <vector>
 #include <fstream>
 #include <functional>
-#include <savvy/portable_endian.hpp>
 
 namespace savvy
 {
