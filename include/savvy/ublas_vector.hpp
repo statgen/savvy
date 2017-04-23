@@ -8,11 +8,14 @@
 
 namespace savvy
 {
-  template <typename T>
-  using sparse_ublas_allele_vector = allele_vector<boost::numeric::ublas::compressed_vector<T>>;
+  namespace ublas
+  {
+    template <typename T>
+    using sparse_allele_vector = allele_vector<boost::numeric::ublas::compressed_vector<T>>;
 
-  template <typename T>
-  using dense_ublas_allele_vector = allele_vector<boost::numeric::ublas::vector<T>>;
+    template <typename T>
+    using dense_allele_vector = allele_vector<boost::numeric::ublas::vector<T>>;
+  }
 }
 
 #endif //LIBSAVVY_UBLAS_VECTOR_HPP
