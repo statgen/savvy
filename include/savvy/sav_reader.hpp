@@ -338,8 +338,9 @@ namespace savvy
       }
 
       template <typename T>
-      void write(const allele_vector<T>& m, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1.0, const typename T::value_type ref_value = 0.0)
+      void write(const allele_vector<T>& m, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
       {
+        const typename T::value_type ref_value = typename T::value_type();
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
         varint_encode(m.locus(), os_it);
 
@@ -372,7 +373,7 @@ namespace savvy
             std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
             std::uint64_t offset = dist - last_pos;
             last_pos = dist + 1;
-            std::uint8_t allele = (*it != *it || *it == missing_value ? std::uint8_t(0x80) : std::uint8_t(0x00));
+            std::uint8_t allele = (*it == missing_value || (missing_value != missing_value && *it != *it)  ? std::uint8_t(0x80) : std::uint8_t(0x00));
             one_bit_prefixed_varint::encode(allele, offset, os_it);
           }
         }
