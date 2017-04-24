@@ -38,10 +38,10 @@ namespace savvy
       virtual ~reader_base() {}
 
       template <typename T>
-      bool read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1)
+      bool read_variant(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
       {
         read_variant_details(destination);
-        read_genotype(destination, missing_value, alt_value);
+        read_genotype(destination, missing_value);
 
         return good();
       }
@@ -142,10 +142,11 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotype(allele_vector<T>& destination, const typename T::value_type missing_value, const typename T::value_type alt_value)
+      void read_genotype(allele_vector<T>& destination, const typename T::value_type missing_value)
       {
         if (good())
         {
+          const typename T::value_type alt_value = typename T::value_type(1);
           std::istreambuf_iterator<char> in_it(input_stream_);
           std::istreambuf_iterator<char> end_it;
 
@@ -184,7 +185,13 @@ namespace savvy
       template <typename T>
       reader& operator>>(allele_vector<T>& destination)
       {
-        read(destination);
+        read_variant(destination);
+        return *this;
+      }
+      template <typename T>
+      reader& read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
+      {
+        read_variant(destination, missing_value);
         return *this;
       }
     };
@@ -212,12 +219,19 @@ namespace savvy
       template <typename T>
       indexed_reader& operator>>(allele_vector<T>& destination)
       {
-        read(destination);
+        read_variant(destination);
+        return *this;
+      }
+
+      template <typename T>
+      indexed_reader& read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
+      {
+        read_variant(destination, missing_value);
         return *this;
       }
 
       template <typename T, typename Pred>
-      indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1)
+      indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
       {
         bool predicate_failed = true;
         while (good() && predicate_failed)
@@ -228,7 +242,7 @@ namespace savvy
             predicate_failed = !fn(destination);
             if (!predicate_failed)
             {
-              read_genotype(destination, missing_value, alt_value);
+              read_genotype(destination, missing_value);
             }
           }
         }
@@ -338,7 +352,7 @@ namespace savvy
       }
 
       template <typename T>
-      void write(const allele_vector<T>& m, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
+      void write(const allele_vector<T>& m)
       {
         const typename T::value_type ref_value = typename T::value_type();
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
@@ -373,7 +387,7 @@ namespace savvy
             std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
             std::uint64_t offset = dist - last_pos;
             last_pos = dist + 1;
-            std::uint8_t allele = (*it == missing_value || (missing_value != missing_value && *it != *it)  ? std::uint8_t(0x80) : std::uint8_t(0x00));
+            std::uint8_t allele = (std::isnan(*it)  ? std::uint8_t(0x80) : std::uint8_t(0x00));
             one_bit_prefixed_varint::encode(allele, offset, os_it);
           }
         }

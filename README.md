@@ -131,17 +131,14 @@ while (f >> variant)
 }
 ```
 
-## Custom Allele Status Values
-Values used to load vectors can be customized.
+## Custom Missing Allele Value
+The default value for missing genotypes is `std::numeric_limits<T::value_type>::quiet_NaN()`. This can be overwritten when using the read method.
 ```c++
 savvy::reader f("chr1.cmf");
 savvy::dense_allele_vector<float> variant;
 
-const float is_missing = std::numeric_values<float>::epsilon();
-const float has_alt = 1;
-const float has_ref = 0;
-
-while (f.read(variant, is_missing, has_alt, has_ref))
+const float missing_value = std::numeric_values<float>::epsilon();
+while (f.read(variant, missing_value))
 {
   ...
 }

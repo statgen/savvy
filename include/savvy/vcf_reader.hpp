@@ -69,18 +69,18 @@ namespace savvy
       std::uint64_t sample_count() const;
 
 
-      template <typename VecType>
-      bool read(allele_vector<VecType>& destination, const typename VecType::value_type missing_value = std::numeric_limits<typename VecType::value_type>::quiet_NaN(), const typename VecType::value_type alt_value = 1);
+      template <typename T>
+      bool read_variant(allele_vector <T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN());
     protected:
       virtual bcf_hdr_t* hts_hdr() const = 0;
       virtual bcf1_t* hts_rec() const = 0;
       virtual bool read_hts_record() = 0;
       void init_property_fields();
 
-      template <typename VecType>
-      void read_variant_details(allele_vector<VecType>& destination);
-      template <typename VecType>
-      void read_genotype(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value);
+      template <typename T>
+      void read_variant_details(allele_vector<T>& destination);
+      template <typename T>
+      void read_genotype(allele_vector<T>& destination, const typename T::value_type missing_value);
     protected:
       std::ios::iostate state_;
       int* gt_;
@@ -89,17 +89,17 @@ namespace savvy
       std::vector<std::string> property_fields_; // TODO: This member is no longer necessary not that prop_fields_{begin,end}() methods are gone. Eventually remove this and init_property_fileds()
     };
 
-    template <typename VecType>
-    bool reader_base::read(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value)
+    template <typename T>
+    bool reader_base::read_variant(allele_vector <T>& destination, const typename T::value_type missing_value)
     {
       read_variant_details(destination);
-      read_genotype(destination, missing_value, alt_value);
+      read_genotype(destination, missing_value);
 
       return good();
     }
 
-    template <typename VecType>
-    void reader_base::read_variant_details(allele_vector<VecType>& destination)
+    template <typename T>
+    void reader_base::read_variant_details(allele_vector<T>& destination)
     {
       if (good())
       {
@@ -165,7 +165,7 @@ namespace savvy
             }
           }
 
-          destination = allele_vector<VecType>(
+          destination = allele_vector<T>(
             std::string(bcf_hdr_id2name(hts_hdr(), hts_rec()->rid)),
             static_cast<std::uint64_t>(hts_rec()->pos + 1),
             std::string(hts_rec()->d.allele[0]),
@@ -181,11 +181,12 @@ namespace savvy
       }
     }
 
-    template <typename VecType>
-    void reader_base::read_genotype(allele_vector<VecType>& destination, const typename VecType::value_type missing_value, const typename VecType::value_type alt_value)
+    template <typename T>
+    void reader_base::read_genotype(allele_vector<T>& destination, const typename T::value_type missing_value)
     {
       if (good())
       {
+        const typename T::value_type alt_value = typename T::value_type(1);
         bcf_unpack(hts_rec(), BCF_UN_ALL);
         bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_));
         int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
@@ -223,17 +224,24 @@ namespace savvy
 
       std::vector<std::string> chromosomes() const;
 
-      template <typename VecType>
-      reader& operator>>(allele_vector<VecType>& destination)
+      template <typename T>
+      reader& operator>>(allele_vector<T>& destination)
       {
         read(destination);
         return *this;
       }
 
+      template <typename T>
+      reader& read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
+      {
+        read(destination, missing_value);
+        return *this;
+      }
+
 //      static std::string get_chromosome(const reader& rdr, const marker& mkr);
     private:
-//      template <typename VecType>
-//      bool read_block(allele_vector<VecType>& destination)
+//      template <typename T>
+//      bool read_block(allele_vector<T>& destination)
 //      {
 //        bool ret = true;
 //
@@ -245,7 +253,7 @@ namespace savvy
 //
 //        if (ret)
 //        {
-//          destination = allele_vector<VecType>(
+//          destination = allele_vector<T>(
 //            std::string(bcf_hdr_id2name(hts_hdr_, hts_rec_->rid)),
 //            static_cast<std::uint64_t>(hts_rec_->pos + 1),
 //            std::string(hts_rec_->d.allele[0]),
@@ -257,7 +265,7 @@ namespace savvy
 //          for (std::size_t i = 0; i < gt_sz_; ++i)
 //          {
 //            if (gt_[i] == bcf_gt_missing)
-//              destination[i] = std::numeric_limits<typename VecType::value_type>::quiet_NaN();
+//              destination[i] = std::numeric_limits<typename T::value_type>::quiet_NaN();
 //            else if (bcf_gt_allele(gt_[i]) == allele_index_)
 //              destination[i] = 1.0;
 //          }
@@ -284,10 +292,12 @@ namespace savvy
       //region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end);
       ~indexed_reader();
       void reset_region(const region& reg);
-      template <typename VecType>
-      indexed_reader& operator>>(allele_vector<VecType>& destination);
+      template <typename T>
+      indexed_reader& operator>>(allele_vector<T>& destination);
+      template <typename T>
+      indexed_reader& read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN());
       template <typename T, typename Pred>
-      indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN(), const typename T::value_type alt_value = 1);
+      indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN());
     private:
       bool read_hts_record();
 //      index_reader& seek(const std::string& chromosome, std::uint64_t position);
@@ -301,15 +311,22 @@ namespace savvy
       std::string file_path_;
     };
 
-    template <typename VecType>
-    indexed_reader& indexed_reader::operator>>(allele_vector<VecType>& destination)
+    template <typename T>
+    indexed_reader& indexed_reader::operator>>(allele_vector<T>& destination)
     {
       read(destination);
       return *this;
     }
 
+    template <typename T>
+    indexed_reader& indexed_reader::read(allele_vector<T>& destination, const typename T::value_type missing_value)
+    {
+      read(destination, missing_value);
+      return *this;
+    }
+
     template <typename T, typename Pred>
-    indexed_reader& indexed_reader::read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value, const typename T::value_type alt_value)
+    indexed_reader& indexed_reader::read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value)
     {
       bool predicate_failed = true;
       while (good() && predicate_failed)
@@ -320,7 +337,7 @@ namespace savvy
           predicate_failed = !fn(destination);
           if (!predicate_failed)
           {
-            read_genotype(destination, missing_value, alt_value);
+            read_genotype(destination, missing_value);
           }
         }
       }
