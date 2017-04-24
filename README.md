@@ -1,6 +1,16 @@
 # libsavvy
 Interface to various variant calling formats.
 
+## Installing
+The easiest way to install savvy and its dependencies is to use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget).
+```shell
+cget install --prefix <install_prefix> statgen/savvy
+```
+CMakeLists.txt:
+```cmake
+add_executable(prog main.cpp)
+target_link_libraries(prog savvy hts z lzma)
+```
 
 ## Read Variants from File 
 ```c++
@@ -131,7 +141,7 @@ while (f >> variant)
 }
 ```
 
-## Custom Missing Allele Value
+## Custom Missing Value
 The default value for missing genotypes is `std::numeric_limits<T::value_type>::quiet_NaN()`. This can be overwritten when using the read method.
 ```c++
 savvy::reader f("chr1.cmf");

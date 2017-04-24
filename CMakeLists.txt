@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(libsavvy VERSION 1.0.0)
+project(savvy VERSION 1.0.0)
 include(CMakePackageConfigHelpers)
 
 set(CMAKE_CXX_STANDARD 14)
