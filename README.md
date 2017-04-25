@@ -122,9 +122,9 @@ auto lin_reg = [](const std::vector<float>& x, const std::vector<float>& y)
   const float m       = (n * s_xy - s_x * s_y) / (n * s_xx - s_x * s_x);
   const float b       = (s_y - m * s_x) / n;
   auto fx             = [m,b](float x) { return m * x + b; };
-  float se_line       = 0.0f; for (std::size_t i = 0; i < n; ++i) se_line += y[i] - fx(x[i]);
+  float se_line       = 0.0f; for (std::size_t i = 0; i < n; ++i) se_line += std::pow(y[i] - fx(x[i]), 2);
   const float y_mean  = s_y / n;
-  float se_y_mean     = 0.0f; for (std::size_t i = 0; i < n; ++i) se_y_mean += y[i] - y_mean;
+  float se_y_mean     = 0.0f; for (std::size_t i = 0; i < n; ++i) se_y_mean += std::pow(y[i] - y_mean, 2);
   const float r2      = 1 - se_line / se_y_mean;
 
   return std::make_tuple(m, b, r2); // slope, y-intercept, r-squared
