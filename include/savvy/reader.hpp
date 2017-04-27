@@ -140,6 +140,7 @@ namespace savvy
     std::vector<std::string> prop_fields() const;
     sample_iterator samples_begin() const;
     sample_iterator samples_end() const;
+    std::size_t sample_size() const;
   protected:
     std::unique_ptr<sav::reader_base> sav_reader_;
     std::unique_ptr<vcf::reader_base> vcf_reader_;

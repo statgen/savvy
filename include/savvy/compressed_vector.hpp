@@ -13,7 +13,7 @@ namespace savvy
   public:
     typedef T value_type;
     typedef compressed_vector<T> self_type;
-    static constexpr T const_value_type = value_type();
+    static const T const_value_type;
 
     compressed_vector() :
       size_(0)
@@ -30,7 +30,7 @@ namespace savvy
       }
       else
       {
-        auto it = std::upper_bound(offsets_.begin(), offsets_.end(), pos);
+        auto it = std::lower_bound(offsets_.begin(), offsets_.end(), pos);
         if (it == offsets_.end() || *it != pos)
         {
           it = offsets_.insert(it, pos);
@@ -40,11 +40,17 @@ namespace savvy
       }
     }
 
+    auto begin() const  { return this->values_.cbegin(); }
+    auto end() const { return this->values_.cend(); }
+
+    auto begin() { return this->values_.begin(); }
+    auto end() { return this->values_.end(); }
+
     const value_type& operator[](std::size_t pos) const
     {
-      auto it = std::upper_bound(offsets_.begin(), offsets_.end(), pos);
+      auto it = std::lower_bound(offsets_.begin(), offsets_.end(), pos);
       if (it == offsets_.end() || *it != pos)
-        return value_type();
+        return const_value_type;
       return values_[it - offsets_.begin()];
     }
 
@@ -76,6 +82,9 @@ namespace savvy
     std::vector<std::size_t> offsets_;
     std::size_t size_;
   };
+
+  template <typename T>
+  const T compressed_vector<T>::const_value_type = T();
 }
 
 #endif //LIBSAVVY_SPARSE_VECTOR_HPP

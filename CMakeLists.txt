@@ -42,8 +42,10 @@ target_link_libraries(bcf2sav savvy)
 add_executable(sav-sample-sort src/sav_sample_sort.cpp)
 target_link_libraries(sav-sample-sort savvy)
 
-add_executable(slr-examples src/slr_examples.cpp)
-target_link_libraries(slr-examples savvy)
+if(BUILD_SLR_EXAMPLES)
+    add_executable(slr-examples src/slr_examples.cpp)
+    target_link_libraries(slr-examples savvy armadillo)
+endif()
 
 install(DIRECTORY include/savvy DESTINATION include)
 install(TARGETS savvy EXPORT ${PROJECT_NAME}-config

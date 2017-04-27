@@ -130,13 +130,26 @@ auto lin_reg = [](const std::vector<float>& x, const std::vector<float>& y)
   return std::make_tuple(m, b, r2); // slope, y-intercept, r-squared
 };
 
-savvy::dense_allele_vector<float> variant;
-std::vector<float> pheno((r.samples_end() - r.samples_begin()) * 2);
-
 savvy::reader f("chr1.cmf");
+savvy::dense_allele_vector<float> variant;
+std::vector<float> pheno(f.sample_size() * 2);
+
 while (f >> variant)
 {
   auto [ m, b, r2 ] = lin_reg(variant, pheno);
+  // ...
+}
+```
+
+## Armadillo Example
+```c++
+savvy::reader f("chr1.cmf");
+savvy::armadillo::dense_allele_vector<float> variant;
+arma::Col<float> pheno(f.sample_size() * 2);
+
+while (f >> variant)
+{
+  float r2 = arma::as_scalar(arma::square(arma::cor(variant, pheno)));
   // ...
 }
 ```

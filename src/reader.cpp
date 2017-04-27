@@ -32,6 +32,16 @@ namespace savvy
     return ret;
   }
 
+  std::size_t reader_base::sample_size() const
+  {
+    std::size_t ret{};
+    if (sav_reader_)
+      ret = static_cast<std::size_t>(sav_reader_->samples_end() - sav_reader_->samples_begin());
+    else if (vcf_reader_)
+      ret = static_cast<std::size_t>(vcf_reader_->samples_end() - vcf_reader_->samples_begin());
+    return ret;
+  }
+
   std::vector<std::string> reader::chromosomes() const
   {
     if (sav_reader_)
