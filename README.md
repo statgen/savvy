@@ -143,13 +143,22 @@ while (f >> variant)
 
 ## Armadillo Example
 ```c++
+auto arma_lin_reg = [](const arma::Col<float>& x, const arma::Col<float>& y)
+{
+  float m = arma::as_scalar(arma::cov(x, y) / arma::cov(x, x));
+  float b = arma::as_scalar(arma::mean(y) - m * arma::mean(x));
+  float r2 = arma::as_scalar(arma::square(arma::cor(x, y)));
+
+  return std::make_tuple(m, b, r2); // slope, y-intercept, r-squared
+};
+
 savvy::reader f("chr1.cmf");
 savvy::armadillo::dense_allele_vector<float> variant;
 arma::Col<float> pheno(f.sample_size() * 2);
 
 while (f >> variant)
 {
-  float r2 = arma::as_scalar(arma::square(arma::cor(variant, pheno)));
+  auto [ m, b, r2 ] = arma_lin_reg(variant, pheno);
   // ...
 }
 ```
