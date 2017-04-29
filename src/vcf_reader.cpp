@@ -157,6 +157,7 @@ namespace savvy
       if (synced_readers_)
         bcf_sr_destroy(synced_readers_);
       synced_readers_ = bcf_sr_init();
+      hts_rec_ = nullptr;
       state_ = std::ios::goodbit;
 
       std::stringstream contigs;
@@ -164,8 +165,8 @@ namespace savvy
       if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())
         contigs << ":" << reg.from() << "-" << reg.to();
 
-      bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0);
-      bcf_sr_add_reader(synced_readers_, file_path_.c_str());
+      if (bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0) != 0 || bcf_sr_add_reader(synced_readers_, file_path_.c_str()) != 1)
+        state_ = std::ios::failbit;
     }
 
     bool indexed_reader::read_hts_record()

@@ -28,7 +28,6 @@ namespace savvy
 
     void increment()
     {
-      bool b = file_reader_->good();
       file_reader_->read_variant(m_);
       if (!file_reader_->good())
         file_reader_ = nullptr;
