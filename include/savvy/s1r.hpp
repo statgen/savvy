@@ -153,7 +153,7 @@ namespace savvy
 
       void init()
       {
-        const std::size_t header_data_size = 7 + 2 + 8;
+        const std::uint16_t header_data_size = 7 + 2 + 8;
         block_count_needed_for_header_ = ceil_divide(header_data_size, block_size_);
 
         this->entry_counts_per_level_.insert(this->entry_counts_per_level_.begin(), entry_count_);

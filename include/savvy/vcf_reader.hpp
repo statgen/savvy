@@ -227,14 +227,14 @@ namespace savvy
       template <typename T>
       reader& operator>>(allele_vector<T>& destination)
       {
-        read(destination);
+        read_variant(destination);
         return *this;
       }
 
       template <typename T>
       reader& read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
       {
-        read(destination, missing_value);
+        read_variant(destination, missing_value);
         return *this;
       }
 
@@ -314,14 +314,14 @@ namespace savvy
     template <typename T>
     indexed_reader& indexed_reader::operator>>(allele_vector<T>& destination)
     {
-      read(destination);
+      read_variant(destination);
       return *this;
     }
 
     template <typename T>
     indexed_reader& indexed_reader::read(allele_vector<T>& destination, const typename T::value_type missing_value)
     {
-      read(destination, missing_value);
+      read_variant(destination, missing_value);
       return *this;
     }
 

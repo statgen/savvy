@@ -196,7 +196,7 @@ namespace savvy
           {
             std::uint16_t nbo16;
             std::memcpy(&nbo16, &buff[i * 2], 2);
-            destination.sample_mappings_[i] = ntohs(nbo16);
+            destination.sample_mappings_[i] = be16toh(nbo16);
           }
           break;
         }
@@ -277,7 +277,7 @@ namespace savvy
         {
           for (std::size_t i = 0; i < source.haplotype_count(); ++i)
           {
-            std::uint16_t nbo16 = htons(source.sample_mappings_[i]);
+            std::uint16_t nbo16 = htobe16(source.sample_mappings_[i]);
             std::memcpy(&buff[i * 2], &nbo16, 2);
           }
           break;
