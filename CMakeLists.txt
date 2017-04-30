@@ -45,6 +45,9 @@ target_link_libraries(sav-sample-sort savvy)
 if(BUILD_SLR_EXAMPLES)
     add_executable(slr-examples src/slr_examples.cpp)
     target_link_libraries(slr-examples savvy armadillo)
+
+    add_executable(linreg-ttest src/linreg_ttest.cpp)
+    target_link_libraries(linreg-ttest savvy)
 endif()
 
 install(DIRECTORY include/savvy DESTINATION include)
