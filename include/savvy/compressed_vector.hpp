@@ -66,7 +66,7 @@ namespace savvy
       {
         values_.resize(sz, val);
         offsets_.resize(sz);
-        for (std::size_t i = 0; i < sz; ++i)
+        for (std::size_t i = size_; i < sz; ++i)
           offsets_[i] = i;
       }
 
