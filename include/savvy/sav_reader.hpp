@@ -292,7 +292,7 @@ namespace savvy
         sample_size_(samples_end - samples_beg),
         ploidy_level_(ploidy),
         record_count_(0),
-        block_size_(8)
+        block_size_(64)
       {
         std::string version_string("sav\x00\x01\x00\x00", 7);
         output_stream_.write(version_string.data(), version_string.size());
@@ -351,6 +351,67 @@ namespace savvy
         return *this;
       }
 
+//#define NO_LEB128 1
+#ifdef NO_LEB128
+      template <typename T>
+      void write(const allele_vector<T>& m)
+      {
+        const typename T::value_type ref_value = typename T::value_type();
+        //std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
+        std::uint64_t sz = m.locus();
+
+        output_stream_.write((char*)&sz, 8); //varint_encode(m.locus(), os_it);
+
+        sz = (m.ref().size() << 48);
+        output_stream_.write((char*)&sz, 2); //varint_encode(m.ref().size(), os_it);
+        if (m.ref().size())
+          output_stream_.write(m.ref().data(), m.ref().size()); //std::copy(m.ref().begin(), m.ref().end(), os_it);
+        //os.write(&source.ref_[0], source.ref_.size());
+
+        sz = (m.alt().size() << 48);
+        output_stream_.write((char*)&sz, 2); //varint_encode(m.ref().size(), os_it);
+        if (m.alt().size())
+          output_stream_.write(m.alt().data(), m.alt().size()); //std::copy(m.ref().begin(), m.ref().end(), os_it);
+        //os.write(&source.ref_[0], source.ref_.size());
+
+        for (const std::string& key : property_fields_)
+        {
+          std::string value(m.prop(key));
+          sz = (m.ref().size() << 48);
+          output_stream_.write((char*)&sz, 2); //varint_encode(m.ref().size(), os_it);
+          if (value.size())
+            output_stream_.write(value.data(), value.size()); //std::copy(m.ref().begin(), m.ref().end(), os_it);
+          //os.write(&source.ref_[0], source.ref_.size());
+        }
+
+        struct sparse_geno
+        {
+          std::uint32_t v: 1, offset: 31;
+        };
+
+        std::uint64_t non_zero_count =  m.size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), ref_value));
+        output_stream_.write((char*)&non_zero_count, 8);//varint_encode(non_zero_count, os_it);
+
+        std::vector<sparse_geno> tmp(non_zero_count);
+
+        std::uint64_t last_pos = 0;
+        auto beg = m.begin();
+        std::size_t non_ref_counter = 0;
+        for (auto it = beg; it != m.end(); ++it)
+        {
+          if (*it != ref_value)
+          {
+            std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
+            std::uint64_t offset = dist - last_pos;
+            last_pos = dist + 1;
+            tmp[non_ref_counter].v = (std::isnan(*it)  ? std::uint8_t(0x80) : std::uint8_t(0x00));
+            tmp[non_ref_counter].offset = offset;
+            ++non_ref_counter;
+          }
+        }
+        output_stream_.write((char*)tmp.data(), tmp.size() * 4);
+      }
+#else
       template <typename T>
       void write(const allele_vector<T>& m)
       {
@@ -392,6 +453,7 @@ namespace savvy
           }
         }
       }
+#endif
 
       static bool create_index(const std::string& input_file_path, std::string output_file_path = "");
     private:
@@ -400,7 +462,7 @@ namespace savvy
     private:
       static const std::array<std::string, 0> empty_string_array;
     private:
-      oxzstream output_stream_;
+      std::ofstream output_stream_;
       std::vector<std::string> property_fields_;
       std::string file_path_;
       std::uint64_t sample_size_;
