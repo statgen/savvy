@@ -9,12 +9,15 @@
 #include <numeric>
 #include <iostream>
 #include <vector>
+#include <assert.h>
 
 #include <boost/math/distributions.hpp>
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/lu.hpp>
-
+#include <OpenCL/cl.h>
+#include <boost/compute.hpp>
+#include <savvy/ublas_vector.hpp>
 
 namespace ublas = boost::numeric::ublas;
 
@@ -23,8 +26,100 @@ void tab_delimited_write_floats(std::ostream& os, std::tuple<float, float, float
   std::cout << std::get<0>(fields) << "\t" << std::get<1>(fields) << "\t" << std::get<2>(fields) << "\t" << std::get<3>(fields) << std::endl;
 }
 
+void print(std::ostream& os, const ublas::matrix<float>& m)
+{
+  for (std::size_t i = 0; i < m.size1(); ++i)
+  {
+    for (std::size_t j = 0; j < m.size2(); ++i)
+    {
+      os << m(i, j);
+    }
+    os << std::endl;
+  }
+}
+
 template <typename T>
-T square(const T& v) { return v * v; }
+T square(const T& v)
+{
+  return v * v;
+}
+
+auto linreg_ttest_gpu(const std::vector<float>& x, const std::vector<float>& y, const boost::compute::vector<float>& device_x, const boost::compute::vector<float>& device_y, const boost::compute::vector<float>& device_coefs, boost::compute::command_queue& queue)
+{
+  const std::size_t n = x.size();
+  auto start = std::chrono::high_resolution_clock().now();
+  boost::compute::copy(x.begin(), x.end(), device_x.begin(), queue);
+  auto op1 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+
+  start = std::chrono::high_resolution_clock().now();
+  float sum_x = std::accumulate(x.begin(), x.end(), 0.0f);
+  float sum_y = std::accumulate(y.begin(), y.end(), 0.0f);
+  auto op2 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+
+  start = std::chrono::high_resolution_clock().now();
+  float sum_xx = std::inner_product(x.begin(), x.end(), x.begin(), 0.0f);
+  float sum_xy = std::inner_product(x.begin(), x.end(), y.begin(), 0.0f);
+  auto op3 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+
+  start = std::chrono::high_resolution_clock().now();
+  float s_x    = {}; boost::compute::reduce(device_x.begin(), device_x.end(), device_coefs.begin(), queue);
+  float s_y    = {}; boost::compute::reduce(device_y.begin(), device_y.end(), device_coefs.begin() + 1, queue);
+  auto op4 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+
+  start = std::chrono::high_resolution_clock().now();
+  float s_xx    = boost::compute::inner_product(device_x.begin(), device_x.end(), device_x.begin(), 0.0f, queue);
+  float s_xy    = boost::compute::inner_product(device_x.begin(), device_x.end(), device_y.begin(), 0.0f, queue);
+  auto op5 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+  auto h = 0;
+
+  start = std::chrono::high_resolution_clock().now();
+  boost::compute::transform_reduce(device_x.begin(), device_x.end(), device_x.begin(), device_coefs.begin() + 2, boost::compute::multiplies<float>(), boost::compute::plus<float>(), queue);
+  boost::compute::transform_reduce(device_x.begin(), device_x.end(), device_y.begin(), device_coefs.begin() + 3, boost::compute::multiplies<float>(), boost::compute::plus<float>(), queue);
+  auto op6 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+
+  h = 0;
+
+  const float m       = (n * s_xy - s_x * s_y) / (n * s_xx - s_x * s_x);
+  const float b       = (s_y - m * s_x) / n;
+  //auto fx             = [m,b](float x) { return m * x + b; };
+  BOOST_COMPUTE_CLOSURE(float, lin_func, (float x, float y), (m, b),
+  {
+    float ret = y - (m * x + b);
+    return ret * ret;
+  });
+
+  start = std::chrono::high_resolution_clock().now();
+  float se_line{}; for (std::size_t i = 0; i < n; ++i) se_line += square(y[i] - (m * x[i] + b));
+  auto op7 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+  se_line = 0.0f;
+
+  start = std::chrono::high_resolution_clock().now();
+  boost::compute::transform_reduce(device_x.begin(), device_x.end(), device_y.begin(), &se_line, lin_func, boost::compute::plus<float>(), queue);
+  auto op8 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+
+  h = 0;
+  std::cout << "    copy: " << op1 << std::endl;
+  std::cout << " std sum: " << op2 << std::endl;
+  std::cout << "std prod: " << op3 << std::endl;
+  std::cout << " bst sum: " << op4 << std::endl;
+  std::cout << "bst prod: " << op5 << std::endl;
+  std::cout << "bst t_rd: " << op6 << std::endl;
+  std::cout << "  std fx: " << op7 << std::endl;
+  std::cout << "bst clsr: " << op8 << std::endl;
+  std::cout << sum_x << sum_y << sum_xx << sum_xy << std::endl;
+  std::cout << std::endl;
+
+//
+//  const float x_mean  = s_x / n;
+//  float se_x_mean[1]     = {}; //for (std::size_t i = 0; i < n; ++i) se_x_mean += square(x[i] - x_mean);
+//  boost::compute::transform_reduce(x.begin(), x.end(), std::begin(se_x_mean), boost::compute::placeholders::_1 - x_mean, boost::compute::plus<float>());
+//  const float dof     = n - 2;
+//  const float std_err = std::sqrt(se_line[0] / dof) / std::sqrt(se_x_mean[0]);
+//  float t = m / std_err;
+//  boost::math::students_t_distribution<float> dist(dof);
+//  float pval = cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
+  return std::make_tuple(1.0, 1.0, 1.0, 1.0); //return std::make_tuple(m, std_err, t, pval); // slope, std error, t statistic, p value
+}
 
 auto linreg_ttest_old(const std::vector<float>& x, const std::vector<float>& y)
 {
@@ -43,21 +138,22 @@ auto linreg_ttest_old(const std::vector<float>& x, const std::vector<float>& y)
   const float std_err = std::sqrt(se_line / dof) / std::sqrt(se_x_mean);
   float t = m / std_err;
   boost::math::students_t_distribution<float> dist(dof);
-  float pval = cdf(complement(dist, std::fabs(t))) * 2;
+  float pval = cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
   return std::make_tuple(m, std_err, t, pval); // slope, std error, t statistic, p value
 }
 
-auto linreg_ttest(const std::vector<float>& x, const std::vector<float>& y)
+auto linreg_ttest(const std::vector<float>& x, const std::vector<float>& y, const float s_y)
 {
   const std::size_t n = x.size();
   float s_x{}; //     = std::accumulate(x.begin(), x.end(), 0.0f);
-  float s_y{}; //     = std::accumulate(y.begin(), y.end(), 0.0f);
+  //float s_y{}; //     = std::accumulate(y.begin(), y.end(), 0.0f);
   float s_xx{}; //    = std::inner_product(x.begin(), x.end(), x.begin(), 0.0f);
   float s_xy{}; //    = std::inner_product(x.begin(), x.end(), y.begin(), 0.0f);
+
   for (std::size_t i = 0; i < n; ++i)
   {
     s_x += x[i];
-    s_y += y[i];
+    //s_y += y[i];
     s_xx += x[i] * x[i];
     s_xy += x[i] * y[i];
   }
@@ -79,7 +175,7 @@ auto linreg_ttest(const std::vector<float>& x, const std::vector<float>& y)
   const float std_err = std::sqrt(se_line / dof) / std::sqrt(se_x_mean);
   float t = m / std_err;
   boost::math::students_t_distribution<float> dist(dof);
-  float pval = cdf(complement(dist, std::fabs(t))) * 2;
+  float pval = cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
 
   return std::make_tuple(m, std_err, t, pval); // slope, std error, t statistic, p value
 }
@@ -105,7 +201,7 @@ auto sp_lin_reg_old(const savvy::compressed_vector<float>& x, const std::vector<
   return std::make_tuple(m, std_err, t, pval); // slope, std error, t statistic, p value
 }
 
-auto linreg_ttest(const savvy::compressed_vector<float>& x, const std::vector<float>& y)
+auto linreg_ttest(const savvy::compressed_vector<float>& x, const std::vector<float>& y, const float s_y)
 {
   const std::size_t n = x.size();
   float s_x{}; //     = std::accumulate(x.begin(), x.end(), 0.0f);
@@ -120,11 +216,10 @@ auto linreg_ttest(const savvy::compressed_vector<float>& x, const std::vector<fl
   {
     s_x += *it;
     s_xx += (*it) * (*it);
-    s_xy += (*it * y[x_indices[it - x_beg]]);
+    s_xy += (*it) * y[x_indices[it - x_beg]];
   }
 
-
-  const float s_y     = std::accumulate(y.begin(), y.end(), 0.0f);
+  //const float s_y     = std::accumulate(y.begin(), y.end(), 0.0f);
   const float m       = (n * s_xy - s_x * s_y) / (n * s_xx - s_x * s_x);
   const float b       = (s_y - m * s_x) / n;
   auto fx             = [m,b](float x) { return m * x + b; };
@@ -132,17 +227,38 @@ auto linreg_ttest(const savvy::compressed_vector<float>& x, const std::vector<fl
 
   float se_line{};
   float se_x_mean{};
-  for (std::size_t i = 0; i < n; ++i)
+
+  const float f_of_zero = fx(0.0f);
+  const auto x_idx_beg = x.index_data();
+  const auto x_idx_end = x.index_data() + x.non_zero_size();
+  std::size_t i = 0;
+  for (auto it = x_idx_beg; it != x_idx_end; ++i)
   {
-    se_line += square(y[i] - fx(x[i]));
-    se_x_mean += square(x[i] - x_mean);
+    if (i == (*it))
+    {
+      float x_val = x_values[it - x_idx_beg];
+      se_line += square(y[i] - fx(x_val));
+      se_x_mean += square(x_val - x_mean);
+      ++it;
+    }
+    else
+    {
+      se_line += square(y[i] - f_of_zero);
+    }
   }
+
+  for ( ; i < n; ++i)
+  {
+    se_line += square(y[i] - f_of_zero);
+  }
+
+  se_x_mean += (square(0.0f - x_mean) * float(n - x.non_zero_size()));
 
   const float dof     = n - 2;
   const float std_err = std::sqrt(se_line / dof) / std::sqrt(se_x_mean);
   float t = m / std_err;
   boost::math::students_t_distribution<float> dist(dof);
-  float pval = cdf(complement(dist, std::fabs(t))) * 2;
+  float pval = cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
 
   return std::make_tuple(m, std_err, t, pval); // slope, std error, t statistic, p value
 }
@@ -176,7 +292,13 @@ auto multi_lin_reg_ttest(const ublas::vector<float>& geno, const ublas::vector<f
 void run_simple(const std::string& file_path)
 {
   auto start = std::chrono::high_resolution_clock().now();
-  savvy::dense_allele_vector<float> x;
+  std::int64_t compute_time = 0;
+
+//  boost::compute::device device = boost::compute::system::default_device();
+//  boost::compute::context context(device);
+//  boost::compute::command_queue q(context, device);
+
+  savvy::sparse_allele_vector<float> x;
   savvy::reader r(file_path);
 
   std::random_device rnd_device;
@@ -186,20 +308,37 @@ void run_simple(const std::string& file_path)
 
   std::vector<float> y(r.sample_size() * 2);
   generate(y.begin(), y.end(), gen);
+  const float y_sum = std::accumulate(y.begin(), y.end(), 0.0f);
+
+//  std::vector<float> fake_x(150000, 1.0f);
+//  std::vector<float> fake_y(150000, 1.0f);
+//  std::generate(fake_x.begin(), fake_x.end(), gen);
+//  std::generate(fake_y.begin(), fake_y.end(), gen);
+//
+//  boost::compute::vector<float> device_y(fake_y.begin(), fake_y.end(), q);
+//  boost::compute::vector<float> device_x(fake_y.size(), 0.0f, q);
+//  boost::compute::vector<float> device_coefs(4, 0.0f, q);
 
   std::cout << "pos\tref\talt\tslope\tse\ttstat\tpval\n";
   std::cout << std::fixed << std::setprecision( 4 );
+  int i = 0;
   while (r.read(x, std::numeric_limits<float>::epsilon()))
   {
     float m, se, tstat, pval;
-    std::tie(m, se, tstat, pval) = linreg_ttest(x, y);
+    //auto compute_start = std::chrono::high_resolution_clock().now();
+    std::tie(m, se, tstat, pval) = linreg_ttest(x, y, y_sum); //linreg_ttest_gpu(fake_x, fake_y, device_x, device_y, device_coefs, q);
+    //compute_time += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - compute_start).count();
 
-    std::cout << x.locus() << "\t" << x.ref() << "\t" << x.alt() << "\t";
-    std::cout << m << "\t" << se << "\t" << tstat << "\t" << pval << std::endl;
+//    ++i;
+//    if (i == 5)
+//      break;
+
+//    std::cout << x.locus() << "\t" << x.ref() << "\t" << x.alt() << "\t";
+//    std::cout << m << "\t" << se << "\t" << tstat << "\t" << pval << std::endl;
   }
-
   auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock().now() - start).count();
-  std::cout << "elapsed: " << elapsed << "s" << std::endl;
+  std::cout << "wall time: " << elapsed << "s" << std::endl;
+  //std::cout << "compute time: : " <<  std::chrono::duration_cast<std::chrono::seconds>(std::chrono::microseconds(compute_time)).count() << "s" << std::endl;
 }
 
 void print_matrix(const ublas::matrix<float>& m)
@@ -210,6 +349,13 @@ void print_matrix(const ublas::matrix<float>& m)
       std::cout << m(i, j) << " ";
     std::cout << std::endl;
   }
+}
+
+void print_matrix(const ublas::vector<float>& m)
+{
+  for (auto i = 0; i < m.size(); i++)
+    std::cout << m(i) << " ";
+  std::cout << std::endl;
 }
 
 template <typename T>
@@ -237,77 +383,228 @@ auto invert_matrix(const ublas::matrix<T>& input)
   return ret;
 }
 
+class slow_multi_reg
+{
+public:
+  slow_multi_reg(const ublas::vector<float>& observed_responses, const ublas::matrix<float>& covariates) :
+    observed_responses_(observed_responses),
+    covariates_(covariates.size1(), covariates.size2() + 2)
+  {
+    std::fill((covariates_.begin2() + 0).begin(), (covariates_.begin2() + 0).end(), 1.0);
+    for (std::size_t i = 0; i < covariates.size2(); ++i)
+      std::copy((covariates.begin2() + i).begin(), (covariates.begin2() + i).end(), (covariates_.begin2() + (i + 1)).begin());
+  }
+
+  auto operator()(const ublas::vector<float>& genotypes)
+  {
+    std::copy(genotypes.begin(), genotypes.end(), (covariates_.begin2() + covariates_.size2() - 1).begin());
+
+    const std::size_t num_rows = observed_responses_.size();
+    const std::size_t num_cols = covariates_.size2();
+
+    ublas::matrix<float> beta_variances;
+    try
+    {
+      beta_variances = invert_matrix<float>(ublas::prod(ublas::trans(covariates_), covariates_));
+    }
+    catch (std::exception& e)
+    {
+      std::cerr << e.what() << std::endl;
+      return std::make_tuple(ublas::vector<float>(covariates_.size2(), 0.0), ublas::vector<float>(covariates_.size2(), 0.0));
+    }
+
+    ublas::vector<float> beta = ublas::prod(ublas::prod(beta_variances, ublas::trans(covariates_)), observed_responses_);
+    ublas::vector<float> residuals = observed_responses_ - ublas::prod(covariates_, beta);
+
+    float square_error{};
+    for (const float& r : residuals)
+      square_error += square(r);
+
+    const float se_line_mean = square_error / num_rows;
+
+    const float dof = num_rows - num_cols; //n - (k + 1)
+    const float variance = square_error / dof;
+
+    ublas::matrix<float> var_cov_mat = variance * beta_variances;
+
+    ublas::vector<float> standard_errors(num_cols);
+
+    for (std::size_t i = 0; i < num_cols; ++i)
+      standard_errors[i] = std::sqrt(var_cov_mat(i,i));
+
+    return std::make_tuple(std::move(beta), std::move(standard_errors));
+  }
+private:
+  const ublas::vector<float>& observed_responses_;
+  ublas::matrix<float> covariates_;
+
+};
+
 const std::vector<float> predictor_1 = {41.9, 43.4, 43.9, 44.5, 47.3, 47.5, 47.9, 50.2, 52.8, 53.2, 56.7, 57.0, 63.5, 65.3, 71.1, 77.0, 77.8};
 const std::vector<float> predictor_2 = {29.1, 29.3, 29.5, 29.7, 29.9, 30.3, 30.5, 30.7, 30.8, 30.9, 31.5, 31.7, 31.9, 32.0, 32.1, 32.5, 32.9};
 const std::vector<float> response = {251.3, 251.3, 248.3, 267.5, 273.0, 276.5, 270.3, 274.9, 285.0, 290.0, 297.0, 302.5, 304.5, 309.3, 321.7, 330.7, 349.0};
 
 void run_multi(const std::string& file_path)
 {
+//  ublas::vector<float> y(response.size());
+//  std::copy(response.begin(), response.end(), y.begin());
+//
+//  ublas::matrix<float> cov(predictor_2.size(), 1);
+//  std::copy(predictor_2.begin(), predictor_2.end(), (cov.begin2()).begin());
+//
+//  ublas::vector<float> geno(predictor_1.size());
+//  std::copy(predictor_1.begin(), predictor_1.end(), geno.begin());
+
+  std::random_device rnd_device;
+  std::mt19937 mersenne_engine(rnd_device());
+  std::uniform_int_distribution<int> dist(0, 100);
+  auto gen = std::bind(dist, mersenne_engine);
+
+  savvy::reader r(file_path);
+
+  ublas::vector<float> y(r.sample_size() * 2);
+  generate(y.begin(), y.end(), gen);
+
+  ublas::matrix<float> cov(r.sample_size() * 2, 1);
+  generate(cov.begin1().begin(), cov.begin1().end(), gen);
+
   auto start = std::chrono::high_resolution_clock().now();
+  slow_multi_reg slow_reg(y, cov);
 
-  const std::size_t num_rows = response.size();
-
-  ublas::vector<float> y(num_rows);
-  std::copy(response.begin(), response.end(), y.begin());
-
-
-  ublas::matrix<float, ublas::column_major> x(num_rows, 3);
-  const std::size_t num_cols = x.size2();
-  std::fill((x.begin2() + 0).begin(), (x.begin2() + 0).end(), 1.0);
-  std::copy(predictor_1.begin(), predictor_1.end(), (x.begin2() + 1).begin());
-  std::copy(predictor_2.begin(), predictor_2.end(), (x.begin2() + 2).begin());
-
-  ublas::matrix<float> beta_variances = invert_matrix<float>(ublas::prod(ublas::trans(x), x));
-  ublas::vector<float> beta = ublas::prod(ublas::prod(beta_variances, ublas::trans(x)), y); // ublas::trans(beta) ;
-  auto fx             = [&beta](const std::vector<float>& x) { return beta[0] + beta[1] * x[0] + beta[2] * x[1]; };
-  std::cout << fx({47, 31}) << std::endl;
-
-  ublas::vector<float> residuals = y - ublas::prod(x, beta);
-  float square_error{};
-  for (const float& r : residuals)
+  savvy::ublas::dense_allele_vector<float> variant;
+  while (r.read(variant, std::numeric_limits<float>::epsilon()))
   {
-    std::cout << r << " ";
-    square_error += square(r);
+    ublas::vector<float> coefs, se;
+    std::tie(coefs, se) = slow_reg(variant);
+
+    boost::math::students_t_distribution<float> dist(y.size() - (2 + 1));
+    float t = coefs[2] / se[2];
+    float pval = cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
   }
-  std::cout << std::endl;
-  const float mean_square_error = square_error / residuals.size();
-  std::cout << mean_square_error << std::endl;
-
-  float se_line{};
-  float se_x_mean{};
-  for (std::size_t i = 0; i < num_rows; ++i)
-  {
-    se_line += square(y[i] - fx({x(i, 1), x(i, 2)}));
-  }
-  const float se_line_mean = se_line / num_rows;
-
-  const float dof = num_rows - num_cols; //n - (k + 1)
-  const float variance = se_line / dof;
-
-  ublas::matrix<float> var_cov_mat = variance * beta_variances;
-
-
-
-  const float std_err_beta_1 = std::sqrt(var_cov_mat(1, 1));
-  const float std_err_beta_2 = std::sqrt(var_cov_mat(2, 2));
-
-  const float b1_t = beta[1] / std_err_beta_1;
-  const float b2_t = beta[2] / std_err_beta_2;
-
-  boost::math::students_t_distribution<float> dist(dof);
-  float pval1 = cdf(complement(dist, std::fabs(b1_t))) * 2;
-  float pval2 = cdf(complement(dist, std::fabs(b2_t))) * 2;
-
-  std::cout << beta[0] << " + " << beta[1] << "x + " << beta[2] << "x + " << ublas::sum(residuals) << std::endl;
-
-
   auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock().now() - start).count();
-  std::cout << "elapsed: " << elapsed << "s" << std::endl;
+  std::cout << "wall time: " << elapsed << "s" << std::endl;
 }
+
+//void run_multi(const std::string& file_path)
+//{
+//  auto start = std::chrono::high_resolution_clock().now();
+//
+//  const std::size_t num_rows = response.size();
+//
+//  ublas::vector<float> y(num_rows);
+//  std::copy(response.begin(), response.end(), y.begin());
+//
+//
+//  ublas::matrix<float, ublas::column_major> x(num_rows, 3);
+//  const std::size_t num_cols = x.size2();
+//  std::fill((x.begin2() + 0).begin(), (x.begin2() + 0).end(), 1.0);
+//  std::copy(predictor_1.begin(), predictor_1.end(), (x.begin2() + 1).begin());
+//  std::copy(predictor_2.begin(), predictor_2.end(), (x.begin2() + 2).begin());
+//
+//
+//  ublas::matrix<float> beta_variances = invert_matrix<float>(ublas::prod(ublas::trans(x), x));
+//
+//  ublas::vector<float> beta = ublas::prod(ublas::prod(beta_variances, ublas::trans(x)), y); // ublas::trans(beta) ;
+//  auto fx             = [&beta](const std::vector<float>& x) { return beta[0] + beta[1] * x[0] + beta[2] * x[1]; };
+//  std::cout << fx({47, 31}) << std::endl;
+//
+//  ublas::vector<float> residuals = y - ublas::prod(x, beta);
+//  float square_error{};
+//  for (const float& r : residuals)
+//  {
+//    std::cout << r << " ";
+//    square_error += square(r);
+//  }
+//  std::cout << std::endl;
+//  const float mean_square_error = square_error / residuals.size();
+//  std::cout << mean_square_error << std::endl;
+//
+//  float se_line{};
+//  float se_x_mean{};
+//  for (std::size_t i = 0; i < num_rows; ++i)
+//  {
+//    std::cout << (y[i] - fx({x(i, 1), x(i, 2)})) << " ";
+//    se_line += square(y[i] - fx({x(i, 1), x(i, 2)}));
+//  }
+//  std::cout << std::endl;
+//  const float se_line_mean = se_line / num_rows;
+//
+//  const float dof = num_rows - num_cols; //n - (k + 1)
+//  const float variance = se_line / dof;
+//
+//  ublas::matrix<float> var_cov_mat = variance * beta_variances;
+//
+//
+//
+//  const float std_err_beta_1 = std::sqrt(var_cov_mat(1, 1));
+//  const float std_err_beta_2 = std::sqrt(var_cov_mat(2, 2));
+//
+//  const float b1_t = beta[1] / std_err_beta_1;
+//  const float b2_t = beta[2] / std_err_beta_2;
+//
+//  boost::math::students_t_distribution<float> dist(dof);
+//  float pval1 = cdf(complement(dist, std::fabs(b1_t))) * 2;
+//  float pval2 = cdf(complement(dist, std::fabs(b2_t))) * 2;
+//
+//  std::cout << beta[0] << " + " << beta[1] << "x + " << beta[2] << "x + " << ublas::sum(residuals) << std::endl;
+//
+//
+//  auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock().now() - start).count();
+//  std::cout << "elapsed: " << elapsed << "s" << std::endl;
+//}
 
 
 int main(int argc, char** argv)
 {
+  boost::compute::device device = boost::compute::system::default_device();
+//  for (const auto& device : boost::compute::system::devices())
+//  {
+//    std::cout << "NAME: " << device.name() << std::endl;
+//    std::cout << "compute_units: " << device.compute_units() << std::endl;
+//    std::cout << "max_work_group_size: " << device.max_work_group_size() << std::endl;
+//    std::cout << "max_work_item_dimensions: " << device.max_work_item_dimensions() << std::endl;
+//    std::cout << "preferred_vector_width: " << device.preferred_vector_width<float>() << std::endl;
+//    std::cout << "profile: " << device.profile() << std::endl;
+//    std::cout << "max_memory_alloc_size: " << device.max_memory_alloc_size() << std::endl;
+//    std::cout << "local_memory_size: " << device.local_memory_size() << std::endl;
+//    std::cout << "global_memory_size: " << device.global_memory_size() / 1024 / 1024 << std::endl;
+//    std::cout << "clock_frequency: " << device.clock_frequency() << std::endl;
+//    std::cout << std::endl;
+//  }
+//  return 0;
+
+//  boost::compute::context context(device);
+//  boost::compute::command_queue queue(context, device);
+//
+//  std::vector<float> x(300000, 1.0f);
+//  std::cout << x.size() << std::endl;
+//
+//  boost::compute::vector<float> device_x(x.begin(), x.end(), queue);
+//  boost::compute::vector<float> device_result(1, 0.0f, queue);
+//
+//  float cpu_res{}, gpu_res{};
+//
+//  auto start = std::chrono::high_resolution_clock().now();;
+//  for (std::size_t i = 0; i < 1000; ++i)
+//    cpu_res += std::accumulate(x.begin(), x.end(), 0.0f);
+//  auto cpu_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+//
+//  start = std::chrono::high_resolution_clock().now();
+//  for (std::size_t i = 0; i < 1000; ++i)
+//    boost::compute::reduce(device_x.begin(), device_x.end(), device_result.begin(), queue);
+//  boost::compute::copy(device_result.begin(), device_result.end(), &gpu_res, queue);
+//  auto gpu_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+//
+//  std::cout << "cpu res: " << cpu_res << std::endl;
+//  std::cout << "cpu res: " << gpu_res << std::endl;
+//
+//  std::cout << "cpu time: " << cpu_time << "us" << std::endl;
+//  std::cout << "gpu time: " << gpu_time << "us" << std::endl;
+//
+//
+//
+//  return 0;
+
   run_multi(argv[1]);
 
 
