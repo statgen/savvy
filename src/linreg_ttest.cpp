@@ -386,7 +386,7 @@ auto invert_matrix(const ublas::matrix<T>& input)
 class slow_multi_reg
 {
 public:
-  slow_multi_reg(const ublas::vector<float>& observed_responses, const ublas::matrix<float>& covariates) :
+  slow_multi_reg(const ublas::vector<float>& observed_responses, const ublas::matrix<float, ublas::column_major>& covariates) :
     observed_responses_(observed_responses),
     covariates_(covariates.size1(), covariates.size2() + 2)
   {
@@ -440,20 +440,130 @@ private:
 
 };
 
+class fast_multi_reg
+{
+public:
+  fast_multi_reg(const ublas::vector<float>& observed_responses, const ublas::matrix<float, ublas::column_major>& covariates) :
+    observed_responses_(observed_responses),
+    covariates_(covariates.size1(), covariates.size2() + 1),
+    transpose_product_matrix_(covariates_.size2() + 1, covariates_.size2() + 1)
+  {
+    std::fill((covariates_.begin2() + 0).begin(), (covariates_.begin2() + 0).end(), 1.0);
+    for (std::size_t i = 0; i < covariates.size2(); ++i)
+      std::copy((covariates.begin2() + i).begin(), (covariates.begin2() + i).end(), (covariates_.begin2() + (i + 1)).begin());
+    ublas::matrix<float> tmp = ublas::prod(ublas::trans(covariates_), covariates_);
+
+    std::size_t i = 0;
+    for (auto row = tmp.begin1(); row != tmp.end1(); ++row, ++i)
+      std::copy(row.begin(), row.end(), (transpose_product_matrix_.begin1() + i).begin());
+  }
+
+  auto operator()(const ublas::vector<float>& genotypes)
+  {
+    const std::size_t num_rows = observed_responses_.size();
+    const std::size_t num_cols = covariates_.size2() + 1;
+    const std::size_t num_covs = covariates_.size2();
+    const std::size_t last_index_of_result_matrix = num_covs;
+
+    // zeros bottom row
+    for (std::size_t i = 0; i < num_cols; ++i)
+    {
+      transpose_product_matrix_(last_index_of_result_matrix, i) = 0.0;
+      //transpose_product_matrix_(i, last_index_of_result_matrix) = 0.0;
+    }
+
+    // Sets bottom row of result matrix.
+    for (std::size_t i = 0; i < num_rows; ++i) // TODO: test performance of flipping loop order.
+    {
+      for (std::size_t j = 0; j < num_covs; ++j)
+      {
+        transpose_product_matrix_(last_index_of_result_matrix, j) += (genotypes[i] * covariates_(i, j));
+      }
+      transpose_product_matrix_(last_index_of_result_matrix, last_index_of_result_matrix) += (genotypes[i] * genotypes[i]);
+    }
+
+    // Fills reflected column.
+    for (std::size_t j = 0; j < num_covs; ++j)
+      transpose_product_matrix_(j, last_index_of_result_matrix) = transpose_product_matrix_(last_index_of_result_matrix, j);
+
+    ublas::matrix<float> beta_variances;
+    try
+    {
+      beta_variances = invert_matrix<float>(transpose_product_matrix_);
+    }
+    catch (std::exception& e)
+    {
+      std::cerr << e.what() << std::endl;
+      return std::make_tuple(ublas::vector<float>(covariates_.size2(), 0.0), ublas::vector<float>(covariates_.size2(), 0.0));
+    }
+
+    ublas::matrix<float> beta_var_and_x_trans_prod(beta_variances.size1(), num_rows, 0.0);
+
+    for (std::size_t i = 0; i < num_cols; ++i)
+    {
+      for (std::size_t j = 0; j < num_rows; ++j)
+      {
+        for (std::size_t k = 0; k < num_covs; ++k)
+        {
+          beta_var_and_x_trans_prod(i, j) += (beta_variances(i, k) * covariates_(j, k));
+        }
+        beta_var_and_x_trans_prod(i, j) += (beta_variances(i, last_index_of_result_matrix) * genotypes[j]);
+      }
+    }
+
+    ublas::vector<float> beta = ublas::prod(beta_var_and_x_trans_prod, observed_responses_);
+
+    ublas::vector<float> y_hat(num_rows, 0.0);
+    for (std::size_t i = 0; i < num_rows; ++i)
+    {
+      for (std::size_t j = 0; j < num_covs; ++j)
+      {
+        y_hat[i] += (covariates_(i, j) * beta[j]);
+      }
+      y_hat[i] += (genotypes[i] * beta[last_index_of_result_matrix]);
+    }
+
+
+    ublas::vector<float> residuals = observed_responses_ - y_hat;
+
+    float square_error{};
+    for (const float& r : residuals)
+      square_error += square(r);
+
+    const float se_line_mean = square_error / num_rows;
+
+    const float dof = num_rows - num_cols; //n - (k + 1)
+    const float variance = square_error / dof;
+
+    ublas::matrix<float> var_cov_mat = variance * beta_variances;
+
+    ublas::vector<float> standard_errors(num_cols);
+
+    for (std::size_t i = 0; i < num_cols; ++i)
+      standard_errors[i] = std::sqrt(var_cov_mat(i,i));
+
+    return std::make_tuple(std::move(beta), std::move(standard_errors));
+  }
+private:
+  const ublas::vector<float>& observed_responses_;
+  ublas::matrix<float> covariates_;
+  ublas::matrix<float> transpose_product_matrix_;
+};
+
 const std::vector<float> predictor_1 = {41.9, 43.4, 43.9, 44.5, 47.3, 47.5, 47.9, 50.2, 52.8, 53.2, 56.7, 57.0, 63.5, 65.3, 71.1, 77.0, 77.8};
 const std::vector<float> predictor_2 = {29.1, 29.3, 29.5, 29.7, 29.9, 30.3, 30.5, 30.7, 30.8, 30.9, 31.5, 31.7, 31.9, 32.0, 32.1, 32.5, 32.9};
 const std::vector<float> response = {251.3, 251.3, 248.3, 267.5, 273.0, 276.5, 270.3, 274.9, 285.0, 290.0, 297.0, 302.5, 304.5, 309.3, 321.7, 330.7, 349.0};
 
 void run_multi(const std::string& file_path)
 {
-//  ublas::vector<float> y(response.size());
-//  std::copy(response.begin(), response.end(), y.begin());
-//
-//  ublas::matrix<float> cov(predictor_2.size(), 1);
-//  std::copy(predictor_2.begin(), predictor_2.end(), (cov.begin2()).begin());
-//
-//  ublas::vector<float> geno(predictor_1.size());
-//  std::copy(predictor_1.begin(), predictor_1.end(), geno.begin());
+  ublas::vector<float> ty(response.size());
+  std::copy(response.begin(), response.end(), ty.begin());
+
+  ublas::matrix<float, ublas::column_major> tcov(predictor_2.size(), 1);
+  std::copy(predictor_2.begin(), predictor_2.end(), (tcov.begin2()).begin());
+
+  ublas::vector<float> tgeno(predictor_1.size());
+  std::copy(predictor_1.begin(), predictor_1.end(), tgeno.begin());
 
   std::random_device rnd_device;
   std::mt19937 mersenne_engine(rnd_device());
@@ -470,16 +580,31 @@ void run_multi(const std::string& file_path)
 
   auto start = std::chrono::high_resolution_clock().now();
   slow_multi_reg slow_reg(y, cov);
+  fast_multi_reg fast_reg(y, cov);
 
   savvy::ublas::dense_allele_vector<float> variant;
+  int i = 0;
   while (r.read(variant, std::numeric_limits<float>::epsilon()))
   {
+    auto op_start = std::chrono::high_resolution_clock().now();
     ublas::vector<float> coefs, se;
     std::tie(coefs, se) = slow_reg(variant);
+    auto op1 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - op_start).count();
+
+    op_start = std::chrono::high_resolution_clock().now();
+    ublas::vector<float> coefs2, se2;
+    std::tie(coefs2, se2) = fast_reg(variant);
+    auto op2 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - op_start).count();
+
+    std::cout << op1 << " " << op2 << std::endl;
 
     boost::math::students_t_distribution<float> dist(y.size() - (2 + 1));
     float t = coefs[2] / se[2];
     float pval = cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
+
+    ++i;
+    if (i == 10)
+      return;
   }
   auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock().now() - start).count();
   std::cout << "wall time: " << elapsed << "s" << std::endl;
