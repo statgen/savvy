@@ -94,6 +94,9 @@ namespace savvy
       std::vector<std::string>::const_iterator stdstring_itr_;
       std::string tmp_;
     };
+
+    virtual ~reader_base() {}
+
     operator bool() const
     {
       return this->good();
