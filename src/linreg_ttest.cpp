@@ -10,6 +10,8 @@
 #include <iostream>
 #include <vector>
 #include <assert.h>
+#include <tuple>
+#include <type_traits>
 
 #include <boost/math/distributions.hpp>
 #include <boost/numeric/ublas/matrix.hpp>
@@ -383,6 +385,99 @@ auto invert_matrix(const ublas::matrix<T>& input)
   return ret;
 }
 
+static_assert(sizeof(std::array<char, 1>) == sizeof(char));
+
+template <std::size_t NumCovariates>
+class gpu_multi_reg
+{
+public:
+  static const std::size_t num_cols = NumCovariates + 2;
+public:
+  gpu_multi_reg(boost::compute::command_queue& queue, const std::vector<float>& observed_responses, const std::vector<std::array<float, NumCovariates>>& covariates) :
+    queue_(queue),
+    observed_responses_(observed_responses.begin(), observed_responses.end(), queue_),
+    covariates_(covariates.size())
+  {
+//    for (auto & row : covariates_)
+//      row[0] = 1.0;
+//    for (std::size_t i = 0; i < covariates.size(); ++i)
+//      std::copy(covariates[i].begin(), covariates[i].end(), covariates_[i + 1].begin());
+  }
+
+  auto operator()(const std::vector<float>& genotypes)
+  {
+
+//    const std::size_t num_rows = observed_responses_.size();
+//    for (std::size_t i = 0; i < num_rows; ++i)
+//      covariates_[i][num_cols - 1] = genotypes[i];
+//
+
+
+//    ublas::matrix<float> beta_variances;
+//    try
+//    {
+//      beta_variances = invert_matrix<float>(ublas::prod(ublas::trans(covariates_), covariates_));
+//    }
+//    catch (std::exception& e)
+//    {
+//      std::cerr << e.what() << std::endl;
+//      return std::make_tuple(ublas::vector<float>(covariates_.size2(), 0.0), ublas::vector<float>(covariates_.size2(), 0.0));
+//    }
+//
+//    ublas::vector<float> beta = ublas::prod(ublas::prod(beta_variances, ublas::trans(covariates_)), observed_responses_);
+//    ublas::vector<float> residuals = observed_responses_ - ublas::prod(covariates_, beta);
+//
+//    float square_error{};
+//    for (const float& r : residuals)
+//      square_error += square(r);
+//
+//    const float se_line_mean = square_error / num_rows;
+//
+//    const float dof = num_rows - num_cols; //n - (k + 1)
+//    const float variance = square_error / dof;
+//
+//    ublas::matrix<float> var_cov_mat = variance * beta_variances;
+//
+//    ublas::vector<float> standard_errors(num_cols);
+//
+//    for (std::size_t i = 0; i < num_cols; ++i)
+//      standard_errors[i] = std::sqrt(var_cov_mat(i,i));
+//
+//    return std::make_tuple(std::move(beta), std::move(standard_errors));
+  }
+private:
+  template <typename T, std::size_t Sz>
+  struct required_float_type
+  {
+    typedef typename std::conditional<std::is_same<T, float>::value && Sz == 1, float,
+      typename std::conditional<std::is_same<T, float>::value && Sz == 2, boost::compute::float2_,
+        typename std::conditional<std::is_same<T, float>::value && (Sz == 3 || Sz == 4), boost::compute::float4_,
+          typename std::conditional<std::is_same<T, float>::value && (Sz > 4 && Sz <= 8), boost::compute::float8_,
+            typename std::conditional<std::is_same<T, float>::value && (Sz > 8 && Sz <= 16), boost::compute::float16_,
+              typename std::conditional<std::is_same<T, double>::value && Sz == 1, double,
+                typename std::conditional<std::is_same<T, double>::value && Sz == 2, boost::compute::double2_,
+                  typename std::conditional<std::is_same<T, double>::value && (Sz == 3 || Sz == 4), boost::compute::double4_,
+                    typename std::conditional<std::is_same<T, double>::value && (Sz > 4 && Sz <= 8), boost::compute::double8_,
+                      typename std::conditional<std::is_same<T, double>::value && (Sz > 8 && Sz <= 16), boost::compute::double16_, void>::type>::type>::type>::type>::type>::type>::type>::type>::type>::type type;
+
+//    typedef std::conditional<
+//      std::is_same<T, float>::value && Sz == 1,
+//      float,
+//      std::conditional<
+//        std::is_same<T, float>::value && Sz == 2,
+//        boost::compute::float2_,
+//        boost::compute::float4_
+//      >::type
+//    >::type type;
+  };
+private:
+  boost::compute::command_queue & queue_;
+  boost::compute::vector<float> observed_responses_;
+  typename required_float_type<float, 1>::type foo_;
+  boost::compute::vector<typename required_float_type<float, 16>::type> covariates_;
+
+};
+
 class slow_multi_reg
 {
 public:
@@ -674,6 +769,91 @@ void run_multi(const std::string& file_path)
 int main(int argc, char** argv)
 {
   boost::compute::device device = boost::compute::system::default_device();
+  boost::compute::context context(device);
+  boost::compute::command_queue queue(context, device);
+
+  std::vector<float> a;
+  std::vector<std::array<float, 2>> b;
+  gpu_multi_reg<2> test(queue, a, b);
+
+  boost::compute::float4_ foo;
+  std::vector<std::array<float, 4>> bar;
+  std::vector<std::tuple<float, float, float, float>> man;
+  //foo = man;
+
+  boost::compute::vector<float> res(4, 0.0, queue);
+  boost::compute::vector<boost::compute::float4_> res_4(1, boost::compute::float4_(0, 0, 0, 0), queue);
+
+
+  std::vector<float> v(1000);
+  boost::compute::vector<float> device_vec(1000 * 4, queue.get_context());
+  boost::compute::vector<boost::compute::float4_> device_vec_4(1000, boost::compute::float4_(1, 2, 3, 0), queue);
+
+
+
+
+  {
+    auto start = std::chrono::high_resolution_clock().now();
+    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+    std::cout << elapsed << std::endl;
+  }
+
+  {
+    auto start = std::chrono::high_resolution_clock().now();
+    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+    std::cout << elapsed << std::endl;
+  }
+
+  {
+    auto start = std::chrono::high_resolution_clock().now();
+    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+    std::cout << elapsed << std::endl;
+  }
+
+  {
+    auto start = std::chrono::high_resolution_clock().now();
+    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+    std::cout << elapsed << std::endl;
+  }
+
+  std::cout << std::endl;
+
+
+  {
+    auto start = std::chrono::high_resolution_clock().now();
+    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+    std::cout << elapsed << std::endl;
+  }
+
+  {
+    auto start = std::chrono::high_resolution_clock().now();
+    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+    std::cout << elapsed << std::endl;
+  }
+
+  {
+    auto start = std::chrono::high_resolution_clock().now();
+    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+    std::cout << elapsed << std::endl;
+  }
+
+  {
+    auto start = std::chrono::high_resolution_clock().now();
+    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+    std::cout << elapsed << std::endl;
+  }
+
+  return 0;
+
+
 //  for (const auto& device : boost::compute::system::devices())
 //  {
 //    std::cout << "NAME: " << device.name() << std::endl;
@@ -723,6 +903,7 @@ int main(int argc, char** argv)
 //  return 0;
 
   run_multi(argv[1]);
+
 
 
 
