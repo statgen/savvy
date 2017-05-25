@@ -409,7 +409,7 @@ public:
     }
     catch (std::exception& e)
     {
-      std::cerr << e.what() << std::endl;
+      //std::cerr << e.what() << std::endl;
       return std::make_tuple(ublas::vector<float>(covariates_.size2(), 0.0), ublas::vector<float>(covariates_.size2(), 0.0));
     }
 
@@ -446,6 +446,7 @@ public:
   fast_multi_reg(const ublas::vector<float>& observed_responses, const ublas::matrix<float, ublas::column_major>& covariates) :
     observed_responses_(observed_responses),
     covariates_(covariates.size1(), covariates.size2() + 1),
+    row_maj_covariates_(covariates.size1(), covariates.size2() + 1),
     transpose_product_matrix_(covariates_.size2() + 1, covariates_.size2() + 1)
   {
     std::fill((covariates_.begin2() + 0).begin(), (covariates_.begin2() + 0).end(), 1.0);
@@ -456,6 +457,8 @@ public:
     std::size_t i = 0;
     for (auto row = tmp.begin1(); row != tmp.end1(); ++row, ++i)
       std::copy(row.begin(), row.end(), (transpose_product_matrix_.begin1() + i).begin());
+
+    row_maj_covariates_ = covariates_;
   }
 
   auto operator()(const ublas::vector<float>& genotypes)
@@ -493,8 +496,7 @@ public:
     }
     catch (std::exception& e)
     {
-      std::cerr << e.what() << std::endl;
-      return std::make_tuple(ublas::vector<float>(covariates_.size2(), 0.0), ublas::vector<float>(covariates_.size2(), 0.0));
+      return std::make_tuple(ublas::vector<float>(num_cols, 0.0), ublas::vector<float>(num_cols, 0.0));
     }
 
     ublas::matrix<float> beta_var_and_x_trans_prod(beta_variances.size1(), num_rows, 0.0);
@@ -505,7 +507,7 @@ public:
       {
         for (std::size_t k = 0; k < num_covs; ++k)
         {
-          beta_var_and_x_trans_prod(i, j) += (beta_variances(i, k) * covariates_(j, k));
+          beta_var_and_x_trans_prod(i, j) += (beta_variances(i, k) * row_maj_covariates_(j, k));
         }
         beta_var_and_x_trans_prod(i, j) += (beta_variances(i, last_index_of_result_matrix) * genotypes[j]);
       }
@@ -546,7 +548,8 @@ public:
   }
 private:
   const ublas::vector<float>& observed_responses_;
-  ublas::matrix<float> covariates_;
+  ublas::matrix<float, ublas::column_major> covariates_;
+  ublas::matrix<float, ublas::row_major> row_maj_covariates_;
   ublas::matrix<float> transpose_product_matrix_;
 };
 
@@ -556,18 +559,18 @@ const std::vector<float> response = {251.3, 251.3, 248.3, 267.5, 273.0, 276.5, 2
 
 void run_multi(const std::string& file_path)
 {
-  ublas::vector<float> ty(response.size());
-  std::copy(response.begin(), response.end(), ty.begin());
-
-  ublas::matrix<float, ublas::column_major> tcov(predictor_2.size(), 1);
-  std::copy(predictor_2.begin(), predictor_2.end(), (tcov.begin2()).begin());
-
-  ublas::vector<float> tgeno(predictor_1.size());
-  std::copy(predictor_1.begin(), predictor_1.end(), tgeno.begin());
+//  ublas::vector<float> ty(response.size());
+//  std::copy(response.begin(), response.end(), ty.begin());
+//
+//  ublas::matrix<float, ublas::column_major> tcov(predictor_2.size(), 1);
+//  std::copy(predictor_2.begin(), predictor_2.end(), (tcov.begin2()).begin());
+//
+//  ublas::vector<float> tgeno(predictor_1.size());
+//  std::copy(predictor_1.begin(), predictor_1.end(), tgeno.begin());
 
   std::random_device rnd_device;
   std::mt19937 mersenne_engine(rnd_device());
-  std::uniform_int_distribution<int> dist(0, 100);
+  std::uniform_real_distribution<float> dist(0.0, 1.0);
   auto gen = std::bind(dist, mersenne_engine);
 
   savvy::reader r(file_path);
@@ -575,36 +578,25 @@ void run_multi(const std::string& file_path)
   ublas::vector<float> y(r.sample_size() * 2);
   generate(y.begin(), y.end(), gen);
 
-  ublas::matrix<float> cov(r.sample_size() * 2, 1);
-  generate(cov.begin1().begin(), cov.begin1().end(), gen);
+  ublas::matrix<float> cov(r.sample_size() * 2, 8);
+  for (auto row_it = cov.begin1(); row_it != cov.end1(); ++row_it)
+    generate(row_it.begin(), row_it.end(), gen);
 
   auto start = std::chrono::high_resolution_clock().now();
-  slow_multi_reg slow_reg(y, cov);
+  //slow_multi_reg slow_reg(y, cov);
   fast_multi_reg fast_reg(y, cov);
 
   savvy::ublas::dense_allele_vector<float> variant;
-  int i = 0;
   while (r.read(variant, std::numeric_limits<float>::epsilon()))
   {
-    auto op_start = std::chrono::high_resolution_clock().now();
     ublas::vector<float> coefs, se;
-    std::tie(coefs, se) = slow_reg(variant);
-    auto op1 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - op_start).count();
+    //std::tie(coefs, se) = slow_reg(variant);
+    std::tie(coefs, se) = fast_reg(variant);
 
-    op_start = std::chrono::high_resolution_clock().now();
-    ublas::vector<float> coefs2, se2;
-    std::tie(coefs2, se2) = fast_reg(variant);
-    auto op2 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - op_start).count();
-
-    std::cout << op1 << " " << op2 << std::endl;
 
     boost::math::students_t_distribution<float> dist(y.size() - (2 + 1));
     float t = coefs[2] / se[2];
     float pval = cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
-
-    ++i;
-    if (i == 10)
-      return;
   }
   auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock().now() - start).count();
   std::cout << "wall time: " << elapsed << "s" << std::endl;
