@@ -462,7 +462,7 @@ namespace savvy
     private:
       static const std::array<std::string, 0> empty_string_array;
     private:
-      std::ofstream output_stream_;
+      oxzstream output_stream_;
       std::vector<std::string> property_fields_;
       std::string file_path_;
       std::uint64_t sample_size_;
