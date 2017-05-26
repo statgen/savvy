@@ -130,7 +130,18 @@ namespace savvy
     }
 
     template <typename T>
-    bool read_variant(allele_vector <T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
+    bool read_variant(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
+    {
+      if (sav_reader_)
+        sav_reader_->read_variant(destination, missing_value);
+      else if (vcf_reader_)
+        vcf_reader_->read_variant(destination, missing_value);
+
+      return good();
+    }
+
+    template <typename T>
+    bool read_variant(genotype_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
     {
       if (sav_reader_)
         sav_reader_->read_variant(destination, missing_value);
@@ -159,7 +170,12 @@ namespace savvy
     template <typename T>
     reader& operator>>(allele_vector<T>& destination);
     template <typename T>
+    reader& operator>>(genotype_vector<T>& destination);
+
+    template <typename T>
     reader& read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN());
+    template <typename T>
+    reader& read(genotype_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN());
     std::vector<std::string> chromosomes() const;
   };
 
@@ -173,15 +189,30 @@ namespace savvy
     template <typename T>
     indexed_reader& operator>>(allele_vector<T>& destination);
     template <typename T>
+    indexed_reader& operator>>(genotype_vector<T>& destination);
+
+    template <typename T>
     indexed_reader& read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN());
+    template <typename T>
+    indexed_reader& read(genotype_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN());
+
     template <typename T, typename Pred>
     indexed_reader& read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN());
+    template <typename T, typename Pred>
+    indexed_reader& read_if(genotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN());
   private:
 
   };
 
   template <typename T>
   reader& reader::operator>>(allele_vector<T>& destination)
+  {
+    read_variant(destination);
+    return *this;
+  }
+
+  template <typename T>
+  reader& reader::operator>>(genotype_vector<T>& destination)
   {
     read_variant(destination);
     return *this;
@@ -195,7 +226,21 @@ namespace savvy
   }
 
   template <typename T>
+  reader& reader::read(genotype_vector<T>& destination, const typename T::value_type missing_value)
+  {
+    read_variant(destination, missing_value);
+    return *this;
+  }
+
+  template <typename T>
   indexed_reader& indexed_reader::operator>>(allele_vector<T>& destination)
+  {
+    read_variant(destination);
+    return *this;
+  }
+
+  template <typename T>
+  indexed_reader& indexed_reader::operator>>(genotype_vector<T>& destination)
   {
     read_variant(destination);
     return *this;
@@ -208,8 +253,26 @@ namespace savvy
     return *this;
   }
 
+  template <typename T>
+  indexed_reader& indexed_reader::read(genotype_vector<T>& destination, const typename T::value_type missing_value)
+  {
+    read_variant(destination, missing_value);
+    return *this;
+  }
+
   template <typename T, typename Pred>
   indexed_reader& indexed_reader::read_if(allele_vector<T>& destination, Pred fn, const typename T::value_type missing_value)
+  {
+    if (sav_reader_)
+      dynamic_cast<sav::indexed_reader*>(sav_reader_.get())->read_if(destination, fn, missing_value);
+    else if (vcf_reader_)
+      dynamic_cast<vcf::indexed_reader*>(vcf_reader_.get())->read_if(destination, fn, missing_value);
+
+    return *this;
+  }
+
+  template <typename T, typename Pred>
+  indexed_reader& indexed_reader::read_if(genotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value)
   {
     if (sav_reader_)
       dynamic_cast<sav::indexed_reader*>(sav_reader_.get())->read_if(destination, fn, missing_value);

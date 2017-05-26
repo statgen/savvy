@@ -21,62 +21,69 @@ namespace savvy
       std::istreambuf_iterator<char> in_it(input_stream_);
       std::istreambuf_iterator<char> end;
 
-      std::uint64_t sz;
-      if (varint_decode(in_it, end, sz) != end)
+      std::uint64_t flags{};
+      if (varint_decode(in_it, end, flags) != end)
       {
         ++in_it;
-        if (sz)
-        {
-          chromosome_.resize(sz);
-          input_stream_.read(&chromosome_[0], sz);
-        }
+        value_bit_width_ = std::uint8_t(flags & 0x07);
 
-        varint_decode(in_it, end, sz);
-        assert(sz < 256);
-        ploidy_level_ = static_cast<std::uint8_t>(sz);
-
-        if (in_it != end)
+        std::uint64_t sz;
+        if (varint_decode(in_it, end, sz) != end)
         {
-          std::uint64_t sample_size;
-          if (varint_decode(++in_it, end, sample_size) != end)
+          ++in_it;
+          if (sz)
           {
-            ++in_it;
-            sample_ids_.reserve(sample_size);
+            chromosome_.resize(sz);
+            input_stream_.read(&chromosome_[0], sz);
+          }
 
-            std::uint64_t id_sz;
-            while (sample_size && varint_decode(in_it, end, id_sz) != end)
+          varint_decode(in_it, end, sz);
+          assert(sz < 256);
+          ploidy_level_ = static_cast<std::uint8_t>(sz);
+
+          if (in_it != end)
+          {
+            std::uint64_t sample_size;
+            if (varint_decode(++in_it, end, sample_size) != end)
             {
               ++in_it;
-              sample_ids_.emplace_back();
-              if (id_sz)
-              {
-                sample_ids_.back().resize(id_sz);
-                input_stream_.read(&sample_ids_.back()[0], id_sz);
-              }
-              --sample_size;
-            }
+              sample_ids_.reserve(sample_size);
 
-            std::uint64_t metadata_fields_cnt;
-            if (varint_decode(in_it, end, metadata_fields_cnt) != end)
-            {
-              ++in_it;
-              metadata_fields_.reserve(metadata_fields_cnt);
-
-              std::uint64_t field_sz;
-              while (metadata_fields_cnt && varint_decode(in_it, end, field_sz) != end)
+              std::uint64_t id_sz;
+              while (sample_size && varint_decode(in_it, end, id_sz) != end)
               {
                 ++in_it;
-                metadata_fields_.emplace_back();
-                if (field_sz)
+                sample_ids_.emplace_back();
+                if (id_sz)
                 {
-                  metadata_fields_.back().resize(field_sz);
-                  input_stream_.read(&metadata_fields_.back()[0], field_sz);
+                  sample_ids_.back().resize(id_sz);
+                  input_stream_.read(&sample_ids_.back()[0], id_sz);
                 }
-                --metadata_fields_cnt;
+                --sample_size;
               }
 
-              if (!metadata_fields_cnt)
-                return; //TODO: This is ugly. Consider not depending on on istream error handling.
+              std::uint64_t metadata_fields_cnt;
+              if (varint_decode(in_it, end, metadata_fields_cnt) != end)
+              {
+                ++in_it;
+                metadata_fields_.reserve(metadata_fields_cnt);
+
+                std::uint64_t field_sz;
+                while (metadata_fields_cnt && varint_decode(in_it, end, field_sz) != end)
+                {
+                  ++in_it;
+                  metadata_fields_.emplace_back();
+                  if (field_sz)
+                  {
+                    metadata_fields_.back().resize(field_sz);
+                    input_stream_.read(&metadata_fields_.back()[0], field_sz);
+                  }
+                  --metadata_fields_cnt;
+                }
+
+                if (!metadata_fields_cnt)
+                  return; //TODO: This is ugly. Consider not depending on on istream error handling.
+              }
             }
           }
         }

@@ -385,7 +385,7 @@ auto invert_matrix(const ublas::matrix<T>& input)
   return ret;
 }
 
-static_assert(sizeof(std::array<char, 1>) == sizeof(char));
+static_assert(sizeof(std::array<char, 1>) == sizeof(char), "Compiler not supported. std::array has extra data. This is allowed by standard but not expected.");
 
 template <std::size_t NumCovariates>
 class gpu_multi_reg

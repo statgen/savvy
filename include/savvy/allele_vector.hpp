@@ -10,15 +10,34 @@
 
 namespace savvy
 {
+  struct variant_details
+  {
+    variant_details(std::string&& chromosome, std::uint64_t locus, std::string&& ref, std::string&& alt, std::unordered_map<std::string, std::string>&& properties) :
+      chromosome(std::move(chromosome)),
+      locus(locus),
+      ref(std::move(ref)),
+      alt(std::move(alt)),
+      properties(std::move(properties))
+    {
+
+    }
+
+    std::string chromosome;
+    std::uint64_t locus;
+    std::string ref;
+    std::string alt;
+    std::unordered_map<std::string, std::string> properties;
+  };
+
   template<typename T>
-  class allele_vector : public T
+  class variant_vector : public T
   {
   public:
-    allele_vector()
+    variant_vector()
     {
     }
 
-    allele_vector(
+    variant_vector(
       std::string&& chromosome,
       std::uint64_t locus,
       std::string&& ref,
@@ -36,34 +55,16 @@ namespace savvy
 
     }
 
-//    template <typename RandAccessIterType>
-//    allele_vector(
-//      const std::string& chromosome,
-//      std::uint64_t locus,
-//      const std::string& ref,
-//      const std::string& alt,
-//      std::uint64_t sample_count,
-//      std::uint8_t ploidy,
-//      RandAccessIterType gt_beg,
-//      RandAccessIterType gt_end)
-//      :
-//      T(std::move(mixin_vector)),
-//      chromosome_(chromosome),
-//      locus_(locus),
-//      ref_(ref),
-//      alt_(alt),
-//      sample_count_(sample_count),
-//      ploidy_(ploidy)
-//    {
-//      T::resize(sample_count_ * ploidy_, 0.0);
-//      for (it = gt_beg; it != gt_end; ++it)
-//      {
-//        if (*it != 0.0)
-//        {
-//          (*this)[std::distance(gt_beg, it)] = *it;
-//        }
-//      }
-//    }
+    virtual ~variant_vector() {}
+
+    void operator<<(variant_details&& details)
+    {
+      chromosome_ = std::move(details.chromosome);
+      locus_ = details.locus;
+      ref_ = std::move(details.ref);
+      alt_ = std::move(details.alt);
+      properties_ = std::move(details.properties);
+    }
 
     const std::string& chromosome() const { return chromosome_; }
     const std::string& ref() const { return ref_; }
@@ -85,12 +86,31 @@ namespace savvy
     static const std::string empty_string;
   };
 
+  template <typename T>
+  class allele_vector : public variant_vector<T>
+  {
+  public:
+    using variant_vector<T>::variant_vector;
+  };
+
+  template <typename T>
+  class genotype_vector : public variant_vector<T>
+  {
+  public:
+    using variant_vector<T>::variant_vector;
+  };
+
   template<typename T>
-  const std::string allele_vector<T>::empty_string = {};
+  const std::string variant_vector<T>::empty_string = {};
 
   template <typename T>
   using dense_allele_vector = allele_vector<std::vector<T>>;
   template <typename T>
   using sparse_allele_vector = allele_vector<compressed_vector<T>>;
+
+  template <typename T>
+  using dense_genotype_vector = genotype_vector<std::vector<T>>;
+  template <typename T>
+  using sparse_genotype_vector = genotype_vector<compressed_vector<T>>;
 }
 #endif //LIBSAVVY_ALLELE_VECTOR_HPP

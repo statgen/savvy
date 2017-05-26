@@ -20,11 +20,26 @@
 #include <tuple>
 #include <cmath>
 #include <unordered_map>
+#include <type_traits>
 
 namespace savvy
 {
   namespace sav
   {
+//    namespace detail
+//    {
+//      template <std::uint8_t Exp>
+//      struct static_base2_pow; //              : public std::integral_constant<std::uint8_t, 0> {};
+//
+//      template <> struct static_base2_pow<0> : public std::integral_constant<std::uint8_t, 1>   {};
+//      template <> struct static_base2_pow<1> : public std::integral_constant<std::uint8_t, 2>   {};
+//      template <> struct static_base2_pow<2> : public std::integral_constant<std::uint8_t, 4>   {};
+//      template <> struct static_base2_pow<3> : public std::integral_constant<std::uint8_t, 8>   {};
+//      template <> struct static_base2_pow<4> : public std::integral_constant<std::uint8_t, 16>  {};
+//      template <> struct static_base2_pow<5> : public std::integral_constant<std::uint8_t, 32>  {};
+//      template <> struct static_base2_pow<6> : public std::integral_constant<std::uint8_t, 64>  {};
+//      template <> struct static_base2_pow<7> : public std::integral_constant<std::uint8_t, 128> {};
+//    }
 
     class reader_base
     {
@@ -41,10 +56,44 @@ namespace savvy
       bool read_variant(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
       {
         read_variant_details(destination);
-        read_genotype(destination, missing_value);
+
+        switch (value_bit_width_)
+        {
+          case 0: read_alleles<0>(destination, missing_value); break;
+          case 1: read_alleles<1>(destination, missing_value); break;
+          case 2: read_alleles<2>(destination, missing_value); break;
+          case 3: read_alleles<3>(destination, missing_value); break;
+          case 4: read_alleles<4>(destination, missing_value); break;
+          case 5: read_alleles<5>(destination, missing_value); break;
+          case 6: read_alleles<6>(destination, missing_value); break;
+          case 7: read_alleles<7>(destination, missing_value); break;
+          default: read_alleles<0>(destination, missing_value);
+        }
 
         return good();
       }
+
+      template <typename T>
+      bool read_variant(genotype_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
+      {
+        read_variant_details(destination);
+
+        switch (value_bit_width_)
+        {
+          case 0: read_genotypes<0>(destination, missing_value); break;
+          case 1: read_genotypes<1>(destination, missing_value); break;
+          case 2: read_genotypes<2>(destination, missing_value); break;
+          case 3: read_genotypes<3>(destination, missing_value); break;
+          case 4: read_genotypes<4>(destination, missing_value); break;
+          case 5: read_genotypes<5>(destination, missing_value); break;
+          case 6: read_genotypes<6>(destination, missing_value); break;
+          case 7: read_genotypes<7>(destination, missing_value); break;
+          default: read_genotypes<0>(destination, missing_value);
+        }
+
+        return good();
+      }
+
       explicit operator bool() const { return input_stream_.good(); }
       bool good() const { return input_stream_.good(); }
       bool fail() const { return input_stream_.fail(); }
@@ -64,7 +113,7 @@ namespace savvy
     protected:
       virtual bool update_file_position() { return true; }
       template <typename T>
-      void read_variant_details(allele_vector<T>& destination)
+      void read_variant_details(variant_vector<T>& destination)
       {
         if (good())
         {
@@ -132,7 +181,7 @@ namespace savvy
                     }
                   }
 
-                  destination = allele_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), std::move(props), std::move(destination));
+                  destination << variant_details(std::string(chromosome()), locus, std::move(ref), std::move(alt), std::move(props));
                   destination.resize(0);
                 }
               }
@@ -141,8 +190,16 @@ namespace savvy
         }
       }
 
-      template <typename T>
-      void read_genotype(allele_vector<T>& destination, const typename T::value_type missing_value)
+      template<std::uint8_t BitWidth>
+      struct allele_decoder
+      {
+        static const std::uint8_t denom = (~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
+        template <typename T>
+        static std::tuple<T, std::uint64_t> decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value);
+      };
+
+      template <std::uint8_t BitWidth, typename T>
+      void read_alleles(allele_vector<T>& destination, const typename T::value_type missing_value)
       {
         if (good())
         {
@@ -157,11 +214,39 @@ namespace savvy
           std::uint64_t total_offset = 0;
           for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
           {
-            std::uint8_t allele;
+            typename T::value_type allele;
             std::uint64_t offset;
-            one_bit_prefixed_varint::decode(++in_it, end_it, allele, offset);
+            std::tie(allele, offset) = allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
             total_offset += offset;
-            destination[total_offset] = (allele ? missing_value : alt_value);
+            destination[total_offset] = allele; //(allele ? missing_value : alt_value);
+          }
+
+          input_stream_.get();
+        }
+      }
+
+      template <std::uint8_t BitWidth, typename T>
+      void read_genotypes(genotype_vector<T>& destination, const typename T::value_type missing_value)
+      {
+        if (good())
+        {
+          const typename T::value_type alt_value{1};
+          std::istreambuf_iterator<char> in_it(input_stream_);
+          std::istreambuf_iterator<char> end_it;
+
+          destination.resize(sample_count() * ploidy());
+
+          std::uint64_t sz;
+          varint_decode(in_it, end_it, sz);
+          std::uint64_t total_offset = 0;
+          std::uint64_t ploidy_counter = 0;
+          for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+          {
+            typename T::value_type allele;
+            std::uint64_t offset;
+            std::tie(allele, offset) = allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
+            total_offset += offset;
+            destination[total_offset / ploidy_level_] += allele; //(allele ? missing_value : alt_value);
           }
 
           input_stream_.get();
@@ -170,6 +255,7 @@ namespace savvy
     protected:
       std::vector<std::string> sample_ids_;
       std::string chromosome_;
+      std::uint8_t value_bit_width_;
       //ixzbuf sbuf_;
       ixzstream input_stream_;
       std::string file_path_;
@@ -224,7 +310,21 @@ namespace savvy
       }
 
       template <typename T>
+      indexed_reader& operator>>(genotype_vector<T>& destination)
+      {
+        read_variant(destination);
+        return *this;
+      }
+
+      template <typename T>
       indexed_reader& read(allele_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
+      {
+        read_variant(destination, missing_value);
+        return *this;
+      }
+
+      template <typename T>
+      indexed_reader& read(genotype_vector<T>& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
       {
         read_variant(destination, missing_value);
         return *this;
@@ -242,7 +342,49 @@ namespace savvy
             predicate_failed = !fn(destination);
             if (!predicate_failed)
             {
-              read_genotype(destination, missing_value);
+              switch (value_bit_width_)
+              {
+                case 0: read_alleles<0>(destination, missing_value); break;
+                case 1: read_alleles<1>(destination, missing_value); break;
+                case 2: read_alleles<2>(destination, missing_value); break;
+                case 3: read_alleles<3>(destination, missing_value); break;
+                case 4: read_alleles<4>(destination, missing_value); break;
+                case 5: read_alleles<5>(destination, missing_value); break;
+                case 6: read_alleles<6>(destination, missing_value); break;
+                case 7: read_alleles<7>(destination, missing_value); break;
+                default: read_alleles<0>(destination, missing_value);
+              }
+            }
+          }
+        }
+
+        return *this;
+      }
+
+      template <typename T, typename Pred>
+      indexed_reader& read_if(genotype_vector<T>& destination, Pred fn, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
+      {
+        bool predicate_failed = true;
+        while (good() && predicate_failed)
+        {
+          read_variant_details(destination);
+          if (good())
+          {
+            predicate_failed = !fn(destination);
+            if (!predicate_failed)
+            {
+              switch (value_bit_width_)
+              {
+                case 0: read_genotypes<0>(destination, missing_value); break;
+                case 1: read_genotypes<1>(destination, missing_value); break;
+                case 2: read_genotypes<2>(destination, missing_value); break;
+                case 3: read_genotypes<3>(destination, missing_value); break;
+                case 4: read_genotypes<4>(destination, missing_value); break;
+                case 5: read_genotypes<5>(destination, missing_value); break;
+                case 6: read_genotypes<6>(destination, missing_value); break;
+                case 7: read_genotypes<7>(destination, missing_value); break;
+                default: read_genotypes<0>(destination, missing_value);
+              }
             }
           }
         }
@@ -286,18 +428,23 @@ namespace savvy
     {
     public:
       template <typename RandAccessStringIterator, typename RandAccessStringIterator2>
-      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessStringIterator2 property_fields_beg, RandAccessStringIterator2 property_fields_end) :
+      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessStringIterator2 property_fields_beg, RandAccessStringIterator2 property_fields_end, std::uint8_t value_bit_width = 1) :
         output_stream_(file_path),
         file_path_(file_path),
         sample_size_(samples_end - samples_beg),
         ploidy_level_(ploidy),
         record_count_(0),
-        block_size_(64)
+        block_size_(64),
+        value_bit_width_(value_bit_width)
       {
         std::string version_string("sav\x00\x01\x00\x00", 7);
         output_stream_.write(version_string.data(), version_string.size());
 
         std::ostreambuf_iterator<char> out_it(output_stream_);
+
+        std::uint64_t flags = value_bit_width_;
+
+        varint_encode(value_bit_width_, out_it);
 
         varint_encode(chromosome.size(), out_it);
         std::copy(chromosome.begin(), chromosome.end(), out_it);
@@ -325,8 +472,8 @@ namespace savvy
 
 
       template <typename RandAccessStringIterator>
-      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end) :
-        writer(file_path, chromosome, ploidy, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_array.end(), empty_string_array.end())
+      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, std::uint8_t value_bit_width = 1) :
+        writer(file_path, chromosome, ploidy, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_array.end(), empty_string_array.end(), value_bit_width)
       {
 
       }
@@ -415,7 +562,7 @@ namespace savvy
       template <typename T>
       void write(const allele_vector<T>& m)
       {
-        const typename T::value_type ref_value = typename T::value_type();
+
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
         varint_encode(m.locus(), os_it);
 
@@ -437,21 +584,19 @@ namespace savvy
             std::copy(value.begin(), value.end(), os_it);
         }
 
-        std::uint64_t non_zero_count =  m.size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), ref_value));
-        varint_encode(non_zero_count, os_it);
-        std::uint64_t last_pos = 0;
-        auto beg = m.begin();
-        for (auto it = beg; it != m.end(); ++it)
+        switch (value_bit_width_)
         {
-          if (*it != ref_value)
-          {
-            std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
-            std::uint64_t offset = dist - last_pos;
-            last_pos = dist + 1;
-            std::uint8_t allele = (std::isnan(*it)  ? std::uint8_t(0x80) : std::uint8_t(0x00));
-            one_bit_prefixed_varint::encode(allele, offset, os_it);
-          }
+          case 0:  write_alleles<0>(m); break;
+          case 1:  write_alleles<1>(m); break;
+          case 2:  write_alleles<2>(m); break;
+          case 3:  write_alleles<3>(m); break;
+          case 4:  write_alleles<4>(m); break;
+          case 5:  write_alleles<5>(m); break;
+          case 6:  write_alleles<6>(m); break;
+          case 7:  write_alleles<7>(m); break;
+          default: write_alleles<0>(m);
         }
+
       }
 #endif
 
@@ -459,6 +604,38 @@ namespace savvy
     private:
       template <typename T>
       static std::size_t get_string_size(T str);
+
+
+      template<std::uint8_t BitWidth>
+      struct allele_encoder
+      {
+        static const std::uint8_t multiplier = (~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
+        template <typename T>
+        static void encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it);
+      };
+
+      template <std::uint8_t BitWidth, typename T>
+      void write_alleles(const allele_vector<T>& m)
+      {
+        const typename T::value_type ref_value = typename T::value_type();
+
+        std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
+        std::uint64_t non_zero_count =  m.size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), ref_value));
+        varint_encode(non_zero_count, os_it);
+        std::uint64_t last_pos = 0;
+        auto beg = m.begin();
+        for (auto it = beg; it != m.end(); ++it)
+        {
+          //std::int8_t signed_allele = std::round((std::isnan(*it) ? T::value_type(0.5) : *it) * type_multiplier) - T::value_type(1);
+          if (*it != ref_value)
+          {
+            std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
+            std::uint64_t offset = dist - last_pos;
+            last_pos = dist + 1;
+            allele_encoder<BitWidth>::encode(*it, offset, os_it);
+          }
+        }
+      }
     private:
       static const std::array<std::string, 0> empty_string_array;
     private:
@@ -470,7 +647,40 @@ namespace savvy
       std::uint32_t metadata_fields_cnt_;
       std::size_t record_count_;
       std::size_t block_size_;
+      std::uint8_t value_bit_width_;
     };
+
+    template <>
+    template <typename T>
+    inline std::tuple<T, std::uint64_t> reader_base::allele_decoder<0>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
+    {
+      std::tuple<std::uint8_t, std::uint64_t> ret{1, 0};
+      in_it = varint_decode(in_it, end_it, std::get<1>(ret));
+      return ret;
+    }
+
+    template<>
+    template <typename T>
+    inline std::tuple<T, std::uint64_t> reader_base::allele_decoder<1>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
+    {
+      std::tuple<std::uint8_t, std::uint64_t> ret;
+      std:uint8_t allele;
+      in_it = prefixed_varint<1>::decode(in_it, end_it, allele, std::get<1>(ret));
+      std::get<0>(ret) = (allele ? T(1) : missing_value);
+      return ret;
+    }
+
+    template<std::uint8_t BitWidth>
+    template <typename T>
+    inline std::tuple<T, std::uint64_t> reader_base::allele_decoder<BitWidth>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
+    {
+      std::tuple<std::uint8_t, std::uint64_t> ret;
+      std:uint8_t allele;
+      in_it = prefixed_varint<BitWidth>::decode(in_it, end_it, allele, std::get<1>(ret));
+      std::get<0>(ret) = (static_cast<T>(allele) + T(1)) / denom;
+      return ret;
+    }
+
 
     template <typename T>
     std::size_t writer::get_string_size(T str)
@@ -482,6 +692,27 @@ namespace savvy
     inline std::size_t writer::get_string_size<const char*>(const char* str)
     {
       return std::strlen(str);
+    }
+
+    template<>
+    template <typename T>
+    inline void writer::allele_encoder<0>::encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
+    {
+      varint_encode(offset, os_it);
+    }
+
+    template<>
+    template <typename T>
+    inline void writer::allele_encoder<1>::encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
+    {
+      prefixed_varint<1>::encode(std::uint8_t(std::isnan(allele) ? 0 : 1), offset, os_it);
+    }
+
+    template<std::uint8_t ByteWidth>
+    template <typename T>
+    inline void writer::allele_encoder<ByteWidth>::encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
+    {
+      prefixed_varint<ByteWidth>::encode(std::uint8_t(std::round((std::isnan(allele) ? T::value_type(0.5) : allele) * multiplier) - T::value_type(1)), offset, os_it);
     }
 
     template <typename VecType>
