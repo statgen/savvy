@@ -106,7 +106,7 @@ namespace savvy
     bool reader_base::read_variant(genotype_vector<T>& destination, const typename T::value_type missing_value)
     {
       read_variant_details(destination);
-      read_alleles(destination, missing_value);
+      read_genotypes(destination, missing_value);
 
       return good();
     }
@@ -240,7 +240,7 @@ namespace savvy
         else
         {
           const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample);
-          destination.resize(sample_count() * ploidy);
+          destination.resize(sample_count());
 
           for (std::size_t i = 0; i < gt_sz_; ++i)
           {
@@ -438,7 +438,7 @@ namespace savvy
           predicate_failed = !fn(destination);
           if (!predicate_failed)
           {
-            read_alleles(destination, missing_value);
+            read_genotypes(destination, missing_value);
           }
         }
       }

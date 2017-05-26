@@ -234,7 +234,7 @@ namespace savvy
           std::istreambuf_iterator<char> in_it(input_stream_);
           std::istreambuf_iterator<char> end_it;
 
-          destination.resize(sample_count() * ploidy());
+          destination.resize(sample_count());
 
           std::uint64_t sz;
           varint_decode(in_it, end_it, sz);
