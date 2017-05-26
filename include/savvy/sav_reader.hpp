@@ -712,7 +712,7 @@ namespace savvy
     template <typename T>
     inline void writer::allele_encoder<ByteWidth>::encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
     {
-      prefixed_varint<ByteWidth>::encode(std::uint8_t(std::round((std::isnan(allele) ? T::value_type(0.5) : allele) * multiplier) - T::value_type(1)), offset, os_it);
+      prefixed_varint<ByteWidth>::encode(std::uint8_t(std::round((std::isnan(allele) ? T(0.5) : allele) * multiplier) - T(1)), offset, os_it);
     }
 
     template <typename VecType>
