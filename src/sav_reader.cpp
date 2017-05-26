@@ -100,7 +100,8 @@ namespace savvy
       input_stream_(std::move(source.input_stream_)),
       file_path_(std::move(source.file_path_)),
       ploidy_level_(source.ploidy_level_),
-      metadata_fields_(std::move(source.metadata_fields_))
+      metadata_fields_(std::move(source.metadata_fields_)),
+      value_bit_width_(source.value_bit_width_)
     {
     }
 
@@ -116,6 +117,7 @@ namespace savvy
         file_path_ = std::move(source.file_path_);
         ploidy_level_ = source.ploidy_level_;
         metadata_fields_ = std::move(source.metadata_fields_);
+        value_bit_width_ = source.value_bit_width_;
       }
       return *this;
     }
