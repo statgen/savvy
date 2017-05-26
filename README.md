@@ -64,7 +64,7 @@ while (it != savvy::sparse_variant_iterator<float>{})
 ```
 
 ## Custom Vectors
-The allele_vector class utilizes the "mixin" pattern to efficiently support 3rd-party linear algebra libraries. 
+The allele_vector and genotype_vector classes utilizes the "mixin" pattern to efficiently support 3rd-party linear algebra libraries. 
 ```c++
 savvy::allele_vector<std::vector<float>> std_vector;
 savvy::allele_vector<savvy::compressed_vector<double>> savvy_sparse_vector;
@@ -131,8 +131,8 @@ auto lin_reg = [](const std::vector<float>& x, const std::vector<float>& y)
 };
 
 savvy::reader f("chr1.cmf");
-savvy::dense_allele_vector<float> variant;
-std::vector<float> pheno(f.sample_size() * 2);
+savvy::dense_genotype_vector<float> variant;
+std::vector<float> pheno(f.sample_size());
 
 while (f >> variant)
 {
