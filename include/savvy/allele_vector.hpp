@@ -10,25 +10,6 @@
 
 namespace savvy
 {
-  struct variant_details
-  {
-    variant_details(std::string&& chromosome, std::uint64_t locus, std::string&& ref, std::string&& alt, std::unordered_map<std::string, std::string>&& properties) :
-      chromosome(std::move(chromosome)),
-      locus(locus),
-      ref(std::move(ref)),
-      alt(std::move(alt)),
-      properties(std::move(properties))
-    {
-
-    }
-
-    std::string chromosome;
-    std::uint64_t locus;
-    std::string ref;
-    std::string alt;
-    std::unordered_map<std::string, std::string> properties;
-  };
-
   template<typename T>
   class variant_vector : public T
   {
@@ -56,15 +37,6 @@ namespace savvy
     }
 
     virtual ~variant_vector() {}
-
-    void operator<<(variant_details&& details)
-    {
-      chromosome_ = std::move(details.chromosome);
-      locus_ = details.locus;
-      ref_ = std::move(details.ref);
-      alt_ = std::move(details.alt);
-      properties_ = std::move(details.properties);
-    }
 
     const std::string& chromosome() const { return chromosome_; }
     const std::string& ref() const { return ref_; }

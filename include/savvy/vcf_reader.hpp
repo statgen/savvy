@@ -178,12 +178,13 @@ namespace savvy
             }
           }
 
-          destination << variant_details(
+          destination = variant_vector<T>(
             std::string(bcf_hdr_id2name(hts_hdr(), hts_rec()->rid)),
             static_cast<std::uint64_t>(hts_rec()->pos + 1),
             std::string(hts_rec()->d.allele[0]),
             std::string(hts_rec()->n_allele > 1 ? hts_rec()->d.allele[allele_index_] : ""),
-            std::move(props));
+            std::move(props),
+            std::move(destination));
           destination.resize(0);
         }
 

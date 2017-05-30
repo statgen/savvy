@@ -181,7 +181,7 @@ namespace savvy
                     }
                   }
 
-                  destination << variant_details(std::string(chromosome()), locus, std::move(ref), std::move(alt), std::move(props));
+                  destination = variant_vector<T>(std::string(chromosome()), locus, std::move(ref), std::move(alt), std::move(props), std::move(destination));
                   destination.resize(0);
                 }
               }
