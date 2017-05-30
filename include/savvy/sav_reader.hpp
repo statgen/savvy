@@ -59,7 +59,6 @@ namespace savvy
 
         switch (value_bit_width_)
         {
-          case 0: read_alleles<0>(destination, missing_value); break;
           case 1: read_alleles<1>(destination, missing_value); break;
           case 2: read_alleles<2>(destination, missing_value); break;
           case 3: read_alleles<3>(destination, missing_value); break;
@@ -80,7 +79,6 @@ namespace savvy
 
         switch (value_bit_width_)
         {
-          case 0: read_genotypes<0>(destination, missing_value); break;
           case 1: read_genotypes<1>(destination, missing_value); break;
           case 2: read_genotypes<2>(destination, missing_value); break;
           case 3: read_genotypes<3>(destination, missing_value); break;
@@ -344,7 +342,6 @@ namespace savvy
             {
               switch (value_bit_width_)
               {
-                case 0: read_alleles<0>(destination, missing_value); break;
                 case 1: read_alleles<1>(destination, missing_value); break;
                 case 2: read_alleles<2>(destination, missing_value); break;
                 case 3: read_alleles<3>(destination, missing_value); break;
@@ -375,7 +372,6 @@ namespace savvy
             {
               switch (value_bit_width_)
               {
-                case 0: read_genotypes<0>(destination, missing_value); break;
                 case 1: read_genotypes<1>(destination, missing_value); break;
                 case 2: read_genotypes<2>(destination, missing_value); break;
                 case 3: read_genotypes<3>(destination, missing_value); break;
@@ -586,7 +582,6 @@ namespace savvy
 
         switch (value_bit_width_)
         {
-          case 0:  write_alleles<0>(m); break;
           case 1:  write_alleles<1>(m); break;
           case 2:  write_alleles<2>(m); break;
           case 3:  write_alleles<3>(m); break;
