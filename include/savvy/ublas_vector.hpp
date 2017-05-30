@@ -17,10 +17,10 @@ namespace savvy
     using dense_allele_vector = allele_vector<boost::numeric::ublas::vector<T>>;
 
     template <typename T>
-    using genotype_allele_vector = genotype_vector<boost::numeric::ublas::compressed_vector<T>>;
+    using sparse_genotype_vector = genotype_vector<boost::numeric::ublas::compressed_vector<T>>;
 
     template <typename T>
-    using genotype_allele_vector = genotype_vector<boost::numeric::ublas::vector<T>>;
+    using dense_genotype_vector = genotype_vector<boost::numeric::ublas::vector<T>>;
   }
 }
 

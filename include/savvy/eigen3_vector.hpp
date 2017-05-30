@@ -76,7 +76,7 @@ namespace savvy
     using sparse_genotype_vector = genotype_vector<sparse_vector<T>>;
 
     template <typename T>
-    using sparse_genotype_vector = genotype_vector<dense_vector<T>>;
+    using dense_genotype_vector = genotype_vector<dense_vector<T>>;
   }
 }
 #endif //LIBSAVVY_EIGEN3_VECTOR_HPP
