@@ -20,9 +20,10 @@ All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB12
 +----------------------------------------------------------------+
 | 01110011 01100001 01110110 MMMMMMMM MMMMMMMM mmmmmmmm mmmmmmmm |
 +----------------------------------------------------------------+
-+vvvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
-|  CHROM  | PLOIDY_LEVEL | SAMPLE_SIZE |     SAMPLE_ID_ARRAY ...     |
-+vvvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
++~~~~~~~~~~~+vvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVV+
+| BIT_WIDTH | CHROM  | PLOIDY_LEVEL | SAMPLE_SIZE | SAMPLE_ID_ARRAY ... |
++~~~~~~~~~~~+vvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVV+
+* BIT_WIDTH: Bit width of genotype values (0-7). 
 * CHROM: Chromosome string stored has VLS.
 * PLOIDY_LEVEL: Ploidy level stored has VLI.
 * SAMPLE_SIZE: Number of samples stored has VLI.
@@ -36,17 +37,19 @@ All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB12
 
 ```
 
-## Haplotype Pairs
-Haplotype pairs are encoded in 1 or more bytes. The first bit of the first byte determines whether the pair represents a missing or alternate allele. The next 7 bits and any additional bytes in the pair make up a VLI that represents a zero-based offset from the previous non-zero haplotype.
+## Allele Pairs
+Allele pairs are encoded in 1 or more bytes. The first BIT_WIDTH bits of the first byte encodes the non-zero value of the allele. The the remaining bits and any additional bytes in the pair make up a VLI that represents a zero-based offset from the previous non-zero allele.
+
+Allele values can be decoded with the following formula (VALUE + 1) / 2 ^ BIT_WIDTH. With 1-bit values, 0.5 is considered a missing binary genotype. 2-bit values and greater represent binned posterior genotype probabilities.
 
 ### Example
 ```
-An allele with an offset of 25.
+A 1-bit missing allele with an offset of 25.
 +-+--------+
 |0|001 1001|
 +-+--------+
 
-A missing haplotype with an offset of 8000.
+A 1-bit alternate allele with an offset of 8000.
 +-+--------+ +---------+
 |1|100 0000| |0111 1101|
 +-+--------+ +---------+
@@ -54,16 +57,16 @@ A missing haplotype with an offset of 8000.
 
 ## Record Format
 ```
-+~~~~~~~~~+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+~~~~~~~~~+VVVVVVVVVVVVVVVVVVVV+
-|   POS   |   REF   |   ALT   | META_VALUE_ARRAY ... | HPA_SZ  | HAP_PAIR_ARRAY ... |
-+~~~~~~~~~+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+~~~~~~~~~+VVVVVVVVVVVVVVVVVVVV+
++~~~~~~~~~+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVV+
+|   POS   |   REF   |   ALT   | META_VALUE_ARRAY ... | APA_SZ  | ALLELE_PAIR_ARRAY ... |
++~~~~~~~~~+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVV+
 
 * POS: Chromosome pos stored has VLI.
 * MARKID: Marker ID string stored has VLS.
 * REF: Reference haplotype stored has VLS.
 * ALT: Alternate haplotype stored has VLS.
 * META_VALUE_ARRAY: Array of size META_FIELDS_CNT that stores metadata for each marker. Values correspond to META_FIELDS_ARRAY in header.
-* HPA_SZ: Size of haplotype pair array stored as VLI with one bit prefix.
-* HAP_PAIR_ARRAY: Array of size HPA_SZ that stores alleles or missing haplotypes in Haplotype Pair encoding.
+* APA_SZ: Size of allele pair array stored as VLI with one bit prefix.
+* ALLELE_PAIR_ARRAY: Array of size APA_SZ that stores alternate alleles Allele Pair encoding.
 
 ```
