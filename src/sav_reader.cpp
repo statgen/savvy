@@ -62,27 +62,69 @@ namespace savvy
                 --sample_size;
               }
 
-              std::uint64_t metadata_fields_cnt;
-              if (varint_decode(in_it, end, metadata_fields_cnt) != end)
+              std::uint64_t file_info_size;
+              if (varint_decode(in_it, end, file_info_size) != end)
               {
                 ++in_it;
-                metadata_fields_.reserve(metadata_fields_cnt);
+                file_info_.reserve(file_info_size);
 
-                std::uint64_t field_sz;
-                while (metadata_fields_cnt && varint_decode(in_it, end, field_sz) != end)
+
+                while (file_info_size && in_it != end)
                 {
-                  ++in_it;
-                  metadata_fields_.emplace_back();
-                  if (field_sz)
+                  std::uint64_t key_size;
+                  if (varint_decode(in_it, end, key_size) != end)
                   {
-                    metadata_fields_.back().resize(field_sz);
-                    input_stream_.read(&metadata_fields_.back()[0], field_sz);
+                    ++in_it;
+                    if (key_size)
+                    {
+                      std::string key;
+                      key.resize(key_size);
+                      input_stream_.read(&key[0], key_size);
+
+                      std::uint64_t val_size;
+                      if (varint_decode(in_it, end, val_size) != end)
+                      {
+                        ++in_it;
+                        if (key_size)
+                        {
+                          std::string val;
+                          val.resize(val_size);
+                          input_stream_.read(&val[0], val_size);
+
+                          file_info_.emplace_back(std::move(key), std::move(val));
+                        }
+                      }
+
+                    }
                   }
-                  --metadata_fields_cnt;
+                  --file_info_size;
                 }
 
-                if (!metadata_fields_cnt)
-                  return; //TODO: This is ugly. Consider not depending on on istream error handling.
+                if (!file_info_size)
+                {
+                  std::uint64_t metadata_fields_cnt;
+                  if (varint_decode(in_it, end, metadata_fields_cnt) != end)
+                  {
+                    ++in_it;
+                    metadata_fields_.reserve(metadata_fields_cnt);
+
+                    std::uint64_t field_sz;
+                    while (metadata_fields_cnt && varint_decode(in_it, end, field_sz) != end)
+                    {
+                      ++in_it;
+                      metadata_fields_.emplace_back();
+                      if (field_sz)
+                      {
+                        metadata_fields_.back().resize(field_sz);
+                        input_stream_.read(&metadata_fields_.back()[0], field_sz);
+                      }
+                      --metadata_fields_cnt;
+                    }
+
+                    if (!metadata_fields_cnt)
+                      return; //TODO: This is ugly. Consider not depending on on istream error handling.
+                  }
+                }
               }
             }
           }
@@ -131,6 +173,7 @@ namespace savvy
 
     //================================================================//
     const std::array<std::string, 0> writer::empty_string_array = {};
+    const std::array<std::pair<std::string, std::string>, 0> writer::empty_string_pair_array = {};
 
     bool writer::create_index(const std::string& input_file_path, std::string output_file_path)
     {

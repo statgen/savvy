@@ -29,11 +29,17 @@ All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB12
 * SAMPLE_SIZE: Number of samples stored has VLI.
 * SAMPLE_ID_ARRAY: Array of length SAMPLE_SIZE that stores sample ID's in VLS encoding.
 
-+~~~~~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
-| META_FIELDS_CNT |     META_FIELDS_ARRAY ...   |
-+~~~~~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVVVVVVVV+
++~~~~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVV+
+| FILE_INFO_SIZE | FILE_INFO_ARRAY ... |
++~~~~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVV+
+* FILE_INFO_SIZE: Number of key value pairs of file level info.
+* FILE_INFO_ARRAY: Array of FILE_INFO_SIZE key value pairs of file level info.
+
++~~~~~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVV+
+| META_FIELDS_CNT | META_FIELDS_ARRAY ... |
++~~~~~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVV+
 * META_FIELDS_CNT: Number of metadata fields.
-* META_FIELDS_ARRAY: Array of length META_FIELDS_CNT that stores metadata fiels in VLS encoding.
+* META_FIELDS_ARRAY: Array of length META_FIELDS_CNT that stores variant level annotation fields in VLS encoding.
 
 ```
 

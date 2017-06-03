@@ -510,8 +510,9 @@ void convert_file_test()
     const std::string chrom = cur != eof ? cur->chromosome() : "";
     const std::size_t ploidy = cur != eof ? (cur->size() / input.sample_count()) : 0;
 
+    auto file_info = input.metadata();
     auto prop_fields = input.prop_fields();
-    savvy::sav::writer compact_output("test_file.sav", chrom, ploidy, input.samples_begin(), input.samples_end(), prop_fields.begin(), prop_fields.end());
+    savvy::sav::writer compact_output("test_file.sav", chrom, ploidy, input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end(), prop_fields.begin(), prop_fields.end());
 
     while (cur != eof)
     {

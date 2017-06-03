@@ -28,6 +28,52 @@ namespace savvy
       return static_cast<std::uint64_t>(bcf_hdr_nsamples(hts_hdr()));
     }
 
+    std::vector<std::pair<std::string, std::string>> reader_base::metadata() const
+    {
+      std::vector<std::pair<std::string, std::string>> ret;
+
+      bcf_hdr_t* hdr = hts_hdr();
+      if (hdr)
+      {
+        ret.reserve(hdr->nhrec - 1);
+        for (int i = 1; i < hdr->nhrec; ++i)
+        {
+          std::string key, val;
+          if (hdr->hrec[i]->key && hdr->hrec[i]->value)
+          {
+            key = hdr->hrec[i]->key;
+            val = hdr->hrec[i]->value;
+          }
+          else if (hdr->hrec[i]->key &&  (hdr->hrec[i]->type == BCF_HL_INFO || hdr->hrec[i]->type == BCF_HL_FLT || hdr->hrec[i]->type == BCF_HL_STR))
+          {
+            bcf_hrec_t* r = hdr->hrec[i];
+            key = r->key;
+            std::stringstream ss_val;
+
+            ss_val << "<";
+            for (int j = 0; j < r->nkeys - 1; ++j) // minus 1 to remove IDX;
+            {
+              if (j > 0)
+                ss_val << ",";
+              if (r->keys[j])
+                ss_val << r->keys[j];
+              ss_val << "=";
+              if (r->vals[j])
+                ss_val << r->vals[j];
+            }
+            ss_val << ">";
+            val = ss_val.str();
+          }
+
+          if (key.size())
+            ret.emplace_back(std::move(key), std::move(val));
+            //ret.insert(std::upper_bound(ret.begin(), ret.end(), std::make_pair(key, std::string()), [](const auto& a, const auto& b) { return a.first < b.first; }), {std::move(key), std::move(val)});
+        }
+      }
+
+      return ret;
+    }
+
     std::vector<std::string> reader_base::prop_fields() const
     {
       std::vector<std::string> ret(property_fields_);

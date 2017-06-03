@@ -191,7 +191,7 @@ namespace savvy
       template<std::uint8_t BitWidth>
       struct allele_decoder
       {
-        static const std::uint8_t denom = (~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
+        static const std::uint8_t denom = std::uint8_t(~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
         template <typename T>
         static std::tuple<T, std::uint64_t> decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value);
       };
@@ -258,6 +258,7 @@ namespace savvy
       ixzstream input_stream_;
       std::string file_path_;
       std::uint8_t ploidy_level_;
+      std::vector<std::pair<std::string, std::string>> file_info_;
       std::vector<std::string> metadata_fields_;
     };
 
@@ -423,8 +424,8 @@ namespace savvy
     class writer
     {
     public:
-      template <typename RandAccessStringIterator, typename RandAccessStringIterator2>
-      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessStringIterator2 property_fields_beg, RandAccessStringIterator2 property_fields_end, std::uint8_t value_bit_width = 1) :
+      template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename RandAccessStringIterator2>
+      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator file_info_beg, RandAccessKVPIterator file_info_end,  RandAccessStringIterator2 property_fields_beg, RandAccessStringIterator2 property_fields_end, std::uint8_t value_bit_width = 1) :
         output_stream_(file_path),
         file_path_(file_path),
         sample_size_(samples_end - samples_beg),
@@ -455,6 +456,25 @@ namespace savvy
             output_stream_.write(&(*it)[0], str_sz);
         }
 
+
+        file_info_.assign(file_info_beg, file_info_end);
+        varint_encode(file_info_.size(), out_it);
+        for (auto it = file_info_.begin(); it != file_info_.end(); ++it)
+        {
+          std::size_t str_sz = get_string_size(it->first);
+          varint_encode(str_sz, out_it);
+          if (str_sz)
+          {
+            output_stream_.write(it->first.data(), str_sz);
+
+            str_sz = get_string_size(it->second);
+            varint_encode(str_sz, out_it);
+            if (str_sz)
+              output_stream_.write(it->second.data(), str_sz);
+          }
+        }
+
+
         property_fields_.assign(property_fields_beg, property_fields_end);
         varint_encode(property_fields_.size(), out_it);
         for (auto it = property_fields_.begin(); it != property_fields_.end(); ++it)
@@ -469,7 +489,7 @@ namespace savvy
 
       template <typename RandAccessStringIterator>
       writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, std::uint8_t value_bit_width = 1) :
-        writer(file_path, chromosome, ploidy, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_array.end(), empty_string_array.end(), value_bit_width)
+        writer(file_path, chromosome, ploidy, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_pair_array.end(), empty_string_pair_array.end(),  empty_string_array.end(), empty_string_array.end(), value_bit_width)
       {
 
       }
@@ -604,7 +624,7 @@ namespace savvy
       template<std::uint8_t BitWidth>
       struct allele_encoder
       {
-        static const std::uint8_t multiplier = (~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
+        static const std::uint8_t multiplier = std::uint8_t(~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
         template <typename T>
         static void encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it);
       };
@@ -633,8 +653,10 @@ namespace savvy
       }
     private:
       static const std::array<std::string, 0> empty_string_array;
+      static const std::array<std::pair<std::string, std::string>, 0> empty_string_pair_array;
     private:
       oxzstream output_stream_;
+      std::vector<std::pair<std::string, std::string>> file_info_;
       std::vector<std::string> property_fields_;
       std::string file_path_;
       std::uint64_t sample_size_;

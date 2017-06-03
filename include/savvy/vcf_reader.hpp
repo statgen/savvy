@@ -64,6 +64,7 @@ namespace savvy
       const char** samples_end() const;
 
       std::vector<std::string> prop_fields() const;
+      std::vector<std::pair<std::string, std::string>> metadata() const;
 //      std::vector<std::string>::const_iterator prop_fields_begin() const { return property_fields_.begin(); }
 //      std::vector<std::string>::const_iterator prop_fields_end() const { return property_fields_.end(); }
       std::uint64_t sample_count() const;
@@ -90,6 +91,7 @@ namespace savvy
       int* gt_;
       int gt_sz_;
       int allele_index_;
+      std::vector<std::pair<std::string, std::string>> metadata_;
       std::vector<std::string> property_fields_; // TODO: This member is no longer necessary not that prop_fields_{begin,end}() methods are gone. Eventually remove this and init_property_fileds()
     };
 
