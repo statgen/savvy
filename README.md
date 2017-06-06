@@ -14,7 +14,7 @@ target_link_libraries(prog savvy hts z lzma)
 
 ## Read Variants from File 
 ```c++
-savvy::reader f("chr1.cmf");
+savvy::reader f("chr1.sav");
 savvy::sparse_allele_vector<float> variant;
 while (f >> variant)
 {
@@ -31,7 +31,7 @@ while (f >> variant)
 
 ## Indexed Files
 ```c++
-savvy::indexed_reader f("chr1.cmf", {"X", 100000, 199999});
+savvy::indexed_reader f("chr1.sav", {"X", 100000, 199999});
 savvy::dense_allele_vector<float> variant;
 while (f >> variant)
 {
@@ -47,7 +47,7 @@ while (f >> variant)
 
 ## Input Iterators 
 ```c++
-savvy::reader f("chr1.cmf");
+savvy::reader f("chr1.sav");
 savvy::sparse_variant_iterator<float> it(f);
 while (it != savvy::sparse_variant_iterator<float>{})
 {
@@ -74,7 +74,7 @@ savvy::allele_vector<boost::numeric::ublas::compressed_vector<float>> ublas_spar
 ## Read Predicates
 Reading genotypes can be bypassed when using a read predicate.
 ```c++
-savvy::indexed_reader f("chr1.cmf");
+savvy::indexed_reader f("chr1.sav");
 savvy::sparse_allele_vector<float> variant;
 
 while (f.read_if(variant, [](const auto& v) { return std::stof(v.prop("AF")) < 0.1; }))
@@ -83,7 +83,7 @@ while (f.read_if(variant, [](const auto& v) { return std::stof(v.prop("AF")) < 0
 }
 ```
 ```c++
-savvy::indexed_reader f("chr1.cmf");
+savvy::indexed_reader f("chr1.sav");
 savvy::dense_allele_vector<float> buf;
 
 {
@@ -130,7 +130,7 @@ auto lin_reg = [](const std::vector<float>& x, const std::vector<float>& y)
   return std::make_tuple(m, b, r2); // slope, y-intercept, r-squared
 };
 
-savvy::reader f("chr1.cmf");
+savvy::reader f("chr1.sav");
 savvy::dense_genotype_vector<float> variant;
 std::vector<float> pheno(f.sample_size());
 
@@ -152,7 +152,7 @@ auto arma_lin_reg = [](const arma::Col<float>& x, const arma::Col<float>& y)
   return std::make_tuple(m, b, r2); // slope, y-intercept, r-squared
 };
 
-savvy::reader f("chr1.cmf");
+savvy::reader f("chr1.sav");
 savvy::armadillo::dense_allele_vector<float> variant;
 arma::Col<float> pheno(f.sample_size() * 2);
 
@@ -166,7 +166,7 @@ while (f >> variant)
 ## Custom Missing Value
 The default value for missing genotypes is `std::numeric_limits<T::value_type>::quiet_NaN()`. This can be overwritten when using the read method.
 ```c++
-savvy::reader f("chr1.cmf");
+savvy::reader f("chr1.sav");
 savvy::dense_allele_vector<float> variant;
 
 const float missing_value = std::numeric_values<float>::epsilon();
@@ -184,7 +184,7 @@ savvy::vcf::dense_variant_iterator eof;
 
 if (it != eof)
 {
-  savvy::cmf::writer output("file.cmf", it->chromosome(), savvy::get_ploidy(bcf_file, *it), bcf_file.samples_begin(), bcf_file.samples_end());
+  savvy::cmf::writer output("file.sav", it->chromosome(), savvy::get_ploidy(bcf_file, *it), bcf_file.samples_begin(), bcf_file.samples_end());
   savvy::cmf::output_iterator out_it(cmf_file);
   
   if (subset_file)
