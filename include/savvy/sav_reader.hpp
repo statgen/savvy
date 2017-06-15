@@ -9,7 +9,9 @@
 #include "region.hpp"
 #include "variant_iterator.hpp"
 
-#include <xzbuf.hpp>
+#include <shrinkwrap/xz.hpp>
+#include <shrinkwrap/gz.hpp>
+#include <shrinkwrap/istream.hpp>
 
 #include <cstdint>
 #include <string>
@@ -21,6 +23,7 @@
 #include <cmath>
 #include <unordered_map>
 #include <type_traits>
+#include <memory>
 
 namespace savvy
 {
@@ -255,7 +258,7 @@ namespace savvy
       std::string chromosome_;
       std::uint8_t value_bit_width_;
       //ixzbuf sbuf_;
-      ixzstream input_stream_;
+      shrinkwrap::istream input_stream_;
       std::string file_path_;
       std::uint8_t ploidy_level_;
       std::vector<std::pair<std::string, std::string>> file_info_;
@@ -424,16 +427,30 @@ namespace savvy
     class writer
     {
     public:
+      struct options
+      {
+        enum class compression_type { none = 0, xz, bgzf } compression;
+        std::uint8_t value_bit_width;
+        options() :
+          compression(compression_type::xz),
+          value_bit_width(1)
+        {
+        }
+      };
+
       template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename RandAccessStringIterator2>
-      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator file_info_beg, RandAccessKVPIterator file_info_end,  RandAccessStringIterator2 property_fields_beg, RandAccessStringIterator2 property_fields_end, std::uint8_t value_bit_width = 1) :
-        output_stream_(file_path),
+      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator file_info_beg, RandAccessKVPIterator file_info_end,  RandAccessStringIterator2 property_fields_beg, RandAccessStringIterator2 property_fields_end, options opts = options()) :
+        output_buf_(opts.compression == options::compression_type::xz ? std::unique_ptr<std::streambuf>(new shrinkwrap::xz::obuf(file_path)) : std::unique_ptr<std::streambuf>(new shrinkwrap::bgz::obuf(file_path))),
+        output_stream_(output_buf_.get()),
         file_path_(file_path),
         sample_size_(samples_end - samples_beg),
         ploidy_level_(ploidy),
         record_count_(0),
         block_size_(64),
-        value_bit_width_(value_bit_width)
+        value_bit_width_(opts.value_bit_width)
       {
+
+
         std::string version_string("sav\x00\x01\x00\x00", 7);
         output_stream_.write(version_string.data(), version_string.size());
 
@@ -488,8 +505,8 @@ namespace savvy
 
 
       template <typename RandAccessStringIterator>
-      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, std::uint8_t value_bit_width = 1) :
-        writer(file_path, chromosome, ploidy, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_pair_array.end(), empty_string_pair_array.end(),  empty_string_array.end(), empty_string_array.end(), value_bit_width)
+      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, options opts = options()) :
+        writer(file_path, chromosome, ploidy, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_pair_array.end(), empty_string_pair_array.end(),  empty_string_array.end(), empty_string_array.end(), opts)
       {
 
       }
@@ -655,7 +672,8 @@ namespace savvy
       static const std::array<std::string, 0> empty_string_array;
       static const std::array<std::pair<std::string, std::string>, 0> empty_string_pair_array;
     private:
-      oxzstream output_stream_;
+      std::unique_ptr<std::streambuf> output_buf_;
+      std::ostream output_stream_;
       std::vector<std::pair<std::string, std::string>> file_info_;
       std::vector<std::string> property_fields_;
       std::string file_path_;
