@@ -14,6 +14,8 @@ namespace savvy
   class variant_vector : public T
   {
   public:
+    typedef T vector_type;
+
     variant_vector()
     {
     }
@@ -72,6 +74,13 @@ namespace savvy
     using variant_vector<T>::variant_vector;
   };
 
+  template <typename T>
+  class dosage_vector : public variant_vector<T>
+  {
+  public:
+    using variant_vector<T>::variant_vector;
+  };
+
   template<typename T>
   const std::string variant_vector<T>::empty_string = {};
 
@@ -84,5 +93,10 @@ namespace savvy
   using dense_genotype_vector = genotype_vector<std::vector<T>>;
   template <typename T>
   using sparse_genotype_vector = genotype_vector<compressed_vector<T>>;
+
+  template <typename T>
+  using dense_dosage_vector = dosage_vector<std::vector<T>>;
+  template <typename T>
+  using sparse_dosage_vector = dosage_vector<compressed_vector<T>>;
 }
 #endif //LIBSAVVY_ALLELE_VECTOR_HPP
