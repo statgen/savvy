@@ -195,14 +195,13 @@ namespace savvy
         const typename T::value_type alt_value = typename T::value_type(1);
         bcf_unpack(hts_rec(), BCF_UN_ALL);
         bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_));
-        int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
-        if (gt_sz_ % num_samples != 0)
+        if (gt_sz_ % sample_count() != 0)
         {
           // TODO: mixed ploidy at site error.
         }
         else
         {
-          destination.resize(sample_count() * (gt_sz_ / hts_rec()->n_sample));
+          destination.resize(gt_sz_);
 
           for (std::size_t i = 0; i < gt_sz_; ++i)
           {
@@ -226,14 +225,13 @@ namespace savvy
         const typename T::value_type alt_value = typename T::value_type(1);
         bcf_unpack(hts_rec(), BCF_UN_ALL);
         bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_));
-        int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
-        if (gt_sz_ % num_samples != 0)
+        if (gt_sz_ % sample_count() != 0)
         {
           // TODO: mixed ploidy at site error.
         }
         else
         {
-          const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample);
+          const std::uint64_t ploidy(gt_sz_ / sample_count());
           destination.resize(sample_count());
 
           for (std::size_t i = 0; i < gt_sz_; ++i)
@@ -256,7 +254,8 @@ namespace savvy
       if (good())
       {
         bcf_unpack(hts_rec(), BCF_UN_ALL);
-        bcf_get_format_float(hts_hdr(),hts_rec(),"DS", &(gt_), &(gt_sz_));
+        if (bcf_get_format_float(hts_hdr(),hts_rec(),"EC", &(gt_), &(gt_sz_)) < 0)
+          bcf_get_format_float(hts_hdr(),hts_rec(),"DS", &(gt_), &(gt_sz_));
         int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
         if (gt_sz_ % num_samples != 0)
         {
@@ -265,7 +264,7 @@ namespace savvy
         else
         {
           const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample);
-          destination.resize(sample_count());
+          destination.resize(gt_sz_);
 
           float* ds = (float*)(void*)(gt_);
           for (std::size_t i = 0; i < gt_sz_; ++i)
