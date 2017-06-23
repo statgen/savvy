@@ -10,8 +10,8 @@ int main(int argc, char** argv)
 
 
   savvy::vcf::reader input(argv[1]);
-  savvy::vcf::dense_variant_iterator<float> eof;
-  savvy::vcf::dense_variant_iterator<float> cur(input);
+  savvy::vcf::dense_allele_variant_iterator<float> eof;
+  savvy::vcf::dense_allele_variant_iterator<float> cur(input);
 
   if (cur != eof)
   {

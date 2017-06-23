@@ -8,14 +8,14 @@
 int main(int argc, char** argv)
 {
   savvy::vcf::reader input(argv[1]);
-  savvy::vcf::dense_variant_iterator<float> cur(input);
-  savvy::vcf::dense_variant_iterator<float> eof{};
+  savvy::vcf::dense_allele_variant_iterator<float> cur(input);
+  savvy::vcf::dense_allele_variant_iterator<float> eof{};
   const std::string chrom = cur != eof ? cur->chromosome() : "";
   const int ploidy =  cur != eof ? savvy::get_ploidy(input, *cur) : 0;
 
   std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
   std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-  savvy::sav::writer compact_output(argv[2], chrom, ploidy, sample_ids.begin(), sample_ids.end());
+  savvy::sav::writer compact_output(argv[2], sample_ids.begin(), sample_ids.end());
 
   while (cur != eof)
   {
