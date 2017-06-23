@@ -223,12 +223,12 @@ namespace savvy
   }
 
   template <typename VecType>
-  using variant_iterator =  basic_variant_iterator<reader_base, VecType>;
+  using allele_variant_iterator =  basic_allele_variant_iterator<reader_base, VecType>;
 
   template <typename ValType>
-  using dense_variant_iterator =  basic_variant_iterator<reader_base, std::vector<ValType>>;
+  using dense_allele_variant_iterator =  basic_allele_variant_iterator<reader_base, std::vector<ValType>>;
   template <typename ValType>
-  using sparse_variant_iterator =  basic_variant_iterator<reader_base, compressed_vector<ValType>>;
+  using sparse_allele_variant_iterator =  basic_allele_variant_iterator<reader_base, compressed_vector<ValType>>;
 }
 
 #endif //VC_READER_HPP

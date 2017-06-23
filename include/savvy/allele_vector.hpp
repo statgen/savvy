@@ -75,6 +75,13 @@ namespace savvy
   };
 
   template <typename T>
+  class genotype_probabilities_vector : public variant_vector<T>
+  {
+  public:
+    using variant_vector<T>::variant_vector;
+  };
+
+  template <typename T>
   class dosage_vector : public variant_vector<T>
   {
   public:
@@ -93,6 +100,11 @@ namespace savvy
   using dense_genotype_vector = genotype_vector<std::vector<T>>;
   template <typename T>
   using sparse_genotype_vector = genotype_vector<compressed_vector<T>>;
+
+  template <typename T>
+  using dense_genotype_probabilities_vector = genotype_probabilities_vector<std::vector<T>>;
+//  template <typename T>
+//  using sparse_genotype_probabilities_vector = genotype_probabilities_vector<compressed_vector<T>>;
 
   template <typename T>
   using dense_dosage_vector = dosage_vector<std::vector<T>>;

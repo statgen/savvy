@@ -21,108 +21,122 @@ namespace savvy
       std::istreambuf_iterator<char> in_it(input_stream_);
       std::istreambuf_iterator<char> end;
 
-      std::uint64_t flags{};
-      if (varint_decode(in_it, end, flags) != end)
+      std::uint64_t sz;
+      if (varint_decode(in_it, end, sz) != end)
       {
         ++in_it;
-        value_bit_width_ = std::uint8_t(flags & 0x07);
-
-        std::uint64_t sz;
-        if (varint_decode(in_it, end, sz) != end)
+        std::string format_string;
+        if (sz)
         {
-          ++in_it;
-          if (sz)
-          {
-            chromosome_.resize(sz);
-            input_stream_.read(&chromosome_[0], sz);
-          }
+          format_string.resize(sz);
+          input_stream_.read(&format_string[0], sz);
+        }
 
-          varint_decode(in_it, end, sz);
-          assert(sz < 256);
-          ploidy_level_ = static_cast<std::uint8_t>(sz);
+        if (format_string == "GT")
+          data_format_ = data_format_type::genotype;
+        else if (format_string == "GP")
+          data_format_ = data_format_type::posterior_probablities;
+        else
+          this->input_stream_.setstate(std::ios::badbit);
 
-          if (in_it != end)
+        if (input_stream_.good())
+        {
+          if (varint_decode(in_it, end, sz) != end)
           {
-            std::uint64_t sample_size;
-            if (varint_decode(++in_it, end, sample_size) != end)
+            ++in_it;
+            if (sz)
             {
-              ++in_it;
-              sample_ids_.reserve(sample_size);
+              chromosome_.resize(sz);
+              input_stream_.read(&chromosome_[0], sz);
+            }
 
-              std::uint64_t id_sz;
-              while (sample_size && varint_decode(in_it, end, id_sz) != end)
+            varint_decode(in_it, end, sz);
+            assert(sz < 256);
+            ploidy_level_ = static_cast<std::uint8_t>(sz);
+
+            if (in_it != end)
+            {
+              std::uint64_t sample_size;
+              if (varint_decode(++in_it, end, sample_size) != end)
               {
                 ++in_it;
-                sample_ids_.emplace_back();
-                if (id_sz)
+                sample_ids_.reserve(sample_size);
+
+                std::uint64_t id_sz;
+                while (sample_size && varint_decode(in_it, end, id_sz) != end)
                 {
-                  sample_ids_.back().resize(id_sz);
-                  input_stream_.read(&sample_ids_.back()[0], id_sz);
-                }
-                --sample_size;
-              }
-
-              std::uint64_t file_info_size;
-              if (varint_decode(in_it, end, file_info_size) != end)
-              {
-                ++in_it;
-                file_info_.reserve(file_info_size);
-
-
-                while (file_info_size && in_it != end)
-                {
-                  std::uint64_t key_size;
-                  if (varint_decode(in_it, end, key_size) != end)
+                  ++in_it;
+                  sample_ids_.emplace_back();
+                  if (id_sz)
                   {
-                    ++in_it;
-                    if (key_size)
-                    {
-                      std::string key;
-                      key.resize(key_size);
-                      input_stream_.read(&key[0], key_size);
-
-                      std::uint64_t val_size;
-                      if (varint_decode(in_it, end, val_size) != end)
-                      {
-                        ++in_it;
-                        if (key_size)
-                        {
-                          std::string val;
-                          val.resize(val_size);
-                          input_stream_.read(&val[0], val_size);
-
-                          file_info_.emplace_back(std::move(key), std::move(val));
-                        }
-                      }
-
-                    }
+                    sample_ids_.back().resize(id_sz);
+                    input_stream_.read(&sample_ids_.back()[0], id_sz);
                   }
-                  --file_info_size;
+                  --sample_size;
                 }
 
-                if (!file_info_size)
+                std::uint64_t file_info_size;
+                if (varint_decode(in_it, end, file_info_size) != end)
                 {
-                  std::uint64_t metadata_fields_cnt;
-                  if (varint_decode(in_it, end, metadata_fields_cnt) != end)
-                  {
-                    ++in_it;
-                    metadata_fields_.reserve(metadata_fields_cnt);
+                  ++in_it;
+                  file_info_.reserve(file_info_size);
 
-                    std::uint64_t field_sz;
-                    while (metadata_fields_cnt && varint_decode(in_it, end, field_sz) != end)
+
+                  while (file_info_size && in_it != end)
+                  {
+                    std::uint64_t key_size;
+                    if (varint_decode(in_it, end, key_size) != end)
                     {
                       ++in_it;
-                      metadata_fields_.emplace_back();
-                      if (field_sz)
+                      if (key_size)
                       {
-                        metadata_fields_.back().resize(field_sz);
-                        input_stream_.read(&metadata_fields_.back()[0], field_sz);
-                      }
-                      --metadata_fields_cnt;
-                    }
+                        std::string key;
+                        key.resize(key_size);
+                        input_stream_.read(&key[0], key_size);
 
-                    if (!metadata_fields_cnt)
-                      return; //TODO: This is ugly. Consider not depending on on istream error handling.
+                        std::uint64_t val_size;
+                        if (varint_decode(in_it, end, val_size) != end)
+                        {
+                          ++in_it;
+                          if (key_size)
+                          {
+                            std::string val;
+                            val.resize(val_size);
+                            input_stream_.read(&val[0], val_size);
+
+                            file_info_.emplace_back(std::move(key), std::move(val));
+                          }
+                        }
+
+                      }
+                    }
+                    --file_info_size;
+                  }
+
+                  if (!file_info_size)
+                  {
+                    std::uint64_t metadata_fields_cnt;
+                    if (varint_decode(in_it, end, metadata_fields_cnt) != end)
+                    {
+                      ++in_it;
+                      metadata_fields_.reserve(metadata_fields_cnt);
+
+                      std::uint64_t field_sz;
+                      while (metadata_fields_cnt && varint_decode(in_it, end, field_sz) != end)
+                      {
+                        ++in_it;
+                        metadata_fields_.emplace_back();
+                        if (field_sz)
+                        {
+                          metadata_fields_.back().resize(field_sz);
+                          input_stream_.read(&metadata_fields_.back()[0], field_sz);
+                        }
+                        --metadata_fields_cnt;
+                      }
+
+                      if (!metadata_fields_cnt)
+                        return; //TODO: This is ugly. Consider not depending on on istream error handling.
+                    }
                   }
                 }
               }
@@ -143,7 +157,7 @@ namespace savvy
       file_path_(std::move(source.file_path_)),
       ploidy_level_(source.ploidy_level_),
       metadata_fields_(std::move(source.metadata_fields_)),
-      value_bit_width_(source.value_bit_width_)
+      data_format_(source.data_format_)
     {
     }
 
@@ -159,7 +173,7 @@ namespace savvy
         file_path_ = std::move(source.file_path_);
         ploidy_level_ = source.ploidy_level_;
         metadata_fields_ = std::move(source.metadata_fields_);
-        value_bit_width_ = source.value_bit_width_;
+        data_format_ = source.data_format_;
       }
       return *this;
     }
@@ -191,8 +205,8 @@ namespace savvy
       std::int64_t start_pos = r.tellg();
 
 
-      variant_iterator<std::vector<float>> it(r);
-      variant_iterator<std::vector<float>> end;
+      allele_variant_iterator<std::vector<float>> it(r);
+      allele_variant_iterator<std::vector<float>> end;
       while (it != end && start_pos >= 0)
       {
         std::int64_t end_pos = r.tellg();

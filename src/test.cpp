@@ -458,8 +458,8 @@ private:
   {
     std::size_t ret = 0;
 
-    savvy::basic_variant_iterator<ReaderType, std::vector<float>> cur(reader);
-    savvy::basic_variant_iterator<ReaderType, std::vector<float>> end;
+    savvy::basic_allele_variant_iterator<ReaderType, std::vector<float>> cur(reader);
+    savvy::basic_allele_variant_iterator<ReaderType, std::vector<float>> end;
 
     std::size_t num_markers = 0;
     while (cur != end)
@@ -505,8 +505,8 @@ void convert_file_test()
 {
   {
     savvy::vcf::reader input("test_file.vcf");
-    savvy::vcf::variant_iterator<std::vector<float>> cur(input);
-    savvy::vcf::variant_iterator<std::vector<float>> eof;
+    savvy::vcf::allele_variant_iterator<std::vector<float>> cur(input);
+    savvy::vcf::allele_variant_iterator<std::vector<float>> eof;
     const std::string chrom = cur != eof ? cur->chromosome() : "";
     const std::size_t ploidy = cur != eof ? (cur->size() / input.sample_count()) : 0;
 
@@ -671,8 +671,8 @@ void random_access_test()
   savvy::sav::writer::create_index("test_file.sav");
 
   savvy::indexed_reader rdr("test_file.vcf.gz", {"20", 17000, 1120000});
-  auto it = savvy::variant_iterator<std::vector<float>>(rdr);
-  auto end = savvy::variant_iterator<std::vector<float>>{};
+  auto it = savvy::allele_variant_iterator<std::vector<float>>(rdr);
+  auto end = savvy::allele_variant_iterator<std::vector<float>>{};
   for ( ; it != end; ++it)
   {
     std::cout << it->locus() << std::endl;
@@ -703,15 +703,6 @@ void generic_reader_test()
 
 int main(int argc, char** argv)
 {
-//  using namespace boost::numeric;
-//  ublas::compressed_vector<float> v(10);
-//  v[3] = 0;
-//  v[5] = 3;
-//  std::cout << v.nnz() << std::endl;
-//  savvy::allele_vector<ublas::compressed_vector<float>> v2;
-//
-//  std::cout << std::endl;
-//  return 0;
   std::cout << "[0] Run all tests." << std::endl;
   std::cout << "[1] Run varint test." << std::endl;
   std::cout << "[2] Run file conversion test." << std::endl;

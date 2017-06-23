@@ -14,7 +14,7 @@ namespace savvy
   public:
     typedef basic_variant_iterator self_type;
     typedef std::ptrdiff_t difference_type;
-    typedef allele_vector<VectorType> value_type;
+    typedef VectorType value_type;
     typedef const value_type& reference;
     typedef const value_type* pointer;
     typedef std::input_iterator_tag iterator_category;
@@ -42,6 +42,15 @@ namespace savvy
     ReaderType* file_reader_;
     value_type m_;
   };
+
+  template <typename ReaderType, typename VectorType>
+  using basic_allele_variant_iterator = basic_variant_iterator<ReaderType, allele_vector<VectorType>>;
+
+  template <typename ReaderType, typename VectorType>
+  using basic_genotype_variant_iterator = basic_variant_iterator<ReaderType, genotype_vector<VectorType>>;
+
+  template <typename ReaderType, typename VectorType>
+  using basic_dosage_variant_iterator = basic_variant_iterator<ReaderType, dosage_vector<VectorType>>;
 }
 
 #endif //LIBSAVVY_VARIANT_ITERATOR_HPP

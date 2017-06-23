@@ -85,6 +85,8 @@ namespace savvy
       template <typename T>
       void read_genotypes(genotype_vector<T>& destination, const typename T::value_type missing_value);
       template <typename T>
+      void read_genotypes(genotype_probabilities_vector<T>& destination, const typename T::value_type missing_value);
+      template <typename T>
       void read_genotypes(dosage_vector<T>& destination, const typename T::value_type missing_value);
     protected:
       std::ios::iostate state_;
@@ -194,23 +196,25 @@ namespace savvy
       {
         const typename T::value_type alt_value = typename T::value_type(1);
         bcf_unpack(hts_rec(), BCF_UN_ALL);
-        bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_));
-        if (gt_sz_ % sample_count() != 0)
+        if (bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
         {
-          // TODO: mixed ploidy at site error.
-        }
-        else
-        {
-          destination.resize(gt_sz_);
-
-          for (std::size_t i = 0; i < gt_sz_; ++i)
+          if (gt_sz_ % sample_count() != 0)
           {
-            if (gt_[i] == bcf_gt_missing)
-              destination[i] = missing_value;
-            else if (bcf_gt_allele(gt_[i]) == allele_index_)
-              destination[i] = alt_value;
+            // TODO: mixed ploidy at site error.
           }
-          return;
+          else
+          {
+            destination.resize(gt_sz_);
+
+            for (std::size_t i = 0; i < gt_sz_; ++i)
+            {
+              if (gt_[i] == bcf_gt_missing)
+                destination[i] = missing_value;
+              else if (bcf_gt_allele(gt_[i]) == allele_index_)
+                destination[i] = alt_value;
+            }
+            return;
+          }
         }
 
         this->state_ = std::ios::failbit;
@@ -224,24 +228,26 @@ namespace savvy
       {
         const typename T::value_type alt_value = typename T::value_type(1);
         bcf_unpack(hts_rec(), BCF_UN_ALL);
-        bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_));
-        if (gt_sz_ % sample_count() != 0)
+        if (bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
         {
-          // TODO: mixed ploidy at site error.
-        }
-        else
-        {
-          const std::uint64_t ploidy(gt_sz_ / sample_count());
-          destination.resize(sample_count());
-
-          for (std::size_t i = 0; i < gt_sz_; ++i)
+          if (gt_sz_ % sample_count() != 0)
           {
-            if (gt_[i] == bcf_gt_missing)
-              destination[i / ploidy] += missing_value;
-            else if (bcf_gt_allele(gt_[i]) == allele_index_)
-              destination[i / ploidy] += alt_value;
+            // TODO: mixed ploidy at site error.
           }
-          return;
+          else
+          {
+            const std::uint64_t ploidy(gt_sz_ / sample_count());
+            destination.resize(sample_count());
+
+            for (std::size_t i = 0; i < gt_sz_; ++i)
+            {
+              if (gt_[i] == bcf_gt_missing)
+                destination[i / ploidy] += missing_value;
+              else if (bcf_gt_allele(gt_[i]) == allele_index_)
+                destination[i / ploidy] += alt_value;
+            }
+            return;
+          }
         }
 
         this->state_ = std::ios::failbit;
@@ -254,24 +260,62 @@ namespace savvy
       if (good())
       {
         bcf_unpack(hts_rec(), BCF_UN_ALL);
-        if (bcf_get_format_float(hts_hdr(),hts_rec(),"EC", &(gt_), &(gt_sz_)) < 0)
-          bcf_get_format_float(hts_hdr(),hts_rec(),"DS", &(gt_), &(gt_sz_));
-        int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
-        if (gt_sz_ % num_samples != 0)
+        if (bcf_get_format_float(hts_hdr(),hts_rec(),"DS", &(gt_), &(gt_sz_)) >= 0)
         {
-          // TODO: mixed ploidy at site error.
-        }
-        else
-        {
-          const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample);
-          destination.resize(gt_sz_);
-
-          float* ds = (float*)(void*)(gt_);
-          for (std::size_t i = 0; i < gt_sz_; ++i)
+          int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
+          if (gt_sz_ % num_samples != 0)
           {
-            destination[i] = ds[i];
+            // TODO: mixed ploidy at site error.
           }
+          else
+          {
+            const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample);
+            destination.resize(gt_sz_);
+
+            float* ds = (float*)(void*)(gt_);
+            for (std::size_t i = 0; i < gt_sz_; ++i)
+            {
+              destination[i] = ds[i];
+            }
+            return;
+          }
+        }
+
+        this->state_ = std::ios::failbit;
+      }
+    }
+
+    template <typename T>
+    void reader_base::read_genotypes(genotype_probabilities_vector <T>& destination, const typename T::value_type missing_value)
+    {
+      if (good())
+      {
+        if (hts_rec()->n_allele > 2)
+        {
+          state_ = std::ios::failbit; // multi allelic GP not supported.
           return;
+        }
+
+        bcf_unpack(hts_rec(), BCF_UN_ALL);
+        if (bcf_get_format_float(hts_hdr(),hts_rec(),"GP", &(gt_), &(gt_sz_)) >= 0)
+        {
+          int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
+          if (gt_sz_ % num_samples != 0)
+          {
+            // TODO: mixed ploidy at site error.
+          }
+          else
+          {
+            const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample - 1);
+            destination.resize(gt_sz_);
+
+            float* gp = (float*)(void*)(gt_);
+            for (std::size_t i = 0; i < gt_sz_; ++i)
+            {
+              destination[i] = gp[i];
+            }
+            return;
+          }
         }
 
         this->state_ = std::ios::failbit;
@@ -415,12 +459,12 @@ namespace savvy
     }
 
     template <typename VecType>
-    using variant_iterator =  basic_variant_iterator<reader_base, VecType>;
+    using allele_variant_iterator =  basic_allele_variant_iterator<reader_base, VecType>;
 
     template <typename ValType>
-    using dense_variant_iterator =  basic_variant_iterator<reader_base, std::vector<ValType>>;
+    using dense_allele_variant_iterator =  basic_allele_variant_iterator<reader_base, std::vector<ValType>>;
     template <typename ValType>
-    using sparse_variant_iterator =  basic_variant_iterator<reader_base, compressed_vector<ValType>>;
+    using sparse_allele_variant_iterator =  basic_allele_variant_iterator<reader_base, compressed_vector<ValType>>;
   }
 }
 
