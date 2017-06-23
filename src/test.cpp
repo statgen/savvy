@@ -507,21 +507,13 @@ void convert_file_test()
     savvy::vcf::reader input("test_file.vcf");
     savvy::vcf::allele_variant_iterator<std::vector<float>> cur(input);
     savvy::vcf::allele_variant_iterator<std::vector<float>> eof;
-    const std::string chrom = cur != eof ? cur->chromosome() : "";
-    const std::size_t ploidy = cur != eof ? (cur->size() / input.sample_count()) : 0;
 
     auto file_info = input.metadata();
     auto prop_fields = input.prop_fields();
-    savvy::sav::writer compact_output("test_file.sav", chrom, ploidy, input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end(), prop_fields.begin(), prop_fields.end());
+    savvy::sav::writer compact_output("test_file.sav", input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end(), prop_fields.begin(), prop_fields.end());
 
     while (cur != eof)
     {
-      if (cur->chromosome() != chrom)
-      {
-        std::cerr << "Multiple chromosomes encountered. CMF files can only contain one chromosome." << std::endl;
-        break;
-      }
-
       //    savvy::allele_vector<std::vector<float>> m(std::string(chrom), cur->locus(), std::string(cur->ref()), std::string(cur->alt()), sample_ids.size(), ploidy, std::vector<float>());
       //    for (auto it = cur->begin(); it != cur->end(); ++it)
       //    {

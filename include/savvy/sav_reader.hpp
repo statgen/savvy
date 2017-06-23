@@ -482,12 +482,11 @@ namespace savvy
       };
 
       template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename RandAccessStringIterator2>
-      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator file_info_beg, RandAccessKVPIterator file_info_end,  RandAccessStringIterator2 property_fields_beg, RandAccessStringIterator2 property_fields_end, options opts = options()) :
+      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator file_info_beg, RandAccessKVPIterator file_info_end,  RandAccessStringIterator2 property_fields_beg, RandAccessStringIterator2 property_fields_end, options opts = options()) :
         output_buf_(opts.compression == compression_type::xz ? std::unique_ptr<std::streambuf>(new shrinkwrap::xz::obuf(file_path)) : std::unique_ptr<std::streambuf>(new shrinkwrap::bgz::obuf(file_path))),
         output_stream_(output_buf_.get()),
         file_path_(file_path),
         sample_size_(samples_end - samples_beg),
-        ploidy_level_(ploidy),
         record_count_(0),
         block_size_(64),
         data_format_(opts.data_format)
@@ -547,8 +546,8 @@ namespace savvy
 
 
       template <typename RandAccessStringIterator>
-      writer(const std::string& file_path, const std::string& chromosome, std::uint8_t ploidy, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, options opts = options()) :
-        writer(file_path, chromosome, ploidy, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_pair_array.end(), empty_string_pair_array.end(),  empty_string_array.end(), empty_string_array.end(), opts)
+      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, options opts = options()) :
+        writer(file_path, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_pair_array.end(), empty_string_pair_array.end(),  empty_string_array.end(), empty_string_array.end(), opts)
       {
 
       }
@@ -558,7 +557,7 @@ namespace savvy
       {
         if (output_stream_.good())
         {
-          if (m.size() != sample_size_ * ploidy_level_)
+          if (m.size() % sample_size_ != 0)
           {
             output_stream_.setstate(std::ios::failbit);
           }
@@ -723,7 +722,6 @@ namespace savvy
       std::vector<std::string> property_fields_;
       std::string file_path_;
       std::uint64_t sample_size_;
-      std::uint8_t ploidy_level_;
       std::uint32_t metadata_fields_cnt_;
       std::size_t record_count_;
       std::size_t block_size_;
