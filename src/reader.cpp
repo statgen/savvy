@@ -42,15 +42,6 @@ namespace savvy
     return ret;
   }
 
-  std::vector<std::string> reader::chromosomes() const
-  {
-    if (sav_reader_)
-      return dynamic_cast<sav::reader*>(sav_reader_.get())->chromosomes();
-    else if (vcf_reader_)
-      return dynamic_cast<vcf::reader*>(vcf_reader_.get())->chromosomes();
-    return {};
-  }
-
   reader::reader(const std::string& file_path)
   {
     if (savvy::detail::has_extension(file_path, ".sav"))

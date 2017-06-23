@@ -161,7 +161,6 @@ namespace savvy
 
     template <typename T>
     reader& read(T& destination, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN());
-    std::vector<std::string> chromosomes() const;
   };
 
   class indexed_reader : public reader_base

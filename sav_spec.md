@@ -20,14 +20,12 @@ All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB12
 +----------------------------------------------------------------+
 | 01110011 01100001 01110110 MMMMMMMM MMMMMMMM mmmmmmmm mmmmmmmm |
 +----------------------------------------------------------------+
-+~~~~~~~~~~~+vvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVV+
-| BIT_WIDTH | CHROM  | PLOIDY_LEVEL | SAMPLE_SIZE | SAMPLE_ID_ARRAY ... |
-+~~~~~~~~~~~+vvvvvvvv+~~~~~~~~~~~~~~+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVV+
-* BIT_WIDTH: Bit width of genotype values (0-7). 
-* CHROM: Chromosome string stored has VLS.
-* PLOIDY_LEVEL: Ploidy level stored has VLI.
-* SAMPLE_SIZE: Number of samples stored has VLI.
-* SAMPLE_ID_ARRAY: Array of length SAMPLE_SIZE that stores sample ID's in VLS encoding.
+
++-------------------------------------------------------------------------------------------------------------------------------------------------+
+| 16 byte UUID                                                                                                                                    |
++-------------------------------------------------------------------------------------------------------------------------------------------------+
+| UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU |
++-------------------------------------------------------------------------------------------------------------------------------------------------+
 
 +~~~~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVV+
 | FILE_INFO_SIZE | FILE_INFO_ARRAY ... |
@@ -41,6 +39,12 @@ All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB12
 * META_FIELDS_CNT: Number of metadata fields.
 * META_FIELDS_ARRAY: Array of length META_FIELDS_CNT that stores variant level annotation fields in VLS encoding.
 
++vvvvvvvv+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVV+
+| FORMAT | SAMPLE_SIZE | SAMPLE_ID_ARRAY ... |
++vvvvvvvv+~~~~~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVV+
+* FORMAT: GT or GP. 
+* SAMPLE_SIZE: Number of samples stored has VLI.
+* SAMPLE_ID_ARRAY: Array of length SAMPLE_SIZE that stores sample ID's in VLS encoding.
 ```
 
 ## Allele Pairs
@@ -63,15 +67,17 @@ A 1-bit alternate allele with an offset of 8000.
 
 ## Record Format
 ```
-+~~~~~~~~~+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVV+
-|   POS   |   REF   |   ALT   | META_VALUE_ARRAY ... | APA_SZ  | ALLELE_PAIR_ARRAY ... |
-+~~~~~~~~~+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVV+
++vvvvvvvv+~~~~~~~~~+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+~~~~~~~~~~~~~~+~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVV+
+| CHROM  |   POS   |   REF   |   ALT   | META_VALUE_ARRAY ... | PLOIDY_LEVEL | APA_SZ  | ALLELE_PAIR_ARRAY ... |
++vvvvvvvv+~~~~~~~~~+vvvvvvvvv+vvvvvvvvv+VVVVVVVVVVVVVVVVVVVVVV+~~~~~~~~~~~~~~+~~~~~~~~~+VVVVVVVVVVVVVVVVVVVVVVV+
 
+* CHROM: Chromosome string stored has VLS.
 * POS: Chromosome pos stored has VLI.
 * MARKID: Marker ID string stored has VLS.
 * REF: Reference haplotype stored has VLS.
 * ALT: Alternate haplotype stored has VLS.
 * META_VALUE_ARRAY: Array of size META_FIELDS_CNT that stores metadata for each marker. Values correspond to META_FIELDS_ARRAY in header.
+* PLOIDY_LEVEL: Ploidy level stored has VLI.
 * APA_SZ: Size of allele pair array stored as VLI with one bit prefix.
 * ALLELE_PAIR_ARRAY: Array of size APA_SZ that stores alternate alleles Allele Pair encoding.
 
