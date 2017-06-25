@@ -8,20 +8,31 @@
 | 01110011 00110001 01110010 MMMMMMMM MMMMMMMM mmmmmmmm mmmmmmmm |
 +----------------------------------------------------------------+
 
-+------------------------------------------------------------------------------------+~~~~~~~~~+
-| RRRRRRBB | NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN | PADDING |
-+------------------------------------------------------------------------------------+~~~~~~~~~+
-R: Reserved bits.
-B: The size of each node in bytes is specified as 8^(B+2). Possible bucket sizes are 64, 512, 4,096 and 32,768.
-N: Record count.
-P: Padding to end of current block.
++-------------------------------------------------------------------------------------------------------------------------------------------------+
+| 16 byte UUID used to match index to indexed file                                                                                                |
++-------------------------------------------------------------------------------------------------------------------------------------------------+
+| UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU |
++-------------------------------------------------------------------------------------------------------------------------------------------------+
+```
+Each chromosome is described with the following.
+```
++----------+vvvvvvvvvvv+-------------------------------------------------------------------------+-------------------------------------------------------------------------+-------------------------------------------------------------------------+
+| SSSSSSSS | CHROM_STR | RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR | BBBBBBBB BBBBBBBB BBBBBBBB BBBBBBBB BBBBBBBB BBBBBBBB BBBBBBBB BBBBBBBB | FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF |
++----------+vvvvvvvvvvv+-------------------------------------------------------------------------+-------------------------------------------------------------------------+-------------------------------------------------------------------------+
+S: Size of chromosome byte array encoded in one byte (1-255 range). A size of 0 terminates the chromosome list. 
+CHROM_STR: Chromosome byte array of size S bytes.
+R: Number of records.
+B: Max base pair position.
+F: Max file position.
 ```
 
+Current block is then padded with zeros up to the next multiple of 65,536. Following the header is a tree for each chromosome. Trees are in the same order as listed in the header.
+
 ## Internal Nodes
-Internal nodes contain at most (block size / 16) entries. Entries are made up of two big-endian 64-bit integers that. The first of which represents the start value of the interval while the second represents the length of the interval.
+Internal nodes contain at most (block size / 16) entries. Entries are made up of two big-endian 64-bit integers. The first of which represents the start value of the interval while the second represents the length of the interval.
 
 ## Leaf Nodes
-Internal nodes contain at most (block size / 32) entries. Entries are made up of four big-endian 64-bit integers that. The first of which represents the start value of the interval. The second represents the length of the interval. The third represents the offset of the record in the target file. The fourth represents the length of the record in the target file. In most cases, the unit for the record offset and length is a byte.
+Internal nodes contain at most (block size / 32) entries. Entries are made up of four big-endian 64-bit integers. The first of which represents the start value of the interval. The second represents the length of the interval. The third represents the offset of the record in the target file. The fourth represents the length of the record in the target file. In most cases, the unit for the record offset and length is a byte.
 
 ## Tree Structure
 The index file begins with the header block followed by the root block. Then each level of the tree going downward is stored from left to right. All nodes must be full except for the last node at each level.
