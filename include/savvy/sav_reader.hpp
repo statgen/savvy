@@ -382,23 +382,16 @@ namespace savvy
     class indexed_reader : public reader_base
     {
     public:
-      indexed_reader(const std::string& file_path, std::uint64_t from, std::uint64_t to, const std::string& index_file_path = "") :
+      indexed_reader(const std::string& file_path, const region& reg, const std::string& index_file_path = "") :
         reader_base(file_path),
         index_(index_file_path.size() ? index_file_path : file_path + ".s1r"),
-        query_(index_.create_query(from, to)),
+        query_(index_.create_query(reg)),
         i_(query_.begin())
       {
         if (!index_.good())
           this->input_stream_.setstate(std::ios::badbit);
       }
 
-      indexed_reader(const std::string& file_path, const region& reg, const std::string& index_file_path = "") :
-        indexed_reader(file_path, reg.from(), reg.to(), index_file_path)
-      {
-        // TODO
-//        if (this->chromosome() != reg.chromosome())
-//          this->input_stream_.setstate(std::ios::badbit);
-      }
 
       template <typename T>
       indexed_reader& operator>>(T& destination)
@@ -434,22 +427,13 @@ namespace savvy
         return *this;
       }
 
-      void reset_region(std::uint64_t from, std::uint64_t to)
-      {
-        input_stream_.clear();
-        query_ = index_.create_query(from, to);
-        i_ = query_.begin();
-        if (!index_.good())
-          this->input_stream_.setstate(std::ios::badbit);
-      }
-
       void reset_region(const region& reg)
       {
         input_stream_.clear();
-        reset_region(reg.from(), reg.to());
-        // TODO
-//        if (this->chromosome() != reg.chromosome())
-//          this->input_stream_.setstate(std::ios::badbit);
+        query_ = index_.create_query(reg);
+        i_ = query_.begin();
+        if (!index_.good())
+          this->input_stream_.setstate(std::ios::badbit);
       }
 
     private:
@@ -457,7 +441,7 @@ namespace savvy
       {
         if (i_ == query_.end())
           return false;
-        input_stream_.seekg(std::streampos(i_->value().first));
+        input_stream_.seekg(std::streampos(i_->value()));
         ++i_;
         return true;
       }

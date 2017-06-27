@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <algorithm>
+#include <map>
 
 
 namespace savvy
@@ -181,14 +182,10 @@ namespace savvy
       if (output_file_path.empty())
         output_file_path = input_file_path + ".s1r";
 
-      std::uint64_t max_region_value = 0;
-      std::uint64_t max_file_position = 0;
-
-      std::vector<s1r::tree_base::entry> entries;
       reader r(input_file_path);
       std::int64_t start_pos = r.tellg();
 
-
+      std::map<std::string, std::vector<s1r::tree_base::entry>> index_data;
       allele_variant_iterator<std::vector<float>> it(r);
       allele_variant_iterator<std::vector<float>> end;
       while (it != end && start_pos >= 0)
@@ -196,11 +193,8 @@ namespace savvy
         std::int64_t end_pos = r.tellg();
         if (start_pos >= 0 && end_pos >= 0)
         {
-          s1r::tree_base::entry e(it->locus(), it->locus() + std::max(it->ref().size(), it->alt().size()) - 1, static_cast<std::uint64_t>(start_pos), static_cast<std::uint64_t>(end_pos) - static_cast<std::uint64_t>(start_pos));
-          max_region_value = std::max(max_region_value, e.region_end());
-          max_file_position = std::max(max_file_position, e.value().first);
-          max_file_position = std::max(max_file_position, e.value().second);
-          entries.emplace_back(std::move(e));
+          s1r::tree_base::entry e(it->locus(), it->locus() + std::max(it->ref().size(), it->alt().size()) - 1, static_cast<std::uint64_t>(start_pos));
+          index_data[it->chromosome()].emplace_back(std::move(e));
         }
         start_pos = end_pos;
         ++i;
@@ -213,7 +207,7 @@ namespace savvy
       }
       else
       {
-        ret = s1r::create_file(output_file_path, entries.begin(), entries.end(), s1r::block_size::bs_4096);
+        ret = s1r::create_file(output_file_path, index_data, 32 - 1);
       }
 
       return ret;

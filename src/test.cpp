@@ -662,7 +662,7 @@ void random_access_test()
 {
   savvy::sav::writer::create_index("test_file.sav");
 
-  savvy::indexed_reader rdr("test_file.vcf.gz", {"20", 17000, 1120000});
+  savvy::indexed_reader rdr("test_file.sav", {"20", 17000, 1120000});
   auto it = savvy::allele_variant_iterator<std::vector<float>>(rdr);
   auto end = savvy::allele_variant_iterator<std::vector<float>>{};
   for ( ; it != end; ++it)
