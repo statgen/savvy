@@ -2,6 +2,7 @@
 #define LIBSAVVY_CMF_INDEX_READER_HPP
 
 #include "portable_endian.hpp"
+#include "region.hpp"
 
 #include <fstream>
 #include <cstring>
@@ -15,6 +16,15 @@ namespace savvy
 {
   namespace s1r
   {
+    struct tree_details
+    {
+      std::string name;
+      std::uint64_t entry_count = 0;
+      std::uint64_t block_offset = 0;
+//      std::uint64_t max_region_pos = 0;
+//      std::uint64_t max_file_pos = 0;
+    };
+
     enum class block_size : std::uint16_t
     {
       bs_64 = 64,
@@ -23,9 +33,33 @@ namespace savvy
       bs_32768 = 32768
     };
 
-    class index_base
+    namespace detail
+    {
+      std::uint64_t ceil_divide(std::uint64_t x, std::uint64_t y)
+      {
+        return (x + y - 1) / y;
+      }
+
+      std::uint16_t ceil_divide(std::uint16_t x, std::uint16_t y)
+      {
+        return (x + y - std::uint16_t(1)) / y;
+      }
+
+      std::size_t entries_per_leaf_node(std::size_t block_size)
+      {
+        return block_size / std::size_t(16);
+      }
+
+      std::size_t entries_per_internal_node(std::size_t block_size)
+      {
+        return block_size / std::uint16_t(8);
+      }
+    }
+
+    class tree_base
     {
     public:
+
       class internal_entry
       {
       public:
@@ -48,21 +82,18 @@ namespace savvy
       class entry : public internal_entry
       {
       public:
-        std::pair<std::uint64_t, std::uint64_t> value() const { return std::make_pair(be64toh(value1_), be64toh(value2_)); }
+        std::uint64_t value() const { return value_; }
 
         entry() :
-          value1_(0),
-          value2_(0)
+          value_(0)
         { }
 
-        entry(std::uint64_t beg, std::uint64_t end, std::uint64_t val1, std::uint64_t val2) :
+        entry(std::uint64_t beg, std::uint64_t end, std::uint64_t value) :
           internal_entry(beg, end),
-          value1_(htobe64(val1)),
-          value2_(htobe64(val2))
+          value_(htobe64(value))
         { }
       private:
-        std::uint64_t value1_;
-        std::uint64_t value2_;
+        std::uint64_t value_;
       };
 
       struct node_position
@@ -81,7 +112,7 @@ namespace savvy
         std::uint64_t entry_offset;
       };
 
-      std::uint64_t header_block_count() const { return block_count_needed_for_header_; }
+      std::uint64_t header_block_count() const { return root_block_offset_; }
       std::uint64_t entry_count() const { return entry_count_; }
       std::uint64_t bucket_size() const { return block_size_; }
       std::uint64_t entry_count_at_level(std::size_t level) const { return entry_counts_per_level_[level]; }
@@ -117,7 +148,7 @@ namespace savvy
 
       std::streampos calculate_file_position(node_position input) const
       {
-        std::uint64_t ret = block_count_needed_for_header_ * block_size_;
+        std::uint64_t ret = root_block_offset_ * block_size_;
 
         if (input.level > 0)
         {
@@ -145,16 +176,20 @@ namespace savvy
       {
         return entry_counts_per_level_.size();
       }
+
+      const std::string& name() const { return name_; }
     protected:
-      std::uint16_t block_count_needed_for_header_;
+      std::string name_;
+
+      std::uint64_t root_block_offset_;
       std::uint16_t block_size_;
       std::vector<std::uint64_t> entry_counts_per_level_;
       std::uint64_t entry_count_;
 
-      void init()
+      void init(std::uint64_t block_offset, const std::string& name)
       {
-        const std::uint16_t header_data_size = 7 + 2 + 8;
-        block_count_needed_for_header_ = ceil_divide(header_data_size, block_size_);
+        //const std::uint16_t header_data_size = 7 + 2 + 8;
+        root_block_offset_ = block_offset; //ceil_divide(header_data_size, block_size_);
 
         this->entry_counts_per_level_.insert(this->entry_counts_per_level_.begin(), entry_count_);
         for (std::uint64_t nodes_at_current_level = ceil_divide(entry_count_, (std::uint64_t) this->entries_per_leaf_node());
@@ -176,7 +211,7 @@ namespace savvy
       }
     };
 
-    class reader : public index_base
+    class tree_reader : public tree_base
     {
     public:
       class query
@@ -192,7 +227,7 @@ namespace savvy
           typedef const value_type* pointer;
           typedef std::bidirectional_iterator_tag iterator_category;
 
-          iterator(reader& rdr, std::istream& ifs, std::uint64_t beg, std::uint64_t end, tree_position pos = {0, 0, 0}) :
+          iterator(tree_reader& rdr, std::istream& ifs, std::uint64_t beg, std::uint64_t end, tree_position pos = {0, 0, 0}) :
             reader_(&rdr),
             ifs_(&ifs),
             beg_(beg),
@@ -300,7 +335,7 @@ namespace savvy
           bool operator!=(const self_type& other) { return position_ != other.position_; }
 
         private:
-          reader* reader_;
+          tree_reader* reader_;
           std::istream* ifs_;
           std::uint64_t beg_;
           std::uint64_t end_;
@@ -311,7 +346,7 @@ namespace savvy
           static const tree_position end_tree_position() { return tree_position((std::uint64_t)-1, 0, 1); }
         };
 
-        query(reader& rdr, std::istream& ifs, std::uint64_t beg, std::uint64_t end) :
+        query(tree_reader& rdr, std::istream& ifs, std::uint64_t beg, std::uint64_t end) :
           reader_(&rdr),
           ifs_(&ifs),
           beg_(beg),
@@ -322,24 +357,25 @@ namespace savvy
         iterator begin() { return iterator(*reader_, *ifs_, beg_, end_); }
         iterator end() { return iterator(*reader_, *ifs_, beg_, end_, tree_position((std::uint64_t)(-1), 0, 1)); }
       private:
-        reader* reader_;
+        tree_reader* reader_;
         std::istream* ifs_;
         std::uint64_t beg_;
         std::uint64_t end_;
       };
 
-      reader(const std::string& file_path) :
-        ifs_(file_path, std::ios::binary)
+      tree_reader(std::ifstream& file, std::uint64_t block_offset, tree_details details) :
+        ifs_(file)
       {
-        std::string version(7, '\0');
-        ifs_.read(&version[0], version.size());
-        std::uint8_t block_size_exponent;
-        ifs_.read((char*)(&block_size_exponent), 1);
-        block_size_ = static_cast<std::uint16_t>(std::pow(8.0, (0x03 & block_size_exponent) + 2));
-        ifs_.read((char*)(&entry_count_), 8);
-        entry_count_ = be64toh(entry_count_);
+//        std::string version(7, '\0');
+//        ifs_.read(&version[0], version.size());
+//        std::uint8_t block_size_exponent;
+//        ifs_.read((char*)(&block_size_exponent), 1);
+//        block_size_ = static_cast<std::uint16_t>(std::pow(8.0, (0x03 & block_size_exponent) + 2));
+//        ifs_.read((char*)(&entry_count_), 8);
+//        entry_count_ = be64toh(entry_count_);
+        entry_count_ = details.entry_count;
 
-        index_base::init();
+        tree_base::init(block_offset, name);
       }
 
       bool good() const { return ifs_.good(); }
@@ -350,57 +386,246 @@ namespace savvy
         return ret;
       }
     private:
-      std::ifstream ifs_;
+      std::ifstream& ifs_;
     };
 
-    template<typename EntryIter>
-    class writer : public index_base
+    enum class sort_type : std::uint8_t
+    {
+      midpoint = 0,
+      left_point = 0x10,
+      right_point = 0x01
+    };
+
+    class reader
     {
     public:
-      writer(const std::string& file_path, EntryIter beg, EntryIter end, block_size bs = block_size::bs_4096) :
+      typedef reader self_type;
+
+
+      reader(const std::string& file_path, const std::vector<region>& regions) :
+        file_path_(file_path),
+        input_file_(file_path, std::ios::binary),
+        query_(regions)
+      {
+        std::string version(7, '\0');
+        input_file_.read(&version[0], version.size());
+        std::string uuid(16, '\0');
+        input_file_.read(&uuid[0], uuid.size());
+
+        std::uint8_t sort_byte;
+        input_file_.read((char*)(&sort_byte), 1);
+
+        switch (sort_byte)
+        {
+        case (std::uint8_t)sort_type::left_point: sort_ = sort_type::left_point; break;
+        case (std::uint8_t)sort_type::right_point: sort_ = sort_type::right_point; break;
+        default: sort_ = sort_type::midpoint;
+        }
+
+        std::uint8_t block_size_byte;
+        input_file_.read((char*)(&block_size_byte), 1);
+
+        const std::uint32_t block_size = (block_size_byte + 1) * 1024u;
+
+        std::vector<tree_details> tree_details_array;
+
+        std::uint8_t name_size;
+        do
+        {
+          input_file_.read((char*)(&name_size), 1);
+
+          if (name_size)
+          {
+            tree_details details;
+            details.name.resize(name_size)
+            input_file_.read(&details.name[0], name_size);
+
+            std::uint64_t entry_count_be;
+            input_file_.read((char*)(entry_count_be), 8);
+            details.entry_count = be64toh(entry_count_be);
+
+//            std::uint64_t max_region_be;
+//            input_file_.read((char*)(max_region_be), 8);
+//            details.max_region_pos = be64toh(max_region_be);
+//
+//            std::uint64_t max_file_pos_be;
+//            input_file_.read((char*)(max_file_pos_be), 8);
+//            details.max_file_pos = be64toh(max_file_pos_be);
+
+            tree_details_array.emplace_back(std::move(details));
+          }
+        }
+        while (name_size > 0);
+
+        std::uint64_t block_count = 1; // TODO: support headers larger than one block;
+
+        trees_.reserve(tree_details_array.size());
+        for (auto it = tree_details_array.begin(); it != tree_details_array.end(); ++it)
+        {
+          for (std::uint64_t nodes_at_current_level = detail::ceil_divide(it->entry_count, (std::uint64_t) detail::entries_per_leaf_node(block_size));
+            nodes_at_current_level > 1;
+            nodes_at_current_level = detail::ceil_divide(nodes_at_current_level, (std::uint64_t) detail::entries_per_internal_node(block_size)))
+          {
+            block_count += nodes_at_current_level;
+          }
+
+          block_count += 1;
+
+          trees_.emplace_back(input_file_, block_count, tree_details_array)
+
+        }
+
+
+//        std::uint8_t block_size_exponent;
+//        ifs_.read((char*)(&block_size_exponent), 1);
+//        block_size_ = static_cast<std::uint16_t>(std::pow(8.0, (0x03 & block_size_exponent) + 2));
+//        ifs_.read((char*)(&entry_count_), 8);
+//        entry_count_ = be64toh(entry_count_);
+      }
+
+      class query;
+
+      query create_query(region reg)
+      {
+        query ret(input_file_, trees_, reg);
+        return ret;
+      }
+    private:
+      std::string file_path_;
+      std::ifstream input_file_;
+      std::vector<tree_reader> trees_;
+      std::size_t tree_index_;
+      sort_type sort_;
+    };
+
+    class reader::query
+    {
+    public:
+      query(std::ifstream& ifs, std::vector<tree_reader>& trees, region reg) :
+        ifs_(ifs),
+        regions_{{reg}}
+      {
+        for (auto i = regions_.begin(); i != regions_.end(); ++i)
+        {
+          for (auto j = trees.begin(); j != trees.end(); ++j)
+          {
+            if (i->chromosome() == j->name())
+              tree_queries_.emplace_back(j->create_query(i->from(), i->to()));
+          }
+        }
+        tree_queries_.emplace_back(
+      }
+
+      class iterator;
+
+      iterator begin() { return iterator(ifs_, tree_queries_.begin(),
+    private:
+      std::ifstream& ifs_;
+      std::vector<tree_reader::query> tree_queries_;
+      std::vector<region> regions_;
+    };
+
+    class reader::query::iterator
+    {
+    public:
+      typedef iterator self_type;
+      typedef std::ptrdiff_t difference_type;
+      typedef tree_reader::entry value_type;
+      typedef const value_type& reference;
+      typedef const value_type* pointer;
+      typedef std::bidirectional_iterator_tag iterator_category;
+
+      iterator(std::istream& ifs, std::vector<tree_reader::query>::iterator tree_query_it, tree_reader::query::iterator tree_query_beg, tree_reader::query::iterator tree_query_end) :
+        ifs_(&ifs),
+        tree_it_(tree_query_it),
+        tree_query_it_(tree_query_beg),
+        tree_query_end_(tree_query_end)
+      {
+
+      }
+
+      self_type& operator++()
+      {
+        if (tree_query_it_ == tree_query_end_)
+        {
+          ++tree_it_;
+          tree_query_it_ = tree_it_->begin();
+        }
+        else
+        {
+          ++tree_query_it_;
+        }
+
+        return *this;
+      }
+
+      self_type operator++(int)
+      {
+        self_type r = *this;
+        ++(*this);
+        return r;
+      }
+
+      reference operator*() { return *tree_query_it_; }
+      pointer operator->() { return &(*tree_query_it_); }
+      bool operator==(const self_type& other) { return tree_it_ == other.tree_it_ && tree_query_it_ == other.tree_query_it_; }
+      bool operator!=(const self_type& other) { return return tree_it_ != other.tree_it_ || tree_query_it_ != other.tree_query_it_; }
+
+    private:
+      std::vector<tree_reader::query>::iterator tree_it_;
+      tree_reader::query::iterator tree_query_it_;
+      tree_reader::query::iterator tree_query_end_;
+      std::istream* ifs_;
+    };
+
+
+
+    template<typename EntryIter>
+    class writer : public tree_base
+    {
+    public:
+      //writer(const std::string& file_path, const std::string& chrom, EntryIter beg, EntryIter end) :
+      writer(const std::string& file_path, std::vector<std::tuple<std::string, EntryIter, EntryIter>>&& chrom_data) :
         ofs_(file_path, std::ios::binary)
       {
-        std::sort(beg, end, [](const reader::entry& a, const reader::entry& b)
+        for (auto it = chrom_data.begin(); it != chrom_data.end(); ++it)
         {
-          double mid_a = static_cast<double>(a.region_start()) + (static_cast<double>(a.region_length()) / 2.0);
-          double mid_b = static_cast<double>(b.region_start()) + (static_cast<double>(b.region_length()) / 2.0);
+          std::uint64_t max_base_pair_pos = 0;
+          std::uint64_t max_file_pos = 0;
+          auto beg = std::get<1>(*it);
+          auto end = std::get<2>(*it);
+          std::sort(beg, end, [&max_base_pair_pos, &max_file_pos](const tree_reader::entry& a, const tree_reader::entry& b)
+          {
+            double mid_a = static_cast<double>(a.region_start()) + (static_cast<double>(a.region_length()) / 2.0);
+            double mid_b = static_cast<double>(b.region_start()) + (static_cast<double>(b.region_length()) / 2.0);
 
-          return mid_a < mid_b;
-        });
-
-        std::uint8_t block_size_exponent;
-        switch (bs)
-        {
-          case block_size::bs_64:
-            block_size_ = 64;
-            block_size_exponent = 2;
-            break;
-          case block_size::bs_512:
-            block_size_ = 512;
-            block_size_exponent = 3;
-            break;
-          case block_size::bs_4096:
-            block_size_ = 4096;
-            block_size_exponent = 4;
-            break;
-          case block_size::bs_32768:
-            block_size_ = 32768;
-            block_size_exponent = 5;
-            break;
+            return mid_a < mid_b;
+          });
         }
-        block_size_exponent -= 2;
+
 
         entry_count_ = (std::uint64_t) std::distance(beg, end);
-        std::uint64_t entry_count_be = htobe64(entry_count_);
 
-        index_base::init();
+        tree_base::init();
 
-        std::string header_block(16, '\0');
+        std::string header_block(7 + 16 + 1 + chrom.size() + 24, '\0');
         std::memcpy(&header_block[0], "s1r\0x00\0x01\0x00\0x00", 7);
-        std::memcpy(&header_block[7], &block_size_exponent, 1);
-        std::memcpy(&header_block[8], &entry_count_be, 8);
+        std::memset(&header_block[7], '\0', 16); // uuid
 
-        header_block.resize(static_cast<std::uint16_t>(bs), '\0');
+        std::uint8_t chrom_sz((std::uint8_t)(std::uint8_t(0xFF) & chrom.size()));
+
+        std::memcpy(&header_block[23], &chrom_sz, 1);
+
+        std::uint64_t entry_count_be = htobe64(entry_count_);
+        std::memcpy(&header_block[24], &entry_count_be, 8);
+
+        std::uint64_t max_base_pair_pos_be = htobe64(max_base_pair_pos);
+        std::memcpy(&header_block[32], &max_base_pair_pos_be, 8);
+
+        std::uint64_t max_file_pos_be = htobe64(max_file_pos);
+        std::memcpy(&header_block[40], &max_file_pos_be, 8);
+
+        header_block.resize(0x10000, '\0');
         ofs_.write(header_block.data(), header_block.size());
 
         std::vector<std::pair<std::vector<internal_entry>, tree_position>> current_nodes_at_each_internal_level;
@@ -484,9 +709,9 @@ namespace savvy
     };
 
     template<typename EntryIter>
-    bool create_file(const std::string& file_path, EntryIter beg, EntryIter end, block_size bs = block_size::bs_4096)
+    bool create_file(const std::string& file_path, const std::string& chromosome, EntryIter beg, EntryIter end)
     {
-      writer<EntryIter> w(file_path, beg, end, bs);
+      writer<EntryIter> w(file_path, chromosome, beg, end);
       return w.flush();
     }
   }
