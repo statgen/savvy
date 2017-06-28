@@ -228,10 +228,7 @@ namespace savvy
             {
               const std::uint64_t leaf_level = reader_->tree_height() - 1;
               ifs_->seekg(reader_->calculate_file_position(position_));
-              if (ifs_->eof())
-              {
-                std::cout << ifs_->good() << std::endl;
-              }
+
               if (position_.level == leaf_level)
                 ifs_->read((char*) leaf_node_.data(), reader_->block_size_);
               else
@@ -512,10 +509,16 @@ namespace savvy
       {
         for (auto i = regions_.begin(); i != regions_.end(); ++i)
         {
-          for (auto j = trees.begin(); j != trees.end(); ++j)
+          for (auto j = trees.begin(); j != std::prev(trees.end()); ++j)
           {
             if (i->chromosome() == j->name())
-              tree_queries_.emplace_back(j->create_query(i->from(), i->to()));
+            {
+              auto tmp_query = j->create_query(i->from(), i->to());
+              auto b = tmp_query.begin();
+              auto e = tmp_query.end();
+              if (b != e)
+                tree_queries_.emplace_back(std::move(tmp_query));
+            }
           }
         }
         tree_queries_.emplace_back(trees.back().create_query(0, 0)); // empty tree.
@@ -556,6 +559,7 @@ namespace savvy
         {
           ++tree_it_;
           tree_query_it_ = tree_it_->begin();
+          tree_query_end_ = tree_it_->end();
         }
 
         return *this;

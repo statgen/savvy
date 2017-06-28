@@ -667,14 +667,16 @@ void random_access_test()
   auto end = savvy::allele_variant_iterator<std::vector<float>>{};
   for ( ; it != end; ++it)
   {
-    std::cout << it->locus() << std::endl;
+    std::cout << it->chromosome() << " " << it->locus()  << " " << it->ref()  << " " << it->alt() << std::endl;
   }
+
+  std::cout << "--------------------------------" << std::endl;
 
   rdr.reset_region({"20", 17000, 1120000});
   savvy::dense_allele_vector<float> v;
   while (rdr >> v)
   {
-    std::cout << v.locus() << std::endl;
+    std::cout << v.chromosome() << " " << v.locus()  << " " << v.ref()  << " " << v.alt() << std::endl;
   }
 }
 
