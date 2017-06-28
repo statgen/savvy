@@ -180,6 +180,7 @@ namespace savvy
         root_block_offset_ = block_offset; //ceil_divide(header_data_size, block_size_);
         name_ = name;
 
+        entry_counts_per_level_.clear();
         this->entry_counts_per_level_.insert(this->entry_counts_per_level_.begin(), entry_count_);
         for (std::uint64_t nodes_at_current_level = ceil_divide(entry_count_, (std::uint64_t) this->entries_per_leaf_node());
              nodes_at_current_level > 1;
@@ -492,6 +493,7 @@ namespace savvy
 
       class query;
       query create_query(region reg);
+      query create_query(std::vector<region> regs);
     private:
       std::string file_path_;
       std::ifstream input_file_;
@@ -503,9 +505,9 @@ namespace savvy
     class reader::query
     {
     public:
-      query(std::ifstream& ifs, std::vector<tree_reader>& trees, region reg) :
+      query(std::ifstream& ifs, std::vector<tree_reader>& trees, std::vector<region> regs) :
         ifs_(&ifs),
-        regions_{{reg}}
+        regions_{regs}
       {
         for (auto i = regions_.begin(); i != regions_.end(); ++i)
         {
@@ -523,6 +525,8 @@ namespace savvy
         }
         tree_queries_.emplace_back(trees.back().create_query(0, 0)); // empty tree.
       }
+
+      query(std::ifstream& ifs, std::vector<tree_reader>& trees, region reg) : query(ifs, trees, std::vector<region>({reg})) {}
 
       class iterator;
       iterator begin();
@@ -644,9 +648,6 @@ namespace savvy
 
         ofs_.write(header_block.data(), header_block.size());
 
-        auto a = header_block.size();
-        auto b = std::uint64_t(1024u * (std::uint32_t(block_size_in_kib) + 1));
-
         std::uint64_t block_offset = header_block.size() / std::uint64_t(1024u * (std::uint32_t(block_size_in_kib) + 1));
 
         header_block.clear();
@@ -756,6 +757,12 @@ namespace savvy
     inline reader::query reader::create_query(region reg)
     {
       query ret(input_file_, trees_, reg);
+      return ret;
+    }
+
+    inline reader::query reader::create_query(std::vector<region> regs)
+    {
+      query ret(input_file_, trees_, regs);
       return ret;
     }
 

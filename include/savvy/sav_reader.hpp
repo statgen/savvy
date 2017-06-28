@@ -382,15 +382,17 @@ namespace savvy
     class indexed_reader : public reader_base
     {
     public:
-      indexed_reader(const std::string& file_path, const region& reg, const std::string& index_file_path = "") :
+      indexed_reader(const std::string& file_path, const std::vector<region>& regs, const std::string& index_file_path = "") :
         reader_base(file_path),
         index_(index_file_path.size() ? index_file_path : file_path + ".s1r"),
-        query_(index_.create_query(reg)),
+        query_(index_.create_query(regs)),
         i_(query_.begin())
       {
         if (!index_.good())
           this->input_stream_.setstate(std::ios::badbit);
       }
+
+      indexed_reader(const std::string& file_path, const region& reg, const std::string& index_file_path = "") : indexed_reader(file_path, std::vector<region>({reg}), index_file_path) {}
 
 
       template <typename T>
@@ -429,8 +431,14 @@ namespace savvy
 
       void reset_region(const region& reg)
       {
+        reset_regions({reg});
+      }
+
+
+      void reset_regions(const std::vector<region>& regs)
+      {
         input_stream_.clear();
-        query_ = index_.create_query(reg);
+        query_ = index_.create_query(regs);
         i_ = query_.begin();
         if (!index_.good())
           this->input_stream_.setstate(std::ios::badbit);

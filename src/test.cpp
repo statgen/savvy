@@ -672,7 +672,7 @@ void random_access_test()
 
   std::cout << "--------------------------------" << std::endl;
 
-  rdr.reset_region({"20", 17000, 1120000});
+  rdr.reset_region({"18", 2234600, 2234700});
   savvy::dense_allele_vector<float> v;
   while (rdr >> v)
   {
