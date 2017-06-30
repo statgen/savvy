@@ -104,38 +104,38 @@ namespace savvy
 
     bool good() const
     {
-      if (sav_reader_)
-        return sav_reader_->good();
-      else if (vcf_reader_)
-        return vcf_reader_->good();
+      if (sav_impl())
+        return sav_impl()->good();
+      else if (vcf_impl())
+        return vcf_impl()->good();
       return false;
     }
 
     bool fail() const
     {
-      if (sav_reader_)
-        return sav_reader_->fail();
-      else if (vcf_reader_)
-        return vcf_reader_->fail();
+      if (sav_impl())
+        return sav_impl()->fail();
+      else if (vcf_impl())
+        return vcf_impl()->fail();
       return true;
     }
 
     bool bad() const
     {
-      if (sav_reader_)
-        return sav_reader_->bad();
-      else if (vcf_reader_)
-        return vcf_reader_->bad();
+      if (sav_impl())
+        return sav_impl()->bad();
+      else if (vcf_impl())
+        return vcf_impl()->bad();
       return true;
     }
 
     template <typename T>
     bool read_variant(T& destination, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN())
     {
-      if (sav_reader_)
-        sav_reader_->read_variant(destination, missing_value);
-      else if (vcf_reader_)
-        vcf_reader_->read_variant(destination, missing_value);
+      if (sav_impl())
+        sav_impl()->read_variant(destination, missing_value);
+      else if (vcf_impl())
+        vcf_impl()->read_variant(destination, missing_value);
 
       return good();
     }
@@ -145,8 +145,8 @@ namespace savvy
     sample_iterator samples_end() const;
     std::size_t sample_size() const;
   protected:
-    std::unique_ptr<sav::reader_base> sav_reader_;
-    std::unique_ptr<vcf::reader_base> vcf_reader_;
+    virtual savvy::sav::reader_base* sav_impl() const = 0;
+    virtual savvy::vcf::reader_base* vcf_impl() const = 0;
   };
 
   class reader : public reader_base
@@ -161,6 +161,12 @@ namespace savvy
 
     template <typename T>
     reader& read(T& destination, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN());
+  private:
+    savvy::sav::reader_base* sav_impl() const { return sav_reader_.get(); }
+    savvy::vcf::reader_base* vcf_impl() const { return vcf_reader_.get(); }
+  private:
+    std::unique_ptr<sav::reader> sav_reader_;
+    std::unique_ptr<vcf::reader> vcf_reader_;
   };
 
   class indexed_reader : public reader_base
@@ -181,7 +187,11 @@ namespace savvy
     template <typename T, typename Pred>
     indexed_reader& read_if(T& destination, Pred fn, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN());
   private:
-
+    savvy::sav::reader_base* sav_impl() const { return sav_reader_.get(); }
+    savvy::vcf::reader_base* vcf_impl() const { return vcf_reader_.get(); }
+  private:
+    std::unique_ptr<sav::indexed_reader> sav_reader_;
+    std::unique_ptr<vcf::indexed_reader> vcf_reader_;
   };
 
   template <typename T>
@@ -216,9 +226,9 @@ namespace savvy
   indexed_reader& indexed_reader::read_if(T& destination, Pred fn, const typename T::vector_type::value_type missing_value)
   {
     if (sav_reader_)
-      dynamic_cast<sav::indexed_reader*>(sav_reader_.get())->read_if(destination, fn, missing_value);
+      sav_reader_->read_if(destination, fn, missing_value);
     else if (vcf_reader_)
-      dynamic_cast<vcf::indexed_reader*>(vcf_reader_.get())->read_if(destination, fn, missing_value);
+      vcf_reader_->read_if(destination, fn, missing_value);
 
     return *this;
   }
