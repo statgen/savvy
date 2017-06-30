@@ -491,6 +491,23 @@ namespace savvy
 
       bool good() const { return input_file_.good(); }
 
+      std::vector<std::string> tree_names() const
+      {
+        std::vector<std::string> ret;
+        std::size_t sz = trees_.size();
+        if (sz > 0)
+        {
+          --sz;
+          ret.reserve(sz);
+          for (auto it = trees_.begin(); it != std::prev(trees_.end()); ++it)
+          {
+            ret.push_back(it->name());
+          }
+        }
+
+        return ret;
+      }
+
       class query;
       query create_query(region reg);
       query create_query(std::vector<region> regs);

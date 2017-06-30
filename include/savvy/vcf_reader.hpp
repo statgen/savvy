@@ -332,8 +332,6 @@ namespace savvy
       reader& operator=(const reader&) = delete;
       ~reader();
 
-      std::vector<std::string> chromosomes() const;
-
       template <typename T>
       reader& operator>>(T& destination)
       {
@@ -403,6 +401,8 @@ namespace savvy
       ~indexed_reader();
       void reset_region(const region& reg);
 
+      std::vector<std::string> chromosomes() const;
+
       template <typename T>
       indexed_reader& operator>>(T& destination);
 
@@ -419,9 +419,9 @@ namespace savvy
       bcf_hdr_t* hts_hdr() const { return bcf_sr_get_header(synced_readers_, 0); }
       bcf1_t* hts_rec() const { return hts_rec_; }
     private:
+      std::string file_path_;
       bcf_srs_t* synced_readers_;
       bcf1_t* hts_rec_;
-      std::string file_path_;
     };
 
     template <typename T>

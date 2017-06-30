@@ -157,15 +157,15 @@ namespace savvy
       }
     }
 
-    std::vector<std::string> reader::chromosomes() const
-    {
-      std::vector<std::string> ret(hts_hdr_->n[BCF_DT_CTG] > 0 ? (unsigned)hts_hdr_->n[BCF_DT_CTG] : 0);
-      for (int i = 0; i < ret.size(); ++i)
-      {
-        ret[i] = hts_hdr()->id[BCF_DT_CTG][i].key;
-      }
-      return ret;
-    }
+//    std::vector<std::string> reader::chromosomes() const
+//    {
+//      std::vector<std::string> ret(hts_hdr_->n[BCF_DT_CTG] > 0 ? (unsigned)hts_hdr_->n[BCF_DT_CTG] : 0);
+//      for (int i = 0; i < ret.size(); ++i)
+//      {
+//        ret[i] = hts_hdr()->id[BCF_DT_CTG][i].key;
+//      }
+//      return ret;
+//    }
 
 
     bool reader::read_hts_record()
@@ -196,6 +196,25 @@ namespace savvy
     {
       if (synced_readers_)
         bcf_sr_destroy(synced_readers_);
+    }
+
+    std::vector<std::string> indexed_reader::chromosomes() const
+    {
+      std::vector<std::string> ret;
+
+      hts_idx_t* idx = bcf_index_load(file_path_.c_str());
+      if (idx)
+      {
+        int n{};
+        const char** arr = bcf_index_seqnames(idx, hts_hdr(), &n);
+        ret.resize(n);
+        for (int i = 0; i < n; ++i)
+        {
+          ret[i] = arr[i];
+        }
+      }
+
+      return ret;
     }
 
     void indexed_reader::reset_region(const region& reg)

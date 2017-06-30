@@ -170,6 +170,8 @@ namespace savvy
     indexed_reader(const std::string& file_path, const region& reg);
     void reset_region(const region& reg);
 
+    std::vector<std::string> chromosomes() const;
+
     template <typename T>
     indexed_reader& operator>>(T& destination);
 

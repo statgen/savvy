@@ -394,6 +394,10 @@ namespace savvy
 
       indexed_reader(const std::string& file_path, const region& reg, const std::string& index_file_path = "") : indexed_reader(file_path, std::vector<region>({reg}), index_file_path) {}
 
+      std::vector<std::string> chromosomes() const
+      {
+        return index_.tree_names();
+      }
 
       template <typename T>
       indexed_reader& operator>>(T& destination)

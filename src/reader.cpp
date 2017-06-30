@@ -50,6 +50,15 @@ namespace savvy
       vcf_reader_ = std::make_unique<vcf::reader>(file_path);
   }
 
+  std::vector<std::string> indexed_reader::chromosomes() const
+  {
+    if (sav_reader_)
+      return dynamic_cast<sav::indexed_reader*>(sav_reader_.get())->chromosomes();
+    else if (vcf_reader_)
+      return dynamic_cast<vcf::indexed_reader*>(vcf_reader_.get())->chromosomes();
+    return {};
+  }
+
   indexed_reader::indexed_reader(const std::string& file_path, const region& reg)
   {
     if (savvy::detail::has_extension(file_path, ".sav"))
