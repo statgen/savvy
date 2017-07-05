@@ -118,12 +118,6 @@ namespace savvy
       {
         hts_hdr_ = bcf_hdr_read(hts_file_);
         this->init_property_fields();
-
-        for (int i = 0; i < hts_hdr_->n[BCF_DT_CTG]; ++i)
-        {
-          auto a = hts_hdr_->id[BCF_DT_CTG][i].key;
-          auto b = a;
-        }
       }
     }
 
@@ -188,8 +182,10 @@ namespace savvy
         contigs << ":" << reg.from() << "-" << reg.to();
 
       bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0);
-      bcf_sr_add_reader(synced_readers_, file_path_.c_str());
-      this->init_property_fields();
+      if (bcf_sr_add_reader(synced_readers_, file_path_.c_str()))
+        this->init_property_fields();
+      else
+        state_ = std::ios::badbit;
     }
 
     indexed_reader::~indexed_reader()
@@ -202,15 +198,18 @@ namespace savvy
     {
       std::vector<std::string> ret;
 
-      hts_idx_t* idx = bcf_index_load(file_path_.c_str());
-      if (idx)
+      if (good())
       {
-        int n{};
-        const char** arr = bcf_index_seqnames(idx, hts_hdr(), &n);
-        ret.resize(n);
-        for (int i = 0; i < n; ++i)
+        hts_idx_t* idx = bcf_index_load(file_path_.c_str());
+        if (idx)
         {
-          ret[i] = arr[i];
+          int n{};
+          const char** arr = bcf_index_seqnames(idx, hts_hdr(), &n);
+          ret.resize(n);
+          for (int i = 0; i < n; ++i)
+          {
+            ret[i] = arr[i];
+          }
         }
       }
 
@@ -219,19 +218,22 @@ namespace savvy
 
     void indexed_reader::reset_region(const region& reg)
     {
-      if (synced_readers_)
-        bcf_sr_destroy(synced_readers_);
-      synced_readers_ = bcf_sr_init();
-      hts_rec_ = nullptr;
-      state_ = std::ios::goodbit;
+      if (good())
+      {
+        if (synced_readers_)
+          bcf_sr_destroy(synced_readers_);
+        synced_readers_ = bcf_sr_init();
+        hts_rec_ = nullptr;
+        state_ = std::ios::goodbit;
 
-      std::stringstream contigs;
-      contigs << reg.chromosome();
-      if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())
-        contigs << ":" << reg.from() << "-" << reg.to();
+        std::stringstream contigs;
+        contigs << reg.chromosome();
+        if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())
+          contigs << ":" << reg.from() << "-" << reg.to();
 
-      if (bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0) != 0 || bcf_sr_add_reader(synced_readers_, file_path_.c_str()) != 1)
-        state_ = std::ios::failbit;
+        if (bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0) != 0 || bcf_sr_add_reader(synced_readers_, file_path_.c_str()) != 1)
+          state_ = std::ios::failbit;
+      }
     }
 
     bool indexed_reader::read_hts_record()
