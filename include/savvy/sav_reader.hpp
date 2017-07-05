@@ -738,7 +738,7 @@ namespace savvy
     inline std::tuple<T, std::uint64_t> reader_base::allele_decoder<1>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
     {
       std::tuple<T, std::uint64_t> ret;
-      std:uint8_t allele;
+      std::uint8_t allele;
       in_it = prefixed_varint<1>::decode(in_it, end_it, allele, std::get<1>(ret));
       std::get<0>(ret) = (allele ? T(1) : missing_value);
       return ret;
@@ -749,7 +749,7 @@ namespace savvy
     inline std::tuple<T, std::uint64_t> reader_base::allele_decoder<BitWidth>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
     {
       std::tuple<T, std::uint64_t> ret;
-      std:uint8_t allele;
+      std::uint8_t allele;
       in_it = prefixed_varint<BitWidth>::decode(in_it, end_it, allele, std::get<1>(ret));
       std::get<0>(ret) = (static_cast<T>(allele) + T(1)) / denom;
       return ret;
