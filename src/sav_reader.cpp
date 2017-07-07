@@ -177,7 +177,6 @@ namespace savvy
     bool writer::create_index(const std::string& input_file_path, std::string output_file_path)
     {
       bool ret = false;
-      std::size_t i = 0;
 
       if (output_file_path.empty())
         output_file_path = input_file_path + ".s1r";
@@ -185,19 +184,52 @@ namespace savvy
       reader r(input_file_path);
       std::int64_t start_pos = r.tellg();
 
+      std::uint32_t min = std::numeric_limits<std::uint32_t>::max();
+      std::uint32_t max = 0;
       std::map<std::string, std::vector<s1r::tree_base::entry>> index_data;
-      allele_variant_iterator<std::vector<float>> it(r);
-      allele_variant_iterator<std::vector<float>> end;
+      basic_variant_iterator<reader, dense_allele_vector<float>> it(r);
+      basic_variant_iterator<reader, dense_allele_vector<float>> end;
+      std::size_t records_in_block = 0;
+      std::string current_chromosome;
       while (it != end && start_pos >= 0)
       {
-        std::int64_t end_pos = r.tellg();
-        if (start_pos >= 0 && end_pos >= 0)
+        if (records_in_block > 0 && it->chromosome() != current_chromosome)
         {
-          s1r::tree_base::entry e(it->locus(), it->locus() + std::max(it->ref().size(), it->alt().size()) - 1, static_cast<std::uint64_t>(start_pos));
+          // TODO: Possibly make this an error case.
+          s1r::tree_base::entry e(min, max, (static_cast<std::uint64_t>(start_pos) << 16) | std::uint16_t(records_in_block - 1));
+          index_data[current_chromosome].emplace_back(std::move(e));
+          min = std::numeric_limits<std::uint32_t>::max();
+          max = 0;
+        }
+
+        ++records_in_block;
+        current_chromosome = it->chromosome();
+        min = std::min(min, std::uint32_t(it->locus()));
+        max = std::max(max, std::uint32_t(it->locus() + std::max(it->ref().size(), it->alt().size()) - 1));
+
+        std::int64_t end_pos = r.tellg();
+        if (start_pos != end_pos) // zstd frame frame boundary
+        {
+          if (records_in_block > 0x10000) // Max records per block: 64*1024
+          {
+            assert(!"Too many records in zstd frame to be indexed!");
+            return false;
+          }
+
+          if (start_pos > 0x0000FFFFFFFFFFFF) // Max file size: 256 TiB
+          {
+            assert(!"File size to large to be indexed!");
+            return false;
+          }
+
+          s1r::tree_base::entry e(min, max, (static_cast<std::uint64_t>(start_pos) << 16) | std::uint16_t(records_in_block - 1));
           index_data[it->chromosome()].emplace_back(std::move(e));
+
+          records_in_block = 0;
+          min = std::numeric_limits<std::uint32_t>::max();
+          max = 0;
         }
         start_pos = end_pos;
-        ++i;
         ++it;
       }
 

@@ -28,7 +28,7 @@ namespace savvy
 
     void increment()
     {
-      file_reader_->read_variant(m_);
+      file_reader_->read(m_);
       if (!file_reader_->good())
         file_reader_ = nullptr;
     }
@@ -42,15 +42,6 @@ namespace savvy
     ReaderType* file_reader_;
     value_type m_;
   };
-
-  template <typename ReaderType, typename VectorType>
-  using basic_allele_variant_iterator = basic_variant_iterator<ReaderType, allele_vector<VectorType>>;
-
-  template <typename ReaderType, typename VectorType>
-  using basic_genotype_variant_iterator = basic_variant_iterator<ReaderType, genotype_vector<VectorType>>;
-
-  template <typename ReaderType, typename VectorType>
-  using basic_dosage_variant_iterator = basic_variant_iterator<ReaderType, dosage_vector<VectorType>>;
 }
 
 #endif //LIBSAVVY_VARIANT_ITERATOR_HPP

@@ -13,12 +13,13 @@ if(CGET_PREFIX)
 endif()
 
 #list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX})
-find_package(shrinkwrap CONFIG REQUIRED)
+#find_package(shrinkwrap CONFIG REQUIRED)
 find_library(HTS_LIBRARY hts)
 find_library(ZLIB_LIBRARY z)
+find_library(ZSTD_LIBRARY zstd)
 
 
-get_target_property(SHRINKWRAP_LIBS shrinkwrap INTERFACE_LINK_LIBRARIES)
+#get_target_property(SHRINKWRAP_LIBS shrinkwrap INTERFACE_LINK_LIBRARIES)
 
 set(HEADER_FILES
     include/savvy/savvy.hpp include/savvy/reader.hpp include/savvy/m3vcf_reader.hpp include/savvy/sav_reader.hpp include/savvy/allele_status.hpp include/savvy/vcf_reader.hpp include/savvy/varint.hpp include/savvy/s1r.hpp include/savvy/allele_vector.hpp include/savvy/genotype_vector.hpp include/savvy/variant_iterator.hpp include/savvy/portable_endian.hpp include/savvy/region.hpp include/savvy/compressed_vector.hpp include/savvy/eigen3_vector.hpp include/savvy/ublas_vector.hpp include/savvy/armadillo_vector.hpp)
@@ -27,7 +28,7 @@ set(SOURCE_FILES
     src/savvy.cpp src/reader.cpp src/m3vcf_reader.cpp include/savvy/sav_reader.hpp src/sav_reader.cpp include/savvy/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
 
 add_library(savvy ${SOURCE_FILES} ${HEADER_FILES})
-target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${SHRINKWRAP_LIBS})
+target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY})
 target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 add_executable(savvy-test src/test.cpp src/test_class.cpp include/savvy/test_class.hpp)

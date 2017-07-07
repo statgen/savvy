@@ -25,6 +25,43 @@ namespace savvy
     std::uint64_t from_;
     std::uint64_t to_;
   };
+
+  struct any_coordinate_within_region
+  {
+    template<typename T>
+    bool operator()(const T& var, const region& reg)
+    {
+      return (var.locus() <= reg.to() && (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1) >= reg.from() && var.chromosome() == reg.chromosome());
+    }
+  };
+
+  struct all_coordinates_within_region
+  {
+    template<typename T>
+    bool operator()(const T& var, const region& reg)
+    {
+      return (var.locus() >= reg.from() && (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1) <= reg.to() && var.chromosome() == reg.chromosome());
+    }
+  };
+
+  struct leftmost_coordinate_within_region
+  {
+    template<typename T>
+    bool operator()(const T& var, const region& reg)
+    {
+      return (var.locus() >= reg.from() && var.locus() <= reg.to() && var.chromosome() == reg.chromosome());
+    }
+  };
+
+  struct rightmost_coordinate_within_region
+  {
+    template<typename T>
+    bool operator()(const T& var, const region& reg)
+    {
+      std::uint64_t right = (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1);
+      return (right >= reg.from() && right <= reg.to() && var.chromosome() == reg.chromosome());
+    }
+  };
 }
 
 #endif //LIBSAVVY_REGION_HPP

@@ -457,14 +457,6 @@ namespace savvy
 
       return *this;
     }
-
-    template <typename VecType>
-    using allele_variant_iterator =  basic_allele_variant_iterator<reader_base, VecType>;
-
-    template <typename ValType>
-    using dense_allele_variant_iterator =  basic_allele_variant_iterator<reader_base, std::vector<ValType>>;
-    template <typename ValType>
-    using sparse_allele_variant_iterator =  basic_allele_variant_iterator<reader_base, compressed_vector<ValType>>;
   }
 }
 

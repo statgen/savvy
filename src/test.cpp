@@ -458,8 +458,8 @@ private:
   {
     std::size_t ret = 0;
 
-    savvy::basic_allele_variant_iterator<ReaderType, std::vector<float>> cur(reader);
-    savvy::basic_allele_variant_iterator<ReaderType, std::vector<float>> end;
+    savvy::basic_variant_iterator<ReaderType, savvy::dense_allele_vector<float>> cur(reader);
+    savvy::basic_variant_iterator<ReaderType, savvy::dense_allele_vector<float>> end;
 
     std::size_t num_markers = 0;
     while (cur != end)
@@ -505,8 +505,8 @@ void convert_file_test()
 {
   {
     savvy::vcf::reader input("test_file.vcf");
-    savvy::vcf::allele_variant_iterator<std::vector<float>> cur(input);
-    savvy::vcf::allele_variant_iterator<std::vector<float>> eof;
+    savvy::basic_variant_iterator<savvy::vcf::reader, savvy::dense_allele_vector<float>> cur(input);
+    savvy::basic_variant_iterator<savvy::vcf::reader, savvy::dense_allele_vector<float>> eof;
 
     auto file_info = input.metadata();
     auto prop_fields = input.prop_fields();
@@ -665,8 +665,8 @@ void random_access_test()
   savvy::indexed_reader rdr("", {"", 0, 0});
   savvy::indexed_reader tmp("test_file.sav", {"20", 17000, 1120000});
   rdr = std::move(tmp);
-  auto it = savvy::allele_variant_iterator<std::vector<float>>(rdr);
-  auto end = savvy::allele_variant_iterator<std::vector<float>>{};
+  auto it = savvy::basic_variant_iterator<savvy::indexed_reader, savvy::dense_allele_vector<float>>(rdr);
+  auto end = savvy::basic_variant_iterator<savvy::indexed_reader, savvy::dense_allele_vector<float>>{};
   for ( ; it != end; ++it)
   {
     std::cout << it->chromosome() << " " << it->locus()  << " " << it->ref()  << " " << it->alt() << std::endl;

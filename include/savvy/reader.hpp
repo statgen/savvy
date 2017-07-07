@@ -129,16 +129,16 @@ namespace savvy
       return true;
     }
 
-    template <typename T>
-    bool read_variant(T& destination, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN())
-    {
-      if (sav_impl())
-        sav_impl()->read_variant(destination, missing_value);
-      else if (vcf_impl())
-        vcf_impl()->read_variant(destination, missing_value);
-
-      return good();
-    }
+//    template <typename T>
+//    bool read_variant(T& destination, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN())
+//    {
+//      if (sav_impl())
+//        sav_impl()->read_variant(destination, missing_value);
+//      else if (vcf_impl())
+//        vcf_impl()->read_variant(destination, missing_value);
+//
+//      return good();
+//    }
 
     std::vector<std::string> prop_fields() const;
     sample_iterator samples_begin() const;
@@ -197,28 +197,34 @@ namespace savvy
   template <typename T>
   reader& reader::operator>>(T& destination)
   {
-    read_variant(destination);
+    read(destination);
     return *this;
   }
 
   template <typename T>
   reader& reader::read(T& destination, const typename T::vector_type::value_type missing_value)
   {
-    read_variant(destination, missing_value);
+    if (sav_impl())
+      sav_reader_->read(destination, missing_value);
+    else if (vcf_impl())
+      sav_reader_->read(destination, missing_value);
     return *this;
   }
 
   template <typename T>
   indexed_reader& indexed_reader::operator>>(T& destination)
   {
-    read_variant(destination);
+    read(destination);
     return *this;
   }
 
   template <typename T>
   indexed_reader& indexed_reader::read(T& destination, const typename T::vector_type::value_type missing_value)
   {
-    read_variant(destination, missing_value);
+    if (sav_impl())
+      sav_reader_->read(destination, missing_value);
+    else if (vcf_impl())
+      sav_reader_->read(destination, missing_value);
     return *this;
   }
 
@@ -232,14 +238,6 @@ namespace savvy
 
     return *this;
   }
-
-  template <typename VecType>
-  using allele_variant_iterator =  basic_allele_variant_iterator<reader_base, VecType>;
-
-  template <typename ValType>
-  using dense_allele_variant_iterator =  basic_allele_variant_iterator<reader_base, std::vector<ValType>>;
-  template <typename ValType>
-  using sparse_allele_variant_iterator =  basic_allele_variant_iterator<reader_base, compressed_vector<ValType>>;
 }
 
 #endif //VC_READER_HPP
