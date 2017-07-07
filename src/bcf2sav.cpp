@@ -8,8 +8,8 @@
 int main(int argc, char** argv)
 {
   savvy::vcf::reader input(argv[1]);
-  savvy::vcf::dense_allele_variant_iterator<float> cur(input);
-  savvy::vcf::dense_allele_variant_iterator<float> eof{};
+  savvy::basic_variant_iterator<savvy::vcf::reader, savvy::dense_allele_vector<float>> cur(input);
+  savvy::basic_variant_iterator<savvy::vcf::reader, savvy::dense_allele_vector<float>> eof{};
 
   std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
   std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
