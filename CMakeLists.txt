@@ -16,8 +16,9 @@ endif()
 #find_package(shrinkwrap CONFIG REQUIRED)
 find_library(HTS_LIBRARY hts)
 find_library(ZLIB_LIBRARY z)
-find_library(ZSTD_LIBRARY zstd)
-
+#ZSTD can only likn statically since experimental functions are being used.
+find_library(ZSTD_LIBRARY NAMES ${CMAKE_STATIC_LIBRARY_PREFIX}zstd${CMAKE_STATIC_LIBRARY_SUFFIX})
+find_package(Threads)
 
 #get_target_property(SHRINKWRAP_LIBS shrinkwrap INTERFACE_LINK_LIBRARIES)
 
@@ -28,7 +29,7 @@ set(SOURCE_FILES
     src/savvy.cpp src/reader.cpp src/m3vcf_reader.cpp include/savvy/sav_reader.hpp src/sav_reader.cpp include/savvy/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
 
 add_library(savvy ${SOURCE_FILES} ${HEADER_FILES})
-target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY})
+target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 add_executable(savvy-test src/test.cpp src/test_class.cpp include/savvy/test_class.hpp)

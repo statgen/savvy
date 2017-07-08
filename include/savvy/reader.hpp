@@ -207,7 +207,7 @@ namespace savvy
     if (sav_impl())
       sav_reader_->read(destination, missing_value);
     else if (vcf_impl())
-      sav_reader_->read(destination, missing_value);
+      vcf_reader_->read(destination, missing_value);
     return *this;
   }
 
@@ -224,7 +224,7 @@ namespace savvy
     if (sav_impl())
       sav_reader_->read(destination, missing_value);
     else if (vcf_impl())
-      sav_reader_->read(destination, missing_value);
+      vcf_reader_->read(destination, missing_value);
     return *this;
   }
 

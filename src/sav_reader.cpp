@@ -136,7 +136,7 @@ namespace savvy
 
       input_stream_.peek();
     }
-
+#if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
     reader_base::reader_base(reader_base&& source) :
       sample_ids_(std::move(source.sample_ids_)),
       //sbuf_(std::move(source.sbuf_)),
@@ -162,7 +162,7 @@ namespace savvy
       }
       return *this;
     }
-
+#endif
 //    reader& reader_base::operator>>(marker& destination)
 //    {
 //      marker::read(destination, sample_ids_.size() * ploidy_level_, input_stream_);

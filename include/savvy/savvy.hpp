@@ -12,8 +12,15 @@ namespace savvy
 {
   namespace detail
   {
+    template<typename T, typename ...Args>
+    std::unique_ptr<T> make_unique(Args&& ...args)
+    {
+      return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+    }
+
     bool has_extension(const std::string& fullString, const std::string& ext);
 
+#if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
     template<typename F, typename Tuple, std::size_t... S>
     decltype(auto) apply_impl(F&& fn, Tuple&& t, std::index_sequence<S...>)
     {
@@ -86,8 +93,9 @@ namespace savvy
 ////        }
 //      }
 //    };
+#endif
   }
-
+#if 0
   template <typename Fn, typename File, typename File2, typename... AddlFiles>
   void open_files(Fn&& handler, const File& file_path, const File2& file_path2, const AddlFiles&... addl_file_paths)
   {
@@ -120,7 +128,7 @@ namespace savvy
       handler(std::move(input));
     }
   }
-
+#endif
 //  template <typename Fn, typename File, typename File2, typename... AddlFiles>
 //  void open_indexed_files(Fn&& handler, const File& file_path, const File2& file_path2, const AddlFiles&... addl_file_paths)
 //  {

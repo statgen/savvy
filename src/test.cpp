@@ -490,15 +490,13 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 
 void run_file_checksum_test()
 {
-
-  savvy::open_files(std::make_tuple("test_file.vcf", "test_file.sav"), [](auto&& input_file_reader1, auto&& input_file_reader2)
-  {
-    auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
-    std::cout << "Starting checksum test ..." << std::endl;
-    auto timed_call = time_procedure(t);
-    std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
-    std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
-  });
+  savvy::reader input_file_reader1("test_file.vcf");
+  savvy::reader input_file_reader2("test_file.sav");
+  auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
+  std::cout << "Starting checksum test ..." << std::endl;
+  auto timed_call = time_procedure(t);
+  std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
+  std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
 }
 
 void convert_file_test()
