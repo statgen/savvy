@@ -3,7 +3,7 @@ Interface to various variant calling formats.
 
 ## Installing
 The easiest way to install savvy and its dependencies is to use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget).
-```shell
+```bash
 cget install --prefix <install_prefix> statgen/savvy
 ```
 CMakeLists.txt:
