@@ -88,6 +88,20 @@ namespace savvy
     using variant_vector<T>::variant_vector;
   };
 
+  template <typename T>
+  class genotype_likelihoods_vector : public variant_vector<T>
+  {
+  public:
+    using variant_vector<T>::variant_vector;
+  };
+
+  template <typename T>
+  class phred_genotype_likelihoods_vector : public variant_vector<T>
+  {
+  public:
+    using variant_vector<T>::variant_vector;
+  };
+
   template<typename T>
   const std::string variant_vector<T>::empty_string = {};
 

@@ -88,6 +88,10 @@ namespace savvy
       void read_genotypes(genotype_probabilities_vector<T>& destination, const typename T::value_type missing_value);
       template <typename T>
       void read_genotypes(dosage_vector<T>& destination, const typename T::value_type missing_value);
+      template <typename T>
+      void read_genotypes(genotype_likelihoods_vector<T>& destination, const typename T::value_type missing_value);
+      template <typename T>
+      void read_genotypes(phred_genotype_likelihoods_vector<T>& destination, const typename T::value_type missing_value);
     protected:
       std::ios::iostate state_;
       int* gt_;
@@ -313,6 +317,79 @@ namespace savvy
             for (std::size_t i = 0; i < gt_sz_; ++i)
             {
               destination[i] = gp[i];
+            }
+            return;
+          }
+        }
+
+        this->state_ = std::ios::failbit;
+      }
+    }
+
+    template <typename T>
+    void reader_base::read_genotypes(genotype_likelihoods_vector<T>& destination, const typename T::value_type missing_value)
+    {
+      if (good())
+      {
+        if (hts_rec()->n_allele > 2)
+        {
+          state_ = std::ios::failbit; // multi allelic GP not supported.
+          return;
+        }
+
+        bcf_unpack(hts_rec(), BCF_UN_ALL);
+        if (bcf_get_format_float(hts_hdr(),hts_rec(),"GL", &(gt_), &(gt_sz_)) >= 0)
+        {
+          int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
+          if (gt_sz_ % num_samples != 0)
+          {
+            // TODO: mixed ploidy at site error.
+          }
+          else
+          {
+            const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample - 1);
+            destination.resize(gt_sz_);
+
+            float* gp = (float*)(void*)(gt_);
+            for (std::size_t i = 0; i < gt_sz_; ++i)
+            {
+              destination[i] = gp[i];
+            }
+            return;
+          }
+        }
+
+        this->state_ = std::ios::failbit;
+      }
+    }
+
+    template <typename T>
+    void reader_base::read_genotypes(phred_genotype_likelihoods_vector<T>& destination, const typename T::value_type missing_value)
+    {
+      if (good())
+      {
+        if (hts_rec()->n_allele > 2)
+        {
+          state_ = std::ios::failbit; // multi allelic GP not supported.
+          return;
+        }
+
+        bcf_unpack(hts_rec(), BCF_UN_ALL);
+        if (bcf_get_format_int32(hts_hdr(),hts_rec(),"PL", &(gt_), &(gt_sz_)) >= 0)
+        {
+          int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
+          if (gt_sz_ % num_samples != 0)
+          {
+            // TODO: mixed ploidy at site error.
+          }
+          else
+          {
+            const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample - 1);
+            destination.resize(gt_sz_);
+
+            for (std::size_t i = 0; i < gt_sz_; ++i)
+            {
+              destination[i] = gt_[i];
             }
             return;
           }
