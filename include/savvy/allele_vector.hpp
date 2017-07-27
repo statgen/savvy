@@ -117,6 +117,10 @@ namespace savvy
 
   template <typename T>
   using dense_genotype_probabilities_vector = genotype_probabilities_vector<std::vector<T>>;
+  template <typename T>
+  using dense_genotype_likelihoods_vector = genotype_likelihoods_vector<std::vector<T>>;
+  template <typename T>
+  using dense_phred_genotype_likelihoods_vector = phred_genotype_likelihoods_vector<std::vector<T>>;
 //  template <typename T>
 //  using sparse_genotype_probabilities_vector = genotype_probabilities_vector<compressed_vector<T>>;
 
