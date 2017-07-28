@@ -208,32 +208,50 @@ namespace savvy
       template <typename T>
       void discard_genotypes(allele_vector<T>& destination)
       {
-        discard_genotypes<1>();
+        if (data_format_ != data_format_type::genotype)
+          input_stream_.setstate(std::ios::badbit);
+        else
+          discard_genotypes<1>();
       }
 
       template <typename T>
       void discard_genotypes(genotype_vector<T>& destination)
       {
-        discard_genotypes<1>();
+        if (data_format_ != data_format_type::genotype)
+          input_stream_.setstate(std::ios::badbit);
+        else
+          discard_genotypes<1>();
       }
 
       template <typename T>
       void discard_genotypes(genotype_probabilities_vector<T>& destination)
       {
-        discard_genotypes<7>();
+        if (data_format_ != data_format_type::posterior_probablities)
+          input_stream_.setstate(std::ios::badbit);
+        else
+          discard_genotypes<7>();
       }
 
       template <typename T>
       void discard_genotypes(dosage_vector<T>& destination)
       {
-        discard_genotypes<7>();
+        if (data_format_ != data_format_type::posterior_probablities)
+          input_stream_.setstate(std::ios::badbit);
+        else
+          discard_genotypes<7>();
+      }
+
+      template <typename T>
+      void discard_genotypes(T& destination)
+      {
+        input_stream_.setstate(std::ios::badbit);
       }
 
       template <typename T>
       void read_genotypes(allele_vector<T>& destination, const typename T::value_type missing_value)
       {
         if (data_format_ != data_format_type::genotype)
-          input_stream_.setstate(std::ios::failbit);
+          input_stream_.setstate(std::ios::badbit);
 
         if (good())
         {
@@ -397,6 +415,14 @@ namespace savvy
           }
         }
       }
+
+      template <typename T>
+      void read_genotypes(T& destination, const typename T::value_type missing_value)
+      {
+        input_stream_.setstate(std::ios::failbit);
+      }
+
+
     protected:
       std::vector<std::string> sample_ids_;
       data_format_type data_format_;
