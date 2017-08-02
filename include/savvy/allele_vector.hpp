@@ -128,5 +128,48 @@ namespace savvy
   using dense_dosage_vector = dosage_vector<std::vector<T>>;
   template <typename T>
   using sparse_dosage_vector = dosage_vector<compressed_vector<T>>;
+
+  namespace detail
+  {
+    template <typename T>
+    void print_vcf_site_info(std::ostream& out, const variant_vector<T>& in)
+    {
+      out << in.chromosome() << "\t"
+          << in.locus() << "\t"
+          << (in.prop("ID").size() ? in.prop("ID") : ".") << "\t"
+          << in.ref() << "\t"
+          << in.alt() << "\t"
+          << (in.prop("QUAL").size() ? in.prop("QUAL") : ".") << "\t"
+          << (in.prop("FILTER").size() ? in.prop("FILTER") : ".") << "\t"
+          << (in.prop("INFO").size() ? in.prop("INFO") : ".") << "\t"
+          << "GT";
+    }
+  }
+
+  template <typename T>
+  void print_vcf_record(std::ostream& out, const dense_allele_vector<T>& in, std::uint32_t ploidy = 2, bool phased = false)
+  {
+    detail::print_vcf_site_info(out, in);
+
+    std::uint32_t a = 0;
+    for (auto it = in.begin(); it != in.end(); ++it)
+    {
+      if (a == 0)
+        out.put('\t');
+
+      if (*it <= 5.0)
+        out.put('0');
+      else
+        out.put('1');
+
+      ++a;
+      if (a == ploidy)
+        a = 0;
+      else
+        out.put(phased ? '|' : '/');
+    }
+
+    out.put('\n');
+  }
 }
 #endif //LIBSAVVY_ALLELE_VECTOR_HPP
