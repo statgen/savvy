@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <iterator>
+#include <ostream>
 
 namespace savvy
 {
@@ -132,7 +134,7 @@ namespace savvy
   namespace detail
   {
     template <typename T>
-    void print_vcf_site_info(std::ostream& out, const variant_vector<T>& in)
+    void print_vcf_site_info(std::ostream& out, const variant_vector<T>& in, const std::vector<std::string>& info_fields)
     {
       out << in.chromosome() << "\t"
           << in.locus() << "\t"
@@ -140,36 +142,51 @@ namespace savvy
           << in.ref() << "\t"
           << in.alt() << "\t"
           << (in.prop("QUAL").size() ? in.prop("QUAL") : ".") << "\t"
-          << (in.prop("FILTER").size() ? in.prop("FILTER") : ".") << "\t"
-          << (in.prop("INFO").size() ? in.prop("INFO") : ".") << "\t"
-          << "GT";
+          << (in.prop("FILTER").size() ? in.prop("FILTER") : ".") << "\t";
+
+      std::size_t counter = 0;
+      for (auto it = info_fields.begin(); it != info_fields.end(); ++it)
+      {
+        std::string val = in.prop(*it);
+        if (val.size())
+        {
+          out << (counter > 0 ? ";":"") << *it << "=" << val;
+          ++counter;
+        }
+      }
+
+      out << (counter == 0 ? ".\t" : "\t");
+
+      out << "GT";
     }
   }
 
   template <typename T>
-  void print_vcf_record(std::ostream& out, const dense_allele_vector<T>& in, std::uint32_t ploidy = 2, bool phased = false)
+  void print_vcf_record(std::ostream& out, const dense_allele_vector<T>& in, const std::vector<std::string>& info_fields, std::uint32_t ploidy = 2, bool phased = false)
   {
-    detail::print_vcf_site_info(out, in);
+    detail::print_vcf_site_info(out, in, info_fields);
+
+    std::ostreambuf_iterator<char> out_it(out);
 
     std::uint32_t a = 0;
     for (auto it = in.begin(); it != in.end(); ++it)
     {
       if (a == 0)
-        out.put('\t');
+        out_it = '\t';
 
       if (*it <= 5.0)
-        out.put('0');
+        out_it = '0';
       else
-        out.put('1');
+        out_it = '1';
 
       ++a;
       if (a == ploidy)
         a = 0;
       else
-        out.put(phased ? '|' : '/');
+        out_it = (phased ? '|' : '/');
     }
 
-    out.put('\n');
+    out_it = '\n';
   }
 }
 #endif //LIBSAVVY_ALLELE_VECTOR_HPP

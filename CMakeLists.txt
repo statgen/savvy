@@ -23,7 +23,7 @@ find_package(Threads)
 #get_target_property(SHRINKWRAP_LIBS shrinkwrap INTERFACE_LINK_LIBRARIES)
 
 set(HEADER_FILES
-    include/savvy/savvy.hpp include/savvy/reader.hpp include/savvy/m3vcf_reader.hpp include/savvy/sav_reader.hpp include/savvy/allele_status.hpp include/savvy/vcf_reader.hpp include/savvy/varint.hpp include/savvy/s1r.hpp include/savvy/allele_vector.hpp include/savvy/genotype_vector.hpp include/savvy/variant_iterator.hpp include/savvy/portable_endian.hpp include/savvy/region.hpp include/savvy/compressed_vector.hpp include/savvy/eigen3_vector.hpp include/savvy/ublas_vector.hpp include/savvy/armadillo_vector.hpp)
+    include/savvy/savvy.hpp include/savvy/reader.hpp include/savvy/m3vcf_reader.hpp include/savvy/sav_reader.hpp include/savvy/allele_status.hpp include/savvy/vcf_reader.hpp include/savvy/varint.hpp include/savvy/s1r.hpp include/savvy/allele_vector.hpp include/savvy/genotype_vector.hpp include/savvy/variant_iterator.hpp include/savvy/portable_endian.hpp include/savvy/region.hpp include/savvy/compressed_vector.hpp include/savvy/eigen3_vector.hpp include/savvy/ublas_vector.hpp include/savvy/armadillo_vector.hpp include/savvy/utility.hpp)
 
 set(SOURCE_FILES
     src/savvy.cpp src/reader.cpp src/m3vcf_reader.cpp include/savvy/sav_reader.hpp src/sav_reader.cpp include/savvy/test_class.hpp src/vcf_reader.cpp src/varint.cpp)
@@ -40,6 +40,9 @@ target_link_libraries(bcf2m3vcf savvy)
 
 add_executable(bcf2sav src/bcf2sav.cpp)
 target_link_libraries(bcf2sav savvy)
+
+add_executable(sav2vcf src/sav2vcf.cpp)
+target_link_libraries(sav2vcf savvy)
 
 add_executable(sav-sample-sort src/sav_sample_sort.cpp)
 target_link_libraries(sav-sample-sort savvy)

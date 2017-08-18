@@ -5,6 +5,7 @@
 #include "allele_vector.hpp"
 #include "region.hpp"
 #include "variant_iterator.hpp"
+#include "utility.hpp"
 
 //namespace savvy
 //{
@@ -14,7 +15,9 @@
 #include <htslib/vcf.h>
 //}
 //}
+#include <shrinkwrap/gz.hpp>
 
+#include <fstream>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -26,6 +29,11 @@ namespace savvy
 {
   namespace vcf
   {
+    enum class compression_type : std::uint8_t
+    {
+      none = 0,
+      bgzip
+    };
 
     class reader_base
     {
@@ -534,6 +542,163 @@ namespace savvy
 
       return *this;
     }
+
+    class writer
+    {
+    public:
+      struct options
+      {
+        compression_type compression = compression_type::none;
+        std::vector<std::pair<std::string,std::string>> headers;
+      };
+
+      template <typename RandAccessStringIterator>
+      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, const options& opts = options()) :
+        output_stream_(opts.compression == compression_type::none ? std::unique_ptr<std::ostream>(new std::ofstream(file_path)) : std::unique_ptr<std::ostream>(new shrinkwrap::bgz::ostream(file_path))),
+        sample_size_(0)
+      {
+        (*output_stream_) << "##fileformat=VCFv4.2" << std::endl;
+
+        std::ostreambuf_iterator<char> out_it(*output_stream_);
+
+
+        for (auto it = opts.headers.begin(); it != opts.headers.end(); ++it)
+        {
+          (*output_stream_) << (std::string("##") + it->first + "=" + it->second) << std::endl;
+
+          if (it->first == "INFO")
+          {
+            if (it->second.size() && it->second.front() == '<' && it->second.back() == '>')
+            {
+              std::string header_value = it->second;
+              header_value.resize(header_value.size() - 1);
+
+              auto curr_pos = header_value.begin() + 1;
+              auto comma_pos = std::find(curr_pos, header_value.end(), ',');
+
+              while (comma_pos != header_value.end())
+              {
+                auto equals_pos = std::find(curr_pos, comma_pos, '=');
+                if (equals_pos != comma_pos)
+                {
+                  std::string key(curr_pos, equals_pos);
+                  std::string val(equals_pos + 1, comma_pos);
+
+                  if (key == "ID")
+                    info_fields_.emplace_back(std::move(val));
+                }
+
+                curr_pos = comma_pos + 1;
+                comma_pos = std::find(curr_pos, header_value.end(), ',');
+              }
+
+              auto equals_pos = std::find(curr_pos, comma_pos, '=');
+              if (equals_pos != comma_pos)
+              {
+                std::string key(curr_pos, equals_pos);
+                std::string val(equals_pos + 1, comma_pos);
+
+                if (key == "ID")
+                  info_fields_.emplace_back(std::move(val));
+
+                curr_pos = comma_pos + 1;
+              }
+            }
+          }
+        }
+
+        (*output_stream_) << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
+        for (auto it = samples_beg; it != samples_end; ++it)
+        {
+          (*output_stream_) << (std::string("\t") + *it);
+          ++sample_size_;
+        }
+        (*output_stream_) << std::endl;
+      }
+
+      template <typename T>
+      writer& write(const allele_vector<T>& m)
+      {
+        if (good())
+        {
+          if (m.size() % sample_size_ != 0)
+          {
+            output_stream_->setstate(std::ios::failbit);
+          }
+          else
+          {
+            (*output_stream_) << m.chromosome()
+                           << "\t" << m.locus()
+                           << "\t" << std::string(m.prop("ID").size() ? m.prop("ID") : ".")
+                           << "\t" << m.ref()
+                           << "\t" << m.alt()
+                           << "\t" << std::string(m.prop("QUAL").size() ? m.prop("QUAL") : ".")
+                           << "\t" << std::string(m.prop("FILTER").size() ? m.prop("FILTER") : ".");
+
+            std::size_t i = 0;
+            for (auto it = info_fields_.begin(); it != info_fields_.end(); ++it)
+            {
+              if (m.prop(*it).size())
+              {
+                if (i == 0)
+                  (*output_stream_) << "\t";
+                else
+                  (*output_stream_) << ";";
+
+                (*output_stream_) << (*it + "=" + m.prop(*it));
+
+                ++i;
+              }
+            }
+
+            if (i == 0)
+              (*output_stream_) << "\t.";
+
+            (*output_stream_) << "\tGT";
+            write_genotypes(m);
+            (*output_stream_) << std::endl;
+          }
+        }
+
+        return *this;
+      }
+
+      template <typename T>
+      writer& operator<<(const allele_vector<T>& m)
+      {
+        return this->write(m);
+      }
+
+      bool good() { return output_stream_->good(); }
+    private:
+      template <typename T>
+      void write_genotypes(const allele_vector<T>& m)
+      {
+        std::size_t i = 0;
+        const std::size_t ploidy = m.size() / sample_size_;
+        std::ostreambuf_iterator<char> out_it(*output_stream_);
+        for (auto it = m.begin(); it != m.end(); ++it)
+        {
+          if (i % ploidy == 0)
+            out_it = '\t';
+          else
+            out_it = '|';
+
+          if (std::isnan(*it))
+            out_it = '.';
+          else if (*it == 0.0)
+            out_it = '0';
+          else
+            out_it = '1';
+
+          ++i;
+        }
+      }
+    private:
+      std::vector<std::string> info_fields_;
+      std::unique_ptr<std::ostream> output_stream_;
+      std::size_t sample_size_;
+    };
   }
 }
 
