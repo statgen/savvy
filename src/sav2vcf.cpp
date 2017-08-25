@@ -12,6 +12,10 @@ int main(int argc, char** argv)
 
   std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
   std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
+  auto variant_metadata = input.prop_fields();
+
+  savvy::vcf::writer::options opts;
+  opts.headers = input.metadata();
 
   savvy::vcf::writer vcf_output(argc > 2 ? std::string(argv[2]) : std::string("/dev/stdout"), sample_ids.begin(), sample_ids.end());
 

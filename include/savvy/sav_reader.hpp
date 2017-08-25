@@ -78,6 +78,7 @@ namespace savvy
 //      std::vector<std::string>::const_iterator prop_fields_end() const { return metadata_fields_.end(); }
 
       std::vector<std::string> prop_fields() const { return std::vector<std::string>(metadata_fields_); }
+      std::vector<std::pair<std::string,std::string>> metadata() const { return file_info_; }
 
       const std::string& file_path() const { return file_path_; }
       std::streampos tellg() { return this->input_stream_.tellg(); }
