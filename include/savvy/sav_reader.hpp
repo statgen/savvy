@@ -8,6 +8,7 @@
 #include "genotype_vector.hpp"
 #include "region.hpp"
 #include "variant_iterator.hpp"
+#include "utility.hpp"
 
 #include <shrinkwrap/istream.hpp>
 
@@ -78,7 +79,7 @@ namespace savvy
 //      std::vector<std::string>::const_iterator prop_fields_end() const { return metadata_fields_.end(); }
 
       std::vector<std::string> prop_fields() const { return std::vector<std::string>(metadata_fields_); }
-      std::vector<std::pair<std::string,std::string>> metadata() const { return file_info_; }
+      std::vector<std::pair<std::string,std::string>> headers() const { return headers_; }
 
       const std::string& file_path() const { return file_path_; }
       std::streampos tellg() { return this->input_stream_.tellg(); }
@@ -387,7 +388,7 @@ namespace savvy
       data_format_type data_format_;
       shrinkwrap::zstd::istream input_stream_;
       std::string file_path_;
-      std::vector<std::pair<std::string, std::string>> file_info_;
+      std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> metadata_fields_;
     };
 
@@ -551,8 +552,8 @@ namespace savvy
         }
       };
 
-      template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename RandAccessStringIterator2>
-      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator file_info_beg, RandAccessKVPIterator file_info_end,  RandAccessStringIterator2 property_fields_beg, RandAccessStringIterator2 property_fields_end, options opts = options()) :
+      template <typename RandAccessStringIterator, typename RandAccessKVPIterator>
+      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, options opts = options()) :
         output_buf_(std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path))), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         output_stream_(output_buf_.get()),
         file_path_(file_path),
@@ -570,9 +571,15 @@ namespace savvy
         std::ostreambuf_iterator<char> out_it(output_stream_);
 
 
-        file_info_.assign(file_info_beg, file_info_end);
-        varint_encode(file_info_.size(), out_it);
-        for (auto it = file_info_.begin(); it != file_info_.end(); ++it)
+        bool format_header_added = false;
+        headers_.resize(std::distance(headers_beg, headers_end));
+        auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string,std::string>& kvp) { return kvp.first != "FORMAT"; });
+        headers_.resize(std::distance(headers_.begin(), copy_res));
+
+        headers_.push_back(std::make_pair("FORMAT", data_format_  == data_format_type::genotype ? "<ID=GT,Description=\"Genotype\">" : "<ID=GP,Description=\"Genotype posterior probabilities\">"));
+
+        varint_encode(headers_.size(), out_it);
+        for (auto it = headers_.begin(); it != headers_.end(); ++it)
         {
           std::size_t str_sz = get_string_size(it->first);
           varint_encode(str_sz, out_it);
@@ -585,22 +592,12 @@ namespace savvy
             if (str_sz)
               output_stream_.write(it->second.data(), str_sz);
           }
+
+          if (it->first == "INFO")
+          {
+            this->property_fields_.push_back(parse_header_id(it->second));
+          }
         }
-
-
-        property_fields_.assign(property_fields_beg, property_fields_end);
-        varint_encode(property_fields_.size(), out_it);
-        for (auto it = property_fields_.begin(); it != property_fields_.end(); ++it)
-        {
-          std::size_t str_sz = get_string_size(*it);
-          varint_encode(str_sz, out_it);
-          if (str_sz)
-            output_stream_.write(&(*it)[0], str_sz);
-        }
-
-        std::string format_string = (data_format_ == data_format_type::genotype ? "GT" : "GP"); // GP no longer phred-scaled in VCFv4.3
-        varint_encode(format_string.size(), out_it);
-        std::copy(format_string.begin(), format_string.end(), out_it);
 
         varint_encode(sample_size_, out_it);
         for (auto it = samples_beg; it != samples_end; ++it)
@@ -615,7 +612,7 @@ namespace savvy
 
       template <typename RandAccessStringIterator>
       writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, options opts = options()) :
-        writer(file_path, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_pair_array.end(), empty_string_pair_array.end(),  empty_string_array.end(), empty_string_array.end(), opts)
+        writer(file_path, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_pair_array.end(), empty_string_pair_array.end(), opts)
       {
 
       }
@@ -792,7 +789,7 @@ namespace savvy
     private:
       std::unique_ptr<std::streambuf> output_buf_;
       std::ostream output_stream_;
-      std::vector<std::pair<std::string, std::string>> file_info_;
+      std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> property_fields_;
       std::string file_path_;
       std::string current_chromosome_;
@@ -800,7 +797,7 @@ namespace savvy
       std::uint32_t metadata_fields_cnt_;
       std::size_t allele_count_;
       std::size_t record_count_;
-      std::size_t block_size_;
+      std::size_t block_size_{};
       data_format_type data_format_;
     };
 

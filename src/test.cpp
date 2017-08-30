@@ -461,12 +461,17 @@ private:
     savvy::basic_variant_iterator<ReaderType, savvy::dense_allele_vector<float>> cur(reader);
     savvy::basic_variant_iterator<ReaderType, savvy::dense_allele_vector<float>> end;
 
+    auto prop_fields = reader.prop_fields();
+
     std::size_t num_markers = 0;
     while (cur != end)
     {
       ret = hash_combine(ret, cur->locus());
       ret = hash_combine(ret, cur->ref());
       ret = hash_combine(ret, cur->alt());
+
+      for (const auto& prop_key : prop_fields)
+        ret = hash_combine(ret, cur->prop(prop_key));
 
       for (auto gt = cur->begin(); gt != cur->end(); ++gt)
         ret = hash_combine(ret, static_cast<int>(*gt));
@@ -506,9 +511,12 @@ void convert_file_test()
     savvy::basic_variant_iterator<savvy::vcf::reader, savvy::dense_allele_vector<float>> cur(input);
     savvy::basic_variant_iterator<savvy::vcf::reader, savvy::dense_allele_vector<float>> eof;
 
-    auto file_info = input.metadata();
-    auto prop_fields = input.prop_fields();
-    savvy::sav::writer compact_output("test_file.sav", input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end(), prop_fields.begin(), prop_fields.end());
+    auto file_info = input.headers();
+    file_info.reserve(file_info.size() + 3);
+    file_info.insert(file_info.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
+    file_info.insert(file_info.begin(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
+    file_info.insert(file_info.begin(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
+    savvy::sav::writer compact_output("test_file.sav", input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end());
 
     while (cur != eof)
     {

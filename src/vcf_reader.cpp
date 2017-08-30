@@ -28,7 +28,7 @@ namespace savvy
       return static_cast<std::uint64_t>(bcf_hdr_nsamples(hts_hdr()));
     }
 
-    std::vector<std::pair<std::string, std::string>> reader_base::metadata() const
+    std::vector<std::pair<std::string, std::string>> reader_base::headers() const
     {
       std::vector<std::pair<std::string, std::string>> ret;
 
@@ -85,7 +85,7 @@ namespace savvy
       bcf_hdr_t* hdr = hts_hdr();
       if (hdr)
       {
-        this->property_fields_ = {"QUAL", "FILTER"};
+        this->property_fields_ = {"ID","QUAL", "FILTER"};
         for (int i = 0; i < hdr->nhrec; ++i)
         {
           if (hdr->hrec[i]->type == BCF_HL_INFO)

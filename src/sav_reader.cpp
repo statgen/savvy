@@ -1,5 +1,6 @@
 #include "savvy/sav_reader.hpp"
 #include "savvy/variant_iterator.hpp"
+#include "savvy/utility.hpp"
 
 #include <assert.h>
 #include <algorithm>
@@ -25,13 +26,13 @@ namespace savvy
       std::istreambuf_iterator<char> in_it(input_stream_);
       std::istreambuf_iterator<char> end;
 
-      std::uint64_t file_info_size;
-      if (varint_decode(in_it, end, file_info_size) != end)
+      std::uint64_t headers_size;
+      if (varint_decode(in_it, end, headers_size) != end)
       {
         ++in_it;
-        file_info_.reserve(file_info_size);
+        headers_.reserve(headers_size);
 
-        while (file_info_size && in_it != end)
+        while (headers_size && in_it != end)
         {
           std::uint64_t key_size;
           if (varint_decode(in_it, end, key_size) != end)
@@ -53,83 +54,51 @@ namespace savvy
                   val.resize(val_size);
                   input_stream_.read(&val[0], val_size);
 
-                  file_info_.emplace_back(std::move(key), std::move(val));
+                  if (key == "INFO")
+                  {
+                    std::string info_field = parse_header_id(val);
+                    metadata_fields_.push_back(std::move(info_field));
+                  }
+                  else if (key == "FORMAT")
+                  {
+                    std::string format_field = parse_header_id(val);
+                    if (format_field == "GT")
+                      data_format_ = data_format_type::genotype;
+                    else if (format_field == "GP")
+                      data_format_ = data_format_type::posterior_probablities;
+                  }
+                  headers_.emplace_back(std::move(key), std::move(val));
                 }
               }
 
             }
           }
-          --file_info_size;
+          --headers_size;
         }
 
-        if (!file_info_size)
+        if (!headers_size)
         {
-          std::uint64_t metadata_fields_cnt;
-          if (varint_decode(in_it, end, metadata_fields_cnt) != end)
+          std::uint64_t sample_size;
+          if (varint_decode(in_it, end, sample_size) != end)
           {
             ++in_it;
-            metadata_fields_.reserve(metadata_fields_cnt);
+            sample_ids_.reserve(sample_size);
 
-            std::uint64_t field_sz;
-            while (metadata_fields_cnt && varint_decode(in_it, end, field_sz) != end)
+            std::uint64_t id_sz;
+            while (sample_size && varint_decode(in_it, end, id_sz) != end)
             {
               ++in_it;
-              metadata_fields_.emplace_back();
-              if (field_sz)
+              sample_ids_.emplace_back();
+              if (id_sz)
               {
-                metadata_fields_.back().resize(field_sz);
-                input_stream_.read(&metadata_fields_.back()[0], field_sz);
+                sample_ids_.back().resize(id_sz);
+                input_stream_.read(&sample_ids_.back()[0], id_sz);
               }
-              --metadata_fields_cnt;
+              --sample_size;
             }
 
-            if (!metadata_fields_cnt)
-            {
-              std::uint64_t sz;
-              if (varint_decode(in_it, end, sz) != end)
-              {
-                ++in_it;
-                std::string format_string;
-                if (sz)
-                {
-                  format_string.resize(sz);
-                  input_stream_.read(&format_string[0], sz);
-                }
-
-                if (format_string == "GT")
-                  data_format_ = data_format_type::genotype;
-                else if (format_string == "GP")
-                  data_format_ = data_format_type::posterior_probablities;
-                else
-                  this->input_stream_.setstate(std::ios::badbit);
-
-                if (input_stream_.good())
-                {
-                  std::uint64_t sample_size;
-                  if (varint_decode(in_it, end, sample_size) != end)
-                  {
-                    ++in_it;
-                    sample_ids_.reserve(sample_size);
-
-                    std::uint64_t id_sz;
-                    while (sample_size && varint_decode(in_it, end, id_sz) != end)
-                    {
-                      ++in_it;
-                      sample_ids_.emplace_back();
-                      if (id_sz)
-                      {
-                        sample_ids_.back().resize(id_sz);
-                        input_stream_.read(&sample_ids_.back()[0], id_sz);
-                      }
-                      --sample_size;
-                    }
-
-                    if (!sample_size)
-                      return;
-                  }
-                }
-              }
-            }
+            if (!sample_size)
+              return;
           }
         }
       }
