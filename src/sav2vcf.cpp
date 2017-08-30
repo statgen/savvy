@@ -27,7 +27,21 @@ int main(int argc, char** argv)
     if (it->first == "INFO" && (header_id == "ID" || header_id == "QUAL" || header_id == "FILTER"))
       it = headers.erase(it);
     else
+    {
+      if (it->first == "FORMAT")
+      {
+        if (header_id == "GT")
+          it->second = "<ID=GT,Number=1,Type=String,Description=\"Genotype\">";
+        else if (header_id == "GP")
+          it->second = "<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1\">";
+      }
+      else if (it->first == "fileDate")
+      {
+        // TODO: update date
+      }
+
       ++it;
+    }
   }
 
   savvy::vcf::writer vcf_output(output_path, sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end());
