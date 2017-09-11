@@ -6,6 +6,7 @@
 #include "region.hpp"
 #include "variant_iterator.hpp"
 #include "utility.hpp"
+#include "data_format.hpp"
 
 //namespace savvy
 //{
@@ -42,7 +43,8 @@ namespace savvy
         state_(std::ios::goodbit),
         gt_(nullptr),
         gt_sz_(0),
-        allele_index_(0)
+        allele_index_(0),
+        requested_data_formats_({fmt::allele})
       {}
 
       reader_base(reader_base&& source) :
@@ -50,7 +52,8 @@ namespace savvy
         gt_(source.gt_),
         gt_sz_(source.gt_sz_),
         allele_index_(source.allele_index_),
-        property_fields_(std::move(source.property_fields_))
+        property_fields_(std::move(source.property_fields_)),
+        requested_data_formats_(source.requested_data_formats_)
       {
         source.gt_ = nullptr;
       }
@@ -89,30 +92,55 @@ namespace savvy
       template <typename T>
       void read_variant_details(variant_vector<T>& destination);
       template <typename T>
-      void read_genotypes(allele_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_al(variant_vector<T>& destination, const typename T::value_type missing_value);
       template <typename T>
-      void read_genotypes(genotype_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_gt(variant_vector<T>& destination, const typename T::value_type missing_value);
       template <typename T>
-      void read_genotypes(genotype_probabilities_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_gp(variant_vector<T>& destination, const typename T::value_type missing_value);
       template <typename T>
-      void read_genotypes(dosage_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_ds(variant_vector<T>& destination, const typename T::value_type missing_value);
       template <typename T>
-      void read_genotypes(genotype_likelihoods_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_gl(variant_vector<T>& destination, const typename T::value_type missing_value);
       template <typename T>
-      void read_genotypes(phred_genotype_likelihoods_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_pl(variant_vector<T>& destination, const typename T::value_type missing_value);
     protected:
       std::ios::iostate state_;
       int* gt_;
       int gt_sz_;
       int allele_index_;
       std::vector<std::string> property_fields_; // TODO: This member is no longer necessary not that prop_fields_{begin,end}() methods are gone. Eventually remove this and init_property_fileds()
+      std::vector<fmt> requested_data_formats_;
     };
 
     template <typename T>
     bool reader_base::read_variant(T& destination, const typename T::vector_type::value_type missing_value)
     {
       read_variant_details(destination);
-      read_genotypes(destination, missing_value);
+      if (requested_data_formats_.size())
+      {
+        fmt data_fmt = requested_data_formats_.front();
+        switch (data_fmt)
+        {
+          case fmt::allele:
+            read_genotypes_al(destination, missing_value);
+            break;
+          case fmt::genotype:
+            read_genotypes_gt(destination, missing_value);
+            break;
+          case fmt::genotype_probability:
+            read_genotypes_gp(destination, missing_value);
+            break;
+          case fmt::dosage:
+            read_genotypes_ds(destination, missing_value);
+            break;
+          case fmt::genotype_likelihood:
+            read_genotypes_gl(destination, missing_value);
+            break;
+          case fmt::phred_scaled_genotype_likelihood:
+            read_genotypes_pl(destination, missing_value);
+            break;
+        }
+      }
 
       return good();
     }
@@ -202,7 +230,7 @@ namespace savvy
     }
 
     template <typename T>
-    void reader_base::read_genotypes(allele_vector<T>& destination, const typename T::value_type missing_value)
+    void reader_base::read_genotypes_al(variant_vector<T>& destination, const typename T::value_type missing_value)
     {
       if (good())
       {
@@ -234,7 +262,7 @@ namespace savvy
     }
 
     template <typename T>
-    void reader_base::read_genotypes(genotype_vector<T>& destination, const typename T::value_type missing_value)
+    void reader_base::read_genotypes_gt(variant_vector<T>& destination, const typename T::value_type missing_value)
     {
       if (good())
       {
@@ -267,7 +295,7 @@ namespace savvy
     }
 
     template <typename T>
-    void reader_base::read_genotypes(dosage_vector<T>& destination, const typename T::value_type missing_value)
+    void reader_base::read_genotypes_ds(variant_vector<T>& destination, const typename T::value_type missing_value)
     {
       if (good())
       {
@@ -298,7 +326,7 @@ namespace savvy
     }
 
     template <typename T>
-    void reader_base::read_genotypes(genotype_probabilities_vector <T>& destination, const typename T::value_type missing_value)
+    void reader_base::read_genotypes_gp(variant_vector<T>& destination, const typename T::value_type missing_value)
     {
       if (good())
       {
@@ -335,7 +363,7 @@ namespace savvy
     }
 
     template <typename T>
-    void reader_base::read_genotypes(genotype_likelihoods_vector<T>& destination, const typename T::value_type missing_value)
+    void reader_base::read_genotypes_gl(variant_vector<T>& destination, const typename T::value_type missing_value)
     {
       if (good())
       {
@@ -372,7 +400,7 @@ namespace savvy
     }
 
     template <typename T>
-    void reader_base::read_genotypes(phred_genotype_likelihoods_vector<T>& destination, const typename T::value_type missing_value)
+    void reader_base::read_genotypes_pl(variant_vector<T>& destination, const typename T::value_type missing_value)
     {
       if (good())
       {
@@ -411,7 +439,7 @@ namespace savvy
     {
     public:
       //typedef reader_base::input_iterator input_iterator;
-      reader(const std::string& file_path);
+      reader(const std::string& file_path, fmt data_format = fmt::allele);
       reader(reader&& other);
       reader(const reader&) = delete;
       reader& operator=(const reader&) = delete;
@@ -480,7 +508,7 @@ namespace savvy
     class indexed_reader : public reader_base
     {
     public:
-      indexed_reader(const std::string& file_path, const region& reg);
+      indexed_reader(const std::string& file_path, const region& reg, fmt data_format = fmt::allele);
       //template <typename PathItr, typename RegionItr>
       //region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end);
       ~indexed_reader();
@@ -535,7 +563,31 @@ namespace savvy
           predicate_failed = !fn(destination);
           if (!predicate_failed)
           {
-            read_genotypes(destination, missing_value);
+            if (requested_data_formats_.size())
+            {
+              fmt data_fmt = requested_data_formats_.front();
+              switch (data_fmt)
+              {
+                case fmt::allele:
+                  read_genotypes_al(destination, missing_value);
+                  break;
+                case fmt::genotype:
+                  read_genotypes_gt(destination, missing_value);
+                  break;
+                case fmt::genotype_probability:
+                  read_genotypes_gp(destination, missing_value);
+                  break;
+                case fmt::dosage:
+                  read_genotypes_ds(destination, missing_value);
+                  break;
+                case fmt::genotype_likelihood:
+                  read_genotypes_gl(destination, missing_value);
+                  break;
+                case fmt::phred_scaled_genotype_likelihood:
+                  read_genotypes_pl(destination, missing_value);
+                  break;
+              }
+            }
           }
         }
       }

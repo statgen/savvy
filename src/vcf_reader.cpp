@@ -105,11 +105,13 @@ namespace savvy
       }
     }
 
-    reader::reader(const std::string& file_path) :
+    reader::reader(const std::string& file_path, fmt data_format) :
       hts_file_(bcf_open(file_path.c_str(), "r")),
       hts_hdr_(nullptr),
       hts_rec_(bcf_init1())
     {
+
+      requested_data_formats_ = {data_format};
       if (!hts_file_ || !hts_rec_)
       {
         this->state_ = std::ios::badbit;
@@ -171,11 +173,12 @@ namespace savvy
       return false;
     }
 
-    indexed_reader::indexed_reader(const std::string& file_path, const region& reg) :
+    indexed_reader::indexed_reader(const std::string& file_path, const region& reg, fmt data_format) :
       file_path_(file_path),
       synced_readers_(bcf_sr_init()),
       hts_rec_(nullptr)
     {
+      this->requested_data_formats_ = {data_format};
       std::stringstream contigs;
       contigs << reg.chromosome();
       if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())

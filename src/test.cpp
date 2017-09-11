@@ -670,6 +670,8 @@ void random_access_test()
 
   savvy::indexed_reader rdr("", {"", 0, 0});
   savvy::indexed_reader tmp("test_file.sav", {"20", 17000, 1120000});
+  savvy::dense_allele_vector<float> b;
+  rdr.read_if(b, [](const auto& m) { return true; });
   rdr = std::move(tmp);
   auto it = savvy::basic_variant_iterator<savvy::indexed_reader, savvy::dense_allele_vector<float>>(rdr);
   auto end = savvy::basic_variant_iterator<savvy::indexed_reader, savvy::dense_allele_vector<float>>{};

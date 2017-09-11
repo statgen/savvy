@@ -3,6 +3,7 @@
 #define LIBSAVVY_ALLELE_VECTOR_HPP
 
 #include "compressed_vector.hpp"
+#include "data_format.hpp"
 
 #include <string>
 #include <vector>
@@ -12,7 +13,7 @@
 
 namespace savvy
 {
-  template<typename T>
+  template <typename T>
   class variant_vector : public T
   {
   public:

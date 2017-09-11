@@ -153,7 +153,7 @@ namespace savvy
   {
   public:
     reader() {}
-    reader(const std::string& file_path);
+    reader(const std::string& file_path, fmt data_format = fmt::allele);
     ~reader() {}
 
     template <typename T>
@@ -173,7 +173,7 @@ namespace savvy
   {
   public:
     indexed_reader() {}
-    indexed_reader(const std::string& file_path, const region& reg);
+    indexed_reader(const std::string& file_path, const region& reg, fmt data_format = fmt::allele);
     void reset_region(const region& reg);
 
     std::vector<std::string> chromosomes() const;

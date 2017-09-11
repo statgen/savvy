@@ -42,12 +42,12 @@ namespace savvy
     return ret;
   }
 
-  reader::reader(const std::string& file_path)
+  reader::reader(const std::string& file_path, fmt data_format)
   {
     if (savvy::detail::has_extension(file_path, ".sav"))
-      sav_reader_ = detail::make_unique<sav::reader>(file_path);
+      sav_reader_ = detail::make_unique<sav::reader>(file_path, data_format);
     else if (detail::has_extension(file_path, ".vcf") || detail::has_extension(file_path, ".vcf.gz") || detail::has_extension(file_path, ".bcf"))
-      vcf_reader_ = detail::make_unique<vcf::reader>(file_path);
+      vcf_reader_ = detail::make_unique<vcf::reader>(file_path, data_format);
   }
 
   std::vector<std::string> indexed_reader::chromosomes() const
@@ -59,12 +59,12 @@ namespace savvy
     return {};
   }
 
-  indexed_reader::indexed_reader(const std::string& file_path, const region& reg)
+  indexed_reader::indexed_reader(const std::string& file_path, const region& reg, fmt data_format)
   {
     if (savvy::detail::has_extension(file_path, ".sav"))
-      sav_reader_ = detail::make_unique<sav::indexed_reader>(file_path, reg);
+      sav_reader_ = detail::make_unique<sav::indexed_reader>(file_path, reg, data_format);
     else if (detail::has_extension(file_path, ".vcf") || detail::has_extension(file_path, ".vcf.gz") || detail::has_extension(file_path, ".bcf"))
-      vcf_reader_ = detail::make_unique<vcf::indexed_reader>(file_path, reg);
+      vcf_reader_ = detail::make_unique<vcf::indexed_reader>(file_path, reg, data_format);
   }
 
   void indexed_reader::reset_region(const region& reg)

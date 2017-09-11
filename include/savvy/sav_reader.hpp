@@ -9,6 +9,7 @@
 #include "region.hpp"
 #include "variant_iterator.hpp"
 #include "utility.hpp"
+#include "data_format.hpp"
 
 #include <shrinkwrap/istream.hpp>
 
@@ -29,7 +30,6 @@ namespace savvy
   namespace sav
   {
     enum class compression_type : std::uint8_t { none = 0, zstd }; //xz, bgzf };
-    enum class data_format_type : std::uint8_t { genotype = 0, posterior_probablities };
 
 //    namespace detail
 //    {
@@ -50,7 +50,7 @@ namespace savvy
     {
     public:
 
-      reader_base(const std::string& file_path);
+      reader_base(const std::string& file_path, fmt data_format = fmt::allele);
 #if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
       reader_base(reader_base&& source);
       reader_base& operator=(reader_base&& source);
@@ -208,9 +208,9 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotypes(allele_vector<T>& destination, const typename T::value_type missing_value)
+      void read_genotypes_al(variant_vector<T>& destination, const typename T::value_type missing_value)
       {
-        if (data_format_ != data_format_type::genotype)
+        if (file_data_format_ != fmt::allele)
           input_stream_.setstate(std::ios::badbit);
 
         if (good())
@@ -246,9 +246,9 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotypes(genotype_vector<T>& destination, const typename T::value_type missing_value)
+      void read_genotypes_gt(variant_vector<T>& destination, const typename T::value_type missing_value)
       {
-        if (data_format_ != data_format_type::genotype)
+        if (file_data_format_ != fmt::allele)
           input_stream_.setstate(std::ios::failbit);
 
         if (good())
@@ -285,9 +285,9 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotypes(genotype_probabilities_vector<T>& destination, const typename T::value_type missing_value)
+      void read_genotypes_gp(variant_vector<T>& destination, const typename T::value_type missing_value)
       {
-        if (data_format_ != data_format_type::posterior_probablities)
+        if (file_data_format_ != fmt::genotype_probability)
           input_stream_.setstate(std::ios::failbit);
 
         if (good())
@@ -322,7 +322,7 @@ namespace savvy
               std::uint64_t ploidy_plus_one_offset = (total_offset / ploidy_level) * stride + (total_offset % ploidy_level + 1);
               for (std::uint64_t j = next_ref_value_offset; j < ploidy_plus_one_offset; j+= stride)
               {
-                destination[j] = T::value_type(1);
+                destination[j] = typename T::value_type(1);
               }
 
               // Set alt probaility
@@ -338,9 +338,9 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotypes(dosage_vector<T>& destination, const typename T::value_type missing_value)
+      void read_genotypes_ds(variant_vector<T>& destination, const typename T::value_type missing_value)
       {
-        if (data_format_ != data_format_type::posterior_probablities)
+        if (file_data_format_ != fmt::genotype_probability)
           input_stream_.setstate(std::ios::failbit);
 
         if (good())
@@ -379,13 +379,23 @@ namespace savvy
       template <typename T>
       void read_genotypes(T& destination, const typename T::value_type missing_value)
       {
-        input_stream_.setstate(std::ios::failbit);
+        if (requested_data_formats_ == fmt::allele && file_data_format_ == fmt::allele)
+          read_genotypes_al(destination, missing_value);
+        else if (requested_data_formats_ == fmt::genotype && file_data_format_ == fmt::allele)
+          read_genotypes_gt(destination, missing_value);
+        else if (requested_data_formats_ == fmt::genotype_probability && file_data_format_ == fmt::genotype_probability)
+          read_genotypes_gp(destination, missing_value);
+        else if (requested_data_formats_ == fmt::dosage && file_data_format_ == fmt::genotype_probability)
+          read_genotypes_ds(destination, missing_value);
+        else
+          input_stream_.setstate(std::ios::failbit);
       }
 
 
     protected:
       std::vector<std::string> sample_ids_;
-      data_format_type data_format_;
+      fmt file_data_format_;
+      fmt requested_data_formats_;
       shrinkwrap::zstd::istream input_stream_;
       std::string file_path_;
       std::vector<std::pair<std::string, std::string>> headers_;
@@ -415,8 +425,8 @@ namespace savvy
     class indexed_reader : public reader_base
     {
     public:
-      indexed_reader(const std::string& file_path, const region& reg, const std::string& index_file_path = "") :
-        reader_base(file_path),
+      indexed_reader(const std::string& file_path, const region& reg, fmt data_format = fmt::allele, const std::string& index_file_path = "") :
+        reader_base(file_path, data_format),
         index_(index_file_path.size() ? index_file_path : file_path + ".s1r"),
         query_(index_.create_query(reg)),
         i_(query_.begin()),
@@ -497,7 +507,7 @@ namespace savvy
           }
           else
           {
-            if (data_format_ == data_format_type::genotype)
+            if (file_data_format_ == fmt::genotype)
               discard_genotypes<1>();
             else
               discard_genotypes<7>();
@@ -544,10 +554,10 @@ namespace savvy
       struct options
       {
         compression_type compression;
-        data_format_type data_format;
+        fmt data_format;
         options() :
           compression(compression_type::zstd),
-          data_format(data_format_type::genotype)
+          data_format(fmt::genotype)
         {
         }
       };
@@ -576,7 +586,8 @@ namespace savvy
         auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string,std::string>& kvp) { return kvp.first != "FORMAT"; });
         headers_.resize(std::distance(headers_.begin(), copy_res));
 
-        headers_.push_back(std::make_pair("FORMAT", data_format_  == data_format_type::genotype ? "<ID=GT,Description=\"Genotype\">" : "<ID=GP,Description=\"Genotype posterior probabilities\">"));
+        // TODO: Handle unsupported formats.
+        headers_.push_back(std::make_pair("FORMAT", data_format_  == fmt::genotype_probability ? "<ID=GP,Description=\"Genotype posterior probabilities\">" : "<ID=GT,Description=\"Genotype\">"));
 
         varint_encode(headers_.size(), out_it);
         for (auto it = headers_.begin(); it != headers_.end(); ++it)
@@ -731,7 +742,7 @@ namespace savvy
             std::copy(value.begin(), value.end(), os_it);
         }
 
-        if (data_format_ == data_format_type::genotype)
+        if (data_format_ == fmt::genotype)
           write_alleles<1>(m);
         else
           write_alleles<7>(m);
@@ -760,7 +771,7 @@ namespace savvy
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
         std::uint32_t ploidy = m.size() / sample_size_;
-        if (data_format_ == data_format_type::posterior_probablities)
+        if (data_format_ == fmt::genotype_probability)
           --ploidy;
 
         // TODO: check modulus and set error if needed.
@@ -798,7 +809,7 @@ namespace savvy
       std::size_t allele_count_;
       std::size_t record_count_;
       std::size_t block_size_{};
-      data_format_type data_format_;
+      fmt data_format_;
     };
 
     template <>

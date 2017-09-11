@@ -22,7 +22,7 @@ All quantities are encoded in LEB128 format (https://en.wikipedia.org/wiki/LEB12
 +----------------------------------------------------------------+
 
 +-------------------------------------------------------------------------------------------------------------------------------------------------+
-| 16 byte UUID                                                                                                                                    |
+| 16 byte UUID (used to verify index matches correct version of file)                                                                             |
 +-------------------------------------------------------------------------------------------------------------------------------------------------+
 | UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU UUUUUUUU |
 +-------------------------------------------------------------------------------------------------------------------------------------------------+
