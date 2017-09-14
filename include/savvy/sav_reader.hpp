@@ -507,7 +507,7 @@ namespace savvy
           }
           else
           {
-            if (file_data_format_ == fmt::genotype)
+            if (file_data_format_ == fmt::allele)
               discard_genotypes<1>();
             else
               discard_genotypes<7>();

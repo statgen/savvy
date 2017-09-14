@@ -15,7 +15,7 @@ namespace savvy
     reader_base::reader_base(const std::string& file_path, fmt requested_data_format) :
       input_stream_(file_path),
       file_path_(file_path),
-      file_data_format_(fmt::genotype),
+      file_data_format_(fmt::allele),
       requested_data_formats_(requested_data_format)
     {
       std::string version_string(7, '\0');
@@ -65,7 +65,7 @@ namespace savvy
                   {
                     std::string format_field = parse_header_id(val);
                     if (format_field == "GT")
-                      file_data_format_ = fmt::genotype;
+                      file_data_format_ = fmt::allele;
                     else if (format_field == "GP")
                       file_data_format_ = fmt::genotype_probability;
                   }
