@@ -2,7 +2,7 @@
 #define LIBSAVVY_VCF_READER_HPP
 
 #include "allele_status.hpp"
-#include "allele_vector.hpp"
+#include "site_info.hpp"
 #include "region.hpp"
 #include "variant_iterator.hpp"
 #include "utility.hpp"
@@ -30,12 +30,16 @@ namespace savvy
 {
   namespace vcf
   {
+    //################################################################//
     enum class compression_type : std::uint8_t
     {
       none = 0,
       bgzip
     };
+    //################################################################//
 
+    //################################################################//
+    template <std::size_t VecCnt>
     class reader_base
     {
     public:
@@ -43,8 +47,7 @@ namespace savvy
         state_(std::ios::goodbit),
         gt_(nullptr),
         gt_sz_(0),
-        allele_index_(0),
-        requested_data_formats_({fmt::allele})
+        allele_index_(0)
       {}
 
       reader_base(reader_base&& source) :
@@ -80,9 +83,8 @@ namespace savvy
 //      std::vector<std::string>::const_iterator prop_fields_end() const { return property_fields_.end(); }
       std::uint64_t sample_count() const;
 
-
-      template <typename T>
-      bool read_variant(T& destination, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN());
+      template <typename... T>
+      bool read_variant(site_info& annotations, T&... destinations);
     protected:
       virtual bcf_hdr_t* hts_hdr() const = 0;
       virtual bcf1_t* hts_rec() const = 0;
@@ -90,63 +92,385 @@ namespace savvy
       void init_property_fields();
 
       template <typename T>
-      void read_variant_details(variant_vector<T>& destination);
+      void clear_destinations(T& destination);
+      template <typename T, typename... T2>
+      void clear_destinations(T& destination, T2&... other_destinations);
+
+      void read_variant_details(site_info& destination);
+
+      template <std::size_t Idx, typename T1>
+      void read_genos_to(fmt data_format, T1& vec);
+      template <std::size_t Idx, typename T1, typename... T2>
+      void read_genos_to(fmt data_format, T1& vec, T2&... others);
+
       template <typename T>
-      void read_genotypes_al(variant_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_al(T& destination);
       template <typename T>
-      void read_genotypes_gt(variant_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_gt(T& destination);
       template <typename T>
-      void read_genotypes_gp(variant_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_gp(T& destination);
       template <typename T>
-      void read_genotypes_ds(variant_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_ds(T& destination);
       template <typename T>
-      void read_genotypes_gl(variant_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_gl(T& destination);
       template <typename T>
-      void read_genotypes_pl(variant_vector<T>& destination, const typename T::value_type missing_value);
+      void read_genotypes_pl(T& destination);
+
+      void init_requested_formats(fmt f);
+      template <typename... T2>
+      void init_requested_formats(fmt f, T2... args);
     protected:
       std::ios::iostate state_;
       int* gt_;
       int gt_sz_;
       int allele_index_;
       std::vector<std::string> property_fields_; // TODO: This member is no longer necessary not that prop_fields_{begin,end}() methods are gone. Eventually remove this and init_property_fileds()
-      std::vector<fmt> requested_data_formats_;
+      std::array<fmt, VecCnt> requested_data_formats_;
     };
+    //################################################################//
 
-    template <typename T>
-    bool reader_base::read_variant(T& destination, const typename T::vector_type::value_type missing_value)
+    //################################################################//
+    template <std::size_t VecCnt>
+    class reader : public reader_base<VecCnt>
     {
-      read_variant_details(destination);
-      if (requested_data_formats_.size())
+    public:
+      //typedef reader_base::input_iterator input_iterator;
+      template <typename... T>
+      reader(const std::string& file_path, T... data_formats);
+      reader(reader&& other);
+      reader(const reader&) = delete;
+      reader& operator=(const reader&) = delete;
+      ~reader();
+
+      //TODO: Find way to bring extraction operator back.
+//      template <typename T>
+//      reader& operator>>(T& destination)
+//      {
+//        read_variant(destination);
+//        return *this;
+//      }
+
+      template <typename... T>
+      reader& read(site_info& annotations, T&... destinations);
+
+//      static std::string get_chromosome(const reader& rdr, const marker& mkr);
+    private:
+//      template <typename T>
+//      bool read_block(allele_vector<T>& destination)
+//      {
+//        bool ret = true;
+//
+//        ++allele_index_;
+//        if (allele_index_ >= hts_rec_->n_allele)
+//        {
+//          ret = read_hts_record();
+//        }
+//
+//        if (ret)
+//        {
+//          destination = allele_vector<T>(
+//            std::string(bcf_hdr_id2name(hts_hdr_, hts_rec_->rid)),
+//            static_cast<std::uint64_t>(hts_rec_->pos + 1),
+//            std::string(hts_rec_->d.allele[0]),
+//            std::string(hts_rec_->n_allele > 1 ? hts_rec_->d.allele[allele_index_] : ""),
+//            sample_count(),
+//            (gt_sz_ / hts_rec_->n_sample),
+//            std::move(destination));
+//
+//          for (std::size_t i = 0; i < gt_sz_; ++i)
+//          {
+//            if (gt_[i] == bcf_gt_missing)
+//              destination[i] = std::numeric_limits<typename T::value_type>::quiet_NaN();
+//            else if (bcf_gt_allele(gt_[i]) == allele_index_)
+//              destination[i] = 1.0;
+//          }
+//        }
+//
+//        return ret;
+//      }
+
+      bool read_hts_record();
+
+      bcf_hdr_t* hts_hdr() const { return hts_hdr_; }
+      bcf1_t* hts_rec() const { return hts_rec_; }
+    private:
+      htsFile* hts_file_;
+      bcf_hdr_t* hts_hdr_;
+      bcf1_t* hts_rec_;
+    };
+    //################################################################//
+
+    //################################################################//
+    template <std::size_t VecCnt>
+    class indexed_reader : public reader_base<VecCnt>
+    {
+    public:
+      template <typename... T>
+      indexed_reader(const std::string& file_path, const region& reg, T... data_formats);
+      //template <typename PathItr, typename RegionItr>
+      //region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end);
+      ~indexed_reader();
+      void reset_region(const region& reg);
+
+      std::vector<std::string> chromosomes() const;
+//TODO: Bring extraction operator back.
+//      template <typename T>
+//      indexed_reader& operator>>(T& destination);
+
+      template <typename... T>
+      indexed_reader<VecCnt>& read(site_info& annotations, T&... destinations);
+
+      template <typename Pred, typename... T>
+      indexed_reader<VecCnt>& read_if(Pred fn, site_info& annotations, T&... destinations);
+    private:
+      bool read_hts_record();
+//      index_reader& seek(const std::string& chromosome, std::uint64_t position);
+//
+//      static std::string get_chromosome(const index_reader& rdr, const marker& mkr);
+      bcf_hdr_t* hts_hdr() const { return bcf_sr_get_header(synced_readers_, 0); }
+      bcf1_t* hts_rec() const { return hts_rec_; }
+    private:
+      std::string file_path_;
+      bcf_srs_t* synced_readers_;
+      bcf1_t* hts_rec_;
+    };
+    //################################################################//
+
+
+
+
+
+
+    //################################################################//
+    template <std::size_t VecCnt>
+    const char** reader_base<VecCnt>::samples_begin() const
+    {
+      return hts_hdr() ? (const char**) hts_hdr()->samples : nullptr;
+    }
+
+    template <std::size_t VecCnt>
+    const char** reader_base<VecCnt>::samples_end() const
+    {
+      return hts_hdr() ? (const char**) ((hts_hdr()->samples) + bcf_hdr_nsamples(hts_hdr())) : nullptr;
+    }
+
+    template <std::size_t VecCnt>
+    std::uint64_t reader_base<VecCnt>::sample_count() const
+    {
+      return static_cast<std::uint64_t>(bcf_hdr_nsamples(hts_hdr()));
+    }
+
+    template <std::size_t VecCnt>
+    std::vector<std::pair<std::string, std::string>> reader_base<VecCnt>::headers() const
+    {
+      std::vector<std::pair<std::string, std::string>> ret;
+
+      bcf_hdr_t* hdr = hts_hdr();
+      if (hdr)
       {
-        fmt data_fmt = requested_data_formats_.front();
-        switch (data_fmt)
+        ret.reserve(hdr->nhrec - 1);
+        for (int i = 1; i < hdr->nhrec; ++i)
         {
-          case fmt::allele:
-            read_genotypes_al(destination, missing_value);
-            break;
-          case fmt::genotype:
-            read_genotypes_gt(destination, missing_value);
-            break;
-          case fmt::genotype_probability:
-            read_genotypes_gp(destination, missing_value);
-            break;
-          case fmt::dosage:
-            read_genotypes_ds(destination, missing_value);
-            break;
-          case fmt::genotype_likelihood:
-            read_genotypes_gl(destination, missing_value);
-            break;
-          case fmt::phred_scaled_genotype_likelihood:
-            read_genotypes_pl(destination, missing_value);
-            break;
+          std::string key, val;
+          if (hdr->hrec[i]->key && hdr->hrec[i]->value)
+          {
+            key = hdr->hrec[i]->key;
+            val = hdr->hrec[i]->value;
+          }
+          else if (hdr->hrec[i]->key && (hdr->hrec[i]->type == BCF_HL_INFO || hdr->hrec[i]->type == BCF_HL_FLT || hdr->hrec[i]->type == BCF_HL_STR))
+          {
+            bcf_hrec_t* r = hdr->hrec[i];
+            key = r->key;
+            std::stringstream ss_val;
+
+            ss_val << "<";
+            for (int j = 0; j < r->nkeys - 1; ++j) // minus 1 to remove IDX;
+            {
+              if (j > 0)
+                ss_val << ",";
+              if (r->keys[j])
+                ss_val << r->keys[j];
+              ss_val << "=";
+              if (r->vals[j])
+                ss_val << r->vals[j];
+            }
+            ss_val << ">";
+            val = ss_val.str();
+          }
+
+          if (key.size())
+            ret.emplace_back(std::move(key), std::move(val));
+          //ret.insert(std::upper_bound(ret.begin(), ret.end(), std::make_pair(key, std::string()), [](const auto& a, const auto& b) { return a.first < b.first; }), {std::move(key), std::move(val)});
+        }
+      }
+
+      return ret;
+    }
+
+    template <std::size_t VecCnt>
+    std::vector<std::string> reader_base<VecCnt>::prop_fields() const
+    {
+      std::vector<std::string> ret(property_fields_);
+      return ret;
+    }
+
+    template <std::size_t VecCnt>
+    void reader_base<VecCnt>::init_property_fields()
+    {
+      bcf_hdr_t* hdr = hts_hdr();
+      if (hdr)
+      {
+        this->property_fields_ = {"ID", "QUAL", "FILTER"};
+        for (int i = 0; i < hdr->nhrec; ++i)
+        {
+          if (hdr->hrec[i]->type == BCF_HL_INFO)
+          {
+            bcf_hrec_t* r = hdr->hrec[i];
+            for (int j = 0; j < r->nkeys; ++j)
+            {
+              if (strcmp(r->keys[j], "ID") == 0)
+              {
+                const char* inf = r->vals[j];
+                if (inf)
+                  this->property_fields_.emplace_back(inf);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    template <std::size_t VecCnt>
+    void reader_base<VecCnt>::init_requested_formats(fmt f)
+    {
+      requested_data_formats_[requested_data_formats_.size() - 1] = f;
+    }
+
+    template <std::size_t VecCnt>
+    template <typename... T>
+    void reader_base<VecCnt>::init_requested_formats(fmt f, T... args)
+    {
+      requested_data_formats_[requested_data_formats_.size() - (sizeof...(T) + 1)] = f;
+      init_requested_formats(args...);
+    }
+
+    template <std::size_t VecCnt>
+    template <typename T>
+    void reader_base<VecCnt>::clear_destinations(T& destination)
+    {
+      destination.resize(0);
+    }
+
+    template <std::size_t VecCnt>
+    template <typename T, typename... T2>
+    void reader_base<VecCnt>::clear_destinations(T& destination, T2&... other_destinations)
+    {
+      clear_destinations(destination);
+      clear_destinations(other_destinations...);
+    }
+
+    template <std::size_t VecCnt>
+    template <typename... T>
+    bool reader_base<VecCnt>::read_variant(site_info& annotations, T&... destinations)
+    {
+      static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
+      read_variant_details(annotations);
+      clear_destinations(destinations...);
+
+      for (int i = 0; i < hts_rec()->n_fmt; ++i)
+      {
+        int fmt_id = hts_rec()->d.fmt[i].id;
+        std::string fmt_key = hts_hdr()->id[BCF_DT_ID][fmt_id].key;
+
+        std::int64_t gt_idx     = std::distance(requested_data_formats_.begin(), std::find(requested_data_formats_.begin(), requested_data_formats_.end(), fmt::genotype));
+        std::int64_t allele_idx = std::distance(requested_data_formats_.begin(), std::find(requested_data_formats_.begin(), requested_data_formats_.end(), fmt::allele));
+
+        if (fmt_key == "GT" && (gt_idx < VecCnt || allele_idx < VecCnt))
+        {
+          if (gt_idx < VecCnt)
+          {
+            read_genos_to<0>(fmt::genotype, destinations...);
+          }
+          else // allele_idx < VecCnt
+          {
+            read_genos_to<0>(fmt::allele, destinations...);
+          }
+        }
+        else if (fmt_key == "DS")
+        {
+          read_genos_to<0>(fmt::dosage, destinations...);
+        }
+        else if (fmt_key == "GP")
+        {
+          read_genos_to<0>(fmt::genotype_probability, destinations...);
+        }
+        else if (fmt_key == "GL")
+        {
+          read_genos_to<0>(fmt::genotype_likelihood, destinations...);
+        }
+        else if (fmt_key == "PL")
+        {
+          read_genos_to<0>(fmt::phred_scaled_genotype_likelihood, destinations...);
+        }
+        else
+        {
+          // Discard
         }
       }
 
       return good();
     }
 
-    template <typename T>
-    void reader_base::read_variant_details(variant_vector<T>& destination)
+    template <std::size_t VecCnt>
+    template <std::size_t Idx, typename T1>
+    void reader_base<VecCnt>::read_genos_to(fmt data_format, T1& destination)
+    {
+      if (requested_data_formats_[Idx] == data_format)
+      {
+        switch (data_format)
+        {
+          case fmt::allele:
+            read_genotypes_al(destination);
+            break;
+          case fmt::genotype:
+            read_genotypes_gt(destination);
+            break;
+          case fmt::genotype_probability:
+            read_genotypes_gp(destination);
+            break;
+          case fmt::dosage:
+            read_genotypes_ds(destination);
+            break;
+          case fmt::genotype_likelihood:
+            read_genotypes_gl(destination);
+            break;
+          case fmt::phred_scaled_genotype_likelihood:
+            read_genotypes_pl(destination);
+            break;
+        }
+      }
+      else
+      {
+        // Discard Genotypes
+      }
+    }
+
+    template <std::size_t VecCnt>
+    template <std::size_t Idx, typename T1, typename... T2>
+    void reader_base<VecCnt>::read_genos_to(fmt data_format, T1& vec, T2&... others)
+    {
+      if (requested_data_formats_[Idx] == data_format)
+      {
+        read_genos_to<Idx>(data_format, vec);
+      }
+      else
+      {
+        read_genos_to<Idx + 1>(data_format, others...);
+      }
+    }
+
+    template <std::size_t VecCnt>
+    void reader_base<VecCnt>::read_variant_details(site_info& destination)
     {
       if (good())
       {
@@ -213,14 +537,12 @@ namespace savvy
             }
           }
 
-          destination = variant_vector<T>(
+          destination = site_info(
             std::string(bcf_hdr_id2name(hts_hdr(), hts_rec()->rid)),
             static_cast<std::uint64_t>(hts_rec()->pos + 1),
             std::string(hts_rec()->d.allele[0]),
             std::string(hts_rec()->n_allele > 1 ? hts_rec()->d.allele[allele_index_] : ""),
-            std::move(props),
-            std::move(destination));
-          destination.resize(0);
+            std::move(props));
         }
 
         if (!res)
@@ -229,8 +551,9 @@ namespace savvy
       }
     }
 
+    template <std::size_t VecCnt>
     template <typename T>
-    void reader_base::read_genotypes_al(variant_vector<T>& destination, const typename T::value_type missing_value)
+    void reader_base<VecCnt>::read_genotypes_al(T& destination)
     {
       if (good())
       {
@@ -249,7 +572,7 @@ namespace savvy
             for (std::size_t i = 0; i < gt_sz_; ++i)
             {
               if (gt_[i] == bcf_gt_missing)
-                destination[i] = missing_value;
+                destination[i] = std::numeric_limits<typename T::value_type>::quiet_NaN();
               else if (bcf_gt_allele(gt_[i]) == allele_index_)
                 destination[i] = alt_value;
             }
@@ -261,8 +584,9 @@ namespace savvy
       }
     }
 
+    template <std::size_t VecCnt>
     template <typename T>
-    void reader_base::read_genotypes_gt(variant_vector<T>& destination, const typename T::value_type missing_value)
+    void reader_base<VecCnt>::read_genotypes_gt(T& destination)
     {
       if (good())
       {
@@ -282,7 +606,7 @@ namespace savvy
             for (std::size_t i = 0; i < gt_sz_; ++i)
             {
               if (gt_[i] == bcf_gt_missing)
-                destination[i / ploidy] += missing_value;
+                destination[i / ploidy] += std::numeric_limits<typename T::value_type>::quiet_NaN();
               else if (bcf_gt_allele(gt_[i]) == allele_index_)
                 destination[i / ploidy] += alt_value;
             }
@@ -294,8 +618,9 @@ namespace savvy
       }
     }
 
+    template <std::size_t VecCnt>
     template <typename T>
-    void reader_base::read_genotypes_ds(variant_vector<T>& destination, const typename T::value_type missing_value)
+    void reader_base<VecCnt>::read_genotypes_ds(T& destination)
     {
       if (good())
       {
@@ -325,8 +650,9 @@ namespace savvy
       }
     }
 
+    template <std::size_t VecCnt>
     template <typename T>
-    void reader_base::read_genotypes_gp(variant_vector<T>& destination, const typename T::value_type missing_value)
+    void reader_base<VecCnt>::read_genotypes_gp(T& destination)
     {
       if (good())
       {
@@ -362,8 +688,9 @@ namespace savvy
       }
     }
 
+    template <std::size_t VecCnt>
     template <typename T>
-    void reader_base::read_genotypes_gl(variant_vector<T>& destination, const typename T::value_type missing_value)
+    void reader_base<VecCnt>::read_genotypes_gl(T& destination)
     {
       if (good())
       {
@@ -399,8 +726,9 @@ namespace savvy
       }
     }
 
+    template <std::size_t VecCnt>
     template <typename T>
-    void reader_base::read_genotypes_pl(variant_vector<T>& destination, const typename T::value_type missing_value)
+    void reader_base<VecCnt>::read_genotypes_pl(T& destination)
     {
       if (good())
       {
@@ -434,157 +762,143 @@ namespace savvy
         this->state_ = std::ios::failbit;
       }
     }
+    //################################################################//
 
-    class reader : public reader_base
+    //################################################################//
+    template <std::size_t VecCnt>
+    template <typename... T>
+    reader<VecCnt>::reader(const std::string& file_path, T... data_formats) :
+      hts_file_(bcf_open(file_path.c_str(), "r")),
+      hts_hdr_(nullptr),
+      hts_rec_(bcf_init1())
     {
-    public:
-      //typedef reader_base::input_iterator input_iterator;
-      reader(const std::string& file_path, fmt data_format = fmt::allele);
-      reader(reader&& other);
-      reader(const reader&) = delete;
-      reader& operator=(const reader&) = delete;
-      ~reader();
-
-      template <typename T>
-      reader& operator>>(T& destination)
+      static_assert(VecCnt == sizeof...(T), "Number of requested format fields do not match VecCnt template parameter");
+      this->init_requested_formats(data_formats...);
+      if (!hts_file_ || !hts_rec_)
       {
-        read_variant(destination);
-        return *this;
+        this->state_ = std::ios::badbit;
       }
-
-      template <typename T>
-      reader& read(T& destination, const typename T::value_type missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN())
+      else
       {
-        read_variant(destination, missing_value);
-        return *this;
+        hts_hdr_ = bcf_hdr_read(hts_file_);
+        this->init_property_fields();
       }
+    }
 
-//      static std::string get_chromosome(const reader& rdr, const marker& mkr);
-    private:
-//      template <typename T>
-//      bool read_block(allele_vector<T>& destination)
+    template <std::size_t VecCnt>
+    reader<VecCnt>::reader(reader<VecCnt>&& source) :
+      reader_base<VecCnt>(std::move(source)),
+      hts_file_(source.hts_file_),
+      hts_hdr_(source.hts_hdr_),
+      hts_rec_(source.hts_rec_)
+    {
+      source.hts_file_ = nullptr;
+      source.hts_hdr_ = nullptr;
+      source.hts_rec_ = nullptr;
+      source.gt_ = nullptr;
+      source.state_ = std::ios::badbit;
+    }
+
+    template <std::size_t VecCnt>
+    reader<VecCnt>::~reader()
+    {
+      try
+      {
+        if (hts_hdr_)
+          bcf_hdr_destroy(hts_hdr_);
+        if (hts_file_)
+          bcf_close(hts_file_);
+        if (hts_rec_)
+          bcf_destroy1(hts_rec_);
+      }
+      catch (...)
+      {
+        assert(!"bcf_hdr_destroy or bcf_close threw exception!");
+      }
+    }
+
+//    std::vector<std::string> reader::chromosomes() const
+//    {
+//      std::vector<std::string> ret(hts_hdr_->n[BCF_DT_CTG] > 0 ? (unsigned)hts_hdr_->n[BCF_DT_CTG] : 0);
+//      for (int i = 0; i < ret.size(); ++i)
 //      {
-//        bool ret = true;
-//
-//        ++allele_index_;
-//        if (allele_index_ >= hts_rec_->n_allele)
-//        {
-//          ret = read_hts_record();
-//        }
-//
-//        if (ret)
-//        {
-//          destination = allele_vector<T>(
-//            std::string(bcf_hdr_id2name(hts_hdr_, hts_rec_->rid)),
-//            static_cast<std::uint64_t>(hts_rec_->pos + 1),
-//            std::string(hts_rec_->d.allele[0]),
-//            std::string(hts_rec_->n_allele > 1 ? hts_rec_->d.allele[allele_index_] : ""),
-//            sample_count(),
-//            (gt_sz_ / hts_rec_->n_sample),
-//            std::move(destination));
-//
-//          for (std::size_t i = 0; i < gt_sz_; ++i)
-//          {
-//            if (gt_[i] == bcf_gt_missing)
-//              destination[i] = std::numeric_limits<typename T::value_type>::quiet_NaN();
-//            else if (bcf_gt_allele(gt_[i]) == allele_index_)
-//              destination[i] = 1.0;
-//          }
-//        }
-//
-//        return ret;
+//        ret[i] = hts_hdr()->id[BCF_DT_CTG][i].key;
 //      }
+//      return ret;
+//    }
 
-      bool read_hts_record();
 
-      bcf_hdr_t* hts_hdr() const { return hts_hdr_; }
-      bcf1_t* hts_rec() const { return hts_rec_; }
-    private:
-      htsFile* hts_file_;
-      bcf_hdr_t* hts_hdr_;
-      bcf1_t* hts_rec_;
-    };
-
-    class indexed_reader : public reader_base
+    template <std::size_t VecCnt>
+    bool reader<VecCnt>::read_hts_record()
     {
-    public:
-      indexed_reader(const std::string& file_path, const region& reg, fmt data_format = fmt::allele);
-      //template <typename PathItr, typename RegionItr>
-      //region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end);
-      ~indexed_reader();
-      void reset_region(const region& reg);
+      if (bcf_read(hts_file_, hts_hdr_, hts_rec_) >= 0)
+      {
+        return true;
+      }
+      return false;
+    }
 
-      std::vector<std::string> chromosomes() const;
-
-      template <typename T>
-      indexed_reader& operator>>(T& destination);
-
-      template <typename T>
-      indexed_reader& read(T& destination, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN());
-
-      template <typename T, typename Pred>
-      indexed_reader& read_if(T& destination, Pred fn, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN());
-    private:
-      bool read_hts_record();
-//      index_reader& seek(const std::string& chromosome, std::uint64_t position);
-//
-//      static std::string get_chromosome(const index_reader& rdr, const marker& mkr);
-      bcf_hdr_t* hts_hdr() const { return bcf_sr_get_header(synced_readers_, 0); }
-      bcf1_t* hts_rec() const { return hts_rec_; }
-    private:
-      std::string file_path_;
-      bcf_srs_t* synced_readers_;
-      bcf1_t* hts_rec_;
-    };
-
-    template <typename T>
-    indexed_reader& indexed_reader::operator>>(T& destination)
+    template <std::size_t VecCnt>
+    template <typename... T>
+    reader<VecCnt>& reader<VecCnt>::read(site_info& annotations, T&... destinations)
     {
-      read_variant(destination);
+      this->read_variant(annotations, destinations...);
+      return *this;
+    }
+    //################################################################//
+
+    //################################################################//
+//    template <typename T>
+//    indexed_reader& indexed_reader::operator>>(T& destination)
+//    {
+//      read_variant(destination);
+//      return *this;
+//    }
+
+    template <std::size_t VecCnt>
+    template <typename... T>
+    indexed_reader<VecCnt>& indexed_reader<VecCnt>::read(site_info& annotations, T&... destinations)
+    {
+      this->read_variant(annotations, destinations...);
       return *this;
     }
 
-    template <typename T>
-    indexed_reader& indexed_reader::read(T& destination, const typename T::vector_type::value_type missing_value)
-    {
-      read_variant(destination, missing_value);
-      return *this;
-    }
-
-    template <typename T, typename Pred>
-    indexed_reader& indexed_reader::read_if(T& destination, Pred fn, const typename T::vector_type::value_type missing_value)
+    template <std::size_t VecCnt>
+    template <typename Pred, typename... T>
+    indexed_reader<VecCnt>& indexed_reader<VecCnt>::read_if(Pred fn, site_info& annotations, T&... destinations)
     {
       bool predicate_failed = true;
-      while (good() && predicate_failed)
+      while (this->good() && predicate_failed)
       {
-        read_variant_details(destination);
-        if (good())
+        this->read_variant_details(annotations);
+        if (this->good())
         {
-          predicate_failed = !fn(destination);
+          predicate_failed = !fn(annotations);
           if (!predicate_failed)
           {
-            if (requested_data_formats_.size())
+            //TODO: This logic is old and wrong
+            if (this->requested_data_formats_.size())
             {
-              fmt data_fmt = requested_data_formats_.front();
+              fmt data_fmt = this->requested_data_formats_.front();
               switch (data_fmt)
               {
                 case fmt::allele:
-                  read_genotypes_al(destination, missing_value);
+                  this->read_genotypes_al(destinations...);
                   break;
                 case fmt::genotype:
-                  read_genotypes_gt(destination, missing_value);
+                  this->read_genotypes_gt(destinations...);
                   break;
                 case fmt::genotype_probability:
-                  read_genotypes_gp(destination, missing_value);
+                  this->read_genotypes_gp(destinations...);
                   break;
                 case fmt::dosage:
-                  read_genotypes_ds(destination, missing_value);
+                  this->read_genotypes_ds(destinations...);
                   break;
                 case fmt::genotype_likelihood:
-                  read_genotypes_gl(destination, missing_value);
+                  this->read_genotypes_gl(destinations...);
                   break;
                 case fmt::phred_scaled_genotype_likelihood:
-                  read_genotypes_pl(destination, missing_value);
+                  this->read_genotypes_pl(destinations...);
                   break;
               }
             }
@@ -595,6 +909,96 @@ namespace savvy
       return *this;
     }
 
+    template <std::size_t VecCnt>
+    template <typename... T>
+    indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const region& reg, T... data_formats) :
+      file_path_(file_path),
+      synced_readers_(bcf_sr_init()),
+      hts_rec_(nullptr)
+    {
+      static_assert(VecCnt == sizeof...(T), "Number of requested format fields do not match VecCnt template parameter");
+
+      this->init_requested_formats(data_formats...);
+      std::stringstream contigs;
+      contigs << reg.chromosome();
+      if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())
+        contigs << ":" << reg.from() << "-" << reg.to();
+
+      bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0);
+      if (bcf_sr_add_reader(synced_readers_, file_path_.c_str()))
+        this->init_property_fields();
+      else
+        this->state_ = std::ios::badbit;
+    }
+
+    template <std::size_t VecCnt>
+    indexed_reader<VecCnt>::~indexed_reader()
+    {
+      if (synced_readers_)
+        bcf_sr_destroy(synced_readers_);
+    }
+
+    template <std::size_t VecCnt>
+    std::vector<std::string> indexed_reader<VecCnt>::chromosomes() const
+    {
+      std::vector<std::string> ret;
+
+      if (this->good())
+      {
+        hts_idx_t* idx = bcf_index_load(file_path_.c_str());
+        if (idx)
+        {
+          int n{};
+          const char** arr = bcf_index_seqnames(idx, hts_hdr(), &n);
+          ret.resize(n);
+          for (int i = 0; i < n; ++i)
+          {
+            ret[i] = arr[i];
+          }
+        }
+      }
+
+      return ret;
+    }
+
+    template <std::size_t VecCnt>
+    void indexed_reader<VecCnt>::reset_region(const region& reg)
+    {
+      if (this->good())
+      {
+        if (synced_readers_)
+          bcf_sr_destroy(synced_readers_);
+        synced_readers_ = bcf_sr_init();
+        hts_rec_ = nullptr;
+        this->state_ = std::ios::goodbit;
+
+        std::stringstream contigs;
+        contigs << reg.chromosome();
+        if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())
+          contigs << ":" << reg.from() << "-" << reg.to();
+
+        if (bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0) != 0 || bcf_sr_add_reader(synced_readers_, file_path_.c_str()) != 1)
+          this->state_ = std::ios::failbit;
+      }
+    }
+
+    template <std::size_t VecCnt>
+    bool indexed_reader<VecCnt>::read_hts_record()
+    {
+      if (bcf_sr_next_line(synced_readers_) && (hts_rec_ = bcf_sr_get_line(synced_readers_, 0)))
+      {
+        return true;
+      }
+      return false;
+    }
+    //################################################################//
+
+
+
+
+
+
+    //################################################################//
     class writer
     {
     public:
@@ -671,35 +1075,35 @@ namespace savvy
       }
 
       template <typename T>
-      writer& write(const allele_vector<T>& m)
+      writer& write(const site_info& anno, const std::vector<T>& data)
       {
         if (good())
         {
-          if (m.size() % sample_size_ != 0)
+          if (data.size() % sample_size_ != 0)
           {
             output_stream_->setstate(std::ios::failbit);
           }
           else
           {
-            (*output_stream_) << m.chromosome()
-                           << "\t" << m.locus()
-                           << "\t" << std::string(m.prop("ID").size() ? m.prop("ID") : ".")
-                           << "\t" << m.ref()
-                           << "\t" << m.alt()
-                           << "\t" << std::string(m.prop("QUAL").size() ? m.prop("QUAL") : ".")
-                           << "\t" << std::string(m.prop("FILTER").size() ? m.prop("FILTER") : ".");
+            (*output_stream_) << anno.chromosome()
+                           << "\t" << anno.locus()
+                           << "\t" << std::string(anno.prop("ID").size() ? anno.prop("ID") : ".")
+                           << "\t" << anno.ref()
+                           << "\t" << anno.alt()
+                           << "\t" << std::string(anno.prop("QUAL").size() ? anno.prop("QUAL") : ".")
+                           << "\t" << std::string(anno.prop("FILTER").size() ? anno.prop("FILTER") : ".");
 
             std::size_t i = 0;
             for (auto it = info_fields_.begin(); it != info_fields_.end(); ++it)
             {
-              if (m.prop(*it).size())
+              if (anno.prop(*it).size())
               {
                 if (i == 0)
                   (*output_stream_) << "\t";
                 else
                   (*output_stream_) << ";";
 
-                (*output_stream_) << (*it + "=" + m.prop(*it));
+                (*output_stream_) << (*it + "=" + anno.prop(*it));
 
                 ++i;
               }
@@ -709,7 +1113,7 @@ namespace savvy
               (*output_stream_) << "\t.";
 
             (*output_stream_) << "\tGT";
-            write_genotypes(m);
+            write_genotypes(data);
             (*output_stream_) << std::endl;
           }
         }
@@ -717,16 +1121,17 @@ namespace savvy
         return *this;
       }
 
-      template <typename T>
-      writer& operator<<(const allele_vector<T>& m)
-      {
-        return this->write(m);
-      }
+      // TODO: bring back
+//      template <typename T>
+//      writer& operator<<(const allele_vector<T>& m)
+//      {
+//        return this->write(m);
+//      }
 
       bool good() { return output_stream_->good(); }
     private:
       template <typename T>
-      void write_genotypes(const allele_vector<T>& m)
+      void write_genotypes(const std::vector<T>& m)
       {
         std::size_t i = 0;
         const std::size_t ploidy = m.size() / sample_size_;
@@ -753,6 +1158,7 @@ namespace savvy
       std::unique_ptr<std::ostream> output_stream_;
       std::size_t sample_size_;
     };
+    //################################################################//
   }
 }
 

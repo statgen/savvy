@@ -2,7 +2,7 @@
 #ifndef LIBSAVVY_EIGEN3_VECTOR_HPP
 #define LIBSAVVY_EIGEN3_VECTOR_HPP
 
-#include "allele_vector.hpp"
+#include "site_info.hpp"
 
 #include <Eigen/Sparse>
 #include <Eigen/Dense>

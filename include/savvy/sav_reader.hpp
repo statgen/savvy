@@ -4,7 +4,7 @@
 #include "allele_status.hpp"
 #include "varint.hpp"
 #include "s1r.hpp"
-#include "allele_vector.hpp"
+#include "site_info.hpp"
 #include "genotype_vector.hpp"
 #include "region.hpp"
 #include "variant_iterator.hpp"
@@ -29,6 +29,17 @@ namespace savvy
 {
   namespace sav
   {
+    namespace detail
+    {
+      template<std::uint8_t BitWidth>
+      struct allele_decoder
+      {
+        static const std::uint8_t denom = std::uint8_t(~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
+        template <typename T>
+        static std::tuple<T, std::uint64_t> decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value);
+      };
+    }
+
     enum class compression_type : std::uint8_t { none = 0, zstd }; //xz, bgzf };
 
 //    namespace detail
@@ -46,11 +57,13 @@ namespace savvy
 //      template <> struct static_base2_pow<7> : public std::integral_constant<std::uint8_t, 128> {};
 //    }
 
+    //################################################################//
+    template <std::size_t VecCnt>
     class reader_base
     {
     public:
-
-      reader_base(const std::string& file_path, fmt data_format = fmt::allele);
+      template <typename... T>
+      reader_base(const std::string& file_path, T... data_formats);
 #if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
       reader_base(reader_base&& source);
       reader_base& operator=(reader_base&& source);
@@ -85,7 +98,31 @@ namespace savvy
       std::streampos tellg() { return this->input_stream_.tellg(); }
     protected:
       template <typename T>
-      void read_variant_details(variant_vector<T>& destination)
+      void clear_destinations(T& destination)
+      {
+        destination.resize(0);
+      }
+
+      template <typename T, typename... T2>
+      void clear_destinations(T& destination, T2&... other_destinations)
+      {
+        clear_destinations(destination);
+        clear_destinations(other_destinations...);
+      }
+
+      void init_requested_formats(fmt f)
+      {
+        requested_data_formats_[requested_data_formats_.size() - 1] = f;
+      }
+
+      template <typename... T>
+      void init_requested_formats(fmt f, T... args)
+      {
+        requested_data_formats_[requested_data_formats_.size() - (sizeof...(T) + 1)] = f;
+        init_requested_formats(args...);
+      }
+
+      void read_variant_details(site_info& annotations)
       {
         if (good())
         {
@@ -159,8 +196,7 @@ namespace savvy
                     }
                   }
 
-                  destination = variant_vector<T>(std::move(chrom), locus, std::move(ref), std::move(alt), std::move(props), std::move(destination));
-                  destination.resize(0);
+                  annotations = site_info(std::move(chrom), locus, std::move(ref), std::move(alt), std::move(props));
                 }
               }
             }
@@ -168,16 +204,8 @@ namespace savvy
         }
       }
 
-      template<std::uint8_t BitWidth>
-      struct allele_decoder
-      {
-        static const std::uint8_t denom = std::uint8_t(~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
-        template <typename T>
-        static std::tuple<T, std::uint64_t> decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value);
-      };
-
       template <std::uint8_t BitWidth>
-      void discard_genotypes()
+      void discard_genotypes_impl()
       {
         if (good())
         {
@@ -207,8 +235,16 @@ namespace savvy
         }
       }
 
+      void discard_genotypes()
+      {
+        if (this->file_data_format_ == fmt::allele)
+          this->discard_genotypes_impl<1>();
+        else
+          this->discard_genotypes_impl<7>();
+      }
+
       template <typename T>
-      void read_genotypes_al(variant_vector<T>& destination, const typename T::value_type missing_value)
+      void read_genotypes_al(T& destination)
       {
         if (file_data_format_ != fmt::allele)
           input_stream_.setstate(std::ios::badbit);
@@ -235,7 +271,7 @@ namespace savvy
             {
               typename T::value_type allele;
               std::uint64_t offset;
-              std::tie(allele, offset) = allele_decoder<1>::decode(++in_it, end_it, missing_value);
+              std::tie(allele, offset) = detail::allele_decoder<1>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
               total_offset += offset;
               destination[total_offset] = allele; //(allele ? missing_value : alt_value);
             }
@@ -246,7 +282,7 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotypes_gt(variant_vector<T>& destination, const typename T::value_type missing_value)
+      void read_genotypes_gt(T& destination)
       {
         if (file_data_format_ != fmt::allele)
           input_stream_.setstate(std::ios::failbit);
@@ -274,7 +310,7 @@ namespace savvy
             {
               typename T::value_type allele;
               std::uint64_t offset;
-              std::tie(allele, offset) = allele_decoder<1>::decode(++in_it, end_it, missing_value);
+              std::tie(allele, offset) = detail::allele_decoder<1>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
               total_offset += offset;
               destination[total_offset / ploidy_level] += allele; //(allele ? missing_value : alt_value);
             }
@@ -285,7 +321,7 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotypes_gp(variant_vector<T>& destination, const typename T::value_type missing_value)
+      void read_genotypes_gp(T& destination)
       {
         if (file_data_format_ != fmt::genotype_probability)
           input_stream_.setstate(std::ios::failbit);
@@ -314,7 +350,7 @@ namespace savvy
             {
               typename T::value_type allele;
               std::uint64_t offset;
-              std::tie(allele, offset) = allele_decoder<7>::decode(++in_it, end_it, missing_value);
+              std::tie(allele, offset) = detail::allele_decoder<7>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
 
               total_offset += offset;
 
@@ -338,7 +374,7 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotypes_ds(variant_vector<T>& destination, const typename T::value_type missing_value)
+      void read_genotypes_ds(T& destination)
       {
         if (file_data_format_ != fmt::genotype_probability)
           input_stream_.setstate(std::ios::failbit);
@@ -366,7 +402,7 @@ namespace savvy
             {
               typename T::value_type allele;
               std::uint64_t offset;
-              std::tie(allele, offset) = allele_decoder<7>::decode(++in_it, end_it, missing_value);
+              std::tie(allele, offset) = detail::allele_decoder<7>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
               total_offset += offset;
               destination[total_offset / ploidy_level] += (allele * ((total_offset % ploidy_level) + 1));
             }
@@ -377,56 +413,88 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotypes(T& destination, const typename T::value_type missing_value)
+      void read_genotypes(std::size_t idx, T& destination)
       {
-        if (requested_data_formats_ == fmt::allele && file_data_format_ == fmt::allele)
-          read_genotypes_al(destination, missing_value);
-        else if (requested_data_formats_ == fmt::genotype && file_data_format_ == fmt::allele)
-          read_genotypes_gt(destination, missing_value);
-        else if (requested_data_formats_ == fmt::genotype_probability && file_data_format_ == fmt::genotype_probability)
-          read_genotypes_gp(destination, missing_value);
-        else if (requested_data_formats_ == fmt::dosage && file_data_format_ == fmt::genotype_probability)
-          read_genotypes_ds(destination, missing_value);
+        if (requested_data_formats_[idx] == file_data_format_)
+        {
+          if (requested_data_formats_[idx] == fmt::allele && file_data_format_ == fmt::allele)
+            read_genotypes_al(destination);
+          else if (requested_data_formats_[idx] == fmt::genotype && file_data_format_ == fmt::allele)
+            read_genotypes_gt(destination);
+          else if (requested_data_formats_[idx] == fmt::genotype_probability && file_data_format_ == fmt::genotype_probability)
+            read_genotypes_gp(destination);
+          else if (requested_data_formats_[idx] == fmt::dosage && file_data_format_ == fmt::genotype_probability)
+            read_genotypes_ds(destination);
+          else
+            input_stream_.setstate(std::ios::failbit);
+        }
         else
-          input_stream_.setstate(std::ios::failbit);
+        {
+          if (file_data_format_ == fmt::allele)
+            discard_genotypes();
+          else
+            discard_genotypes();
+        }
+      }
+
+      template <typename T, typename... T2>
+      void read_genotypes(std::size_t idx, T& destination, T2&... other_destinations)
+      {
+        if (requested_data_formats_[idx] == file_data_format_)
+        {
+          read_genotypes(idx, destination);
+        }
+        else
+        {
+          read_genotypes(idx + 1, other_destinations...);
+        }
       }
 
 
     protected:
       std::vector<std::string> sample_ids_;
       fmt file_data_format_;
-      fmt requested_data_formats_;
+      std::array<fmt, VecCnt> requested_data_formats_;
       shrinkwrap::zstd::istream input_stream_;
       std::string file_path_;
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> metadata_fields_;
     };
+    //################################################################//
 
-    class reader : public reader_base
+    //################################################################//
+    template <std::size_t VecCnt>
+    class reader : public reader_base<VecCnt>
     {
     public:
-      using reader_base::reader_base;
+      using reader_base<VecCnt>::reader_base;
 
-      template <typename T>
-      reader& operator>>(T& destination)
+      // TODO bring back extraction operator
+//      template <typename T>
+//      reader& operator>>(T& destination)
+//      {
+//        read(destination);
+//        return *this;
+//      }
+      template <typename... T>
+      reader& read(site_info& annotations, T&... destinations)
       {
-        read(destination);
-        return *this;
-      }
-      template <typename T>
-      reader& read(T& destination, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN())
-      {
-        read_variant_details(destination);
-        read_genotypes(destination, missing_value);
+        static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
+
+        this->read_variant_details(annotations);
+        this->clear_destinations(destinations...);
+        this->read_genotypes(0, destinations...);
         return *this;
       }
     };
 
-    class indexed_reader : public reader_base
+    template <std::size_t VecCnt>
+    class indexed_reader : public reader_base<VecCnt>
     {
     public:
-      indexed_reader(const std::string& file_path, const region& reg, fmt data_format = fmt::allele, const std::string& index_file_path = "") :
-        reader_base(file_path, data_format),
+      template <typename... T>
+      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, T... data_formats)  :
+        reader_base<VecCnt>(file_path, data_formats...),
         index_(index_file_path.size() ? index_file_path : file_path + ".s1r"),
         query_(index_.create_query(reg)),
         i_(query_.begin()),
@@ -438,40 +506,50 @@ namespace savvy
           this->input_stream_.setstate(std::ios::badbit);
       }
 
+      template <typename... T>
+      indexed_reader(const std::string& file_path, const region& reg, T... data_formats)  :
+        indexed_reader<VecCnt>(file_path, std::string(""), reg,  data_formats...)
+      {
+      }
+
       std::vector<std::string> chromosomes() const
       {
         return index_.tree_names();
       }
 
-      template <typename T>
-      indexed_reader& operator>>(T& destination)
-      {
-        read(destination);
-        return *this;
-      }
+      // TODO bring back
+//      template <typename T>
+//      indexed_reader& operator>>(T& destination)
+//      {
+//        read(destination);
+//        return *this;
+//      }
 
-      template <typename T>
-      indexed_reader& read(T& destination, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN())
+      template <typename... T>
+      indexed_reader& read(site_info& annotations, T&... destinations)
       {
-        while (good())
+        static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
+
+        while (this->good())
         {
           if (current_offset_in_block_ >= total_in_block_)
           {
             if (i_ == query_.end())
-              input_stream_.setstate(std::ios::eofbit);
+              this->input_stream_.setstate(std::ios::eofbit);
             else
             {
               total_in_block_ = std::uint32_t(0x000000000000FFFF & i_->value()) + 1;
               current_offset_in_block_ = 0;
-              input_stream_.seekg(std::streampos((i_->value() >> 16) & 0x0000FFFFFFFFFFFF));
+              this->input_stream_.seekg(std::streampos((i_->value() >> 16) & 0x0000FFFFFFFFFFFF));
               ++i_;
             }
           }
 
-          read_variant_details(destination);
-          read_genotypes(destination, missing_value);
+          this->read_variant_details(annotations);
+          this->clear_destinations(destinations...);
+          this->read_genotypes(0, destinations...);
           ++current_offset_in_block_;
-          if (region_comparitor_(destination, reg_))
+          if (region_comparitor_(annotations, reg_))
           {
             break;
           }
@@ -479,38 +557,41 @@ namespace savvy
         return *this;
       }
 
-      template <typename T, typename Pred>
-      indexed_reader& read_if(T& destination, Pred fn, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN())
+      template <typename Pred, typename... T>
+      indexed_reader& read_if(Pred fn, site_info& annotations, T&... destinations)
       {
+        static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
+
         bool predicate_failed = true;
-        while (good() && predicate_failed)
+        while (this->good() && predicate_failed)
         {
           if (current_offset_in_block_ >= total_in_block_)
           {
             if (i_ == query_.end())
-              input_stream_.setstate(std::ios::eofbit);
+              this->input_stream_.setstate(std::ios::eofbit);
             else
             {
               total_in_block_ = std::uint32_t(0x000000000000FFFF & i_->value()) + 1;
               current_offset_in_block_ = 0;
-              input_stream_.seekg(std::streampos((i_->value() >> 16) & 0x0000FFFFFFFFFFFF));
+              this->input_stream_.seekg(std::streampos((i_->value() >> 16) & 0x0000FFFFFFFFFFFF));
               ++i_;
             }
           }
 
-          read_variant_details(destination);
+          this->read_variant_details(annotations);
           ++current_offset_in_block_;
-          predicate_failed = !fn(destination);
-          if (region_comparitor_(destination, reg_) && !predicate_failed)
+          predicate_failed = !fn(annotations);
+          if (region_comparitor_(annotations, reg_) && !predicate_failed)
           {
-            read_genotypes(destination, missing_value);
+            this->clear_destinations(destinations...);
+            this->read_genotypes(0, destinations...);
           }
           else
           {
-            if (file_data_format_ == fmt::allele)
-              discard_genotypes<1>();
+            if (this->file_data_format_ == fmt::allele)
+              this->discard_genotypes();
             else
-              discard_genotypes<7>();
+              this->discard_genotypes();
           }
         }
 
@@ -522,7 +603,7 @@ namespace savvy
         current_offset_in_block_ = 0;
         total_in_block_ = 0;
         reg_ = reg;
-        input_stream_.clear();
+        this->input_stream_.clear();
         query_ = index_.create_query(reg);
         i_ = query_.begin();
         if (!index_.good())
@@ -547,6 +628,7 @@ namespace savvy
       std::uint32_t current_offset_in_block_;
       std::uint32_t total_in_block_;
     };
+    //################################################################//
 
     class writer
     {
@@ -628,30 +710,31 @@ namespace savvy
 
       }
 
-      template <typename T>
-      writer& operator<<(const variant_vector<T>& m)
-      {
-        if (output_stream_.good())
-        {
-          if (m.size() % sample_size_ != 0)
-          {
-            output_stream_.setstate(std::ios::failbit);
-          }
-          else
-          {
-            // 1024*1024 non-ref GTs or 64*1024 records
-            if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || m.chromosome() != current_chromosome_)
-            {
-              output_stream_.flush();
-              allele_count_ = 0;
-              current_chromosome_ = m.chromosome();
-            }
-            write(m);
-            ++record_count_;
-          }
-        }
-        return *this;
-      }
+      // TODO: bring back
+//      template <typename T>
+//      writer& operator<<(const std::vector<T>& m)
+//      {
+//        if (output_stream_.good())
+//        {
+//          if (m.size() % sample_size_ != 0)
+//          {
+//            output_stream_.setstate(std::ios::failbit);
+//          }
+//          else
+//          {
+//            // 1024*1024 non-ref GTs or 64*1024 records
+//            if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || m.chromosome() != current_chromosome_)
+//            {
+//              output_stream_.flush();
+//              allele_count_ = 0;
+//              current_chromosome_ = m.chromosome();
+//            }
+//            write(m);
+//            ++record_count_;
+//          }
+//        }
+//        return *this;
+//      }
 
 //#define NO_LEB128 1
 #ifdef NO_LEB128
@@ -715,37 +798,37 @@ namespace savvy
       }
 #else
       template <typename T>
-      void write(const variant_vector<T>& m)
+      void write(const site_info& annotations, const std::vector<T>& data)
       {
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
-        varint_encode(m.chromosome().size(), os_it);
-        std::copy(m.chromosome().begin(), m.chromosome().end(), os_it);
+        varint_encode(annotations.chromosome().size(), os_it);
+        std::copy(annotations.chromosome().begin(), annotations.chromosome().end(), os_it);
 
-        varint_encode(m.locus(), os_it);
+        varint_encode(annotations.locus(), os_it);
 
-        varint_encode(m.ref().size(), os_it);
-        if (m.ref().size())
-          std::copy(m.ref().begin(), m.ref().end(), os_it);
+        varint_encode(annotations.ref().size(), os_it);
+        if (annotations.ref().size())
+          std::copy(annotations.ref().begin(), annotations.ref().end(), os_it);
         //os.write(&source.ref_[0], source.ref_.size());
 
-        varint_encode(m.alt().size(), os_it);
-        if (m.alt().size())
-          std::copy(m.alt().begin(), m.alt().end(), os_it);
+        varint_encode(annotations.alt().size(), os_it);
+        if (annotations.alt().size())
+          std::copy(annotations.alt().begin(), annotations.alt().end(), os_it);
         //os.write(&source.alt_[0], source.alt_.size());
 
         for (const std::string& key : property_fields_)
         {
-          std::string value(m.prop(key));
+          std::string value(annotations.prop(key));
           varint_encode(value.size(), os_it);
           if (value.size())
             std::copy(value.begin(), value.end(), os_it);
         }
 
         if (data_format_ == fmt::genotype)
-          write_alleles<1>(m);
+          write_alleles<1>(data);
         else
-          write_alleles<7>(m);
+          write_alleles<7>(data);
       }
 #endif
 
@@ -764,9 +847,9 @@ namespace savvy
       };
 
       template <std::uint8_t BitWidth, typename T>
-      void write_alleles(const variant_vector<T>& m)
+      void write_alleles(const std::vector<T>& m)
       {
-        const typename T::value_type ref_value = typename T::value_type();
+        const T ref_value = T();
 
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
@@ -812,9 +895,147 @@ namespace savvy
       fmt data_format_;
     };
 
+
+
+
+
+
+    template <std::size_t VecCnt>
+    template <typename... T>
+    reader_base<VecCnt>::reader_base(const std::string& file_path, T... data_formats) :
+      input_stream_(file_path),
+      file_path_(file_path),
+      file_data_format_(fmt::allele)
+    {
+      static_assert(VecCnt == sizeof...(T), "Number of requested format fields do not match VecCnt template parameter");
+
+      init_requested_formats(data_formats...);
+
+      std::string version_string(7, '\0');
+      input_stream_.read(&version_string[0], version_string.size());
+
+      std::string uuid(16, '\0');
+      input_stream_.read(&uuid[0], uuid.size());
+
+
+      std::istreambuf_iterator<char> in_it(input_stream_);
+      std::istreambuf_iterator<char> end;
+
+      std::uint64_t headers_size;
+      if (varint_decode(in_it, end, headers_size) != end)
+      {
+        ++in_it;
+        headers_.reserve(headers_size);
+
+        while (headers_size && in_it != end)
+        {
+          std::uint64_t key_size;
+          if (varint_decode(in_it, end, key_size) != end)
+          {
+            ++in_it;
+            if (key_size)
+            {
+              std::string key;
+              key.resize(key_size);
+              input_stream_.read(&key[0], key_size);
+
+              std::uint64_t val_size;
+              if (varint_decode(in_it, end, val_size) != end)
+              {
+                ++in_it;
+                if (key_size)
+                {
+                  std::string val;
+                  val.resize(val_size);
+                  input_stream_.read(&val[0], val_size);
+
+                  if (key == "INFO")
+                  {
+                    std::string info_field = parse_header_id(val);
+                    metadata_fields_.push_back(std::move(info_field));
+                  }
+                  else if (key == "FORMAT")
+                  {
+                    std::string format_field = parse_header_id(val);
+                    if (format_field == "GT")
+                      file_data_format_ = fmt::allele;
+                    else if (format_field == "GP")
+                      file_data_format_ = fmt::genotype_probability;
+                  }
+                  headers_.emplace_back(std::move(key), std::move(val));
+                }
+              }
+
+            }
+          }
+          --headers_size;
+        }
+
+        if (!headers_size)
+        {
+          std::uint64_t sample_size;
+          if (varint_decode(in_it, end, sample_size) != end)
+          {
+            ++in_it;
+            sample_ids_.reserve(sample_size);
+
+            std::uint64_t id_sz;
+            while (sample_size && varint_decode(in_it, end, id_sz) != end)
+            {
+              ++in_it;
+              sample_ids_.emplace_back();
+              if (id_sz)
+              {
+                sample_ids_.back().resize(id_sz);
+                input_stream_.read(&sample_ids_.back()[0], id_sz);
+              }
+              --sample_size;
+            }
+
+            if (!sample_size)
+              return;
+          }
+        }
+      }
+
+      input_stream_.peek();
+    }
+
+#if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
+    template <std::size_t VecCnt>
+    reader_base<VecCnt>::reader_base(reader_base&& source) :
+      sample_ids_(std::move(source.sample_ids_)),
+      //sbuf_(std::move(source.sbuf_)),
+      //input_stream_(&sbuf_),
+      input_stream_(std::move(source.input_stream_)),
+      file_path_(std::move(source.file_path_)),
+      metadata_fields_(std::move(source.metadata_fields_)),
+      file_data_format_(source.file_data_format_),
+      requested_data_formats_(source.requested_data_formats_)
+    {
+    }
+
+    template <std::size_t VecCnt>
+    reader_base<VecCnt>& reader_base<VecCnt>::operator=(reader_base<VecCnt>&& source)
+    {
+      if (&source != this)
+      {
+        sample_ids_ = std::move(source.sample_ids_);
+        //sbuf_ = std::move(source.sbuf_);
+        //input_stream_.rdbuf(&sbuf_);
+        input_stream_ = std::move(source.input_stream_);
+        file_path_ = std::move(source.file_path_);
+        metadata_fields_ = std::move(source.metadata_fields_);
+        file_data_format_ = source.file_data_format_;
+        requested_data_formats_ = source.requested_data_formats_;
+      }
+      return *this;
+    }
+#endif
+
     template <>
     template <typename T>
-    inline std::tuple<T, std::uint64_t> reader_base::allele_decoder<0>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
+    inline std::tuple<T, std::uint64_t> detail::allele_decoder<0>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
     {
       std::tuple<T, std::uint64_t> ret{T(1), 0};
       in_it = varint_decode(in_it, end_it, std::get<1>(ret));
@@ -823,7 +1044,7 @@ namespace savvy
 
     template<>
     template <typename T>
-    inline std::tuple<T, std::uint64_t> reader_base::allele_decoder<1>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
+    inline std::tuple<T, std::uint64_t> detail::allele_decoder<1>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
     {
       std::tuple<T, std::uint64_t> ret;
       std::uint8_t allele;
@@ -834,7 +1055,7 @@ namespace savvy
 
     template<std::uint8_t BitWidth>
     template <typename T>
-    inline std::tuple<T, std::uint64_t> reader_base::allele_decoder<BitWidth>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
+    inline std::tuple<T, std::uint64_t> detail::allele_decoder<BitWidth>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
     {
       std::tuple<T, std::uint64_t> ret;
       std::uint8_t allele;

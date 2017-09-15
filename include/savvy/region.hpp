@@ -2,6 +2,8 @@
 #ifndef LIBSAVVY_REGION_HPP
 #define LIBSAVVY_REGION_HPP
 
+#include "site_info.hpp"
+
 #include <cstdint>
 #include <string>
 #include <limits>
@@ -28,8 +30,7 @@ namespace savvy
 
   struct any_coordinate_within_region
   {
-    template<typename T>
-    bool operator()(const T& var, const region& reg)
+    bool operator()(const site_info& var, const region& reg)
     {
       return (var.locus() <= reg.to() && (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1) >= reg.from() && var.chromosome() == reg.chromosome());
     }
@@ -37,8 +38,7 @@ namespace savvy
 
   struct all_coordinates_within_region
   {
-    template<typename T>
-    bool operator()(const T& var, const region& reg)
+    bool operator()(const site_info& var, const region& reg)
     {
       return (var.locus() >= reg.from() && (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1) <= reg.to() && var.chromosome() == reg.chromosome());
     }
@@ -46,8 +46,7 @@ namespace savvy
 
   struct leftmost_coordinate_within_region
   {
-    template<typename T>
-    bool operator()(const T& var, const region& reg)
+    bool operator()(const site_info& var, const region& reg)
     {
       return (var.locus() >= reg.from() && var.locus() <= reg.to() && var.chromosome() == reg.chromosome());
     }
@@ -55,8 +54,7 @@ namespace savvy
 
   struct rightmost_coordinate_within_region
   {
-    template<typename T>
-    bool operator()(const T& var, const region& reg)
+    bool operator()(const site_info& var, const region& reg)
     {
       std::uint64_t right = (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1);
       return (right >= reg.from() && right <= reg.to() && var.chromosome() == reg.chromosome());

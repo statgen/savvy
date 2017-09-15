@@ -1,4 +1,4 @@
-#include "savvy/allele_vector.hpp"
+#include "savvy/site_info.hpp"
 #include "savvy/armadillo_vector.hpp"
 #include "savvy/ublas_vector.hpp"
 #include "savvy/reader.hpp"

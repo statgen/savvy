@@ -7,6 +7,7 @@
 #include "savvy/savvy.hpp"
 #include "savvy/variant_iterator.hpp"
 #include "savvy/reader.hpp"
+#include "savvy/site_info.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -458,25 +459,24 @@ private:
   {
     std::size_t ret = 0;
 
-    savvy::basic_variant_iterator<ReaderType, savvy::dense_allele_vector<float>> cur(reader);
-    savvy::basic_variant_iterator<ReaderType, savvy::dense_allele_vector<float>> end;
+    savvy::site_info anno;
+    std::vector<float> data;
 
     auto prop_fields = reader.prop_fields();
 
     std::size_t num_markers = 0;
-    while (cur != end)
+    while (reader.read(anno, data))
     {
-      ret = hash_combine(ret, cur->locus());
-      ret = hash_combine(ret, cur->ref());
-      ret = hash_combine(ret, cur->alt());
+      ret = hash_combine(ret, anno.locus());
+      ret = hash_combine(ret, anno.ref());
+      ret = hash_combine(ret, anno.alt());
 
       for (const auto& prop_key : prop_fields)
-        ret = hash_combine(ret, cur->prop(prop_key));
+        ret = hash_combine(ret, anno.prop(prop_key));
 
-      for (auto gt = cur->begin(); gt != cur->end(); ++gt)
+      for (auto gt = data.begin(); gt != data.end(); ++gt)
         ret = hash_combine(ret, static_cast<int>(*gt));
 
-      ++cur;
       ++num_markers;
     }
     std::cout << "Marker Count: " << num_markers << std::endl;
@@ -495,8 +495,8 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 
 void run_file_checksum_test()
 {
-  savvy::reader input_file_reader1("test_file.vcf");
-  savvy::reader input_file_reader2("test_file.sav");
+  savvy::reader<1> input_file_reader1("test_file.vcf", savvy::fmt::allele);
+  savvy::reader<1> input_file_reader2("test_file.sav", savvy::fmt::allele);
   auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
   std::cout << "Starting checksum test ..." << std::endl;
   auto timed_call = time_procedure(t);
@@ -507,9 +507,9 @@ void run_file_checksum_test()
 void convert_file_test()
 {
   {
-    savvy::vcf::reader input("test_file.vcf");
-    savvy::basic_variant_iterator<savvy::vcf::reader, savvy::dense_allele_vector<float>> cur(input);
-    savvy::basic_variant_iterator<savvy::vcf::reader, savvy::dense_allele_vector<float>> eof;
+    savvy::vcf::reader<1> input("test_file.vcf", savvy::fmt::allele);
+    savvy::site_info anno;
+    std::vector<float> data;
 
     auto file_info = input.headers();
     file_info.reserve(file_info.size() + 3);
@@ -518,7 +518,7 @@ void convert_file_test()
     file_info.insert(file_info.begin(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
     savvy::sav::writer compact_output("test_file.sav", input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end());
 
-    while (cur != eof)
+    while (input.read(anno, data))
     {
       //    savvy::allele_vector<std::vector<float>> m(std::string(chrom), cur->locus(), std::string(cur->ref()), std::string(cur->alt()), sample_ids.size(), ploidy, std::vector<float>());
       //    for (auto it = cur->begin(); it != cur->end(); ++it)
@@ -534,9 +534,7 @@ void convert_file_test()
       //      }
       //    }
 
-      compact_output << *cur;
-
-      ++cur;
+      compact_output.write(anno, data);
     }
   }
 
@@ -668,32 +666,32 @@ void random_access_test()
 {
   savvy::sav::writer::create_index("test_file.sav");
 
-  savvy::indexed_reader rdr("", {"", 0, 0});
-  savvy::indexed_reader tmp("test_file.sav", {"20", 17000, 1120000});
-  savvy::dense_allele_vector<float> b;
-  rdr.read_if(b, [](const auto& m) { return true; });
+  savvy::indexed_reader<1> rdr("", {"", 0, 0}, savvy::fmt::allele);
+  savvy::indexed_reader<1> tmp("test_file.sav", {"20", 17000, 1120000}, savvy::fmt::allele);
+  savvy::site_info anno;
+  std::vector<float> b;
+  rdr.read_if([](const auto& m) { return true; }, anno, b);
   rdr = std::move(tmp);
-  auto it = savvy::basic_variant_iterator<savvy::indexed_reader, savvy::dense_allele_vector<float>>(rdr);
-  auto end = savvy::basic_variant_iterator<savvy::indexed_reader, savvy::dense_allele_vector<float>>{};
-  for ( ; it != end; ++it)
+
+  while (rdr.read(anno, b))
   {
-    std::cout << it->chromosome() << " " << it->locus()  << " " << it->ref()  << " " << it->alt() << std::endl;
+    std::cout << anno.chromosome() << " " << anno.locus()  << " " << anno.ref()  << " " << anno.alt() << std::endl;
   }
 
   std::cout << "--------------------------------" << std::endl;
 
   rdr.reset_region({"18", 2234600, 2234700});
-  savvy::dense_allele_vector<float> v;
-  while (rdr >> v)
+  std::vector<float> v;
+  while (rdr.read(anno, v))
   {
-    std::cout << v.chromosome() << " " << v.locus()  << " " << v.ref()  << " " << v.alt() << std::endl;
+    std::cout << anno.chromosome() << " " << anno.locus()  << " " << anno.ref()  << " " << anno.alt() << std::endl;
   }
 }
 
 void generic_reader_test()
 {
-  savvy::reader rdr1("test_file.sav");
-  savvy::reader rdr2("test_file.vcf");
+  savvy::reader<1> rdr1("test_file.sav", savvy::fmt::allele);
+  savvy::reader<1> rdr2("test_file.vcf", savvy::fmt::allele);
 
 
   auto t = make_file_checksum_test(rdr1, rdr2);
@@ -704,9 +702,122 @@ void generic_reader_test()
 }
 
 //#include <boost/numeric/ublas/vector_sparse.hpp>
+#include <array>
+#include <initializer_list>
+
+enum class foo
+{
+  genotypes = 0,
+  alleles,
+  dosages,
+  genotype_probablities,
+  genotype_likelihoods
+};
+
+struct anno
+{
+  std::string a;
+  std::size_t b;
+};
+
+template <std::size_t VecCnt = 1>
+class bar
+{
+public:
+  template <typename... T2>
+  bar(const std::string& file_path, T2... arg)
+  {
+    static_assert(VecCnt == sizeof...(T2), "oops");
+    init_formats(arg...);
+  }
+
+  void init_formats(foo f)
+  {
+    formats_[formats_.size() - 1] = f;
+  }
+
+  template <typename... T2>
+  void init_formats(foo f, T2... args)
+  {
+    formats_[formats_.size() - (sizeof...(T2) + 1)] = f;
+    init_formats(args...);
+  }
+
+//  std::size_t get_index(foo in) const
+//  {
+//    for (std::size_t i = 0; i < formats_.size(); ++i)
+//    {
+//      if (in == formats_[i])
+//        return i;
+//    }
+//    return formats_.size();
+//  }
+//
+//  std::size_t get_index(std::string in) const
+//  {
+//    if (in == "gt")
+//      return get_index(foo::genotypes);
+//    else
+//      return get_index(foo::dosages);
+//  }
+
+
+  template <std::size_t Idx, typename T1>
+  void read_geno(foo fmt, T1& arg)
+  {
+    if (formats_[Idx] == fmt)
+    {
+      arg.size();
+    }
+  }
+
+  template <std::size_t Idx, typename T1, typename... T2>
+  void read_geno(foo fmt, T1& arg, T2&... others)
+  {
+    if (formats_[Idx] == fmt)
+    {
+      arg.size();
+    }
+    else
+      read_geno<Idx+1>(fmt, others...);
+  }
+
+
+  template <typename... T>
+  void baz(anno& metadata, T&... arg)
+  {
+    static_assert(VecCnt == sizeof...(T), "oops2");
+    std::tuple<T&...> foo(arg...);
+
+    //parse_anno(metadata);
+    read_geno<0>(foo::genotypes, arg...);
+
+
+  }
+private:
+  std::array<foo, VecCnt> formats_;
+};
+
+template <typename T>
+using single_bar = bar<>;
 
 int main(int argc, char** argv)
 {
+
+  anno meta;
+  foo a = foo();
+  std::vector<float> genotypes;
+  savvy::compressed_vector<float> dosages;
+
+  bar<2> o("file.sav", foo::genotypes, foo::dosages);
+  o.baz(meta, genotypes, dosages);
+
+
+  std::vector<double> genotypes_d;
+  single_bar<double> o2("file.sav", foo::genotypes);
+  o2.baz(meta, genotypes_d);
+
+
   std::cout << "[0] Run all tests." << std::endl;
   std::cout << "[1] Run varint test." << std::endl;
   std::cout << "[2] Run file conversion test." << std::endl;

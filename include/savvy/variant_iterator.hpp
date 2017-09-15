@@ -2,7 +2,7 @@
 #ifndef LIBSAVVY_VARIANT_ITERATOR_HPP
 #define LIBSAVVY_VARIANT_ITERATOR_HPP
 
-#include "allele_vector.hpp"
+#include "site_info.hpp"
 
 #include <iterator>
 

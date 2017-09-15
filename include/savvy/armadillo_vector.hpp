@@ -1,7 +1,7 @@
 #ifndef LIBSAVVY_ARMADILLO_VECTOR_HPP
 #define LIBSAVVY_ARMADILLO_VECTOR_HPP
 
-#include "allele_vector.hpp"
+#include "site_info.hpp"
 
 #include <armadillo>
 #include <cstddef>

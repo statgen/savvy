@@ -1,7 +1,7 @@
 #ifndef LIBSAVVY_UBLAS_VECTOR_HPP
 #define LIBSAVVY_UBLAS_VECTOR_HPP
 
-#include "allele_vector.hpp"
+#include "site_info.hpp"
 
 #include <boost/numeric/ublas/vector_sparse.hpp>
 #include <boost/numeric/ublas/vector.hpp>

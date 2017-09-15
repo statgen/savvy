@@ -12,7 +12,7 @@ namespace savvy
     genotype_likelihood,
     phred_scaled_genotype_likelihood,
     dosage,
-//    phase,
+    //phase,
 //    gt = genotype,
 //    gp = genotype_probability,
 //    gl = genotype_likelihood,

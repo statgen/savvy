@@ -1,9 +1,5 @@
-#ifndef LIBSAVVY_VC_HPP
-#define LIBSAVVY_VC_HPP
-
-#include "reader.hpp"
-#include "m3vcf_reader.hpp"
-
+#ifndef LIBSAVVY_SAVVY_HPP
+#define LIBSAVVY_SAVVY_HPP
 
 #include <string>
 #include <functional>
@@ -39,32 +35,32 @@ namespace savvy
 
 
 
-    struct variadic_file_opener
-    {
-      template<typename... TupleArgs, typename Fn, typename...>
-      void operator()(std::tuple<TupleArgs...>&& readers, Fn&& handler)
-      {
-        apply(handler, std::move(readers));
-      }
-
-      template<typename... TupleArgs, typename Fn, typename File, typename... AddlFiles>
-      void operator()(std::tuple<TupleArgs...>&& readers, Fn&& handler, const File& file_path, const AddlFiles& ... addl_file_paths)
-      {
-        if (detail::has_extension(file_path, ".sav"))
-        {
-          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::sav::reader(file_path))), std::ref(handler), addl_file_paths...);
-        }
-//        else if (detail::has_extension(file_path, ".m3vcf"))
+//    struct variadic_file_opener
+//    {
+//      template<typename... TupleArgs, typename Fn, typename...>
+//      void operator()(std::tuple<TupleArgs...>&& readers, Fn&& handler)
+//      {
+//        apply(handler, std::move(readers));
+//      }
+//
+//      template<typename... TupleArgs, typename Fn, typename File, typename... AddlFiles>
+//      void operator()(std::tuple<TupleArgs...>&& readers, Fn&& handler, const File& file_path, const AddlFiles& ... addl_file_paths)
+//      {
+//        if (detail::has_extension(file_path, ".sav"))
 //        {
-//          std::ifstream ifs(file_path);
-//          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::m3vcf::reader(ifs))), std::ref(handler), addl_file_paths...);
+//          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::sav::reader(file_path))), std::ref(handler), addl_file_paths...);
 //        }
-        else if (detail::has_extension(file_path, ".vcf") || detail::has_extension(file_path, "vcf.gz") || detail::has_extension(file_path, ".bcf"))
-        {
-          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::vcf::reader(file_path))), std::ref(handler), addl_file_paths...);
-        }
-      }
-    };
+////        else if (detail::has_extension(file_path, ".m3vcf"))
+////        {
+////          std::ifstream ifs(file_path);
+////          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::m3vcf::reader(ifs))), std::ref(handler), addl_file_paths...);
+////        }
+//        else if (detail::has_extension(file_path, ".vcf") || detail::has_extension(file_path, "vcf.gz") || detail::has_extension(file_path, ".bcf"))
+//        {
+//          variadic_file_opener::operator()(std::tuple_cat(std::move(readers), std::make_tuple(savvy::vcf::reader(file_path))), std::ref(handler), addl_file_paths...);
+//        }
+//      }
+//    };
 
 //    struct variadic_indexed_file_opener
 //    {
@@ -294,5 +290,5 @@ namespace savvy
 //    region_query<R> ret(index_reader, chromosome, start_pos, end_pos);
 //    return ret;
 //  }
-};
-#endif //LIBSAVVY_VC_HPP
+}
+#endif //LIBSAVVY_SAVVY_HPP
