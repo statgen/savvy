@@ -25,6 +25,7 @@
 #include <iostream>
 #include <limits>
 #include <sstream>
+#include <cmath>
 
 namespace savvy
 {

@@ -1,6 +1,8 @@
 
 #include "savvy/utility.hpp"
 
+#include <algorithm>
+
 namespace savvy
 {
   std::string parse_header_id(std::string header_value)

@@ -2,6 +2,8 @@
 #ifndef LIBSAVVY_DATA_FORMAT_HPP
 #define LIBSAVVY_DATA_FORMAT_HPP
 
+#include <cstdint>
+
 namespace savvy
 {
   enum class fmt : std::uint8_t
