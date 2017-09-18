@@ -99,6 +99,8 @@ namespace savvy
 
       void read_variant_details(site_info& destination);
 
+      template <typename... T>
+      void read_requested_genos(T&... vec);
       template <std::size_t Idx, typename T1>
       void read_genos_to(fmt data_format, T1& vec);
       template <std::size_t Idx, typename T1, typename... T2>
@@ -376,10 +378,20 @@ namespace savvy
     {
       static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
       read_variant_details(annotations);
-      clear_destinations(destinations...);
+      read_requested_genos(destinations...);
 
+      return good();
+    }
+
+    template <std::size_t VecCnt>
+    template <typename... T>
+    void reader_base<VecCnt>::read_requested_genos(T&... destinations)
+    {
+      clear_destinations(destinations...);
+      bcf_unpack(hts_rec(), BCF_UN_ALL);
       for (int i = 0; i < hts_rec()->n_fmt; ++i)
       {
+        auto rec_ptr = hts_rec();
         int fmt_id = hts_rec()->d.fmt[i].id;
         std::string fmt_key = hts_hdr()->id[BCF_DT_ID][fmt_id].key;
 
@@ -418,8 +430,6 @@ namespace savvy
           // Discard
         }
       }
-
-      return good();
     }
 
     template <std::size_t VecCnt>
@@ -559,7 +569,6 @@ namespace savvy
       if (good())
       {
         const typename T::value_type alt_value = typename T::value_type(1);
-        bcf_unpack(hts_rec(), BCF_UN_ALL);
         if (bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
         {
           if (gt_sz_ % sample_count() != 0)
@@ -592,7 +601,6 @@ namespace savvy
       if (good())
       {
         const typename T::value_type alt_value = typename T::value_type(1);
-        bcf_unpack(hts_rec(), BCF_UN_ALL);
         if (bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
         {
           if (gt_sz_ % sample_count() != 0)
@@ -625,7 +633,6 @@ namespace savvy
     {
       if (good())
       {
-        bcf_unpack(hts_rec(), BCF_UN_ALL);
         if (bcf_get_format_float(hts_hdr(),hts_rec(),"DS", &(gt_), &(gt_sz_)) >= 0)
         {
           int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
@@ -663,7 +670,6 @@ namespace savvy
           return;
         }
 
-        bcf_unpack(hts_rec(), BCF_UN_ALL);
         if (bcf_get_format_float(hts_hdr(),hts_rec(),"GP", &(gt_), &(gt_sz_)) >= 0)
         {
           int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
@@ -701,7 +707,6 @@ namespace savvy
           return;
         }
 
-        bcf_unpack(hts_rec(), BCF_UN_ALL);
         if (bcf_get_format_float(hts_hdr(),hts_rec(),"GL", &(gt_), &(gt_sz_)) >= 0)
         {
           int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
@@ -739,7 +744,6 @@ namespace savvy
           return;
         }
 
-        bcf_unpack(hts_rec(), BCF_UN_ALL);
         if (bcf_get_format_int32(hts_hdr(),hts_rec(),"PL", &(gt_), &(gt_sz_)) >= 0)
         {
           int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
@@ -877,32 +881,7 @@ namespace savvy
           predicate_failed = !fn(annotations);
           if (!predicate_failed)
           {
-            //TODO: This logic is old and wrong
-            if (this->requested_data_formats_.size())
-            {
-              fmt data_fmt = this->requested_data_formats_.front();
-              switch (data_fmt)
-              {
-                case fmt::allele:
-                  this->read_genotypes_al(destinations...);
-                  break;
-                case fmt::genotype:
-                  this->read_genotypes_gt(destinations...);
-                  break;
-                case fmt::genotype_probability:
-                  this->read_genotypes_gp(destinations...);
-                  break;
-                case fmt::dosage:
-                  this->read_genotypes_ds(destinations...);
-                  break;
-                case fmt::genotype_likelihood:
-                  this->read_genotypes_gl(destinations...);
-                  break;
-                case fmt::phred_scaled_genotype_likelihood:
-                  this->read_genotypes_pl(destinations...);
-                  break;
-              }
-            }
+            this->read_requested_genos(destinations...);
           }
         }
       }
