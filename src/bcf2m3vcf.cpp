@@ -9,27 +9,27 @@ int main(int argc, char** argv)
   std::ofstream ofs(argv[2], std::ios::binary);
 
 
-  savvy::vcf::reader input(argv[1]);
-  savvy::basic_variant_iterator<savvy::vcf::reader, savvy::dense_allele_vector<float>> eof;
-  savvy::basic_variant_iterator<savvy::vcf::reader, savvy::dense_allele_vector<float>> cur(input);
+  savvy::vcf::reader<1> input(argv[1], savvy::fmt::allele);
+  savvy::site_info variant;
+  std::vector<float> genotypes;
 
-  if (cur != eof)
+  if (input.read(variant, genotypes))
   {
     std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
     std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-    savvy::m3vcf::writer compact_output(ofs, cur->chromosome(), savvy::get_ploidy(input, *cur), sample_ids.begin(), sample_ids.end());
+    savvy::m3vcf::writer compact_output(ofs, variant.chromosome(), savvy::get_ploidy(input, genotypes), sample_ids.begin(), sample_ids.end());
 
     savvy::m3vcf::block output_block(sample_ids.size(), 2);
-    while (cur != eof)
+    while (input.good())
     {
-      if (!output_block.add_marker(cur->locus(), cur->ref(), cur->alt(), cur->begin(), cur->end()))
+      if (!output_block.add_marker(variant.locus(), variant.ref(), variant.alt(), genotypes.begin(), genotypes.end()))
       {
         compact_output << output_block;
         output_block = savvy::m3vcf::block(sample_ids.size(), 2);
-        output_block.add_marker(cur->locus(), cur->ref(), cur->alt(), cur->begin(), cur->end());
+        output_block.add_marker(variant.locus(), variant.ref(), variant.alt(), genotypes.begin(), genotypes.end());
       }
 
-      ++cur;
+      input.read(variant, genotypes);
     }
     if (output_block.marker_count())
       compact_output << output_block;
