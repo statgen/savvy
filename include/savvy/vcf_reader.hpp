@@ -1109,12 +1109,11 @@ namespace savvy
         return *this;
       }
 
-      // TODO: bring back
-//      template <typename T>
-//      writer& operator<<(const allele_vector<T>& m)
-//      {
-//        return this->write(m);
-//      }
+      template <typename T>
+      writer& operator<<(const std::tuple<site_info, std::vector<T>>& m)
+      {
+        return this->write(std::get<0>(m), std::get<1>(m));
+      }
 
       bool good() { return output_stream_->good(); }
     private:

@@ -717,31 +717,30 @@ namespace savvy
 
       }
 
-      // TODO: bring back
-//      template <typename T>
-//      writer& operator<<(const std::vector<T>& m)
-//      {
-//        if (output_stream_.good())
-//        {
-//          if (m.size() % sample_size_ != 0)
-//          {
-//            output_stream_.setstate(std::ios::failbit);
-//          }
-//          else
-//          {
-//            // 1024*1024 non-ref GTs or 64*1024 records
-//            if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || m.chromosome() != current_chromosome_)
-//            {
-//              output_stream_.flush();
-//              allele_count_ = 0;
-//              current_chromosome_ = m.chromosome();
-//            }
-//            write(m);
-//            ++record_count_;
-//          }
-//        }
-//        return *this;
-//      }
+      template <typename T>
+      writer& operator<<(std::tuple<site_info, std::vector<T>>& m)
+      {
+        if (output_stream_.good())
+        {
+          if (std::get<1>(m).size() % sample_size_ != 0)
+          {
+            output_stream_.setstate(std::ios::failbit);
+          }
+          else
+          {
+            // 1024*1024 non-ref GTs or 64*1024 records
+            if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || std::get<0>(m).chromosome() != current_chromosome_)
+            {
+              output_stream_.flush();
+              allele_count_ = 0;
+              current_chromosome_ = std::get<0>(m).chromosome();
+            }
+            write(std::get<0>(m), std::get<1>(m));
+            ++record_count_;
+          }
+        }
+        return *this;
+      }
 
 //#define NO_LEB128 1
 #ifdef NO_LEB128
