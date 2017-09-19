@@ -459,13 +459,14 @@ private:
   {
     std::size_t ret = 0;
 
-    savvy::site_info anno;
-    std::vector<float> data;
+    std::tuple<savvy::site_info, std::vector<float>> variant;
+    auto& anno = std::get<0>(variant);
+    auto& data = std::get<1>(variant);
 
     auto prop_fields = reader.prop_fields();
 
     std::size_t num_markers = 0;
-    while (reader.read(anno, data))
+    while (reader >> variant)
     {
       ret = hash_combine(ret, anno.locus());
       ret = hash_combine(ret, anno.ref());

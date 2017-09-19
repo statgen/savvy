@@ -469,13 +469,17 @@ namespace savvy
     public:
       using reader_base<VecCnt>::reader_base;
 
-      // TODO bring back extraction operator
-//      template <typename T>
-//      reader& operator>>(T& destination)
-//      {
-//        read(destination);
-//        return *this;
-//      }
+      template <typename... T>
+      reader& operator>>(std::tuple<site_info, T...>& destination)
+      {
+        ::savvy::detail::apply([this](site_info& anno, auto&... args)
+          {
+            this->read(anno, std::forward<decltype(args)>(args)...);
+          },
+          destination);
+        return *this;
+      }
+
       template <typename... T>
       reader& read(site_info& annotations, T&... destinations)
       {
@@ -517,13 +521,16 @@ namespace savvy
         return index_.tree_names();
       }
 
-      // TODO bring back
-//      template <typename T>
-//      indexed_reader& operator>>(T& destination)
-//      {
-//        read(destination);
-//        return *this;
-//      }
+      template <typename... T>
+      indexed_reader& operator>>(std::tuple<site_info, T...>& destination)
+      {
+        ::savvy::detail::apply([this](site_info& anno, auto&... args)
+          {
+            this->read(anno, std::forward<decltype(args)>(args)...);
+          },
+          destination);
+        return *this;
+      }
 
       template <typename... T>
       indexed_reader& read(site_info& annotations, T&... destinations)

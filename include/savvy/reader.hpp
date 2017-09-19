@@ -162,9 +162,8 @@ namespace savvy
     reader(const std::string& file_path, T... data_formats);
     ~reader() {}
 
-    // TODO: bring back
-//    template <typename T>
-//    reader& operator>>(T& destination);
+    template <typename... T>
+    reader& operator>>(std::tuple<site_info, T...>& destination);
 
     template <typename... T>
     reader& read(site_info& annotations, T&... destinations);
@@ -189,8 +188,8 @@ namespace savvy
 
     std::vector<std::string> chromosomes() const;
 
-    template <typename T>
-    indexed_reader& operator>>(T& destination);
+    template <typename... T>
+    indexed_reader& operator>>(std::tuple<site_info, T...>& destination);
 
     template <typename... T>
     indexed_reader& read(site_info& annotations, T&... destinations);
@@ -259,13 +258,17 @@ namespace savvy
   //################################################################//
 
   //################################################################//
-  // TODO: bring back
-//  template <typename T>
-//  reader& reader::operator>>(T& destination)
-//  {
-//    read(destination);
-//    return *this;
-//  }
+  template <std::size_t VecCnt>
+  template <typename... T>
+  reader<VecCnt>& reader<VecCnt>::operator>>(std::tuple<site_info, T...>& destination)
+  {
+    ::savvy::detail::apply([this](site_info& anno, auto&... args)
+      {
+        this->read(anno, std::forward<decltype(args)>(args)...);
+      },
+      destination);
+    return *this;
+  }
 
   template <std::size_t VecCnt>
   template <typename... T>
@@ -277,15 +280,6 @@ namespace savvy
       vcf_reader_->read(annotations, destinations...);
     return *this;
   }
-
-  // TODO: bring back
-//  template <std::size_t VecCnt>
-//  template <typename T>
-//  indexed_reader& indexed_reader<VecCnt>::operator>>(T& destination)
-//  {
-//    read(destination);
-//    return *this;
-//  }
 
   template <std::size_t VecCnt>
   template <typename... T>
@@ -326,6 +320,18 @@ namespace savvy
       sav_reader_->reset_region(reg);
     else if (vcf_reader_)
       vcf_reader_->reset_region(reg);
+  }
+
+  template <std::size_t VecCnt>
+  template <typename... T>
+  indexed_reader<VecCnt>& indexed_reader<VecCnt>::operator>>(std::tuple<site_info, T...>& destination)
+  {
+    ::savvy::detail::apply([this](site_info& anno, auto&... args)
+      {
+        this->read(anno, std::forward<decltype(args)>(args)...);
+      },
+      destination);
+    return *this;
   }
 
   template <std::size_t VecCnt>

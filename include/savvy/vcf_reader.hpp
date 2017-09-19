@@ -145,13 +145,16 @@ namespace savvy
       reader& operator=(const reader&) = delete;
       ~reader();
 
-      //TODO: Find way to bring extraction operator back.
-//      template <typename T>
-//      reader& operator>>(T& destination)
-//      {
-//        read_variant(destination);
-//        return *this;
-//      }
+      template <typename... T>
+      reader& operator>>(std::tuple<site_info, T...>& destination)
+      {
+        ::savvy::detail::apply([this](site_info& anno, auto&... args)
+          {
+            this->read(anno, std::forward<decltype(args)>(args)...);
+          },
+          destination);
+        return *this;
+      }
 
       template <typename... T>
       reader& read(site_info& annotations, T&... destinations);
@@ -216,9 +219,9 @@ namespace savvy
       void reset_region(const region& reg);
 
       std::vector<std::string> chromosomes() const;
-//TODO: Bring extraction operator back.
-//      template <typename T>
-//      indexed_reader& operator>>(T& destination);
+
+      template <typename... T>
+      indexed_reader& operator>>(std::tuple<site_info,T...>& destination);
 
       template <typename... T>
       indexed_reader<VecCnt>& read(site_info& annotations, T&... destinations);
@@ -853,12 +856,17 @@ namespace savvy
     //################################################################//
 
     //################################################################//
-//    template <typename T>
-//    indexed_reader& indexed_reader::operator>>(T& destination)
-//    {
-//      read_variant(destination);
-//      return *this;
-//    }
+    template <std::size_t VecCnt>
+    template <typename... T>
+    indexed_reader<VecCnt>& indexed_reader<VecCnt>::operator>>(std::tuple<site_info, T...>& destination)
+    {
+      ::savvy::detail::apply([this](site_info& anno, auto&... args)
+        {
+          this->read(anno, std::forward<decltype(args)>(args)...);
+        },
+        destination);
+      return *this;
+    }
 
     template <std::size_t VecCnt>
     template <typename... T>
