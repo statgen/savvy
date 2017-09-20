@@ -497,14 +497,15 @@ namespace savvy
     {
     public:
       template <typename... T>
-      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, T... data_formats)  :
+      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, coord_bound bounding_type, T... data_formats)  :
         reader_base<VecCnt>(file_path, data_formats...),
         index_(index_file_path.size() ? index_file_path : file_path + ".s1r"),
         query_(index_.create_query(reg)),
         i_(query_.begin()),
         reg_(reg),
         current_offset_in_block_(0),
-        total_in_block_(0)
+        total_in_block_(0),
+        bounding_type_(bounding_type)
       {
         if (!index_.good())
           this->input_stream_.setstate(std::ios::badbit);
@@ -512,7 +513,19 @@ namespace savvy
 
       template <typename... T>
       indexed_reader(const std::string& file_path, const region& reg, T... data_formats)  :
-        indexed_reader<VecCnt>(file_path, std::string(""), reg,  data_formats...)
+        indexed_reader<VecCnt>(file_path, std::string(""), reg, coord_bound::any, data_formats...)
+      {
+      }
+
+      template <typename... T>
+      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, T... data_formats)  :
+        indexed_reader<VecCnt>(file_path, index_file_path, reg, coord_bound::any, data_formats...)
+      {
+      }
+
+      template <typename... T>
+      indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats)  :
+        indexed_reader<VecCnt>(file_path, std::string(""), reg, bounding_type, data_formats...)
       {
       }
 
@@ -556,7 +569,7 @@ namespace savvy
           this->clear_destinations(destinations...);
           this->read_genotypes(0, destinations...);
           ++current_offset_in_block_;
-          if (region_comparitor_(annotations, reg_))
+          if (region_compare(bounding_type_, annotations, reg_))
           {
             break;
           }
@@ -569,8 +582,7 @@ namespace savvy
       {
         static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
 
-        bool predicate_failed = true;
-        while (this->good() && predicate_failed)
+        while (this->good())
         {
           if (current_offset_in_block_ >= total_in_block_)
           {
@@ -587,11 +599,12 @@ namespace savvy
 
           this->read_variant_details(annotations);
           ++current_offset_in_block_;
-          predicate_failed = !fn(annotations);
-          if (region_comparitor_(annotations, reg_) && !predicate_failed)
+          bool predicate_passed = fn(annotations);
+          if (region_compare(bounding_type_, annotations, reg_) && predicate_passed)
           {
             this->clear_destinations(destinations...);
             this->read_genotypes(0, destinations...);
+            break;
           }
           else
           {
@@ -630,8 +643,8 @@ namespace savvy
       s1r::reader index_;
       s1r::reader::query query_;
       s1r::reader::query::iterator i_;
-      region reg_;
-      any_coordinate_within_region region_comparitor_; //TODO: make this a default template argument when vector type is also a reader template.
+      region reg_; //TODO: make this a default template argument when vector type is also a reader template.
+      coord_bound bounding_type_;
       std::uint32_t current_offset_in_block_;
       std::uint32_t total_in_block_;
     };
@@ -720,25 +733,7 @@ namespace savvy
       template <typename T>
       writer& operator<<(std::tuple<site_info, std::vector<T>>& m)
       {
-        if (output_stream_.good())
-        {
-          if (std::get<1>(m).size() % sample_size_ != 0)
-          {
-            output_stream_.setstate(std::ios::failbit);
-          }
-          else
-          {
-            // 1024*1024 non-ref GTs or 64*1024 records
-            if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || std::get<0>(m).chromosome() != current_chromosome_)
-            {
-              output_stream_.flush();
-              allele_count_ = 0;
-              current_chromosome_ = std::get<0>(m).chromosome();
-            }
-            write(std::get<0>(m), std::get<1>(m));
-            ++record_count_;
-          }
-        }
+        write(std::get<0>(m), std::get<1>(m));
         return *this;
       }
 
@@ -806,35 +801,55 @@ namespace savvy
       template <typename T>
       void write(const site_info& annotations, const std::vector<T>& data)
       {
-        std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
-
-        varint_encode(annotations.chromosome().size(), os_it);
-        std::copy(annotations.chromosome().begin(), annotations.chromosome().end(), os_it);
-
-        varint_encode(annotations.locus(), os_it);
-
-        varint_encode(annotations.ref().size(), os_it);
-        if (annotations.ref().size())
-          std::copy(annotations.ref().begin(), annotations.ref().end(), os_it);
-        //os.write(&source.ref_[0], source.ref_.size());
-
-        varint_encode(annotations.alt().size(), os_it);
-        if (annotations.alt().size())
-          std::copy(annotations.alt().begin(), annotations.alt().end(), os_it);
-        //os.write(&source.alt_[0], source.alt_.size());
-
-        for (const std::string& key : property_fields_)
+        if (output_stream_.good())
         {
-          std::string value(annotations.prop(key));
-          varint_encode(value.size(), os_it);
-          if (value.size())
-            std::copy(value.begin(), value.end(), os_it);
-        }
+          if (data.size() % sample_size_ != 0)
+          {
+            output_stream_.setstate(std::ios::failbit);
+          }
+          else
+          {
+            // 1024*1024 non-ref GTs or 64*1024 records
+            if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
+            {
+              output_stream_.flush();
+              allele_count_ = 0;
+              current_chromosome_ = annotations.chromosome();
+            }
 
-        if (data_format_ == fmt::genotype)
-          write_alleles<1>(data);
-        else
-          write_alleles<7>(data);
+            std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
+
+            varint_encode(annotations.chromosome().size(), os_it);
+            std::copy(annotations.chromosome().begin(), annotations.chromosome().end(), os_it);
+
+            varint_encode(annotations.locus(), os_it);
+
+            varint_encode(annotations.ref().size(), os_it);
+            if (annotations.ref().size())
+              std::copy(annotations.ref().begin(), annotations.ref().end(), os_it);
+            //os.write(&source.ref_[0], source.ref_.size());
+
+            varint_encode(annotations.alt().size(), os_it);
+            if (annotations.alt().size())
+              std::copy(annotations.alt().begin(), annotations.alt().end(), os_it);
+            //os.write(&source.alt_[0], source.alt_.size());
+
+            for (const std::string& key : property_fields_)
+            {
+              std::string value(annotations.prop(key));
+              varint_encode(value.size(), os_it);
+              if (value.size())
+                std::copy(value.begin(), value.end(), os_it);
+            }
+
+            if (data_format_ == fmt::genotype)
+              write_alleles<1>(data);
+            else
+              write_alleles<7>(data);
+
+            ++record_count_;
+          }
+        }
       }
 #endif
 

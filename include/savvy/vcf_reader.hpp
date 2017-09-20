@@ -213,6 +213,8 @@ namespace savvy
     public:
       template <typename... T>
       indexed_reader(const std::string& file_path, const region& reg, T... data_formats);
+      template <typename... T>
+      indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats);
       //template <typename PathItr, typename RegionItr>
       //region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end);
       ~indexed_reader();
@@ -236,9 +238,11 @@ namespace savvy
       bcf_hdr_t* hts_hdr() const { return bcf_sr_get_header(synced_readers_, 0); }
       bcf1_t* hts_rec() const { return hts_rec_; }
     private:
+      region region_;
       std::string file_path_;
       bcf_srs_t* synced_readers_;
       bcf1_t* hts_rec_;
+      coord_bound bounding_type_;
     };
     //################################################################//
 
@@ -872,7 +876,15 @@ namespace savvy
     template <typename... T>
     indexed_reader<VecCnt>& indexed_reader<VecCnt>::read(site_info& annotations, T&... destinations)
     {
-      this->read_variant(annotations, destinations...);
+      while (this->good())
+      {
+        this->read_variant(annotations, destinations...);
+        if (this->good() && region_compare(bounding_type_, annotations, region_))
+        {
+          this->read_requested_genos(destinations...);
+          break;
+        }
+      }
       return *this;
     }
 
@@ -880,16 +892,15 @@ namespace savvy
     template <typename Pred, typename... T>
     indexed_reader<VecCnt>& indexed_reader<VecCnt>::read_if(Pred fn, site_info& annotations, T&... destinations)
     {
-      bool predicate_failed = true;
-      while (this->good() && predicate_failed)
+      while (this->good())
       {
         this->read_variant_details(annotations);
         if (this->good())
         {
-          predicate_failed = !fn(annotations);
-          if (!predicate_failed)
+          if (fn(annotations) && region_compare(bounding_type_, annotations, region_))
           {
             this->read_requested_genos(destinations...);
+            break;
           }
         }
       }
@@ -900,9 +911,18 @@ namespace savvy
     template <std::size_t VecCnt>
     template <typename... T>
     indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const region& reg, T... data_formats) :
+      indexed_reader<VecCnt>(file_path, reg, coord_bound::any, data_formats...)
+    {
+    }
+
+    template <std::size_t VecCnt>
+    template <typename... T>
+    indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats) :
+      region_(reg),
       file_path_(file_path),
       synced_readers_(bcf_sr_init()),
-      hts_rec_(nullptr)
+      hts_rec_(nullptr),
+      bounding_type_(bounding_type)
     {
       static_assert(VecCnt == sizeof...(T), "Number of requested format fields do not match VecCnt template parameter");
 

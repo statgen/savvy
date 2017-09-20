@@ -10,6 +10,14 @@
 
 namespace savvy
 {
+  enum class coord_bound : std::uint8_t
+  {
+    any = 0,
+    all,
+    left,
+    right
+  };
+
   class region
   {
   public:
@@ -28,38 +36,43 @@ namespace savvy
     std::uint64_t to_;
   };
 
-  struct any_coordinate_within_region
+  namespace detail
   {
-    bool operator()(const site_info& var, const region& reg)
+    struct any_coordinate_within_region
     {
-      return (var.locus() <= reg.to() && (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1) >= reg.from() && var.chromosome() == reg.chromosome());
-    }
-  };
+      static bool compare(const site_info& var, const region& reg)
+      {
+        return (var.locus() <= reg.to() && (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1) >= reg.from() && var.chromosome() == reg.chromosome());
+      }
+    };
 
-  struct all_coordinates_within_region
-  {
-    bool operator()(const site_info& var, const region& reg)
+    struct all_coordinates_within_region
     {
-      return (var.locus() >= reg.from() && (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1) <= reg.to() && var.chromosome() == reg.chromosome());
-    }
-  };
+      static bool compare(const site_info& var, const region& reg)
+      {
+        return (var.locus() >= reg.from() && (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1) <= reg.to() && var.chromosome() == reg.chromosome());
+      }
+    };
 
-  struct leftmost_coordinate_within_region
-  {
-    bool operator()(const site_info& var, const region& reg)
+    struct leftmost_coordinate_within_region
     {
-      return (var.locus() >= reg.from() && var.locus() <= reg.to() && var.chromosome() == reg.chromosome());
-    }
-  };
+      static bool compare(const site_info& var, const region& reg)
+      {
+        return (var.locus() >= reg.from() && var.locus() <= reg.to() && var.chromosome() == reg.chromosome());
+      }
+    };
 
-  struct rightmost_coordinate_within_region
-  {
-    bool operator()(const site_info& var, const region& reg)
+    struct rightmost_coordinate_within_region
     {
-      std::uint64_t right = (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1);
-      return (right >= reg.from() && right <= reg.to() && var.chromosome() == reg.chromosome());
-    }
-  };
+      static bool compare(const site_info& var, const region& reg)
+      {
+        std::uint64_t right = (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1);
+        return (right >= reg.from() && right <= reg.to() && var.chromosome() == reg.chromosome());
+      }
+    };
+  }
+
+  bool region_compare(coord_bound bounding_type, const site_info& var, const region& reg);
 }
 
 #endif //LIBSAVVY_REGION_HPP

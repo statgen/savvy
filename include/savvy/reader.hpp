@@ -184,6 +184,8 @@ namespace savvy
     indexed_reader() {}
     template <typename... T>
     indexed_reader(const std::string& file_path, const region& reg, T... data_formats);
+    template <typename... T>
+    indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats);
     void reset_region(const region& reg);
 
     std::vector<std::string> chromosomes() const;
@@ -311,6 +313,16 @@ namespace savvy
       sav_reader_ = ::savvy::detail::make_unique<sav::indexed_reader<VecCnt>>(file_path, reg, data_formats...);
     else if (::savvy::detail::has_extension(file_path, ".vcf") || ::savvy::detail::has_extension(file_path, ".vcf.gz") || ::savvy::detail::has_extension(file_path, ".bcf"))
       vcf_reader_ = ::savvy::detail::make_unique<vcf::indexed_reader<VecCnt>>(file_path, reg, data_formats...);
+  }
+
+  template <std::size_t VecCnt>
+  template <typename... T>
+  indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats)
+  {
+    if (::savvy::detail::has_extension(file_path, ".sav"))
+      sav_reader_ = ::savvy::detail::make_unique<sav::indexed_reader<VecCnt>>(file_path, reg, bounding_type, data_formats...);
+    else if (::savvy::detail::has_extension(file_path, ".vcf") || ::savvy::detail::has_extension(file_path, ".vcf.gz") || ::savvy::detail::has_extension(file_path, ".bcf"))
+      vcf_reader_ = ::savvy::detail::make_unique<vcf::indexed_reader<VecCnt>>(file_path, reg, bounding_type, data_formats...);
   }
 
   template <std::size_t VecCnt>
