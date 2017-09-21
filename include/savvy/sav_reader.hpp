@@ -5,7 +5,6 @@
 #include "varint.hpp"
 #include "s1r.hpp"
 #include "site_info.hpp"
-#include "genotype_vector.hpp"
 #include "region.hpp"
 #include "variant_iterator.hpp"
 #include "utility.hpp"
