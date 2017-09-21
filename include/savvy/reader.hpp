@@ -153,6 +153,7 @@ namespace savvy
   //################################################################//
 
   //################################################################//
+
   template <std::size_t VecCnt>
   class reader : public reader_base<VecCnt>
   {
@@ -174,6 +175,11 @@ namespace savvy
     std::unique_ptr<sav::reader<VecCnt>> sav_reader_;
     std::unique_ptr<vcf::reader<VecCnt>> vcf_reader_;
   };
+
+#if __cpp_deduction_guides >= 201606
+  template <typename... T>
+  reader(const std::string& file_path, T... data_formats) -> reader<sizeof...(T)>;
+#endif
   //################################################################//
 
   //################################################################//
@@ -205,6 +211,14 @@ namespace savvy
     std::unique_ptr<sav::indexed_reader<VecCnt>> sav_reader_;
     std::unique_ptr<vcf::indexed_reader<VecCnt>> vcf_reader_;
   };
+
+#if __cpp_deduction_guides >= 201606
+  template <typename... T>
+  indexed_reader(const std::string& file_path, const region& reg, T... data_formats) -> indexed_reader<sizeof...(T)>;
+
+  template <typename... T>
+  indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats) -> indexed_reader<sizeof...(T)>;
+#endif
   //################################################################//
 
 

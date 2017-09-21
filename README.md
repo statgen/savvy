@@ -12,6 +12,18 @@ add_executable(prog main.cpp)
 target_link_libraries(prog savvy hts z lzma)
 ```
 
+## C++ 17 Class Template Argument Deduction
+C++ 17 supports class template argument deduction, which means that template arguments can be deduced by constructor arguments. Compilers that do not support this must specify the number of data vectors to read as a template argument to the reader.
+```c++
+// With C++ 17
+savvy::reader f("chr1.sav", savvy::fmt::allele);
+savvy::reader f("chr1.sav", savvy::fmt::allele, savvy::fmt::genotype_likelilhoods);
+
+// Without C++ 17
+savvy::reader<1> f("chr1.sav", savvy::fmt::allele);
+savvy::reader<2> f("chr1.sav", savvy::fmt::allele, savvy::fmt::genotype_likelilhoods);
+``` 
+
 ## Read Variants from File 
 ```c++
 savvy::reader<1> f("chr1.sav", savvy::fmt::allele);
