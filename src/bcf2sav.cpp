@@ -1,4 +1,4 @@
-
+#include <cmath>
 #include "savvy/vcf_reader.hpp"
 #include "savvy/sav_reader.hpp"
 #include "savvy/savvy.hpp"
