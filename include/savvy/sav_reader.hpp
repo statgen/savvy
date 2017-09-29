@@ -657,10 +657,12 @@ namespace savvy
         fmt data_format;
         compression_type compression;
         std::int8_t compression_level;
+        std::uint16_t block_size;
         options() :
           data_format(fmt::genotype),
           compression(compression_type::zstd),
-          compression_level(3)
+          compression_level(3),
+          block_size(2048)
         {
         }
       };
@@ -673,7 +675,7 @@ namespace savvy
         sample_size_(samples_end - samples_beg),
         allele_count_(0),
         record_count_(0),
-        block_size_(64),
+        block_size_(opts.block_size),
         data_format_(opts.data_format)
       {
         std::string version_string("sav\x00\x01\x00\x00", 7);
@@ -815,7 +817,7 @@ namespace savvy
             //if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
 
             // 64*1024 records
-            if ((record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
+            if (block_size_ != 0 && ((record_count_ % block_size_) == 0 || annotations.chromosome() != current_chromosome_))
             {
               output_stream_.flush();
               allele_count_ = 0;
@@ -917,7 +919,7 @@ namespace savvy
       std::uint32_t metadata_fields_cnt_;
       std::size_t allele_count_;
       std::size_t record_count_;
-      std::size_t block_size_{};
+      std::uint16_t block_size_;
       fmt data_format_;
     };
 
