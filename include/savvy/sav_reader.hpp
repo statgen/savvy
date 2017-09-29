@@ -654,21 +654,24 @@ namespace savvy
     public:
       struct options
       {
-        compression_type compression;
         fmt data_format;
+        compression_type compression;
+        std::int8_t compression_level;
         options() :
+          data_format(fmt::genotype),
           compression(compression_type::zstd),
-          data_format(fmt::genotype)
+          compression_level(3)
         {
         }
       };
 
       template <typename RandAccessStringIterator, typename RandAccessKVPIterator>
       writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, options opts = options()) :
-        output_buf_(std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path))), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
+        output_buf_(std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, opts.compression_level))), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         output_stream_(output_buf_.get()),
         file_path_(file_path),
         sample_size_(samples_end - samples_beg),
+        allele_count_(0),
         record_count_(0),
         block_size_(64),
         data_format_(opts.data_format)
@@ -809,7 +812,10 @@ namespace savvy
           else
           {
             // 1024*1024 non-ref GTs or 64*1024 records
-            if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
+            //if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
+
+            // 64*1024 records
+            if ((record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
             {
               output_stream_.flush();
               allele_count_ = 0;

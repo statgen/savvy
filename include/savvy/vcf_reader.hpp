@@ -793,7 +793,10 @@ namespace savvy
       else
       {
         hts_hdr_ = bcf_hdr_read(hts_file_);
-        this->init_property_fields();
+        if (!hts_hdr_)
+          this->state_ = std::ios::badbit;
+        else
+          this->init_property_fields();
       }
     }
 
