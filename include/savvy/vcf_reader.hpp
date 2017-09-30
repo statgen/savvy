@@ -74,6 +74,7 @@ namespace savvy
       bool good() const { return state_ == std::ios::goodbit; }
       bool fail() const { return (state_ & std::ios::failbit) != 0; }
       bool bad() const { return (state_ & std::ios::badbit) != 0; }
+      bool eof() const { return (state_ & std::ios::eofbit) != 0; }
 
       const char** samples_begin() const;
       const char** samples_end() const;
@@ -564,7 +565,7 @@ namespace savvy
         }
 
         if (!res)
-          this->state_ = std::ios::failbit;
+          this->state_ = std::ios::failbit | std::ios::eofbit; // TODO: Find better way to deal with failed reads vs. eof.
 
       }
     }

@@ -22,6 +22,8 @@ find_package(Threads)
 
 #get_target_property(SHRINKWRAP_LIBS shrinkwrap INTERFACE_LINK_LIBRARIES)
 
+add_definitions(-DSAVVY_VERSION="${PROJECT_VERSION}")
+
 set(HEADER_FILES
     include/savvy/savvy.hpp include/savvy/reader.hpp include/savvy/m3vcf_reader.hpp include/savvy/sav_reader.hpp include/savvy/allele_status.hpp include/savvy/vcf_reader.hpp include/savvy/varint.hpp include/savvy/s1r.hpp include/savvy/site_info.hpp include/savvy/variant_iterator.hpp include/savvy/portable_endian.hpp include/savvy/region.hpp include/savvy/compressed_vector.hpp include/savvy/eigen3_vector.hpp include/savvy/ublas_vector.hpp include/savvy/armadillo_vector.hpp include/savvy/utility.hpp include/savvy/data_format.hpp)
 
@@ -38,8 +40,8 @@ target_link_libraries(savvy-test savvy)
 add_executable(bcf2m3vcf src/bcf2m3vcf.cpp)
 target_link_libraries(bcf2m3vcf savvy)
 
-add_executable(bcf2sav src/bcf2sav.cpp)
-target_link_libraries(bcf2sav savvy)
+add_executable(vcf2sav src/vcf2sav.cpp)
+target_link_libraries(vcf2sav savvy)
 
 add_executable(sav2vcf src/sav2vcf.cpp)
 target_link_libraries(sav2vcf savvy)

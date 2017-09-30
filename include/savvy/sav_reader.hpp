@@ -84,6 +84,7 @@ namespace savvy
       bool good() const { return input_stream_.good(); }
       bool fail() const { return input_stream_.fail(); }
       bool bad() const { return input_stream_.bad(); }
+      bool eof() const { return input_stream_.eof(); }
       std::uint64_t sample_count() const { return this->sample_ids_.size(); }
       std::vector<std::string>::const_iterator samples_begin() const { return sample_ids_.begin(); }
       std::vector<std::string>::const_iterator samples_end() const { return sample_ids_.end(); }
@@ -454,7 +455,7 @@ namespace savvy
       std::vector<std::string> sample_ids_;
       fmt file_data_format_;
       std::array<fmt, VecCnt> requested_data_formats_;
-      shrinkwrap::zstd::istream input_stream_;
+      shrinkwrap::istream input_stream_;
       std::string file_path_;
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> metadata_fields_;
@@ -669,7 +670,7 @@ namespace savvy
 
       template <typename RandAccessStringIterator, typename RandAccessKVPIterator>
       writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, options opts = options()) :
-        output_buf_(std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, opts.compression_level))), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
+        output_buf_(opts.compression_level > 0 ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, opts.compression_level)) : std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out))), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         output_stream_(output_buf_.get()),
         file_path_(file_path),
         sample_size_(samples_end - samples_beg),
@@ -815,8 +816,6 @@ namespace savvy
           {
             // 1024*1024 non-ref GTs or 64*1024 records
             //if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
-
-            // 64*1024 records
             if (block_size_ != 0 && ((record_count_ % block_size_) == 0 || annotations.chromosome() != current_chromosome_))
             {
               output_stream_.flush();
@@ -859,11 +858,23 @@ namespace savvy
         }
       }
 #endif
+      explicit operator bool() const { return good(); }
+      bool good() const { return output_stream_.good(); }
+      bool fail() const { return output_stream_.fail(); }
+      bool bad() const { return output_stream_.bad(); }
+      bool eof() const { return output_stream_.eof(); }
 
       static bool create_index(const std::string& input_file_path, std::string output_file_path = "");
     private:
       template <typename T>
       static std::size_t get_string_size(T str);
+
+      static std::filebuf* create_std_filebuf(const std::string& file_path, std::ios::openmode mode)
+      {
+        std::filebuf* ret = new std::filebuf();
+        ret->open(file_path.c_str(), mode);
+        return ret;
+      }
 
 
       template<std::uint8_t BitWidth>

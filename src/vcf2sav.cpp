@@ -18,7 +18,7 @@ private:
   std::vector<option> long_options_;
   std::string input_path_;
   std::string output_path_;
-  int compression_level_ = 0;
+  int compression_level_ = -1;
   std::uint16_t block_size_ = default_block_size;
   bool help_ = false;
 public:
@@ -41,7 +41,7 @@ public:
   void print_usage(std::ostream& os)
   {
     os << "----------------------------------------------\n";
-    os << "Usage: bcf2sav [args] [in.{bcf,vcf}] [out.sav]\n";
+    os << "Usage: vcf2sav [args] [in.{vcf,vcf.gz,bcf}] [out.sav]\n";
     os << "\n";
     os << " -#               : # compression level (1-19, default: " << default_compression_level << ")\n";
     os << " -b, --block-size : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
@@ -67,6 +67,8 @@ public:
         case '7':
         case '8':
         case '9':
+          if (compression_level_ < 0)
+            compression_level_ = 0;
           compression_level_ *= 10;
           compression_level_ += copt - '0';
           break;
@@ -105,7 +107,7 @@ public:
     }
 
 
-    if (compression_level_ == 0)
+    if (compression_level_ < 0)
       compression_level_ = default_compression_level;
     else if (compression_level_ > 19)
       compression_level_ = 19;
@@ -150,9 +152,13 @@ int main(int argc, char** argv)
 
     savvy::sav::writer compact_output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), opts);
 
-    while (input.read(variant, genotypes))
-      compact_output.write(variant, genotypes);
+    if (compact_output.good())
+    {
+      while (input.read(variant, genotypes))
+        compact_output.write(variant, genotypes);
+      return EXIT_SUCCESS;
+    }
   }
 
-  return EXIT_SUCCESS;
+  return EXIT_FAILURE;
 }
