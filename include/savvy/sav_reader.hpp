@@ -455,7 +455,7 @@ namespace savvy
       std::vector<std::string> sample_ids_;
       fmt file_data_format_;
       std::array<fmt, VecCnt> requested_data_formats_;
-      shrinkwrap::istream input_stream_;
+      shrinkwrap::zstd::istream input_stream_;
       std::string file_path_;
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> metadata_fields_;
