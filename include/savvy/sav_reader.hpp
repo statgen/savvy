@@ -39,8 +39,6 @@ namespace savvy
       };
     }
 
-    enum class compression_type : std::uint8_t { none = 0, zstd }; //xz, bgzf };
-
 //    namespace detail
 //    {
 //      template <std::uint8_t Exp>
@@ -656,12 +654,10 @@ namespace savvy
       struct options
       {
         fmt data_format;
-        compression_type compression;
         std::int8_t compression_level;
         std::uint16_t block_size;
         options() :
-          data_format(fmt::genotype),
-          compression(compression_type::zstd),
+          data_format(fmt::allele),
           compression_level(3),
           block_size(2048)
         {
@@ -694,7 +690,7 @@ namespace savvy
         headers_.resize(std::distance(headers_.begin(), copy_res));
 
         // TODO: Handle unsupported formats.
-        headers_.push_back(std::make_pair("FORMAT", data_format_  == fmt::genotype_probability ? "<ID=GP,Description=\"Genotype posterior probabilities\">" : "<ID=GT,Description=\"Genotype\">"));
+        headers_.push_back(std::make_pair("FORMAT", data_format_ == fmt::genotype_probability ? "<ID=GP,Description=\"Genotype posterior probabilities\">" : "<ID=GT,Description=\"Genotype\">"));
 
         varint_encode(headers_.size(), out_it);
         for (auto it = headers_.begin(); it != headers_.end(); ++it)
@@ -848,10 +844,14 @@ namespace savvy
                 std::copy(value.begin(), value.end(), os_it);
             }
 
-            if (data_format_ == fmt::genotype)
-              write_alleles<1>(data);
+            if (data_format_ == fmt::genotype_probability)
+            {
+              write_probs(data);
+            }
             else
-              write_alleles<7>(data);
+            {
+              write_alleles(data);
+            }
 
             ++record_count_;
           }
@@ -876,7 +876,6 @@ namespace savvy
         return ret;
       }
 
-
       template<std::uint8_t BitWidth>
       struct allele_encoder
       {
@@ -885,16 +884,14 @@ namespace savvy
         static void encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it);
       };
 
-      template <std::uint8_t BitWidth, typename T>
+      template <typename T>
       void write_alleles(const std::vector<T>& m)
       {
         const T ref_value = T();
 
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
-        std::uint32_t ploidy = m.size() / sample_size_;
-        if (data_format_ == fmt::genotype_probability)
-          --ploidy;
+        std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF);
 
         // TODO: check modulus and set error if needed.
         varint_encode(ploidy, os_it);
@@ -912,7 +909,42 @@ namespace savvy
             std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
             std::uint64_t offset = dist - last_pos;
             last_pos = dist + 1;
-            allele_encoder<BitWidth>::encode(*it, offset, os_it);
+            allele_encoder<1>::encode(*it, offset, os_it);
+          }
+        }
+      }
+
+      template <typename T>
+      void write_probs(const std::vector<T>& m)
+      {
+        const T ref_value = T();
+
+        std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
+
+        std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF) - 1;
+        std::uint32_t stride = ploidy + 1;
+
+        // TODO: check modulus and set error if needed.
+        varint_encode(ploidy, os_it);
+
+        std::uint64_t non_zero_count =  m.size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), ref_value));
+        allele_count_ += non_zero_count;
+        varint_encode(non_zero_count, os_it);
+        std::uint64_t last_pos = 0;
+        auto beg = m.begin();
+        std::size_t c = 0;
+        for (auto it = beg; it != m.end(); ++it,++c)
+        {
+          if (c % stride != 0)
+          {
+            //std::int8_t signed_allele = std::round((std::isnan(*it) ? T::value_type(0.5) : *it) * type_multiplier) - T::value_type(1);
+            if (*it != ref_value)
+            {
+              std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
+              std::uint64_t offset = dist - last_pos;
+              last_pos = dist + 1;
+              allele_encoder<7>::encode(*it, offset, os_it);
+            }
           }
         }
       }
