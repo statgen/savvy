@@ -58,9 +58,9 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:h", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:f:h", long_options_.data(), &long_index )) != -1)
     {
-      std::string str_opt_arg(optarg);
+      std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
       switch (copt) {
         case '0':
@@ -148,7 +148,7 @@ int main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  savvy::vcf::reader<1> input(args.input_path(), savvy::fmt::allele);
+  savvy::vcf::reader<1> input(args.input_path(), args.format());
 
   if (input.good())
   {
