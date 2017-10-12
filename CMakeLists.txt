@@ -49,6 +49,9 @@ target_link_libraries(sav2vcf savvy)
 add_executable(sav-sample-sort src/sav_sample_sort.cpp)
 target_link_libraries(sav-sample-sort savvy)
 
+add_executable(savvy-speed-test src/savvy_speed_test.cpp)
+target_link_libraries(savvy-speed-test savvy)
+
 if(BUILD_SLR_EXAMPLES)
     add_executable(slr-examples src/slr_examples.cpp)
     target_link_libraries(slr-examples savvy armadillo)
