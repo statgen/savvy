@@ -300,8 +300,9 @@ void run_simple(const std::string& file_path)
 //  boost::compute::context context(device);
 //  boost::compute::command_queue q(context, device);
 
-  savvy::sparse_allele_vector<float> x;
-  savvy::reader r(file_path);
+  savvy::site_info anno;
+  savvy::compressed_vector<float> x;
+  savvy::reader<1> r(file_path, savvy::fmt::allele);
 
   std::random_device rnd_device;
   std::mt19937 mersenne_engine(rnd_device());
@@ -324,7 +325,7 @@ void run_simple(const std::string& file_path)
   std::cout << "pos\tref\talt\tslope\tse\ttstat\tpval\n";
   std::cout << std::fixed << std::setprecision( 4 );
   int i = 0;
-  while (r.read(x, std::numeric_limits<float>::epsilon()))
+  while (r.read(anno, x))
   {
     float m, se, tstat, pval;
     //auto compute_start = std::chrono::high_resolution_clock().now();
@@ -668,7 +669,7 @@ void run_multi(const std::string& file_path)
   std::uniform_real_distribution<float> dist(0.0, 1.0);
   auto gen = std::bind(dist, mersenne_engine);
 
-  savvy::reader r(file_path);
+  savvy::reader<1> r(file_path, savvy::fmt::allele);
 
   ublas::vector<float> y(r.sample_size() * 2);
   generate(y.begin(), y.end(), gen);
@@ -681,8 +682,9 @@ void run_multi(const std::string& file_path)
   //slow_multi_reg slow_reg(y, cov);
   fast_multi_reg fast_reg(y, cov);
 
-  savvy::ublas::dense_allele_vector<float> variant;
-  while (r.read(variant, std::numeric_limits<float>::epsilon()))
+  savvy::site_info anno;
+  boost::numeric::ublas::vector<float> variant;
+  while (r.read(anno, variant))
   {
     ublas::vector<float> coefs, se;
     //std::tie(coefs, se) = slow_reg(variant);
@@ -766,94 +768,104 @@ void run_multi(const std::string& file_path)
 //}
 
 
-int main(int argc, char** argv)
+//int main(int argc, char** argv)
+//{
+//  boost::compute::device device = boost::compute::system::default_device();
+//  boost::compute::context context(device);
+//  boost::compute::command_queue queue(context, device);
+//
+//  std::vector<float> a;
+//  std::vector<std::array<float, 2>> b;
+//  gpu_multi_reg<2> test(queue, a, b);
+//
+//  boost::compute::float4_ foo;
+//  std::vector<std::array<float, 4>> bar;
+//  std::vector<std::tuple<float, float, float, float>> man;
+//  //foo = man;
+//
+//  boost::compute::vector<float> res(4, 0.0, queue);
+//  boost::compute::vector<boost::compute::float4_> res_4(1, boost::compute::float4_(0, 0, 0, 0), queue);
+//
+//
+//  std::vector<float> v(1000);
+//  boost::compute::vector<float> device_vec(1000 * 4, queue.get_context());
+//  boost::compute::vector<boost::compute::float4_> device_vec_4(1000, boost::compute::float4_(1, 2, 3, 0), queue);
+//
+//
+//
+//
+//  {
+//    auto start = std::chrono::high_resolution_clock().now();
+//    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
+//    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+//    std::cout << elapsed << std::endl;
+//  }
+//
+//  {
+//    auto start = std::chrono::high_resolution_clock().now();
+//    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
+//    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+//    std::cout << elapsed << std::endl;
+//  }
+//
+//  {
+//    auto start = std::chrono::high_resolution_clock().now();
+//    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
+//    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+//    std::cout << elapsed << std::endl;
+//  }
+//
+//  {
+//    auto start = std::chrono::high_resolution_clock().now();
+//    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
+//    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+//    std::cout << elapsed << std::endl;
+//  }
+//
+//  std::cout << std::endl;
+//
+//
+//  {
+//    auto start = std::chrono::high_resolution_clock().now();
+//    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
+//    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+//    std::cout << elapsed << std::endl;
+//  }
+//
+//  {
+//    auto start = std::chrono::high_resolution_clock().now();
+//    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
+//    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+//    std::cout << elapsed << std::endl;
+//  }
+//
+//  {
+//    auto start = std::chrono::high_resolution_clock().now();
+//    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
+//    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+//    std::cout << elapsed << std::endl;
+//  }
+//
+//  {
+//    auto start = std::chrono::high_resolution_clock().now();
+//    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
+//    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+//    std::cout << elapsed << std::endl;
+//  }
+//
+//  return 0;
+//
+//
+//  run_multi(argv[1]);
+//
+//
+//
+//
+//  return 0;
+//}
+
+int main()
 {
-  boost::compute::device device = boost::compute::system::default_device();
-  boost::compute::context context(device);
-  boost::compute::command_queue queue(context, device);
-
-  std::vector<float> a;
-  std::vector<std::array<float, 2>> b;
-  gpu_multi_reg<2> test(queue, a, b);
-
-  boost::compute::float4_ foo;
-  std::vector<std::array<float, 4>> bar;
-  std::vector<std::tuple<float, float, float, float>> man;
-  //foo = man;
-
-  boost::compute::vector<float> res(4, 0.0, queue);
-  boost::compute::vector<boost::compute::float4_> res_4(1, boost::compute::float4_(0, 0, 0, 0), queue);
-
-
-  std::vector<float> v(1000);
-  boost::compute::vector<float> device_vec(1000 * 4, queue.get_context());
-  boost::compute::vector<boost::compute::float4_> device_vec_4(1000, boost::compute::float4_(1, 2, 3, 0), queue);
-
-
-
-
-  {
-    auto start = std::chrono::high_resolution_clock().now();
-    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
-    std::cout << elapsed << std::endl;
-  }
-
-  {
-    auto start = std::chrono::high_resolution_clock().now();
-    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
-    std::cout << elapsed << std::endl;
-  }
-
-  {
-    auto start = std::chrono::high_resolution_clock().now();
-    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
-    std::cout << elapsed << std::endl;
-  }
-
-  {
-    auto start = std::chrono::high_resolution_clock().now();
-    boost::compute::copy(v.begin(), v.end(), boost::compute::make_transform_iterator(device_vec_4.begin(), boost::compute::get<0>()), queue);
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
-    std::cout << elapsed << std::endl;
-  }
-
-  std::cout << std::endl;
-
-
-  {
-    auto start = std::chrono::high_resolution_clock().now();
-    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
-    std::cout << elapsed << std::endl;
-  }
-
-  {
-    auto start = std::chrono::high_resolution_clock().now();
-    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
-    std::cout << elapsed << std::endl;
-  }
-
-  {
-    auto start = std::chrono::high_resolution_clock().now();
-    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
-    std::cout << elapsed << std::endl;
-  }
-
-  {
-    auto start = std::chrono::high_resolution_clock().now();
-    boost::compute::copy(v.begin(), v.end(), device_vec.begin(), queue);
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
-    std::cout << elapsed << std::endl;
-  }
-
-  return 0;
-
-
 //  for (const auto& device : boost::compute::system::devices())
 //  {
 //    std::cout << "NAME: " << device.name() << std::endl;
@@ -868,42 +880,39 @@ int main(int argc, char** argv)
 //    std::cout << "clock_frequency: " << device.clock_frequency() << std::endl;
 //    std::cout << std::endl;
 //  }
-//  return 0;
 
-//  boost::compute::context context(device);
-//  boost::compute::command_queue queue(context, device);
-//
-//  std::vector<float> x(300000, 1.0f);
-//  std::cout << x.size() << std::endl;
-//
-//  boost::compute::vector<float> device_x(x.begin(), x.end(), queue);
-//  boost::compute::vector<float> device_result(1, 0.0f, queue);
-//
-//  float cpu_res{}, gpu_res{};
-//
-//  auto start = std::chrono::high_resolution_clock().now();;
-//  for (std::size_t i = 0; i < 1000; ++i)
-//    cpu_res += std::accumulate(x.begin(), x.end(), 0.0f);
-//  auto cpu_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
-//
-//  start = std::chrono::high_resolution_clock().now();
-//  for (std::size_t i = 0; i < 1000; ++i)
-//    boost::compute::reduce(device_x.begin(), device_x.end(), device_result.begin(), queue);
-//  boost::compute::copy(device_result.begin(), device_result.end(), &gpu_res, queue);
-//  auto gpu_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
-//
-//  std::cout << "cpu res: " << cpu_res << std::endl;
-//  std::cout << "cpu res: " << gpu_res << std::endl;
-//
-//  std::cout << "cpu time: " << cpu_time << "us" << std::endl;
-//  std::cout << "gpu time: " << gpu_time << "us" << std::endl;
-//
-//
-//
-//  return 0;
 
-  run_multi(argv[1]);
+  auto device = boost::compute::system::default_device();
+  boost::compute::context context(device);
+  boost::compute::command_queue queue(context, device);
 
+  std::vector<float> x(3000000, 1.0f);
+  std::cout << x.size() << std::endl;
+
+  float cpu_res{};
+  std::vector<float> gpu_res(100);
+
+  boost::compute::vector<float> device_x(x.begin(), x.end(), queue);
+  boost::compute::vector<float> device_result(gpu_res.size(), 0.0f, queue);
+
+  auto start = std::chrono::high_resolution_clock().now();;
+  for (std::size_t i = 0; i < gpu_res.size(); ++i)
+    cpu_res = std::accumulate(x.begin(), x.end(), 0.0f);
+  auto cpu_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+
+
+  start = std::chrono::high_resolution_clock().now();
+  boost::compute::copy_async(x.begin(), x.end(), device_x.begin(), queue);
+  for (std::size_t i = 0; i < gpu_res.size(); ++i)
+    boost::compute::reduce(device_x.begin(), device_x.end(), device_result.begin() + i, queue);
+  boost::compute::copy(device_result.begin(), device_result.end(), gpu_res.begin(), queue);
+  auto gpu_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock().now() - start).count();
+
+  std::cout << "cpu res: " << cpu_res << std::endl;
+  std::cout << "gpu res: " << gpu_res.back() << std::endl;
+
+  std::cout << "cpu time: " << cpu_time << "us" << std::endl;
+  std::cout << "gpu time: " << gpu_time << "us" << std::endl;
 
 
 
