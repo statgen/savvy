@@ -19,6 +19,7 @@ private:
   std::string input_path_;
   //std::string output_path_;
   bool help_ = false;
+  bool version_ = false;
   savvy::fmt format_ = savvy::fmt::allele;
 public:
   prog_args() :
@@ -26,6 +27,7 @@ public:
       {
         {"format", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
+        {"version", no_argument, 0, 'v'},
         {0, 0, 0, 0}
       })
   {
@@ -35,6 +37,7 @@ public:
   //const std::string& output_path() { return output_path_; }
   savvy::fmt format() const { return format_; }
   bool help_is_set() const { return help_; }
+  bool version_is_set() const { return version_; }
 
   void print_usage(std::ostream& os)
   {
@@ -43,6 +46,7 @@ public:
     os << "\n";
     os << " -f, --format     : Format field to copy (GT or GP, default: GT)\n";
     os << " -h, --help       : Print usage\n";
+    os << " -v, --version    : Print version\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -51,7 +55,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "f:h", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "f:hv", long_options_.data(), &long_index )) != -1)
     {
       std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
@@ -69,6 +73,9 @@ public:
           break;
         case 'h':
           help_ = true;
+          break;
+        case 'v':
+          version_ = true;
           break;
         default:
           return false;
@@ -114,6 +121,12 @@ int main(int argc, char** argv)
   if (args.help_is_set())
   {
     args.print_usage(std::cout);
+    return EXIT_SUCCESS;
+  }
+
+  if (args.version_is_set())
+  {
+    std::cout << "Savvy Speed Test v" << savvy::version << std::endl;
     return EXIT_SUCCESS;
   }
 

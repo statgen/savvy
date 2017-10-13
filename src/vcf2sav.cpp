@@ -21,6 +21,7 @@ private:
   int compression_level_ = -1;
   std::uint16_t block_size_ = default_block_size;
   bool help_ = false;
+  bool version_ = false;
   savvy::fmt format_ = savvy::fmt::allele;
 public:
   prog_args() :
@@ -29,6 +30,7 @@ public:
         {"block-size", required_argument, 0, 'b'},
         {"format", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
+        {"version", no_argument, 0, 'v'},
         {0, 0, 0, 0}
       })
   {
@@ -40,6 +42,7 @@ public:
   std::uint16_t block_size() const { return block_size_; }
   savvy::fmt format() const { return format_; }
   bool help_is_set() const { return help_; }
+  bool version_is_set() const { return version_; }
 
   void print_usage(std::ostream& os)
   {
@@ -50,6 +53,7 @@ public:
     os << " -b, --block-size : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
     os << " -f, --format     : Format field to copy (GT or GP, default: GT)\n";
     os << " -h, --help       : Print usage\n";
+    os << " -v, --version    : Print version\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -58,7 +62,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:f:h", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:f:hv", long_options_.data(), &long_index )) != -1)
     {
       std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
@@ -95,6 +99,9 @@ public:
           break;
         case 'h':
           help_ = true;
+          break;
+        case 'v':
+          version_ = true;
           break;
         default:
           return false;
@@ -146,6 +153,12 @@ int main(int argc, char** argv)
   if (args.help_is_set())
   {
     args.print_usage(std::cout);
+    return EXIT_SUCCESS;
+  }
+
+  if (args.version_is_set())
+  {
+    std::cout << "vcf2sav v" << savvy::version << std::endl;
     return EXIT_SUCCESS;
   }
 
