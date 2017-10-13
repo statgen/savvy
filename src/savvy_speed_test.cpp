@@ -117,6 +117,41 @@ int main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
+//  auto* hts_file = bcf_open(args.input_path().c_str(), "r");
+//  auto* hts_hdr = bcf_hdr_read(hts_file);
+//  bcf1_t* hts_rec = bcf_init1();
+//
+//  std::vector<float> destination;
+//  int * gt = nullptr;
+//  int gt_sz = 0;
+//
+//  auto start = std::chrono::high_resolution_clock::now();
+//  std::size_t cnt = 0;
+//  while (bcf_read(hts_file, hts_hdr, hts_rec) >= 0)
+//  {
+//    bcf_unpack(hts_rec, BCF_UN_ALL);
+//    bcf_get_genotypes(hts_hdr, hts_rec, &(gt), &(gt_sz));
+//    destination.resize(0);
+//    destination.resize(gt_sz);
+//
+//    for (std::size_t j = 1; j < hts_rec->n_allele; ++j)
+//    {
+//      for (std::size_t i = 0; i < gt_sz; ++i)
+//      {
+//        if (gt[i] == bcf_gt_missing)
+//          destination[i] = std::numeric_limits<float>::quiet_NaN();
+//        else
+//          destination[i] = (bcf_gt_allele(gt[i]) == j ? 1.0f : 0.0f);
+//      }
+//      ++cnt;
+//    }
+//  }
+//  long elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - start).count();
+//  std::cout << "markers: " << cnt << std::endl;
+//  std::cout << "elapsed: " << elapsed << " seconds" << std::endl;
+//
+//  return 0;
+
   savvy::reader<1> input(args.input_path(), args.format());
 
   if (input.good())
@@ -132,7 +167,8 @@ int main(int argc, char** argv)
     }
     long elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - start).count();
     std::cout << "markers: " << cnt << std::endl;
-    std::cout << "elapsed: " << elapsed << " seconds" << std::endl;
+    std::cout << "elapsed: " << elapsed << "s" << std::endl;
+    return EXIT_SUCCESS;
   }
 
   return EXIT_FAILURE;

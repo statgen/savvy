@@ -498,13 +498,14 @@ namespace savvy
         if (!hts_rec() || allele_index_ >= hts_rec()->n_allele)
         {
           res = read_hts_record();
+          if (res)
+            bcf_unpack(hts_rec(), BCF_UN_SHR);
+
           this->allele_index_ = 1;
         }
-
+        
         if (res)
         {
-          bcf_unpack(hts_rec(), BCF_UN_SHR);
-
           std::size_t n_info = hts_rec()->n_info;
           std::size_t n_flt = hts_rec()->d.n_flt;
           bcf_info_t* info = hts_rec()->d.info;
@@ -577,7 +578,7 @@ namespace savvy
       if (good())
       {
         const typename T::value_type alt_value = typename T::value_type(1);
-        if (bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
+        if (allele_index_ > 1 || bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
         {
           if (gt_sz_ % sample_count() != 0)
           {
@@ -587,11 +588,12 @@ namespace savvy
           {
             destination.resize(gt_sz_);
 
+            const int allele_index_plus_one = allele_index_ + 1;
             for (std::size_t i = 0; i < gt_sz_; ++i)
             {
               if (gt_[i] == bcf_gt_missing)
                 destination[i] = std::numeric_limits<typename T::value_type>::quiet_NaN();
-              else if (bcf_gt_allele(gt_[i]) == allele_index_)
+              else if ((gt_[i] >> 1) == allele_index_plus_one)
                 destination[i] = alt_value;
             }
             return;
@@ -609,7 +611,7 @@ namespace savvy
       if (good())
       {
         const typename T::value_type alt_value = typename T::value_type(1);
-        if (bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
+        if (allele_index_ > 1 || bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
         {
           if (gt_sz_ % sample_count() != 0)
           {
@@ -620,11 +622,12 @@ namespace savvy
             const std::uint64_t ploidy(gt_sz_ / sample_count());
             destination.resize(sample_count());
 
+            const int allele_index_plus_one = allele_index_ + 1;
             for (std::size_t i = 0; i < gt_sz_; ++i)
             {
               if (gt_[i] == bcf_gt_missing)
                 destination[i / ploidy] += std::numeric_limits<typename T::value_type>::quiet_NaN();
-              else if (bcf_gt_allele(gt_[i]) == allele_index_)
+              else if ((gt_[i] >> 1) == allele_index_plus_one)
                 destination[i / ploidy] += alt_value;
             }
             return;
@@ -641,6 +644,12 @@ namespace savvy
     {
       if (good())
       {
+        if (hts_rec()->n_allele > 2)
+        {
+          state_ = std::ios::failbit; // multi allelic GP not supported.
+          return;
+        }
+
         if (bcf_get_format_float(hts_hdr(),hts_rec(),"DS", &(gt_), &(gt_sz_)) >= 0)
         {
           int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];

@@ -62,7 +62,8 @@ public:
     {
       std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
-      switch (copt) {
+      switch (copt)
+      {
         case '0':
         case '1':
         case '2':
