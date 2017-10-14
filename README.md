@@ -9,7 +9,7 @@ cget install --prefix <install_prefix> statgen/savvy
 CMakeLists.txt:
 ```cmake
 add_executable(prog main.cpp)
-target_link_libraries(prog savvy hts z lzma)
+target_link_libraries(prog savvy hts z zstd)
 ```
 
 ## C++ 17 Class Template Argument Deduction
