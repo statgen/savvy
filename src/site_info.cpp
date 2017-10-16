@@ -8,7 +8,7 @@ namespace savvy
     void print_vcf_site_info(std::ostream& out, const site_info& in, const std::vector<std::string>& info_fields)
     {
       out << in.chromosome() << "\t"
-          << in.locus() << "\t"
+          << in.position() << "\t"
           << (in.prop("ID").size() ? in.prop("ID") : ".") << "\t"
           << in.ref() << "\t"
           << in.alt() << "\t"

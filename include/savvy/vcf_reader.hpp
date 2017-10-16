@@ -1107,7 +1107,7 @@ namespace savvy
           else
           {
             (*output_stream_) << anno.chromosome()
-                           << "\t" << anno.locus()
+                           << "\t" << anno.position()
                            << "\t" << std::string(anno.prop("ID").size() ? anno.prop("ID") : ".")
                            << "\t" << anno.ref()
                            << "\t" << anno.alt()

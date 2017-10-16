@@ -22,11 +22,11 @@ int main(int argc, char** argv)
     savvy::m3vcf::block output_block(sample_ids.size(), 2);
     while (input.good())
     {
-      if (!output_block.add_marker(variant.locus(), variant.ref(), variant.alt(), genotypes.begin(), genotypes.end()))
+      if (!output_block.add_marker(variant.position(), variant.ref(), variant.alt(), genotypes.begin(), genotypes.end()))
       {
         compact_output << output_block;
         output_block = savvy::m3vcf::block(sample_ids.size(), 2);
-        output_block.add_marker(variant.locus(), variant.ref(), variant.alt(), genotypes.begin(), genotypes.end());
+        output_block.add_marker(variant.position(), variant.ref(), variant.alt(), genotypes.begin(), genotypes.end());
       }
 
       input.read(variant, genotypes);

@@ -56,8 +56,8 @@ namespace savvy
 
         ++records_in_block;
         current_chromosome = variant.chromosome();
-        min = std::min(min, std::uint32_t(variant.locus()));
-        max = std::max(max, std::uint32_t(variant.locus() + std::max(variant.ref().size(), variant.alt().size()) - 1));
+        min = std::min(min, std::uint32_t(variant.position()));
+        max = std::max(max, std::uint32_t(variant.position() + std::max(variant.ref().size(), variant.alt().size()) - 1));
 
         std::int64_t end_pos = r.tellg();
         if (start_pos != end_pos) // zstd frame frame boundary

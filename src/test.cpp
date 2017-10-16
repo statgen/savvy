@@ -468,7 +468,7 @@ private:
     std::size_t num_markers = 0;
     while (reader >> variant)
     {
-      ret = hash_combine(ret, anno.locus());
+      ret = hash_combine(ret, anno.position());
       ret = hash_combine(ret, anno.ref());
       ret = hash_combine(ret, anno.alt());
 
@@ -676,7 +676,7 @@ void random_access_test()
 
   while (rdr.read(anno, b))
   {
-    std::cout << anno.chromosome() << " " << anno.locus()  << " " << anno.ref()  << " " << anno.alt() << std::endl;
+    std::cout << anno.chromosome() << " " << anno.position()  << " " << anno.ref()  << " " << anno.alt() << std::endl;
   }
 
   std::cout << "--------------------------------" << std::endl;
@@ -685,7 +685,7 @@ void random_access_test()
   std::vector<float> v;
   while (rdr.read(anno, v))
   {
-    std::cout << anno.chromosome() << " " << anno.locus()  << " " << anno.ref()  << " " << anno.alt() << std::endl;
+    std::cout << anno.chromosome() << " " << anno.position()  << " " << anno.ref()  << " " << anno.alt() << std::endl;
   }
 }
 

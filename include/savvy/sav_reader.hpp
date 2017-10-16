@@ -824,7 +824,7 @@ namespace savvy
             varint_encode(annotations.chromosome().size(), os_it);
             std::copy(annotations.chromosome().begin(), annotations.chromosome().end(), os_it);
 
-            varint_encode(annotations.locus(), os_it);
+            varint_encode(annotations.position(), os_it);
 
             varint_encode(annotations.ref().size(), os_it);
             if (annotations.ref().size())

@@ -23,13 +23,13 @@ namespace savvy
 
     site_info(
       std::string&& chromosome,
-      std::uint64_t locus,
+      std::uint64_t pos,
       std::string&& ref,
       std::string&& alt,
       std::unordered_map<std::string, std::string>&& properties)
       :
       chromosome_(std::move(chromosome)),
-      locus_(locus),
+      position_(pos),
       ref_(std::move(ref)),
       alt_(std::move(alt)),
       properties_(std::move(properties))
@@ -42,7 +42,8 @@ namespace savvy
     const std::string& chromosome() const { return chromosome_; }
     const std::string& ref() const { return ref_; }
     const std::string& alt() const { return alt_; }
-    std::uint64_t locus() const { return locus_; }
+    [[deprecated]] std::uint64_t locus() const { return position_; }
+    std::uint64_t position() const { return position_; }
     const std::string& prop(const std::string& key) const
     {
       auto it = properties_.find(key);
@@ -55,7 +56,7 @@ namespace savvy
     std::string ref_;
     std::string alt_;
     std::unordered_map<std::string, std::string> properties_;
-    std::uint64_t locus_;
+    std::uint64_t position_;
     static const std::string empty_string;
   };
 
