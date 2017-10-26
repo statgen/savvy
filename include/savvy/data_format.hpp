@@ -14,6 +14,7 @@ namespace savvy
     genotype_likelihood,
     phred_scaled_genotype_likelihood,
     dosage,
+    haplotype_dosage,
     //phase,
 //    gt = genotype,
 //    gp = genotype_probability,

@@ -151,6 +151,8 @@ int main(int argc, char** argv)
       {
         if (header_id == "GT")
           it->second = "<ID=GT,Number=1,Type=String,Description=\"Genotype\">";
+        else if (header_id == "HDS")
+          it->second = "<ID=HDS,Number=2,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage\">";
         else if (header_id == "GP")
           it->second = "<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1\">"; // TODO: Handle other ploidy levels.
       }

@@ -343,8 +343,8 @@ namespace savvy
             std::uint64_t sz;
             varint_decode(++in_it, end_it, sz);
             std::uint64_t total_offset = 0;
-            std::uint64_t next_ref_value_offset = 0;
-            std::uint64_t last_stride_offset = 0;
+            //std::uint64_t next_ref_value_offset = 0;
+            //std::uint64_t last_stride_offset = 0;
 
             for (std::size_t i = 0; i < sample_count(); ++i)
             {
@@ -372,9 +372,54 @@ namespace savvy
       }
 
       template <typename T>
+      void read_genotypes_hds(T& destination)
+      {
+        if (file_data_format_ != fmt::haplotype_dosage)
+          input_stream_.setstate(std::ios::failbit);
+
+        if (good())
+        {
+          const typename T::value_type alt_value = typename T::value_type(1);
+          std::istreambuf_iterator<char> in_it(input_stream_);
+          std::istreambuf_iterator<char> end_it;
+
+          std::uint64_t ploidy_level;
+          if (varint_decode(in_it, end_it, ploidy_level) == end_it)
+          {
+            this->input_stream_.setstate(std::ios::badbit);
+          }
+          else
+          {
+            destination.resize(sample_count() * ploidy_level);
+
+            std::uint64_t sz;
+            varint_decode(++in_it, end_it, sz);
+            std::uint64_t total_offset = 0;
+            //std::uint64_t next_ref_value_offset = 0;
+            //std::uint64_t last_stride_offset = 0;
+
+
+            for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+            {
+              typename T::value_type allele;
+              std::uint64_t offset;
+              std::tie(allele, offset) = detail::allele_decoder<7>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
+
+              total_offset += offset;
+
+              assert(total_offset < destination.size());
+              destination[total_offset] = allele;
+            }
+
+            input_stream_.get();
+          }
+        }
+      }
+
+      template <typename T>
       void read_genotypes_ds(T& destination)
       {
-        if (file_data_format_ != fmt::genotype_probability)
+        if (file_data_format_ != fmt::genotype_probability && file_data_format_ != fmt::haplotype_dosage)
           input_stream_.setstate(std::ios::failbit);
 
         if (good())
@@ -395,14 +440,29 @@ namespace savvy
             std::uint64_t sz;
             varint_decode(++in_it, end_it, sz);
             std::uint64_t total_offset = 0;
-            std::uint64_t ploidy_counter = 0;
-            for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+            //std::uint64_t ploidy_counter = 0;
+
+            if (file_data_format_ == fmt::genotype_probability)
             {
-              typename T::value_type allele;
-              std::uint64_t offset;
-              std::tie(allele, offset) = detail::allele_decoder<7>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
-              total_offset += offset;
-              destination[total_offset / ploidy_level] += (allele * ((total_offset % ploidy_level) + 1));
+              for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+              {
+                typename T::value_type allele;
+                std::uint64_t offset;
+                std::tie(allele, offset) = detail::allele_decoder<7>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
+                total_offset += offset;
+                destination[total_offset / ploidy_level] += (allele * ((total_offset % ploidy_level) + 1));
+              }
+            }
+            else // fmt::haplotype_dosage
+            {
+              for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+              {
+                typename T::value_type allele;
+                std::uint64_t offset;
+                std::tie(allele, offset) = detail::allele_decoder<7>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
+                total_offset += offset;
+                destination[total_offset / ploidy_level] += allele;
+              }
             }
 
             input_stream_.get();
@@ -421,17 +481,16 @@ namespace savvy
             read_genotypes_gt(destination);
           else if (requested_data_formats_[idx] == fmt::genotype_probability && file_data_format_ == fmt::genotype_probability)
             read_genotypes_gp(destination);
-          else if (requested_data_formats_[idx] == fmt::dosage && file_data_format_ == fmt::genotype_probability)
+          else if (requested_data_formats_[idx] == fmt::dosage && (file_data_format_ == fmt::genotype_probability || file_data_format_ == fmt::haplotype_dosage))
             read_genotypes_ds(destination);
+          else if (requested_data_formats_[idx] == fmt::haplotype_dosage && file_data_format_ == fmt::haplotype_dosage)
+            read_genotypes_hds(destination);
           else
             input_stream_.setstate(std::ios::failbit);
         }
         else
         {
-          if (file_data_format_ == fmt::allele)
-            discard_genotypes();
-          else
-            discard_genotypes();
+          discard_genotypes();
         }
       }
 
@@ -690,7 +749,14 @@ namespace savvy
         headers_.resize(std::distance(headers_.begin(), copy_res));
 
         // TODO: Handle unsupported formats.
-        headers_.push_back(std::make_pair("FORMAT", data_format_ == fmt::genotype_probability ? "<ID=GP,Description=\"Genotype posterior probabilities\">" : "<ID=GT,Description=\"Genotype\">"));
+        const char* fmt_str;
+        if (data_format_ == fmt::genotype_probability)
+          fmt_str = "<ID=GP,Description=\"Genotype posterior probabilities\">";
+        else if (data_format_ == fmt::haplotype_dosage)
+          fmt_str = "<ID=HDS,Description=\"Haplotype dosages\">";
+        else
+          fmt_str = "<ID=GT,Description=\"Genotype\">";
+        headers_.push_back(std::make_pair("FORMAT", fmt_str));
 
         varint_encode(headers_.size(), out_it);
         for (auto it = headers_.begin(); it != headers_.end(); ++it)
@@ -848,6 +914,10 @@ namespace savvy
             {
               write_probs(data);
             }
+            else if (data_format_ == fmt::haplotype_dosage)
+            {
+              write_hap_dosages(data);
+            }
             else
             {
               write_alleles(data);
@@ -962,6 +1032,43 @@ namespace savvy
           }
         }
       }
+
+      template <typename T>
+      void write_hap_dosages(const std::vector<T>& m)
+      {
+        const T ref_value = T();
+
+        std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
+
+        std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF);
+
+        // TODO: check modulus and set error if needed.
+        varint_encode(ploidy, os_it);
+
+        auto beg = m.begin();
+        std::uint64_t non_zero_count = 0;
+        for (auto it = m.begin(); it != m.end(); ++it)
+        {
+          if (allele_encoder<7>::encode(*it) >= 0)
+            ++non_zero_count;
+        }
+
+
+        allele_count_ += non_zero_count;
+        varint_encode(non_zero_count, os_it);
+        std::uint64_t last_pos = 0;
+        for (auto it = beg; it != m.end(); ++it)
+        {
+          std::int8_t signed_allele = allele_encoder<7>::encode(*it);
+          if (signed_allele >= 0)
+          {
+            std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
+            std::uint64_t offset = dist - last_pos;
+            last_pos = dist + 1;
+            prefixed_varint<7>::encode((std::uint8_t)(signed_allele), offset, os_it);
+          }
+        }
+      }
     private:
       static const std::array<std::string, 0> empty_string_array;
       static const std::array<std::pair<std::string, std::string>, 0> empty_string_pair_array;
@@ -1046,6 +1153,8 @@ namespace savvy
                       file_data_format_ = fmt::allele;
                     else if (format_field == "GP")
                       file_data_format_ = fmt::genotype_probability;
+                    else if (format_field == "HDS")
+                      file_data_format_ = fmt::haplotype_dosage;
                   }
                   headers_.emplace_back(std::move(key), std::move(val));
                 }

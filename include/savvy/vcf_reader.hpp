@@ -116,6 +116,8 @@ namespace savvy
       template <typename T>
       void read_genotypes_ds(T& destination);
       template <typename T>
+      void read_genotypes_hds(T& destination);
+      template <typename T>
       void read_genotypes_gl(T& destination);
       template <typename T>
       void read_genotypes_pl(T& destination);
@@ -421,6 +423,10 @@ namespace savvy
         {
           read_genos_to<0>(fmt::dosage, destinations...);
         }
+        else if (fmt_key == "HDS")
+        {
+          read_genos_to<0>(fmt::haplotype_dosage, destinations...);
+        }
         else if (fmt_key == "GP")
         {
           read_genos_to<0>(fmt::genotype_probability, destinations...);
@@ -459,6 +465,9 @@ namespace savvy
             break;
           case fmt::dosage:
             read_genotypes_ds(destination);
+            break;
+          case fmt::haplotype_dosage:
+            read_genotypes_hds(destination);
             break;
           case fmt::genotype_likelihood:
             read_genotypes_gl(destination);
@@ -666,6 +675,43 @@ namespace savvy
             for (std::size_t i = 0; i < gt_sz_; ++i)
             {
               destination[i] = ds[i];
+            }
+            return;
+          }
+        }
+
+        this->state_ = std::ios::failbit;
+      }
+    }
+
+    template <std::size_t VecCnt>
+    template <typename T>
+    void reader_base<VecCnt>::read_genotypes_hds(T& destination)
+    {
+      if (good())
+      {
+        if (hts_rec()->n_allele > 2)
+        {
+          state_ = std::ios::failbit; // multi allelic HDS not supported.
+          return;
+        }
+
+        if (bcf_get_format_float(hts_hdr(),hts_rec(),"HDS", &(gt_), &(gt_sz_)) >= 0)
+        {
+          int num_samples = hts_hdr()->n[BCF_DT_SAMPLE];
+          if (gt_sz_ % num_samples != 0)
+          {
+            // TODO: mixed ploidy at site error.
+          }
+          else
+          {
+            const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample);
+            destination.resize(gt_sz_);
+
+            float* hds = (float*)(void*)(gt_);
+            for (std::size_t i = 0; i < gt_sz_; ++i)
+            {
+              destination[i] = hds[i];
             }
             return;
           }

@@ -51,7 +51,7 @@ public:
     os << "\n";
     os << " -#               : # compression level (1-19, default: " << default_compression_level << ")\n";
     os << " -b, --block-size : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
-    os << " -f, --format     : Format field to copy (GT or GP, default: GT)\n";
+    os << " -f, --format     : Format field to copy (GT, HDS or GP, default: GT)\n";
     os << " -h, --help       : Print usage\n";
     os << " -v, --version    : Print version\n";
     os << "----------------------------------------------\n";
@@ -90,6 +90,10 @@ public:
           if (str_opt_arg == "GP")
           {
             format_ = savvy::fmt::genotype_probability;
+          }
+          else if (str_opt_arg == "HDS")
+          {
+            format_ = savvy::fmt::haplotype_dosage;
           }
           else if (str_opt_arg != "GT")
           {
