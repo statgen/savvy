@@ -525,7 +525,7 @@ namespace savvy
     {
     public:
       using reader_base<VecCnt>::reader_base;
-
+#if __cpp_decltype_auto >= 201304
       template <typename... T>
       reader& operator>>(std::tuple<site_info, T...>& destination)
       {
@@ -536,7 +536,7 @@ namespace savvy
           destination);
         return *this;
       }
-
+#endif
       template <typename... T>
       reader& read(site_info& annotations, T&... destinations)
       {
