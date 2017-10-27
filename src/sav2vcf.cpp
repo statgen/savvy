@@ -126,7 +126,7 @@ int main(int argc, char** argv)
 
   if (args.version_is_set())
   {
-    std::cout << "sav2vcf v" << savvy::version << std::endl;
+    std::cout << "sav2vcf v" << savvy::savvy_version() << std::endl;
     return EXIT_SUCCESS;
   }
 

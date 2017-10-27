@@ -126,7 +126,7 @@ int main(int argc, char** argv)
 
   if (args.version_is_set())
   {
-    std::cout << "Savvy Speed Test v" << savvy::version << std::endl;
+    std::cout << "Savvy Speed Test v" << savvy::savvy_version() << std::endl;
     return EXIT_SUCCESS;
   }
 

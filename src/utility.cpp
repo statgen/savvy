@@ -5,6 +5,11 @@
 
 namespace savvy
 {
+  std::string savvy_version()
+  {
+    return std::string(SAVVY_VERSION);
+  }
+
   std::string parse_header_id(std::string header_value)
   {
     if (header_value.size())

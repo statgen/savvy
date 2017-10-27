@@ -162,7 +162,7 @@ int main(int argc, char** argv)
 
   if (args.version_is_set())
   {
-    std::cout << "vcf2sav v" << savvy::version << std::endl;
+    std::cout << "vcf2sav v" << savvy::savvy_version() << std::endl;
     return EXIT_SUCCESS;
   }
 
