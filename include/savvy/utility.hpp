@@ -19,6 +19,7 @@ namespace savvy
 
   namespace detail
   {
+#if __cpp_decltype_auto >= 201304
     template<typename F, typename Tuple, std::size_t... S>
     decltype(auto) apply_impl(F&& fn, Tuple&& t, std::index_sequence<S...>)
     {
@@ -34,6 +35,7 @@ namespace savvy
         std::forward<Tuple>(t),
         std::make_index_sequence<tuple_size>());
     }
+#endif
   }
 }
 

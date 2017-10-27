@@ -162,10 +162,10 @@ namespace savvy
     template <typename... T>
     reader(const std::string& file_path, T... data_formats);
     ~reader() {}
-
+#if __cpp_decltype_auto >= 201304
     template <typename... T>
     reader& operator>>(std::tuple<site_info, T...>& destination);
-
+#endif
     template <typename... T>
     reader& read(site_info& annotations, T&... destinations);
   private:
@@ -274,6 +274,7 @@ namespace savvy
   //################################################################//
 
   //################################################################//
+#if __cpp_decltype_auto >= 201304
   template <std::size_t VecCnt>
   template <typename... T>
   reader<VecCnt>& reader<VecCnt>::operator>>(std::tuple<site_info, T...>& destination)
@@ -285,7 +286,7 @@ namespace savvy
       destination);
     return *this;
   }
-
+#endif
   template <std::size_t VecCnt>
   template <typename... T>
   reader<VecCnt>& reader<VecCnt>::read(site_info& annotations, T&... destinations)
