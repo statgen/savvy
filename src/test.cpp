@@ -666,12 +666,9 @@ void random_access_test()
 {
   savvy::sav::writer::create_index("test_file.sav");
 
-  savvy::indexed_reader<1> rdr("", {"", 0, 0}, savvy::fmt::allele);
-  savvy::indexed_reader<1> tmp("test_file.sav", {"20", 17000, 1120000}, savvy::fmt::allele);
+  savvy::indexed_reader<1> rdr("test_file.sav", {"20", 17000, 1120000}, savvy::fmt::allele);
   savvy::site_info anno;
   std::vector<float> b;
-  rdr.read_if([](const auto& m) { return true; }, anno, b);
-  rdr = std::move(tmp);
 
   while (rdr.read(anno, b))
   {
