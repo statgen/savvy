@@ -195,10 +195,10 @@ namespace savvy
     void reset_region(const region& reg);
 
     std::vector<std::string> chromosomes() const;
-
+#if __cpp_decltype_auto >= 201304
     template <typename... T>
     indexed_reader& operator>>(std::tuple<site_info, T...>& destination);
-
+#endif
     template <typename... T>
     indexed_reader& read(site_info& annotations, T&... destinations);
 
@@ -348,7 +348,7 @@ namespace savvy
     else if (vcf_reader_)
       vcf_reader_->reset_region(reg);
   }
-
+#if __cpp_decltype_auto >= 201304
   template <std::size_t VecCnt>
   template <typename... T>
   indexed_reader<VecCnt>& indexed_reader<VecCnt>::operator>>(std::tuple<site_info, T...>& destination)
@@ -360,7 +360,7 @@ namespace savvy
       destination);
     return *this;
   }
-
+#endif
   template <std::size_t VecCnt>
   template <typename... T>
   indexed_reader<VecCnt>& indexed_reader<VecCnt>::read(site_info& annotations, T&... destinations)

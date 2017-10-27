@@ -590,7 +590,7 @@ namespace savvy
       {
         return index_.tree_names();
       }
-
+#if __cpp_decltype_auto >= 201304
       template <typename... T>
       indexed_reader& operator>>(std::tuple<site_info, T...>& destination)
       {
@@ -601,7 +601,7 @@ namespace savvy
           destination);
         return *this;
       }
-
+#endif
       template <typename... T>
       indexed_reader& read(site_info& annotations, T&... destinations)
       {
