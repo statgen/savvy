@@ -40,11 +40,11 @@ namespace savvy
       }
     }
 
-    auto begin() const  { return this->values_.cbegin(); }
-    auto end() const { return this->values_.cend(); }
+    typename std::vector<value_type>::const_iterator begin() const  { return this->values_.cbegin(); }
+    typename std::vector<value_type>::const_iterator end() const { return this->values_.cend(); }
 
-    auto begin() { return this->values_.begin(); }
-    auto end() { return this->values_.end(); }
+    typename std::vector<value_type>::iterator begin() { return this->values_.begin(); }
+    typename std::vector<value_type>::iterator end() { return this->values_.end(); }
 
     const value_type& operator[](std::size_t pos) const
     {

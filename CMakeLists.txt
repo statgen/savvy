@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.2)
 project(savvy VERSION 1.0.0)
 include(CMakePackageConfigHelpers)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 
 #add_library(hts STATIC IMPORTED)
 #set_property(TARGET hts PROPERTY IMPORTED_LOCATION ${CMAKE_INSTALL_PREFIX}/lib/libhts.a)
