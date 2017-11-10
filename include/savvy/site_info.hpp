@@ -42,7 +42,7 @@ namespace savvy
     const std::string& chromosome() const { return chromosome_; }
     const std::string& ref() const { return ref_; }
     const std::string& alt() const { return alt_; }
-    [[deprecated]] std::uint64_t locus() const { return position_; }
+    //[[deprecated]] std::uint64_t locus() const { return position_; }
     std::uint64_t position() const { return position_; }
     const std::string& prop(const std::string& key) const
     {
