@@ -16,8 +16,7 @@ endif()
 #find_package(shrinkwrap CONFIG REQUIRED)
 find_library(HTS_LIBRARY hts)
 find_library(ZLIB_LIBRARY z)
-#ZSTD can only likn statically since experimental functions are being used.
-find_library(ZSTD_LIBRARY NAMES ${CMAKE_STATIC_LIBRARY_PREFIX}zstd${CMAKE_STATIC_LIBRARY_SUFFIX})
+find_library(ZSTD_LIBRARY zstd)
 find_package(Threads)
 
 #get_target_property(SHRINKWRAP_LIBS shrinkwrap INTERFACE_LINK_LIBRARIES)
