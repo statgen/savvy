@@ -938,7 +938,7 @@ namespace savvy
     {
       while (this->good())
       {
-        this->read_variant(annotations, destinations...);
+        this->read_variant_details(annotations);
         if (this->good() && region_compare(bounding_type_, annotations, region_))
         {
           this->read_requested_genos(destinations...);
@@ -992,8 +992,8 @@ namespace savvy
       if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())
         contigs << ":" << reg.from() << "-" << reg.to();
 
-      bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0);
-      if (bcf_sr_add_reader(synced_readers_, file_path_.c_str()))
+
+      if (bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0) == 0 && bcf_sr_add_reader(synced_readers_, file_path_.c_str()) == 1)
         this->init_property_fields();
       else
         this->state_ = std::ios::badbit;
