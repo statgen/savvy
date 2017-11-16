@@ -26,6 +26,8 @@
 #include <limits>
 #include <sstream>
 #include <cmath>
+#include <algorithm>
+#include <set>
 
 namespace savvy
 {
@@ -45,6 +47,7 @@ namespace savvy
     {
     public:
       reader_base() :
+        subset_size_(0),
         state_(std::ios::goodbit),
         gt_(nullptr),
         gt_sz_(0),
@@ -52,6 +55,8 @@ namespace savvy
       {}
 
       reader_base(reader_base&& source) :
+        subset_map_(std::move(source.subset_map_)),
+        subset_size_(source.subset_size_),
         state_(source.state_),
         gt_(source.gt_),
         gt_sz_(source.gt_sz_),
@@ -78,6 +83,9 @@ namespace savvy
 
       const char** samples_begin() const;
       const char** samples_end() const;
+
+      std::vector<std::string> subset_samples(const std::set<std::string>& subset);
+      std::vector<std::string> subset_samples(const std::vector<std::string>& subset);
 
       std::vector<std::string> prop_fields() const;
       std::vector<std::pair<std::string, std::string>> headers() const;
@@ -126,6 +134,8 @@ namespace savvy
       template <typename... T2>
       void init_requested_formats(fmt f, T2... args);
     protected:
+      std::vector<std::uint64_t> subset_map_;
+      std::uint64_t subset_size_;
       std::ios::iostate state_;
       int* gt_;
       int gt_sz_;
@@ -318,6 +328,42 @@ namespace savvy
       }
 
       return ret;
+    }
+
+    template <std::size_t VecCnt>
+    std::vector<std::string> reader_base<VecCnt>::subset_samples(const std::set<std::string>& subset)
+    {
+      std::vector<std::string> ret;
+      const char** beg = hts_hdr() ? (const char**) hts_hdr()->samples : nullptr;
+      const char** end = hts_hdr() ? (const char**) (hts_hdr()->samples + bcf_hdr_nsamples(hts_hdr())) : nullptr;
+      ret.reserve(std::min(subset.size(), (std::size_t)std::distance(beg, end)));
+
+      subset_map_.clear();
+      subset_map_.resize((std::size_t)std::distance(beg, end), std::numeric_limits<std::uint64_t>::max());
+      std::uint64_t subset_index = 0;
+      for (auto it = beg; it != end; ++it)
+      {
+        if (subset.find(*it) != subset.end())
+        {
+          subset_map_[std::distance(beg, it)] = subset_index;
+          ret.push_back(*it);
+        }
+        else
+        {
+          ++subset_index;
+        }
+      }
+
+      subset_size_ = subset_index;
+
+      return ret;
+    }
+
+    template <std::size_t VecCnt>
+    std::vector<std::string> reader_base<VecCnt>::subset_samples(const std::vector<std::string>& subset)
+    {
+      std::set<std::string> unique(subset.begin(), subset.end());
+      return subset_samples(unique);
     }
 
     template <std::size_t VecCnt>
@@ -595,15 +641,35 @@ namespace savvy
           }
           else
           {
-            destination.resize(gt_sz_);
-
             const int allele_index_plus_one = allele_index_ + 1;
-            for (std::size_t i = 0; i < gt_sz_; ++i)
+            const std::uint64_t ploidy(gt_sz_ / sample_count());
+            if (subset_map_.size())
             {
-              if (gt_[i] == bcf_gt_missing)
-                destination[i] = std::numeric_limits<typename T::value_type>::quiet_NaN();
-              else if ((gt_[i] >> 1) == allele_index_plus_one)
-                destination[i] = alt_value;
+              destination.resize(subset_size_ * ploidy);
+
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                const std::uint64_t sample_index = i / ploidy;
+                if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
+                {
+                  if (gt_[i] == bcf_gt_missing)
+                    destination[subset_map_[sample_index] + (i % ploidy)] = std::numeric_limits<typename T::value_type>::quiet_NaN();
+                  else if ((gt_[i] >> 1) == allele_index_plus_one)
+                    destination[subset_map_[sample_index] + (i % ploidy)] = alt_value;
+                }
+              }
+            }
+            else
+            {
+              destination.resize(gt_sz_);
+
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                if (gt_[i] == bcf_gt_missing)
+                  destination[i] = std::numeric_limits<typename T::value_type>::quiet_NaN();
+                else if ((gt_[i] >> 1) == allele_index_plus_one)
+                  destination[i] = alt_value;
+              }
             }
             return;
           }
@@ -629,15 +695,35 @@ namespace savvy
           else
           {
             const std::uint64_t ploidy(gt_sz_ / sample_count());
-            destination.resize(sample_count());
-
             const int allele_index_plus_one = allele_index_ + 1;
-            for (std::size_t i = 0; i < gt_sz_; ++i)
+
+            if (subset_map_.size())
             {
-              if (gt_[i] == bcf_gt_missing)
-                destination[i / ploidy] += std::numeric_limits<typename T::value_type>::quiet_NaN();
-              else if ((gt_[i] >> 1) == allele_index_plus_one)
-                destination[i / ploidy] += alt_value;
+              destination.resize(subset_size_);
+
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                const std::uint64_t sample_index = i / ploidy;
+                if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
+                {
+                  if (gt_[i] == bcf_gt_missing)
+                    destination[subset_map_[sample_index]] += std::numeric_limits<typename T::value_type>::quiet_NaN();
+                  else if ((gt_[i] >> 1) == allele_index_plus_one)
+                    destination[subset_map_[sample_index]] += alt_value;
+                }
+              }
+            }
+            else
+            {
+              destination.resize(sample_count());
+
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                if (gt_[i] == bcf_gt_missing)
+                  destination[i / ploidy] += std::numeric_limits<typename T::value_type>::quiet_NaN();
+                else if ((gt_[i] >> 1) == allele_index_plus_one)
+                  destination[i / ploidy] += alt_value;
+              }
             }
             return;
           }
@@ -669,12 +755,33 @@ namespace savvy
           else
           {
             const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample);
-            destination.resize(gt_sz_);
+            const typename T::value_type zero_value{0};
 
-            float* ds = (float*)(void*)(gt_);
-            for (std::size_t i = 0; i < gt_sz_; ++i)
+            if (subset_map_.size())
             {
-              destination[i] = ds[i];
+              destination.resize(subset_size_);
+
+              float* ds = (float*) (void*) (gt_);
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                const std::uint64_t sample_index = i / ploidy;
+                if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
+                {
+                  if (ds[i] != zero_value)
+                    destination[subset_map_[sample_index]] = ds[i];
+                }
+              }
+            }
+            else
+            {
+              destination.resize(gt_sz_);
+
+              float* ds = (float*) (void*) (gt_);
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                if (ds[i] != zero_value)
+                  destination[i] = ds[i];
+              }
             }
             return;
           }
@@ -706,12 +813,33 @@ namespace savvy
           else
           {
             const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample);
-            destination.resize(gt_sz_);
+            const typename T::value_type zero_value{0};
 
-            float* hds = (float*)(void*)(gt_);
-            for (std::size_t i = 0; i < gt_sz_; ++i)
+            if (subset_map_.size())
             {
-              destination[i] = hds[i];
+              destination.resize(subset_size_ * ploidy);
+
+              float* hds = (float*) (void*) (gt_);
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                const std::uint64_t sample_index = i / ploidy;
+                if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
+                {
+                  if (hds[i] != zero_value)
+                    destination[subset_map_[sample_index] + (i % ploidy)] = hds[i];
+                }
+              }
+            }
+            else
+            {
+              destination.resize(gt_sz_);
+
+              float* hds = (float*) (void*) (gt_);
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                if (hds[i] != zero_value)
+                  destination[i] = hds[i];
+              }
             }
             return;
           }
@@ -743,12 +871,29 @@ namespace savvy
           else
           {
             const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample - 1);
-            destination.resize(gt_sz_);
+            const std::uint64_t ploidy_plus_one = ploidy + 1;
 
-            float* gp = (float*)(void*)(gt_);
-            for (std::size_t i = 0; i < gt_sz_; ++i)
+            if (subset_map_.size())
             {
-              destination[i] = gp[i];
+              destination.resize(subset_size_ * ploidy_plus_one);
+
+              float* gp = (float*) (void*) (gt_);
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                const std::uint64_t sample_index = i / ploidy_plus_one;
+                if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
+                  destination[subset_map_[sample_index] + (i % ploidy_plus_one)] = gp[i];
+              }
+            }
+            else
+            {
+              destination.resize(gt_sz_);
+
+              float* gp = (float*) (void*) (gt_);
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                destination[i] = gp[i];
+              }
             }
             return;
           }
@@ -780,12 +925,29 @@ namespace savvy
           else
           {
             const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample - 1);
-            destination.resize(gt_sz_);
+            const std::uint64_t ploidy_plus_one = ploidy + 1;
 
-            float* gp = (float*)(void*)(gt_);
-            for (std::size_t i = 0; i < gt_sz_; ++i)
+            if (subset_map_.size())
             {
-              destination[i] = gp[i];
+              destination.resize(subset_size_ * ploidy_plus_one);
+
+              float* gp = (float*) (void*) (gt_);
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                const std::uint64_t sample_index = i / ploidy_plus_one;
+                if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
+                  destination[subset_map_[sample_index] + (i % ploidy_plus_one)] = gp[i];
+              }
+            }
+            else
+            {
+              destination.resize(gt_sz_);
+
+              float* gp = (float*) (void*) (gt_);
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                destination[i] = gp[i];
+              }
             }
             return;
           }
@@ -817,11 +979,28 @@ namespace savvy
           else
           {
             const std::uint64_t ploidy(gt_sz_ / hts_rec()->n_sample - 1);
-            destination.resize(gt_sz_);
+            const std::uint64_t ploidy_plus_one = ploidy + 1;
 
-            for (std::size_t i = 0; i < gt_sz_; ++i)
+            if (subset_map_.size())
             {
-              destination[i] = gt_[i];
+              destination.resize(subset_size_ * ploidy_plus_one);
+
+
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                const std::uint64_t sample_index = i / ploidy_plus_one;
+                if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
+                  destination[subset_map_[sample_index] + (i % ploidy_plus_one)] = gt_[i];
+              }
+            }
+            else
+            {
+              destination.resize(gt_sz_);
+
+              for (std::size_t i = 0; i < gt_sz_; ++i)
+              {
+                destination[i] = gt_[i];
+              }
             }
             return;
           }
