@@ -572,7 +572,7 @@ namespace savvy
       template <typename T>
       void read_genotypes(std::size_t idx, T& destination)
       {
-        if (requested_data_formats_[idx] == file_data_format_)
+        if (true) //requested_data_formats_[idx] == file_data_format_)
         {
           if (requested_data_formats_[idx] == fmt::allele && file_data_format_ == fmt::allele)
             read_genotypes_al(destination);
@@ -1348,9 +1348,6 @@ namespace savvy
         {
           subset_map_[std::distance(sample_ids_.begin(), it)] = subset_index;
           ret.push_back(*it);
-        }
-        else
-        {
           ++subset_index;
         }
       }

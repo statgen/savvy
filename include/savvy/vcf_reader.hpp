@@ -347,9 +347,6 @@ namespace savvy
         {
           subset_map_[std::distance(beg, it)] = subset_index;
           ret.push_back(*it);
-        }
-        else
-        {
           ++subset_index;
         }
       }

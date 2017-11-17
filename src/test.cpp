@@ -698,10 +698,62 @@ void generic_reader_test()
   std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
 }
 
+#define NUM_MARKERS 28
+#define NUM_ALLELES 34
+
+template <typename R, savvy::fmt F>
+class subset_test
+{
+public:
+  void operator()(const std::string& path)
+  {
+    R rdr(path, F);
+    std::vector<std::string> subset = {"NA00003","NA00005", "NA50000"};
+    auto intersect = rdr.subset_samples(subset);
+    assert(intersect.size() == 2);
+
+    savvy::site_info i;
+    std::vector<float> d;
+    std::size_t cnt{};
+    std::size_t sum{};
+    while (rdr.read(i, d))
+    {
+      assert(d.size() == 2);
+      sum += std::count_if(d.begin(), d.end(), [](float f) { return f > 0.0f; });
+      ++cnt;
+    }
+    assert(cnt == NUM_MARKERS);
+    assert(sum == NUM_ALLELES);
+  }
+};
+
 //#include <boost/numeric/ublas/vector_sparse.hpp>
 
 int main(int argc, char** argv)
 {
+  assert(argc > 1);
+
+  std::string cmd(argv[1]);
+  if (cmd == "subset")
+  {
+    subset_test<savvy::reader<1>, savvy::fmt::genotype>()("test_file.vcf");
+    subset_test<savvy::reader<1>, savvy::fmt::genotype>()("test_file.sav");
+    subset_test<savvy::vcf::reader<1>, savvy::fmt::genotype>()("test_file.vcf");
+    subset_test<savvy::sav::reader<1>, savvy::fmt::genotype>()("test_file.sav");
+  }
+
+  return EXIT_SUCCESS;
+
+
+
+
+
+
+
+
+
+
+
   std::cout << "[0] Run all tests." << std::endl;
   std::cout << "[1] Run varint test." << std::endl;
   std::cout << "[2] Run file conversion test." << std::endl;
