@@ -33,9 +33,6 @@ add_library(savvy ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
-add_executable(savvy-test src/test.cpp src/test_class.cpp include/savvy/test_class.hpp)
-target_link_libraries(savvy-test savvy)
-
 add_executable(bcf2m3vcf src/bcf2m3vcf.cpp)
 target_link_libraries(bcf2m3vcf savvy)
 
@@ -50,6 +47,23 @@ target_link_libraries(sav-sample-sort savvy)
 
 add_executable(savvy-speed-test src/savvy_speed_test.cpp)
 target_link_libraries(savvy-speed-test savvy)
+
+
+if(BUILD_TESTS)
+    enable_testing()
+
+    add_definitions(-DSAVVYT_VCF_FILE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file.vcf\"
+                    -DSAVVYT_SAV_FILE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file.sav\"
+                    -DSAVVYT_MARKER_COUNT=28
+                    -DSAVVYT_ALLELE_COUNT=34)
+
+    add_executable(savvy-test src/test.cpp src/test_class.cpp include/savvy/test_class.hpp)
+    target_link_libraries(savvy-test savvy)
+
+    add_test(convert_file_test savvy-test convert-file)
+    add_test(subset_test savvy-test subset)
+    add_test(varint_test savvy-test varint)
+endif()
 
 if(BUILD_SLR_EXAMPLES)
     add_executable(slr-examples src/slr_examples.cpp)

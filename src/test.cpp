@@ -18,6 +18,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <sys/stat.h>
 
 #include <htslib/synced_bcf_reader.h>
 #include <htslib/tbx.h>
@@ -163,6 +164,12 @@
 //  //----------------------------------------------------------------//
 //  return 0;
 //}
+
+bool file_exists(const std::string& file_path)
+{
+  struct stat st;
+  return (stat(file_path.c_str(), &st) == 0);
+}
 
 int varint_test()
 {
@@ -541,56 +548,6 @@ void convert_file_test()
   run_file_checksum_test();
 }
 
-//template <typename M>
-//double inner_product(const M& mrkr, std::vector<double>& vec, const double start_val = 0.0)
-//{
-//  double ret = start_val;
-//
-//  std::size_t i = 0;
-//  for (const savvy::allele_status& gt : mrkr)
-//  {
-//    if (gt == savvy::allele_status::has_alt)
-//      ret += 1.0 * vec[i];
-//    ++i;
-//  }
-//
-//  return ret;
-//}
-//
-//template <>
-//double inner_product<savvy::sav::marker>(const savvy::sav::marker& mrkr, std::vector<double>& vec, const double start_val)
-//{
-//  double ret = start_val;
-//
-//  for (auto it = mrkr.non_ref_begin(); it != mrkr.non_ref_end(); ++it)
-//  {
-//    if (it->status == savvy::allele_status::has_alt)
-//      ret += 1.0 * vec[it->offset];
-//    else
-//      ret += 0.04 * vec[it->offset];
-//  }
-//
-//  return ret;
-//}
-
-//class file_handler_functor
-//{
-//public:
-//  template <typename T>
-//  void operator()(T&& input_file_reader)
-//  {
-//    typedef typename T::input_iterator input_iterator_type;
-//    typename T::input_iterator::buffer buf{};
-//
-//    for (auto it = input_iterator_type(input_file_reader, buf); it != input_iterator_type(); ++it)
-//    {
-//      inner_product(*it, phenotypes_);
-//    }
-//  };
-//private:
-//  std::vector<double> phenotypes_;
-//};
-
 class triple_file_handler_functor
 {
 public:
@@ -668,21 +625,59 @@ void random_access_test()
 
   savvy::indexed_reader<1> rdr("test_file.sav", {"20", 17000, 1120000}, savvy::fmt::allele);
   savvy::site_info anno;
-  std::vector<float> b;
+  std::vector<float> buf;
 
-  while (rdr.read(anno, b))
-  {
-    std::cout << anno.chromosome() << " " << anno.position()  << " " << anno.ref()  << " " << anno.alt() << std::endl;
-  }
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "20");
+  assert(anno.position() == 17330);
+  assert(anno.ref() == "T");
+  assert(anno.alt() == "A");
 
-  std::cout << "--------------------------------" << std::endl;
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "20");
+  assert(anno.position() == 1110696);
+  assert(anno.ref() == "A");
+  assert(anno.alt() == "G");
+
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "20");
+  assert(anno.position() == 1110696);
+  assert(anno.ref() == "A");
+  assert(anno.alt() == "T");
+
+  assert(rdr.good());
+
+  assert(!rdr.read(anno, buf));
 
   rdr.reset_region({"18", 2234600, 2234700});
-  std::vector<float> v;
-  while (rdr.read(anno, v))
-  {
-    std::cout << anno.chromosome() << " " << anno.position()  << " " << anno.ref()  << " " << anno.alt() << std::endl;
-  }
+
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "18");
+  assert(anno.position() == 2234668);
+  assert(anno.ref() == "G");
+  assert(anno.alt() == "A");
+
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "18");
+  assert(anno.position() == 2234679);
+  assert(anno.ref() == "G");
+  assert(anno.alt() == "T");
+
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "18");
+  assert(anno.position() == 2234687);
+  assert(anno.ref() == "G");
+  assert(anno.alt() == "A");
+
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "18");
+  assert(anno.position() == 2234697);
+  assert(anno.ref() == "T");
+  assert(anno.alt() == "A");
+
+  assert(rdr.good());
+
+  assert(!rdr.read(anno, buf));
 }
 
 void generic_reader_test()
@@ -698,9 +693,6 @@ void generic_reader_test()
   std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
 }
 
-#define NUM_MARKERS 28
-#define NUM_ALLELES 34
-
 template <typename R, savvy::fmt F>
 class subset_test
 {
@@ -708,7 +700,9 @@ public:
   void operator()(const std::string& path)
   {
     R rdr(path, F);
-    std::vector<std::string> subset = {"NA00003","NA00005", "NA50000"};
+    assert(rdr.good());
+
+    std::vector<std::string> subset = {"NA00003","NA00005", "FAKE_ID"};
     auto intersect = rdr.subset_samples(subset);
     assert(intersect.size() == 2);
 
@@ -722,126 +716,63 @@ public:
       sum += std::count_if(d.begin(), d.end(), [](float f) { return f > 0.0f; });
       ++cnt;
     }
-    assert(cnt == NUM_MARKERS);
-    assert(sum == NUM_ALLELES);
+    assert(cnt == SAVVYT_MARKER_COUNT);
+    assert(sum == SAVVYT_ALLELE_COUNT);
   }
 };
 
-//#include <boost/numeric/ublas/vector_sparse.hpp>
-
 int main(int argc, char** argv)
 {
-  assert(argc > 1);
+  std::string cmd = (argc < 2) ? "" : argv[1];
 
-  std::string cmd(argv[1]);
-  if (cmd == "subset")
+  if (cmd.empty())
   {
-    subset_test<savvy::reader<1>, savvy::fmt::genotype>()("test_file.vcf");
-    subset_test<savvy::reader<1>, savvy::fmt::genotype>()("test_file.sav");
-    subset_test<savvy::vcf::reader<1>, savvy::fmt::genotype>()("test_file.vcf");
-    subset_test<savvy::sav::reader<1>, savvy::fmt::genotype>()("test_file.sav");
+    std::cout << "Enter Command:" << std::endl;
+    std::cout << "- convert-file" << std::endl;
+    std::cout << "- subset" << std::endl;
+    std::cout << "- varint" << std::endl;
+    std::cout << "- generic-reader" << std::endl;
+    std::cout << "- random-access" << std::endl;
+    std::cin >> cmd;
   }
+
+
+  if (cmd == "convert-file")
+  {
+    convert_file_test();
+  }
+  else if (cmd == "subset")
+  {
+    if (!file_exists(SAVVYT_SAV_FILE)) convert_file_test();
+
+    subset_test<savvy::reader<1>, savvy::fmt::genotype>()(SAVVYT_VCF_FILE);
+    subset_test<savvy::reader<1>, savvy::fmt::genotype>()(SAVVYT_SAV_FILE);
+    subset_test<savvy::vcf::reader<1>, savvy::fmt::genotype>()(SAVVYT_VCF_FILE);
+    subset_test<savvy::sav::reader<1>, savvy::fmt::genotype>()(SAVVYT_SAV_FILE);
+  }
+  else if (cmd == "varint")
+  {
+    varint_test();
+  }
+  else if (cmd == "random-access")
+  {
+    if (!file_exists(SAVVYT_SAV_FILE)) convert_file_test();
+
+    random_access_test();
+  }
+  else if (cmd == "generic-reader")
+  {
+    if (!file_exists(SAVVYT_SAV_FILE)) convert_file_test();
+
+    generic_reader_test();
+  }
+  else
+  {
+    std::cerr << "Invalid Command" << std::endl;
+    return EXIT_FAILURE;
+  }
+
 
   return EXIT_SUCCESS;
-
-
-
-
-
-
-
-
-
-
-
-  std::cout << "[0] Run all tests." << std::endl;
-  std::cout << "[1] Run varint test." << std::endl;
-  std::cout << "[2] Run file conversion test." << std::endl;
-  std::cout << "[3] Run generic reader test." << std::endl;
-  std::cout << "[4] Run random access test." << std::endl;
-
-  char t = '0';
-  std::cin >> t;
-
-  switch (t)
-  {
-    case '0':
-      varint_test();
-      convert_file_test();
-      break;
-    case '1':
-      varint_test();
-      break;
-    case '2':
-      convert_file_test();
-      break;
-    case '3':
-      generic_reader_test();
-      break;
-    case '4':
-      random_access_test();
-      break;
-    default:
-      std::cout << "Invalid Input" << std::endl;
-  }
-
-
-
-//  savvy::open_marker_files(triple_file_handler_functor(), "chr1.bcf", "chr1.cmf", "chr1.m3vcf");
-//
-//  savvy::open_marker_files(std::make_tuple("chr1.cmf", "chr1.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
-//  {
-//    typedef typename std::remove_reference<decltype(input_file_reader1)>::type R1;
-//    typename R1::input_iterator::buffer buf{};
-//    typename R1::input_iterator eof{};
-//    typename R1::input_iterator it(input_file_reader1, buf);
-//
-//    typedef typename std::remove_reference<decltype(input_file_reader2)>::type R2;
-//    typename R2::input_iterator::buffer buf2{};
-//    typename R2::input_iterator eof2{};
-//    typename R2::input_iterator it2(input_file_reader2, buf2);
-//
-//    while (it != eof)
-//    {
-//
-//      ++it;
-//    }
-//
-//    while (it2 != eof2)
-//    {
-//
-//      ++it2;
-//    }
-//
-//  });
-//
-//  savvy::open_marker_file("chr1.bcf", [](auto&& input_file_reader)
-//  {
-//    typedef typename std::remove_reference<decltype(input_file_reader)>::type R;
-//    typename R::input_iterator::buffer buf{};
-//    typename R::input_iterator eof{};
-//    typename R::input_iterator it(input_file_reader, buf);
-//
-//    while (it != eof)
-//    {
-//      it->pos();
-//      it->ref() + ":" + it->alt();
-//      for (const savvy::allele_status& gt : *it)
-//      {
-//
-//      }
-//      ++it;
-//    }
-//  });
-//
-//  savvy::open_marker_file("chr1.bcf", file_handler_functor());
-//  file_handler_functor f;
-//  savvy::open_marker_file("chr1.bcf", f);
-//
-//  savvy::iterate_marker_file("chr1.bcf", marker_handler_functor());
-
-
-
-  return 0;
 }
 
