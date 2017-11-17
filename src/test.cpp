@@ -502,8 +502,8 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 
 void run_file_checksum_test()
 {
-  savvy::reader<1> input_file_reader1("test_file.vcf", savvy::fmt::allele);
-  savvy::reader<1> input_file_reader2("test_file.sav", savvy::fmt::allele);
+  savvy::reader<1> input_file_reader1(SAVVYT_VCF_FILE, savvy::fmt::allele);
+  savvy::reader<1> input_file_reader2(SAVVYT_SAV_FILE, savvy::fmt::allele);
   auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
   std::cout << "Starting checksum test ..." << std::endl;
   auto timed_call = time_procedure(t);
@@ -514,7 +514,7 @@ void run_file_checksum_test()
 void convert_file_test()
 {
   {
-    savvy::vcf::reader<1> input("test_file.vcf", savvy::fmt::allele);
+    savvy::vcf::reader<1> input(SAVVYT_VCF_FILE, savvy::fmt::allele);
     savvy::site_info anno;
     std::vector<float> data;
 
@@ -523,24 +523,10 @@ void convert_file_test()
     file_info.insert(file_info.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
     file_info.insert(file_info.begin(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
     file_info.insert(file_info.begin(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
-    savvy::sav::writer compact_output("test_file.sav", input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end());
+    savvy::sav::writer compact_output(SAVVYT_SAV_FILE, input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end());
 
     while (input.read(anno, data))
     {
-      //    savvy::allele_vector<std::vector<float>> m(std::string(chrom), cur->locus(), std::string(cur->ref()), std::string(cur->alt()), sample_ids.size(), ploidy, std::vector<float>());
-      //    for (auto it = cur->begin(); it != cur->end(); ++it)
-      //    {
-      //      switch (*it)
-      //      {
-      //        case savvy::allele_status::has_alt:
-      //          m[std::distance(cur->begin(), it)] = 1.0;
-      //          break;
-      //        case savvy::allele_status::is_missing:
-      //          m[std::distance(cur->begin(), it)] = std::numeric_limits<float>::quiet_NaN();
-      //          break;
-      //      }
-      //    }
-
       compact_output.write(anno, data);
     }
   }
