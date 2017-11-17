@@ -22,7 +22,7 @@ install:
 script:
   - cmake --version
   - mkdir build && cd build
-  - cmake -DCMAKE_TOOLCHAIN_FILE=../cget/cget/cget.cmake ..
+  - cmake -DBUILD_TESTS=1 -DCMAKE_TOOLCHAIN_FILE=../cget/cget/cget.cmake ..
   - cd ..
   - make -C build
   - make CTEST_OUTPUT_ON_FAILURE=1 test -C buld
