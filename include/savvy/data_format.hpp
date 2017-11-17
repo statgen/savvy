@@ -23,5 +23,19 @@ namespace savvy
 //    ds = dosage
 //    ec = dosage
   };
+
+  inline std::uint64_t sample_stride(fmt format, std::uint64_t ploidy)
+  {
+    switch (format)
+    {
+      case fmt::allele: return ploidy;
+      case fmt::genotype: return 1;
+      case fmt::genotype_probability: return ploidy + 1;
+      case fmt::genotype_likelihood: return ploidy + 1;
+      case fmt::phred_scaled_genotype_likelihood: return ploidy + 1;
+      case fmt::dosage: return 1;
+      case fmt::haplotype_dosage: return ploidy;
+    }
+  }
 }
 #endif //LIBSAVVY_DATA_FORMAT_HPP

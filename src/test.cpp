@@ -8,6 +8,7 @@
 #include "savvy/variant_iterator.hpp"
 #include "savvy/reader.hpp"
 #include "savvy/site_info.hpp"
+#include "savvy/data_format.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -503,7 +504,7 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 void run_file_checksum_test()
 {
   savvy::reader<1> input_file_reader1(SAVVYT_VCF_FILE, savvy::fmt::allele);
-  savvy::reader<1> input_file_reader2(SAVVYT_SAV_FILE, savvy::fmt::allele);
+  savvy::reader<1> input_file_reader2(SAVVYT_SAV_FILE_HARD, savvy::fmt::allele);
   auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
   std::cout << "Starting checksum test ..." << std::endl;
   auto timed_call = time_procedure(t);
@@ -511,28 +512,42 @@ void run_file_checksum_test()
   std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
 }
 
-void convert_file_test()
+template <savvy::fmt Fmt>
+class convert_file_test
 {
+public:
+  void operator()()
   {
-    savvy::vcf::reader<1> input(SAVVYT_VCF_FILE, savvy::fmt::allele);
-    savvy::site_info anno;
-    std::vector<float> data;
-
-    auto file_info = input.headers();
-    file_info.reserve(file_info.size() + 3);
-    file_info.insert(file_info.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
-    file_info.insert(file_info.begin(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
-    file_info.insert(file_info.begin(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
-    savvy::sav::writer compact_output(SAVVYT_SAV_FILE, input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end());
-
-    while (input.read(anno, data))
     {
-      compact_output.write(anno, data);
-    }
-  }
+      savvy::vcf::reader<1> input(SAVVYT_VCF_FILE, Fmt);
+      savvy::site_info anno;
+      std::vector<float> data;
 
-  run_file_checksum_test();
-}
+      auto file_info = input.headers();
+      file_info.reserve(file_info.size() + 3);
+      file_info.insert(file_info.begin(), {"INFO", "<ID=FILTER,Description=\"Variant filter\">"});
+      file_info.insert(file_info.begin(), {"INFO", "<ID=QUAL,Description=\"Variant quality\">"});
+      file_info.insert(file_info.begin(), {"INFO", "<ID=ID,Description=\"Variant ID\">"});
+      savvy::sav::writer::options opts{};
+      opts.data_format = Fmt;
+      savvy::sav::writer output(Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD, input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end(), opts);
+
+      std::size_t cnt = 0;
+      while (input.read(anno, data))
+      {
+        output.write(anno, data);
+        ++cnt;
+      }
+
+      assert(output.good());
+      assert(cnt == SAVVYT_MARKER_COUNT);
+    }
+
+    if (Fmt != savvy::fmt::haplotype_dosage)
+      run_file_checksum_test();
+    savvy::sav::writer::create_index(Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD);
+  }
+};
 
 class triple_file_handler_functor
 {
@@ -605,11 +620,10 @@ public:
 //  std::size_t file2_cnt_ = 0;
 //};
 
-void random_access_test()
-{
-  savvy::sav::writer::create_index("test_file.sav");
 
-  savvy::indexed_reader<1> rdr("test_file.sav", {"20", 17000, 1120000}, savvy::fmt::allele);
+void sav_random_access_test(savvy::fmt format)
+{
+  savvy::sav::indexed_reader<1> rdr(format == savvy::fmt::allele ? SAVVYT_SAV_FILE_HARD : SAVVYT_SAV_FILE_DOSE, {"20", 17000, 1120000}, format);
   savvy::site_info anno;
   std::vector<float> buf;
 
@@ -666,46 +680,49 @@ void random_access_test()
   assert(!rdr.read(anno, buf));
 }
 
-void generic_reader_test()
+void generic_reader_test(const std::string& path, savvy::fmt format)
 {
-  savvy::reader<1> rdr1("test_file.sav", savvy::fmt::allele);
-  savvy::reader<1> rdr2("test_file.vcf", savvy::fmt::allele);
+  savvy::reader<1> rdr(path, format);
+  assert(rdr.good());
 
+  std::vector<std::string> subset = {"NA00003","NA00005", "FAKE_ID"};
+  auto intersect = rdr.subset_samples({subset.begin(), subset.end()});
+  assert(intersect.size() == 2);
 
-  auto t = make_file_checksum_test(rdr1, rdr2);
-  std::cout << "Starting checksum test ..." << std::endl;
-  auto timed_call = time_procedure(t);
-  std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
-  std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
+  savvy::site_info i;
+  std::vector<float> d;
+  std::size_t cnt{};
+  std::size_t sum{};
+  while (rdr.read(i, d))
+  {
+    assert(d.size() == intersect.size() * savvy::sample_stride(format, 2));
+    sum += std::count_if(d.begin(), d.end(), [](float f) { return f > 0.0f; });
+    ++cnt;
+  }
+  assert(cnt == SAVVYT_MARKER_COUNT);
+  assert(sum == SAVVYT_ALLELE_COUNT);
 }
 
 template <typename R, savvy::fmt F>
-class subset_test
+void subset_test(const std::string& path)
 {
-public:
-  void operator()(const std::string& path)
+  R rdr(path, F);
+  assert(rdr.good());
+
+  std::vector<std::string> subset = {"NA00003","NA00005", "FAKE_ID"};
+  auto intersect = rdr.subset_samples({subset.begin(), subset.end()});
+  assert(intersect.size() == 2);
+
+  savvy::site_info i;
+  std::vector<float> d;
+  std::size_t cnt{};
+  while (rdr.read(i, d))
   {
-    R rdr(path, F);
-    assert(rdr.good());
-
-    std::vector<std::string> subset = {"NA00003","NA00005", "FAKE_ID"};
-    auto intersect = rdr.subset_samples({subset.begin(), subset.end()});
-    assert(intersect.size() == 2);
-
-    savvy::site_info i;
-    std::vector<float> d;
-    std::size_t cnt{};
-    std::size_t sum{};
-    while (rdr.read(i, d))
-    {
-      assert(d.size() == 2);
-      sum += std::count_if(d.begin(), d.end(), [](float f) { return f > 0.0f; });
-      ++cnt;
-    }
-    assert(cnt == SAVVYT_MARKER_COUNT);
-    assert(sum == SAVVYT_ALLELE_COUNT);
+    assert(d.size() == intersect.size() * savvy::sample_stride(F, 2));
+    ++cnt;
   }
-};
+  assert(cnt == SAVVYT_MARKER_COUNT);
+}
 
 int main(int argc, char** argv)
 {
@@ -715,42 +732,50 @@ int main(int argc, char** argv)
   {
     std::cout << "Enter Command:" << std::endl;
     std::cout << "- convert-file" << std::endl;
-    std::cout << "- subset" << std::endl;
-    std::cout << "- varint" << std::endl;
     std::cout << "- generic-reader" << std::endl;
     std::cout << "- random-access" << std::endl;
+    std::cout << "- subset" << std::endl;
+    std::cout << "- varint" << std::endl;
     std::cin >> cmd;
   }
 
 
   if (cmd == "convert-file")
   {
-    convert_file_test();
+    convert_file_test<savvy::fmt::allele>()();
+    convert_file_test<savvy::fmt::haplotype_dosage>()();
+  }
+  else if (cmd == "generic-reader")
+  {
+    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::allele>()();
+    if (!file_exists(SAVVYT_SAV_FILE_DOSE)) convert_file_test<savvy::fmt::haplotype_dosage>()();
+
+    for (auto path : {SAVVYT_SAV_FILE_HARD}) //, SAVVYT_SAV_FILE_DOSE})
+    {
+      for (savvy::fmt format : {savvy::fmt::allele, savvy::fmt::haplotype_dosage})
+        generic_reader_test(path, format);
+    }
+  }
+  else if (cmd == "random-access")
+  {
+    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::allele>()();
+    if (!file_exists(SAVVYT_SAV_FILE_DOSE)) convert_file_test<savvy::fmt::haplotype_dosage>()();
+
+    sav_random_access_test(savvy::fmt::allele);
+    sav_random_access_test(savvy::fmt::haplotype_dosage);
   }
   else if (cmd == "subset")
   {
-    if (!file_exists(SAVVYT_SAV_FILE)) convert_file_test();
+    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::allele>()();
 
-    subset_test<savvy::reader<1>, savvy::fmt::genotype>()(SAVVYT_VCF_FILE);
-    subset_test<savvy::reader<1>, savvy::fmt::genotype>()(SAVVYT_SAV_FILE);
-    subset_test<savvy::vcf::reader<1>, savvy::fmt::genotype>()(SAVVYT_VCF_FILE);
-    subset_test<savvy::sav::reader<1>, savvy::fmt::genotype>()(SAVVYT_SAV_FILE);
+    subset_test<savvy::reader<1>, savvy::fmt::genotype>(SAVVYT_VCF_FILE);
+    subset_test<savvy::reader<1>, savvy::fmt::genotype>(SAVVYT_SAV_FILE_HARD);
+    subset_test<savvy::vcf::reader<1>, savvy::fmt::genotype>(SAVVYT_VCF_FILE);
+    subset_test<savvy::sav::reader<1>, savvy::fmt::genotype>(SAVVYT_SAV_FILE_HARD);
   }
   else if (cmd == "varint")
   {
     varint_test();
-  }
-  else if (cmd == "random-access")
-  {
-    if (!file_exists(SAVVYT_SAV_FILE)) convert_file_test();
-
-    random_access_test();
-  }
-  else if (cmd == "generic-reader")
-  {
-    if (!file_exists(SAVVYT_SAV_FILE)) convert_file_test();
-
-    generic_reader_test();
   }
   else
   {
