@@ -60,6 +60,20 @@ while (f.read(anno, alleles))
 }
 ```
 
+## Subsetting Samples
+```c++
+savvy::reader<1> f("chr1.sav", savvy::fmt::allele);
+std::vector<std::string> requested = {"ID001","ID002","ID003"};
+std::vector<std::string> intersect = f.subset_samples({requested.begin(), requested.end()});
+
+savvy::site_info anno;
+std::vector<float> alleles;
+while (f.read(anno, alleles))
+{
+  ...
+}
+```
+
 ## Multiple Data Vectors
 ```c++
 savvy::reader<2> f("chr1.bcf", savvy::fmt::genotype, savvy::fmt::dosage);

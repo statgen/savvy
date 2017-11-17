@@ -85,7 +85,6 @@ namespace savvy
       const char** samples_end() const;
 
       std::vector<std::string> subset_samples(const std::set<std::string>& subset);
-      std::vector<std::string> subset_samples(const std::vector<std::string>& subset);
 
       std::vector<std::string> prop_fields() const;
       std::vector<std::pair<std::string, std::string>> headers() const;
@@ -354,13 +353,6 @@ namespace savvy
       subset_size_ = subset_index;
 
       return ret;
-    }
-
-    template <std::size_t VecCnt>
-    std::vector<std::string> reader_base<VecCnt>::subset_samples(const std::vector<std::string>& subset)
-    {
-      std::set<std::string> unique(subset.begin(), subset.end());
-      return subset_samples(unique);
     }
 
     template <std::size_t VecCnt>

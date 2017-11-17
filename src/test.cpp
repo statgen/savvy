@@ -689,7 +689,7 @@ public:
     assert(rdr.good());
 
     std::vector<std::string> subset = {"NA00003","NA00005", "FAKE_ID"};
-    auto intersect = rdr.subset_samples(subset);
+    auto intersect = rdr.subset_samples({subset.begin(), subset.end()});
     assert(intersect.size() == 2);
 
     savvy::site_info i;

@@ -148,7 +148,6 @@ namespace savvy
     std::size_t sample_size() const;
 
     std::vector<std::string> subset_samples(const std::set<std::string>& subset);
-    std::vector<std::string> subset_samples(const std::vector<std::string>& subset);
   protected:
     virtual savvy::sav::reader_base<VecCnt>* sav_impl() const = 0;
     virtual savvy::vcf::reader_base<VecCnt>* vcf_impl() const = 0;
@@ -277,16 +276,6 @@ namespace savvy
 
   template <std::size_t VecCnt>
   std::vector<std::string> reader_base<VecCnt>::subset_samples(const std::set<std::string>& subset)
-  {
-    if (sav_impl())
-      return sav_impl()->subset_samples(subset);
-    else if (vcf_impl())
-      return vcf_impl()->subset_samples(subset);
-    return std::vector<std::string>();
-  }
-
-  template <std::size_t VecCnt>
-  std::vector<std::string> reader_base<VecCnt>::subset_samples(const std::vector<std::string>& subset)
   {
     if (sav_impl())
       return sav_impl()->subset_samples(subset);
