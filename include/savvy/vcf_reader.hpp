@@ -91,9 +91,6 @@ namespace savvy
 //      std::vector<std::string>::const_iterator prop_fields_begin() const { return property_fields_.begin(); }
 //      std::vector<std::string>::const_iterator prop_fields_end() const { return property_fields_.end(); }
       std::uint64_t sample_count() const;
-
-      template <typename... T>
-      bool read_variant(site_info& annotations, T&... destinations);
     protected:
       virtual bcf_hdr_t* hts_hdr() const = 0;
       virtual bcf1_t* hts_rec() const = 0;
@@ -108,11 +105,11 @@ namespace savvy
       void read_variant_details(site_info& destination);
 
       template <typename... T>
-      void read_requested_genos(T&... vec);
+      std::size_t read_requested_genos(T&... vec);
       template <std::size_t Idx, typename T1>
-      void read_genos_to(fmt data_format, T1& vec);
+      bool read_genos_to(fmt data_format, T1& vec);
       template <std::size_t Idx, typename T1, typename... T2>
-      void read_genos_to(fmt data_format, T1& vec, T2&... others);
+      bool read_genos_to(fmt data_format, T1& vec, T2&... others);
 
       template <typename T>
       void read_genotypes_al(T& destination);
@@ -419,19 +416,9 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <typename... T>
-    bool reader_base<VecCnt>::read_variant(site_info& annotations, T&... destinations)
+    std::size_t reader_base<VecCnt>::read_requested_genos(T&... destinations)
     {
-      static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
-      read_variant_details(annotations);
-      read_requested_genos(destinations...);
-
-      return good();
-    }
-
-    template <std::size_t VecCnt>
-    template <typename... T>
-    void reader_base<VecCnt>::read_requested_genos(T&... destinations)
-    {
+      std::size_t cnt = 0;
       clear_destinations(destinations...);
       bcf_unpack(hts_rec(), BCF_UN_ALL);
       for (int i = 0; i < hts_rec()->n_fmt; ++i)
@@ -447,44 +434,46 @@ namespace savvy
         {
           if (gt_idx < VecCnt)
           {
-            read_genos_to<0>(fmt::genotype, destinations...);
+            cnt += read_genos_to<0>(fmt::genotype, destinations...);
           }
           else // allele_idx < VecCnt
           {
-            read_genos_to<0>(fmt::allele, destinations...);
+            cnt += read_genos_to<0>(fmt::allele, destinations...);
           }
         }
         else if (fmt_key == "DS")
         {
-          read_genos_to<0>(fmt::dosage, destinations...);
+          cnt += read_genos_to<0>(fmt::dosage, destinations...);
         }
         else if (fmt_key == "HDS")
         {
-          read_genos_to<0>(fmt::haplotype_dosage, destinations...);
+          cnt += read_genos_to<0>(fmt::haplotype_dosage, destinations...);
         }
         else if (fmt_key == "GP")
         {
-          read_genos_to<0>(fmt::genotype_probability, destinations...);
+          cnt += read_genos_to<0>(fmt::genotype_probability, destinations...);
         }
         else if (fmt_key == "GL")
         {
-          read_genos_to<0>(fmt::genotype_likelihood, destinations...);
+          cnt += read_genos_to<0>(fmt::genotype_likelihood, destinations...);
         }
         else if (fmt_key == "PL")
         {
-          read_genos_to<0>(fmt::phred_scaled_genotype_likelihood, destinations...);
+          cnt += read_genos_to<0>(fmt::phred_scaled_genotype_likelihood, destinations...);
         }
         else
         {
           // Discard
         }
       }
+      return cnt;
     }
 
     template <std::size_t VecCnt>
     template <std::size_t Idx, typename T1>
-    void reader_base<VecCnt>::read_genos_to(fmt data_format, T1& destination)
+    bool reader_base<VecCnt>::read_genos_to(fmt data_format, T1& destination)
     {
+      bool ret = true;
       if (requested_data_formats_[Idx] == data_format)
       {
         switch (data_format)
@@ -515,20 +504,22 @@ namespace savvy
       else
       {
         // Discard Genotypes
+        ret = false;
       }
+      return ret;
     }
 
     template <std::size_t VecCnt>
     template <std::size_t Idx, typename T1, typename... T2>
-    void reader_base<VecCnt>::read_genos_to(fmt data_format, T1& vec, T2&... others)
+    bool reader_base<VecCnt>::read_genos_to(fmt data_format, T1& vec, T2&... others)
     {
       if (requested_data_formats_[Idx] == data_format)
       {
-        read_genos_to<Idx>(data_format, vec);
+        return read_genos_to<Idx>(data_format, vec);
       }
       else
       {
-        read_genos_to<Idx + 1>(data_format, others...);
+        return read_genos_to<Idx + 1>(data_format, others...);
       }
     }
 
@@ -1081,7 +1072,14 @@ namespace savvy
     template <typename... T>
     reader<VecCnt>& reader<VecCnt>::read(site_info& annotations, T&... destinations)
     {
-      this->read_variant(annotations, destinations...);
+      static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
+      std::size_t vecs_read = 0;
+      while (vecs_read == 0)
+      {
+        this->read_variant_details(annotations);
+        vecs_read = this->read_requested_genos(destinations...);
+      }
+
       return *this;
     }
     //################################################################//
@@ -1104,13 +1102,14 @@ namespace savvy
     template <typename... T>
     indexed_reader<VecCnt>& indexed_reader<VecCnt>::read(site_info& annotations, T&... destinations)
     {
+      static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
       while (this->good())
       {
         this->read_variant_details(annotations);
         if (this->good() && region_compare(bounding_type_, annotations, region_))
         {
-          this->read_requested_genos(destinations...);
-          break;
+          if (this->read_requested_genos(destinations...) > 0)
+            break;
         }
       }
       return *this;
@@ -1120,6 +1119,7 @@ namespace savvy
     template <typename Pred, typename... T>
     indexed_reader<VecCnt>& indexed_reader<VecCnt>::read_if(Pred fn, site_info& annotations, T&... destinations)
     {
+      static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
       while (this->good())
       {
         this->read_variant_details(annotations);
@@ -1127,8 +1127,8 @@ namespace savvy
         {
           if (fn(annotations) && region_compare(bounding_type_, annotations, region_))
           {
-            this->read_requested_genos(destinations...);
-            break;
+            if (this->read_requested_genos(destinations...) > 0)
+              break;
           }
         }
       }

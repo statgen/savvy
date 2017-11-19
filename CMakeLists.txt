@@ -55,8 +55,8 @@ if(BUILD_TESTS)
     add_definitions(-DSAVVYT_VCF_FILE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file.vcf\"
                     -DSAVVYT_SAV_FILE_HARD=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file_hard.sav\"
                     -DSAVVYT_SAV_FILE_DOSE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file_dose.sav\"
-                    -DSAVVYT_MARKER_COUNT=28
-                    -DSAVVYT_ALLELE_COUNT=40)
+                    -DSAVVYT_MARKER_COUNT_HARD=28
+                    -DSAVVYT_MARKER_COUNT_DOSE=20)
 
     add_executable(savvy-test src/test.cpp src/test_class.cpp include/savvy/test_class.hpp)
     target_link_libraries(savvy-test savvy)

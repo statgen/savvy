@@ -540,7 +540,7 @@ public:
       }
 
       assert(output.good());
-      assert(cnt == SAVVYT_MARKER_COUNT);
+      assert(cnt == (Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
     }
 
     if (Fmt != savvy::fmt::haplotype_dosage)
@@ -680,7 +680,7 @@ void sav_random_access_test(savvy::fmt format)
   assert(!rdr.read(anno, buf));
 }
 
-void generic_reader_test(const std::string& path, savvy::fmt format)
+void generic_reader_test(const std::string& path, savvy::fmt format, std::size_t expected_markers)
 {
   savvy::reader<1> rdr(path, format);
   assert(rdr.good());
@@ -692,15 +692,12 @@ void generic_reader_test(const std::string& path, savvy::fmt format)
   savvy::site_info i;
   std::vector<float> d;
   std::size_t cnt{};
-  std::size_t sum{};
   while (rdr.read(i, d))
   {
     assert(d.size() == intersect.size() * savvy::sample_stride(format, 2));
-    sum += std::count_if(d.begin(), d.end(), [](float f) { return f > 0.0f; });
     ++cnt;
   }
-  assert(cnt == SAVVYT_MARKER_COUNT);
-  assert(sum == SAVVYT_ALLELE_COUNT);
+  assert(cnt == expected_markers);
 }
 
 template <typename R, savvy::fmt F>
@@ -721,7 +718,7 @@ void subset_test(const std::string& path)
     assert(d.size() == intersect.size() * savvy::sample_stride(F, 2));
     ++cnt;
   }
-  assert(cnt == SAVVYT_MARKER_COUNT);
+  assert(cnt == (F == savvy::fmt::haplotype_dosage ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
 }
 
 int main(int argc, char** argv)
@@ -750,11 +747,14 @@ int main(int argc, char** argv)
     if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::allele>()();
     if (!file_exists(SAVVYT_SAV_FILE_DOSE)) convert_file_test<savvy::fmt::haplotype_dosage>()();
 
-    for (auto path : {SAVVYT_SAV_FILE_HARD}) //, SAVVYT_SAV_FILE_DOSE})
-    {
-      for (savvy::fmt format : {savvy::fmt::allele, savvy::fmt::haplotype_dosage})
-        generic_reader_test(path, format);
-    }
+    generic_reader_test(SAVVYT_VCF_FILE, savvy::fmt::allele, SAVVYT_MARKER_COUNT_HARD);
+    generic_reader_test(SAVVYT_VCF_FILE, savvy::fmt::haplotype_dosage, SAVVYT_MARKER_COUNT_DOSE);
+
+    generic_reader_test(SAVVYT_SAV_FILE_HARD, savvy::fmt::allele, SAVVYT_MARKER_COUNT_HARD);
+    generic_reader_test(SAVVYT_SAV_FILE_HARD, savvy::fmt::haplotype_dosage, SAVVYT_MARKER_COUNT_HARD);
+
+    generic_reader_test(SAVVYT_SAV_FILE_DOSE, savvy::fmt::allele, SAVVYT_MARKER_COUNT_DOSE);
+    generic_reader_test(SAVVYT_SAV_FILE_DOSE, savvy::fmt::haplotype_dosage, SAVVYT_MARKER_COUNT_DOSE);
   }
   else if (cmd == "random-access")
   {
