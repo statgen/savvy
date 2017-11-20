@@ -1,7 +1,6 @@
 #include <cmath>
-#include "sav/import.hpp"
-#include "savvy/vcf_reader.hpp"
-#include "savvy/sav_reader.hpp"
+#include "sav/merge.hpp"
+#include "savvy/reader.hpp"
 #include "savvy/savvy.hpp"
 
 #include <stdlib.h>
@@ -10,32 +9,34 @@
 #include <fstream>
 #include <vector>
 
-class import_prog_args
+class merge_prog_args
 {
 private:
   static const int default_compression_level = 3;
   static const int default_block_size = 2048;
 
   std::vector<option> long_options_;
-  std::string input_path_;
+  std::vector<std::string> input_paths_;
   std::string output_path_;
   int compression_level_ = -1;
   std::uint16_t block_size_ = default_block_size;
-  bool help_ = false;
   savvy::fmt format_ = savvy::fmt::allele;
+  bool help_ = false;
 public:
-  import_prog_args() :
+  merge_prog_args() :
     long_options_(
       {
         {"block-size", required_argument, 0, 'b'},
         {"format", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
+        {"output", no_argument, 0, 'o'},
         {0, 0, 0, 0}
-      })
+      }),
+    output_path_("/dev/stdout")
   {
   }
 
-  const std::string& input_path() { return input_path_; }
+  const std::vector<std::string>& input_paths() { return input_paths_; }
   const std::string& output_path() { return output_path_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
@@ -45,12 +46,13 @@ public:
   void print_usage(std::ostream& os)
   {
     os << "----------------------------------------------\n";
-    os << "Usage: sav import [opts] [in.{vcf,vcf.gz,bcf}] [out.sav]\n";
+    os << "Usage: sav merge [opts] input.{sav,vcf,vcf.gz,bcf} input2.{sav,vcf,vcf.gz,bcf} [additional_input.{sav,vcf,vcf.gz,bcf} ...] \n";
     os << "\n";
     os << " -#               : # compression level (1-19, default: " << default_compression_level << ")\n";
     os << " -b, --block-size : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
     os << " -f, --format     : Format field to copy (GT or HDS, default: GT)\n";
     os << " -h, --help       : Print usage\n";
+    os << " -o, --output     : Output file (default: stdout)\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -59,7 +61,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:f:h", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:f:ho:", long_options_.data(), &long_index )) != -1)
     {
       std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
@@ -97,6 +99,8 @@ public:
         case 'h':
           help_ = true;
           break;
+        case 'o':
+          output_path_ = std::string(optarg);
         default:
           return false;
       }
@@ -104,25 +108,18 @@ public:
 
     int remaining_arg_count = argc - optind;
 
-    if (remaining_arg_count == 0)
+    if (remaining_arg_count < 2)
     {
-      input_path_ = "/dev/stdin";
-      output_path_ = "/dev/stdout";
-    }
-    else if (remaining_arg_count == 1)
-    {
-      input_path_ = argv[optind];
-      output_path_ = "/dev/stdout";
-    }
-    else if (remaining_arg_count == 2)
-    {
-      input_path_ = argv[optind];
-      output_path_ = argv[optind + 1];
+      std::cerr << "Too few arguments\n";
+      return false;
     }
     else
     {
-      std::cerr << "Too many arguments\n";
-      return false;
+      input_paths_.reserve(remaining_arg_count);
+      for (int i = optind; i < argc; ++i)
+      {
+        input_paths_.push_back(std::string(argv[i]));
+      }
     }
 
 
@@ -135,9 +132,9 @@ public:
   }
 };
 
-int import_main(int argc, char** argv)
+int merge_main(int argc, char** argv)
 {
-  import_prog_args args;
+  merge_prog_args args;
   if (!args.parse(argc, argv))
   {
     args.print_usage(std::cerr);
@@ -150,20 +147,21 @@ int import_main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  savvy::vcf::reader<1> input(args.input_path(), args.format());
+  std::vector<savvy::reader<1>> input_files;
+  std::vector<savvy::site_info> sites(args.input_paths().size());
+  std::vector<savvy::compressed_vector<float>> genos(args.input_paths().size());
 
-  if (input.good())
   {
     savvy::site_info variant;
     std::vector<float> genotypes;
 
-    std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
-    std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-    auto headers = input.headers();
-    headers.reserve(headers.size() + 3);
-    headers.insert(headers.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
-    headers.insert(headers.begin(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
-    headers.insert(headers.begin(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
+    std::vector<std::string> sample_ids; //(input.samples_end() - input.samples_begin()); TODO
+    //std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin()); TODO
+    std::vector<std::pair<std::string,std::string>> headers; // = input.headers(); TODO
+//    headers.reserve(headers.size() + 3);
+//    headers.insert(headers.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
+//    headers.insert(headers.begin(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
+//    headers.insert(headers.begin(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
 
     savvy::sav::writer::options opts;
     opts.compression_level = args.compression_level();
@@ -171,13 +169,7 @@ int import_main(int argc, char** argv)
     opts.data_format = args.format();
 
     savvy::sav::writer compact_output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), opts);
-
-    if (compact_output.good())
-    {
-      while (input.read(variant, genotypes))
-        compact_output.write(variant, genotypes);
-      return EXIT_SUCCESS;
-    }
+    // TODO
   }
 
   return EXIT_FAILURE;

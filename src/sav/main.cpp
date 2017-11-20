@@ -1,5 +1,6 @@
 #include "sav/import.hpp"
 #include "sav/export.hpp"
+#include "sav/merge.hpp"
 #include "savvy/utility.hpp"
 
 #include <cmath>
@@ -36,7 +37,11 @@ public:
   void print_usage(std::ostream& os)
   {
     os << "----------------------------------------------\n";
-    os << "Usage: sav [args] [sub-command]\n";
+    os << "Usage: sav [sub-command] [args]\n";
+    os << "\n";
+    os << "export  : Converts SAV into VCF or BCF\n";
+    os << "import  : Converts VCF or BCF into SAV\n";
+    os << "merge   : Merges multiple files into one\n";
     os << "\n";
     os << " -h, --help       : Print usage\n";
     os << " -v, --version    : Print version\n";
@@ -100,13 +105,17 @@ int main(int argc, char** argv)
 
   optind = 1;
 
-  if (args.sub_command() == "import")
+  if (args.sub_command() == "export")
+  {
+    return export_main(argc, argv);
+  }
+  else if (args.sub_command() == "import")
   {
     return import_main(argc, argv);
   }
-  else if (args.sub_command() == "export")
+  else if (args.sub_command()== "merge")
   {
-    return export_main(argc, argv);
+    return merge_main(argc,argv);
   }
 
   if (args.help_is_set())
@@ -117,7 +126,7 @@ int main(int argc, char** argv)
 
   if (args.version_is_set())
   {
-    std::cout << "vcf2sav v" << savvy::savvy_version() << std::endl;
+    std::cout << "sav v" << savvy::savvy_version() << std::endl;
     return EXIT_SUCCESS;
   }
 
