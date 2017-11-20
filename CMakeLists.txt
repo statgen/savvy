@@ -33,6 +33,9 @@ add_library(savvy ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
+add_executable(sav src/vcf2sav.cpp)
+target_link_libraries(sav savvy)
+
 add_executable(bcf2m3vcf src/bcf2m3vcf.cpp)
 target_link_libraries(bcf2m3vcf savvy)
 
