@@ -2,7 +2,7 @@
 #include "savvy/sav_reader.hpp"
 #include "savvy/m3vcf_reader.hpp"
 #include "savvy/vcf_reader.hpp"
-#include "savvy/test_class.hpp"
+#include "test/test_class.hpp"
 #include "savvy/varint.hpp"
 #include "savvy/savvy.hpp"
 #include "savvy/variant_iterator.hpp"

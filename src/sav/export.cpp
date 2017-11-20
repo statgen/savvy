@@ -1,4 +1,5 @@
 #include <cmath>
+#include "sav/export.hpp"
 #include "savvy/vcf_reader.hpp"
 #include "savvy/sav_reader.hpp"
 #include "savvy/savvy.hpp"
@@ -8,7 +9,7 @@
 #include <ctime>
 #include <getopt.h>
 
-class prog_args
+class export_prog_args
 {
 private:
   static const int default_compression_level = 3;
@@ -18,15 +19,13 @@ private:
   std::string input_path_;
   std::string output_path_;
   bool help_ = false;
-  bool version_ = false;
   savvy::fmt format_ = savvy::fmt::allele;
 public:
-  prog_args() :
+  export_prog_args() :
     long_options_(
       {
         {"format", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
-        {"version", no_argument, 0, 'v'},
         {0, 0, 0, 0}
       })
   {
@@ -36,16 +35,14 @@ public:
   const std::string& output_path() { return output_path_; }
   savvy::fmt format() const { return format_; }
   bool help_is_set() const { return help_; }
-  bool version_is_set() const { return version_; }
 
   void print_usage(std::ostream& os)
   {
     os << "----------------------------------------------\n";
-    os << "Usage: vcf2sav [args] [in.{vcf,vcf.gz,bcf}] [out.sav]\n";
+    os << "Usage: sav export [args] [in.sav] [out.{vcf,vcf.gz,bcf}]\n";
     os << "\n";
     //os << " -f, --format     : Format field to copy (GT or GP, default: GT)\n";
     os << " -h, --help       : Print usage\n";
-    os << " -v, --version    : Print version\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -54,7 +51,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "f:hv", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "f:h", long_options_.data(), &long_index )) != -1)
     {
       std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
@@ -73,9 +70,6 @@ public:
           break;
         case 'h':
           help_ = true;
-          break;
-        case 'v':
-          version_ = true;
           break;
         default:
           return false;
@@ -109,9 +103,9 @@ public:
   }
 };
 
-int main(int argc, char** argv)
+int export_main(int argc, char** argv)
 {
-  prog_args args;
+  export_prog_args args;
   if (!args.parse(argc, argv))
   {
     args.print_usage(std::cerr);
@@ -121,12 +115,6 @@ int main(int argc, char** argv)
   if (args.help_is_set())
   {
     args.print_usage(std::cout);
-    return EXIT_SUCCESS;
-  }
-
-  if (args.version_is_set())
-  {
-    std::cout << "sav2vcf v" << savvy::savvy_version() << std::endl;
     return EXIT_SUCCESS;
   }
 

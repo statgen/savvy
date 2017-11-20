@@ -1,13 +1,12 @@
+#include "sav/import.hpp"
+#include "sav/export.hpp"
+#include "savvy/utility.hpp"
+
 #include <cmath>
-#include "savvy/vcf_reader.hpp"
-#include "savvy/sav_reader.hpp"
-#include "savvy/savvy.hpp"
-
-#include <stdlib.h>
+#include <cstdlib>
 #include <getopt.h>
-
-#include <fstream>
 #include <vector>
+#include <iostream>
 
 class prog_args
 {
@@ -45,7 +44,7 @@ public:
     os << std::flush;
   }
 
-  bool parse(int argc, char** argv)
+  bool parse(int& argc, char** argv)
   {
     int long_index = 0;
     int opt = 0;
@@ -92,24 +91,22 @@ public:
 
 int main(int argc, char** argv)
 {
-  for (int i = 1; i < argc; ++i)
-  {
-    std::string arg(argv[i]);
-    if ()
-    if (arg == "import")
-    {
-
-    }
-    else if (arg == "export")
-    {
-    }
-  }
-
   prog_args args;
   if (!args.parse(argc, argv))
   {
     args.print_usage(std::cerr);
     return EXIT_FAILURE;
+  }
+
+  optind = 1;
+
+  if (args.sub_command() == "import")
+  {
+    return import_main(argc, argv);
+  }
+  else if (args.sub_command() == "export")
+  {
+    return export_main(argc, argv);
   }
 
   if (args.help_is_set())
@@ -124,35 +121,8 @@ int main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  savvy::vcf::reader<1> input(args.input_path(), args.format());
-
-  if (input.good())
-  {
-    savvy::site_info variant;
-    std::vector<float> genotypes;
-
-    std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
-    std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
-    auto headers = input.headers();
-    headers.reserve(headers.size() + 3);
-    headers.insert(headers.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
-    headers.insert(headers.begin(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
-    headers.insert(headers.begin(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
-
-    savvy::sav::writer::options opts;
-    opts.compression_level = args.compression_level();
-    opts.block_size = args.block_size();
-    opts.data_format = args.format();
-
-    savvy::sav::writer compact_output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), opts);
-
-    if (compact_output.good())
-    {
-      while (input.read(variant, genotypes))
-        compact_output.write(variant, genotypes);
-      return EXIT_SUCCESS;
-    }
-  }
+  std::cerr << "Invalid sub-command (" << args.sub_command() << ")" << std::endl;
+  args.print_usage(std::cerr);
 
   return EXIT_FAILURE;
 }

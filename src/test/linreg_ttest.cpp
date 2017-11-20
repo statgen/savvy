@@ -17,7 +17,7 @@
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/lu.hpp>
-#include <OpenCL/cl.h>
+#include <OpenCL/opencl.h>
 #include <boost/compute.hpp>
 #include <savvy/ublas_vector.hpp>
 
