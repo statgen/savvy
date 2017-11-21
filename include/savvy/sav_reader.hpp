@@ -94,7 +94,7 @@ namespace savvy
       bool fail() const { return input_stream_.fail(); }
       bool bad() const { return input_stream_.bad(); }
       bool eof() const { return input_stream_.eof(); }
-      std::uint64_t sample_count() const { return this->sample_ids_.size(); }
+      std::uint64_t sample_size() const { return this->sample_ids_.size(); }
       std::vector<std::string>::const_iterator samples_begin() const { return sample_ids_.begin(); }
       std::vector<std::string>::const_iterator samples_end() const { return sample_ids_.end(); }
 //      std::vector<std::string>::const_iterator prop_fields_begin() const { return metadata_fields_.begin(); }

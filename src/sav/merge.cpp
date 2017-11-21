@@ -23,6 +23,7 @@ private:
   std::uint16_t block_size_ = default_block_size;
   savvy::fmt format_ = savvy::fmt::allele;
   bool help_ = false;
+  std::uint32_t ploidy_ = 2;
 public:
   merge_prog_args() :
     long_options_(
@@ -42,6 +43,7 @@ public:
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
   savvy::fmt format() const { return format_; }
+  std::uint32_t ploidy() const { return ploidy_; }
   bool help_is_set() const { return help_; }
 
   void print_usage(std::ostream& os)
@@ -133,6 +135,62 @@ public:
   }
 };
 
+template <std::size_t BitWidth, typename T, typename OutIt>
+void merge_serialize_alleles(const savvy::compressed_vector<T>& m, OutIt os_it, std::int64_t last_pos = 0)
+{
+  auto idx_it = m.index_data();
+  auto val_end = m.value_data() + m.non_zero_size();
+  for (auto val_it = m.value_data(); val_it != val_end; ++val_it, ++idx_it)
+  {
+    std::int8_t signed_allele = savvy::sav::detail::allele_encoder<BitWidth>::encode(*val_it);
+    if (signed_allele >= 0)
+    {
+      std::uint64_t dist = (*idx_it);
+      std::uint64_t offset = dist - last_pos;
+      last_pos = dist + 1;
+      savvy::prefixed_varint<BitWidth>::encode((std::uint8_t)(signed_allele), offset, os_it);
+    }
+  }
+
+}
+
+class sav_reader : public savvy::sav::reader_base<1>
+{
+public:
+  using savvy::sav::reader_base<1>::reader_base;
+  using savvy::sav::reader_base<1>::read_variant_details;
+  using savvy::sav::reader_base<1>::read_genotypes;
+};
+
+class compressed_vector_append_wrapper
+{
+public:
+  compressed_vector_append_wrapper(savvy::compressed_vector& vec) :
+    vec_(vec),
+    offset_(vec.size())
+  {
+  }
+
+  void resize(std::size_t sz)
+  {
+    vec_.resize(offset_ + sz);
+  }
+
+  value_type& operator[](std::size_t pos)
+  {
+    return vec_[offset_ + pos];
+  }
+
+  const value_type& operator[](std::size_t pos) const
+  {
+    return vec_[offset_ + pos];
+  }
+
+private:
+  savvy::compressed_vector& vec_;
+  std::size_t offset_;
+};
+
 int merge_main(int argc, char** argv)
 {
   merge_prog_args args;
@@ -148,12 +206,13 @@ int merge_main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  std::vector<savvy::vcf::reader<1>> input_files;
+  std::vector<sav_reader> input_files;
   input_files.reserve(args.input_paths().size());
   for (auto it = args.input_paths().begin(); it != args.input_paths().end(); ++it)
     input_files.emplace_back(*it, args.format());
   std::vector<savvy::site_info> sites(args.input_paths().size());
-  std::vector<std::vector<float>> genos(args.input_paths().size()); //std::vector<savvy::compressed_vector<float>> genos(args.input_paths().size());
+  //std::vector<savvy::compressed_vector<float>> genos(args.input_paths().size()); //std::vector<savvy::compressed_vector<float>> genos(args.input_paths().size());
+  savvy::compressed_vector<float> output_genos;
 
   {
     std::size_t num_samples = 0;
@@ -198,17 +257,15 @@ int merge_main(int argc, char** argv)
 
     // TODO: This will only work for single chromosome.
 
-    std::vector<std::size_t> matching_indices;
-    matching_indices.reserve(input_files.size());
+
 
     std::size_t min_pos_index = input_files.size();
     std::uint64_t min_pos = std::numeric_limits<std::uint64_t>::max();
     for (std::size_t i = 0; i < input_files.size(); ++i)
     {
-      if (!input_files[i].read(sites[i], genos[i]))
-        genos[i].resize(0);
+      input_files[i].read_variant_details(sites[i]);
 
-      if (genos[i].size() && sites[i].position() < min_pos)
+      if (input_files[i].good() && sites[i].position() < min_pos)
       {
         min_pos = sites[i].position();
         min_pos_index = i;
@@ -217,25 +274,47 @@ int merge_main(int argc, char** argv)
 
     while (min_pos_index < input_files.size())
     {
-      matching_indices.resize(0);
+      std::vector<bool> matching(input_files.size(), false);
       for (std::size_t i = 0; i < input_files.size(); ++i)
       {
         if (i == min_pos_index
-          || (genos[i].size()
+          || (input_files[i].good()
           && sites[i].position() == sites[min_pos_index].position()
           && sites[i].ref() == sites[min_pos_index].ref()
           && sites[i].alt() == sites[min_pos_index].alt()))
         {
-          matching_indices.emplace_back(i);
+          matching[i] = true;
         }
       }
 
+      std::size_t offset = 0;
+      for (std::size_t i = 0; i < input_files.size(); ++i)
+      {
+        if (!matching[i])
+        {
+
+        }
+        else
+        {
+          compressed_vector_append_wrapper vec_wrapper(output_genos);
+          input_files[i].read_genotypes(0, vec_wrapper);
+          if (!input_files[i].good())
+          {
+            // TODO: Corrupt File
+          }
+        }
+      }
+
+      std::size_t non_zero_size = 0;
+      for (std::size_t i : matching_indices)
+        non_zero_size += genos[i].non_zero_size();
       //output.write(sites[min_pos_index]);
-      for (auto it = matching_indices.begin(); it != matching_indices.end(); ++it)
+      for (std::size_t i : matching_indices)
       {
         //output.write(genos[*it]);
-        if (!input_files[*it].read(sites[*it], genos[*it]))
-          genos[*it].resize(0);
+        input_files[i].read_genotypes(0, genos[i]);
+        if (!input_files[i].good())
+          genos[i].resize(0);
       }
 
       min_pos_index = input_files.size();
