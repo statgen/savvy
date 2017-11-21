@@ -462,6 +462,13 @@ private:
     return seed;
   }
 
+  static const std::uint8_t multiplier = std::uint8_t(~(std::uint8_t(0xFF) << 7)) + std::uint8_t(1);
+  template <typename T>
+  static std::int8_t bin(const T& allele)
+  {
+    return std::int8_t(std::round((std::isnan(allele) ? T(0.5) : allele) * multiplier) - T(1));
+  }
+
   template <typename ReaderType>
   static std::size_t get_checksum(ReaderType& reader)
   {
@@ -483,7 +490,7 @@ private:
         ret = hash_combine(ret, anno.prop(prop_key));
 
       for (auto gt = data.begin(); gt != data.end(); ++gt)
-        ret = hash_combine(ret, static_cast<int>(*gt));
+        ret = hash_combine(ret, bin(*gt));
 
       ++num_markers;
     }
@@ -501,10 +508,10 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
   return file_checksum_test<T1, T2>(a, b);
 }
 
-void run_file_checksum_test()
+void run_file_checksum_test(const std::string f1, const std::string f2, savvy::fmt format)
 {
-  savvy::reader<1> input_file_reader1(SAVVYT_VCF_FILE, savvy::fmt::allele);
-  savvy::reader<1> input_file_reader2(SAVVYT_SAV_FILE_HARD, savvy::fmt::allele);
+  savvy::reader<1> input_file_reader1(f1, format);
+  savvy::reader<1> input_file_reader2(f2, format);
   auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
   std::cout << "Starting checksum test ..." << std::endl;
   auto timed_call = time_procedure(t);
@@ -543,8 +550,11 @@ public:
       assert(cnt == (Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
     }
 
-    if (Fmt != savvy::fmt::haplotype_dosage)
-      run_file_checksum_test();
+    if (Fmt == savvy::fmt::haplotype_dosage)
+      run_file_checksum_test(SAVVYT_VCF_FILE, SAVVYT_SAV_FILE_DOSE, savvy::fmt::haplotype_dosage);
+    else
+      run_file_checksum_test(SAVVYT_VCF_FILE, SAVVYT_SAV_FILE_HARD, savvy::fmt::allele);
+
     savvy::sav::writer::create_index(Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD);
   }
 };
