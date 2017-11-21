@@ -462,13 +462,6 @@ private:
     return seed;
   }
 
-  static const std::uint8_t multiplier = std::uint8_t(~(std::uint8_t(0xFF) << 7)) + std::uint8_t(1);
-  template <typename T>
-  static std::int8_t bin(const T& allele)
-  {
-    return std::int8_t(std::round((std::isnan(allele) ? T(0.5) : allele) * multiplier) - T(1));
-  }
-
   template <typename ReaderType>
   static std::size_t get_checksum(ReaderType& reader)
   {
@@ -490,7 +483,7 @@ private:
         ret = hash_combine(ret, anno.prop(prop_key));
 
       for (auto gt = data.begin(); gt != data.end(); ++gt)
-        ret = hash_combine(ret, bin(*gt));
+        ret = hash_combine(ret, savvy::sav::detail::allele_encoder<7>::encode(*gt));
 
       ++num_markers;
     }

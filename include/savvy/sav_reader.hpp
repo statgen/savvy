@@ -38,6 +38,16 @@ namespace savvy
         template <typename T>
         static std::tuple<T, std::uint64_t> decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value);
       };
+
+      template<std::uint8_t BitWidth>
+      struct allele_encoder
+      {
+        static const std::uint8_t multiplier = std::uint8_t(~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
+        template <typename T>
+        static void encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it);
+        template <typename T>
+        static std::int8_t encode(const T& allele);
+      };
     }
 
 //    namespace detail
@@ -1018,8 +1028,8 @@ namespace savvy
         output_stream_.write((char*)tmp.data(), tmp.size() * 4);
       }
 #else
-      template <typename T>
-      void write(const site_info& annotations, const std::vector<T>& data)
+      template <typename VecT>
+      void write(const site_info& annotations, const VecT& data)
       {
         if (output_stream_.good())
         {
@@ -1099,15 +1109,44 @@ namespace savvy
         return ret;
       }
 
-      template<std::uint8_t BitWidth>
-      struct allele_encoder
+      template <std::size_t BitWidth, typename T, typename OutIt>
+      static void serialize_alleles(const std::vector<T>& m, OutIt os_it)
       {
-        static const std::uint8_t multiplier = std::uint8_t(~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
-        template <typename T>
-        static void encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it);
-        template <typename T>
-        static std::int8_t encode(const T& allele);
-      };
+        std::uint64_t last_pos = 0;
+        const auto beg = m.begin();
+        for (auto it = beg; it != m.end(); ++it)
+        {
+          std::int8_t signed_allele = detail::allele_encoder<BitWidth>::encode(*it);
+          if (signed_allele >= 0)
+          {
+            std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
+            std::uint64_t offset = dist - last_pos;
+            last_pos = dist + 1;
+            prefixed_varint<BitWidth>::encode((std::uint8_t)(signed_allele), offset, os_it);
+          }
+        }
+
+      }
+
+      template <std::size_t BitWidth, typename T, typename OutIt>
+      static void serialize_alleles(const savvy::compressed_vector<T>& m, OutIt os_it)
+      {
+        std::uint64_t last_pos = 0;
+        auto idx_it = m.index_data();
+        auto val_end = m.value_data() + m.non_zero_size();
+        for (auto val_it = m.value_data(); val_it != val_end; ++val_it, ++idx_it)
+        {
+          std::int8_t signed_allele = detail::allele_encoder<BitWidth>::encode(*val_it);
+          if (signed_allele >= 0)
+          {
+            std::uint64_t dist = static_cast<std::uint64_t>(*idx_it);
+            std::uint64_t offset = dist - last_pos;
+            last_pos = dist + 1;
+            prefixed_varint<BitWidth>::encode((std::uint8_t)(signed_allele), offset, os_it);
+          }
+        }
+
+      }
 
       template <typename T>
       void write_alleles(const std::vector<T>& m)
@@ -1124,66 +1163,26 @@ namespace savvy
         std::uint64_t non_zero_count =  m.size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), ref_value));
         allele_count_ += non_zero_count;
         varint_encode(non_zero_count, os_it);
-        std::uint64_t last_pos = 0;
-        auto beg = m.begin();
-        for (auto it = beg; it != m.end(); ++it)
-        {
-          //std::int8_t signed_allele = std::round((std::isnan(*it) ? T::value_type(0.5) : *it) * type_multiplier) - T::value_type(1);
-          if (*it != ref_value)
-          {
-            std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
-            std::uint64_t offset = dist - last_pos;
-            last_pos = dist + 1;
-            allele_encoder<1>::encode(*it, offset, os_it);
-          }
-        }
+
+        serialize_alleles<1>(m, os_it);
       }
 
       template <typename T>
-      void write_probs(const std::vector<T>& m)
+      void write_alleles(const savvy::compressed_vector<T>& m)
       {
         const T ref_value = T();
 
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
-        std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF) - 1;
-        std::uint32_t stride = ploidy + 1;
+        std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF);
 
         // TODO: check modulus and set error if needed.
         varint_encode(ploidy, os_it);
 
-        auto beg = m.begin();
-        std::uint64_t non_zero_count = 0;
-        std::size_t c = 0;
-        for (auto it = m.begin(); it != m.end(); ++it,++c)
-        {
-          if (c % stride != 0)
-          {
-            if (allele_encoder<7>::encode(*it) >= 0)
-              ++non_zero_count;
-          }
-        }
+        allele_count_ += m.non_zero_size();
+        varint_encode(m.non_zero_size(), os_it);
 
-
-        allele_count_ += non_zero_count;
-        varint_encode(non_zero_count, os_it);
-        std::uint64_t last_pos = 0;
-        c = 0;
-        for (auto it = beg; it != m.end(); ++it,++c)
-        {
-          if (c % stride != 0)
-          {
-            //std::int8_t signed_allele = std::round((std::isnan(*it) ? T::value_type(0.5) : *it) * type_multiplier) - T::value_type(1);
-            std::int8_t signed_allele = allele_encoder<7>::encode(*it);
-            if (signed_allele >= 0)
-            {
-              std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
-              std::uint64_t offset = dist - last_pos;
-              last_pos = dist + 1;
-              prefixed_varint<7>::encode((std::uint8_t)(signed_allele), offset, os_it);
-            }
-          }
-        }
+        serialize_alleles<1>(m, os_it);
       }
 
       template <typename T>
@@ -1202,26 +1201,88 @@ namespace savvy
         std::uint64_t non_zero_count = 0;
         for (auto it = m.begin(); it != m.end(); ++it)
         {
-          if (allele_encoder<7>::encode(*it) >= 0)
+          if (detail::allele_encoder<7>::encode(*it) >= 0)
             ++non_zero_count;
         }
 
+        allele_count_ += non_zero_count;
+        varint_encode(non_zero_count, os_it);
+
+        serialize_alleles<7>(m, os_it);
+      }
+
+      template <typename T>
+      void write_hap_dosages(const savvy::compressed_vector<T>& m)
+      {
+        const T ref_value = T();
+
+        std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
+
+        std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF);
+
+        // TODO: check modulus and set error if needed.
+        varint_encode(ploidy, os_it);
+
+        auto beg = m.begin();
+        std::uint64_t non_zero_count = 0;
+        for (auto it = m.begin(); it != m.end(); ++it)
+        {
+          if (detail::allele_encoder<7>::encode(*it) >= 0)
+            ++non_zero_count;
+        }
 
         allele_count_ += non_zero_count;
         varint_encode(non_zero_count, os_it);
-        std::uint64_t last_pos = 0;
-        for (auto it = beg; it != m.end(); ++it)
-        {
-          std::int8_t signed_allele = allele_encoder<7>::encode(*it);
-          if (signed_allele >= 0)
-          {
-            std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
-            std::uint64_t offset = dist - last_pos;
-            last_pos = dist + 1;
-            prefixed_varint<7>::encode((std::uint8_t)(signed_allele), offset, os_it);
-          }
-        }
+
+        serialize_alleles<7>(m, os_it);
       }
+
+//      template <typename T>
+//      void write_probs(const std::vector<T>& m)
+//      {
+//        const T ref_value = T();
+//
+//        std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
+//
+//        std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF) - 1;
+//        std::uint32_t stride = ploidy + 1;
+//
+//        // TODO: check modulus and set error if needed.
+//        varint_encode(ploidy, os_it);
+//
+//        auto beg = m.begin();
+//        std::uint64_t non_zero_count = 0;
+//        std::size_t c = 0;
+//        for (auto it = m.begin(); it != m.end(); ++it,++c)
+//        {
+//          if (c % stride != 0)
+//          {
+//            if (allele_encoder<7>::encode(*it) >= 0)
+//              ++non_zero_count;
+//          }
+//        }
+//
+//
+//        allele_count_ += non_zero_count;
+//        varint_encode(non_zero_count, os_it);
+//        std::uint64_t last_pos = 0;
+//        c = 0;
+//        for (auto it = beg; it != m.end(); ++it,++c)
+//        {
+//          if (c % stride != 0)
+//          {
+//            //std::int8_t signed_allele = std::round((std::isnan(*it) ? T::value_type(0.5) : *it) * type_multiplier) - T::value_type(1);
+//            std::int8_t signed_allele = allele_encoder<7>::encode(*it);
+//            if (signed_allele >= 0)
+//            {
+//              std::uint64_t dist = static_cast<std::uint64_t>(std::distance(beg, it));
+//              std::uint64_t offset = dist - last_pos;
+//              last_pos = dist + 1;
+//              prefixed_varint<7>::encode((std::uint8_t)(signed_allele), offset, os_it);
+//            }
+//          }
+//        }
+//      }
     private:
       static const std::array<std::string, 0> empty_string_array;
       static const std::array<std::pair<std::string, std::string>, 0> empty_string_pair_array;
@@ -1440,6 +1501,48 @@ namespace savvy
       return ret;
     }
 
+    template<>
+    template <typename T>
+    inline void detail::allele_encoder<0>::encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
+    {
+      varint_encode(offset, os_it);
+    }
+
+    template<>
+    template <typename T>
+    inline void detail::allele_encoder<1>::encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
+    {
+      prefixed_varint<1>::encode(std::uint8_t(std::isnan(allele) ? 0 : 1), offset, os_it);
+    }
+
+    template<std::uint8_t ByteWidth>
+    template <typename T>
+    inline void detail::allele_encoder<ByteWidth>::encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
+    {
+      prefixed_varint<ByteWidth>::encode(std::uint8_t(std::round((std::isnan(allele) ? T(0.5) : allele) * multiplier) - T(1)), offset, os_it);
+    }
+
+    template<>
+    template <typename T>
+    inline std::int8_t detail::allele_encoder<0>::encode(const T& allele)
+    {
+      return -1;
+    }
+
+    template<>
+    template <typename T>
+    inline std::int8_t detail::allele_encoder<1>::encode(const T& allele)
+    {
+      return std::int8_t(std::isnan(allele) ? 0 : (allele == T() ? -1 : 1));
+    }
+
+    template<std::uint8_t ByteWidth>
+    template <typename T>
+    inline std::int8_t detail::allele_encoder<ByteWidth>::encode(const T& allele)
+    {
+      return std::int8_t(std::round((std::isnan(allele) ? T(0.5) : allele) * multiplier) - T(1));
+    }
+
 
     template <typename T>
     std::size_t writer::get_string_size(T str)
@@ -1451,48 +1554,6 @@ namespace savvy
     inline std::size_t writer::get_string_size<const char*>(const char* str)
     {
       return std::strlen(str);
-    }
-
-    template<>
-    template <typename T>
-    inline void writer::allele_encoder<0>::encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
-    {
-      varint_encode(offset, os_it);
-    }
-
-    template<>
-    template <typename T>
-    inline void writer::allele_encoder<1>::encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
-    {
-      prefixed_varint<1>::encode(std::uint8_t(std::isnan(allele) ? 0 : 1), offset, os_it);
-    }
-
-    template<std::uint8_t ByteWidth>
-    template <typename T>
-    inline void writer::allele_encoder<ByteWidth>::encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
-    {
-      prefixed_varint<ByteWidth>::encode(std::uint8_t(std::round((std::isnan(allele) ? T(0.5) : allele) * multiplier) - T(1)), offset, os_it);
-    }
-
-    template<>
-    template <typename T>
-    inline std::int8_t writer::allele_encoder<0>::encode(const T& allele)
-    {
-      return -1;
-    }
-
-    template<>
-    template <typename T>
-    inline std::int8_t writer::allele_encoder<1>::encode(const T& allele)
-    {
-      return std::int8_t(std::isnan(allele) ? 0 : (allele == T() ? -1 : 1));
-    }
-
-    template<std::uint8_t ByteWidth>
-    template <typename T>
-    inline std::int8_t writer::allele_encoder<ByteWidth>::encode(const T& allele)
-    {
-      return std::int8_t(std::round((std::isnan(allele) ? T(0.5) : allele) * multiplier) - T(1));
     }
   }
 }
