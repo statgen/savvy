@@ -55,6 +55,7 @@ namespace savvy
       {}
 
       reader_base(reader_base&& source) :
+        headers_(std::move(source.headers_)),
         subset_map_(std::move(source.subset_map_)),
         subset_size_(source.subset_size_),
         state_(source.state_),
@@ -87,15 +88,16 @@ namespace savvy
       std::vector<std::string> subset_samples(const std::set<std::string>& subset);
 
       std::vector<std::string> prop_fields() const;
-      std::vector<std::pair<std::string, std::string>> headers() const;
+      const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
 //      std::vector<std::string>::const_iterator prop_fields_begin() const { return property_fields_.begin(); }
 //      std::vector<std::string>::const_iterator prop_fields_end() const { return property_fields_.end(); }
-      std::uint64_t sample_count() const;
+      std::uint64_t sample_size() const;
     protected:
       virtual bcf_hdr_t* hts_hdr() const = 0;
       virtual bcf1_t* hts_rec() const = 0;
       virtual bool read_hts_record() = 0;
       void init_property_fields();
+      void init_headers();
 
       template <typename T>
       void clear_destinations(T& destination);
@@ -130,6 +132,7 @@ namespace savvy
       template <typename... T2>
       void init_requested_formats(fmt f, T2... args);
     protected:
+      std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::uint64_t> subset_map_;
       std::uint64_t subset_size_;
       std::ios::iostate state_;
@@ -274,20 +277,18 @@ namespace savvy
     }
 
     template <std::size_t VecCnt>
-    std::uint64_t reader_base<VecCnt>::sample_count() const
+    std::uint64_t reader_base<VecCnt>::sample_size() const
     {
       return static_cast<std::uint64_t>(bcf_hdr_nsamples(hts_hdr()));
     }
 
     template <std::size_t VecCnt>
-    std::vector<std::pair<std::string, std::string>> reader_base<VecCnt>::headers() const
+    void reader_base<VecCnt>::init_headers()
     {
-      std::vector<std::pair<std::string, std::string>> ret;
-
       bcf_hdr_t* hdr = hts_hdr();
       if (hdr)
       {
-        ret.reserve(hdr->nhrec - 1);
+        this->headers_.reserve(std::size_t(hdr->nhrec - 1));
         for (int i = 1; i < hdr->nhrec; ++i)
         {
           std::string key, val;
@@ -318,12 +319,10 @@ namespace savvy
           }
 
           if (key.size())
-            ret.emplace_back(std::move(key), std::move(val));
+            this->headers_.emplace_back(std::move(key), std::move(val));
           //ret.insert(std::upper_bound(ret.begin(), ret.end(), std::make_pair(key, std::string()), [](const auto& a, const auto& b) { return a.first < b.first; }), {std::move(key), std::move(val)});
         }
       }
-
-      return ret;
     }
 
     template <std::size_t VecCnt>
@@ -615,14 +614,14 @@ namespace savvy
         const typename T::value_type alt_value = typename T::value_type(1);
         if (allele_index_ > 1 || bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
         {
-          if (gt_sz_ % sample_count() != 0)
+          if (gt_sz_ % sample_size() != 0)
           {
             // TODO: mixed ploidy at site error.
           }
           else
           {
             const int allele_index_plus_one = allele_index_ + 1;
-            const std::uint64_t ploidy(gt_sz_ / sample_count());
+            const std::uint64_t ploidy(gt_sz_ / sample_size());
             if (subset_map_.size())
             {
               destination.resize(subset_size_ * ploidy);
@@ -668,13 +667,13 @@ namespace savvy
         const typename T::value_type alt_value = typename T::value_type(1);
         if (allele_index_ > 1 || bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
         {
-          if (gt_sz_ % sample_count() != 0)
+          if (gt_sz_ % sample_size() != 0)
           {
             // TODO: mixed ploidy at site error.
           }
           else
           {
-            const std::uint64_t ploidy(gt_sz_ / sample_count());
+            const std::uint64_t ploidy(gt_sz_ / sample_size());
             const int allele_index_plus_one = allele_index_ + 1;
 
             if (subset_map_.size())
@@ -695,7 +694,7 @@ namespace savvy
             }
             else
             {
-              destination.resize(sample_count());
+              destination.resize(sample_size());
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
@@ -1011,7 +1010,10 @@ namespace savvy
         if (!hts_hdr_)
           this->state_ = std::ios::badbit;
         else
+        {
           this->init_property_fields();
+          this->init_headers();
+        }
       }
     }
 
@@ -1162,7 +1164,10 @@ namespace savvy
 
 
       if (bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0) == 0 && bcf_sr_add_reader(synced_readers_, file_path_.c_str()) == 1)
+      {
         this->init_property_fields();
+        this->init_headers();
+      }
       else
         this->state_ = std::ios::badbit;
     }

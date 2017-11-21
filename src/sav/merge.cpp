@@ -1,13 +1,14 @@
 #include <cmath>
 #include "sav/merge.hpp"
 #include "savvy/reader.hpp"
-#include "savvy/savvy.hpp"
+#include "savvy/utility.hpp"
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <getopt.h>
 
 #include <fstream>
 #include <vector>
+#include <set>
 
 class merge_prog_args
 {
@@ -115,10 +116,10 @@ public:
     }
     else
     {
-      input_paths_.reserve(remaining_arg_count);
+      input_paths_.reserve((unsigned)remaining_arg_count);
       for (int i = optind; i < argc; ++i)
       {
-        input_paths_.push_back(std::string(argv[i]));
+        input_paths_.emplace_back(argv[i]);
       }
     }
 
@@ -147,29 +148,108 @@ int merge_main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  std::vector<savvy::reader<1>> input_files;
+  std::vector<savvy::vcf::reader<1>> input_files;
+  input_files.reserve(args.input_paths().size());
+  for (auto it = args.input_paths().begin(); it != args.input_paths().end(); ++it)
+    input_files.emplace_back(*it, args.format());
   std::vector<savvy::site_info> sites(args.input_paths().size());
-  std::vector<savvy::compressed_vector<float>> genos(args.input_paths().size());
+  std::vector<std::vector<float>> genos(args.input_paths().size()); //std::vector<savvy::compressed_vector<float>> genos(args.input_paths().size());
 
   {
-    savvy::site_info variant;
-    std::vector<float> genotypes;
+    std::size_t num_samples = 0;
+    for (auto& f : input_files)
+      num_samples += f.sample_size();
+    std::vector<std::string> sample_ids;
+    sample_ids.reserve(num_samples);
 
-    std::vector<std::string> sample_ids; //(input.samples_end() - input.samples_begin()); TODO
-    //std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin()); TODO
-    std::vector<std::pair<std::string,std::string>> headers; // = input.headers(); TODO
-//    headers.reserve(headers.size() + 3);
-//    headers.insert(headers.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
-//    headers.insert(headers.begin(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
-//    headers.insert(headers.begin(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
+    std::vector<std::pair<std::string,std::string>> merged_headers;
+
+    std::set<std::string> info_fields;
+
+    for (auto& f : input_files)
+    {
+      for (auto it = f.samples_begin(); it != f.samples_end(); ++it)
+        sample_ids.emplace_back(*it);
+
+      merged_headers.reserve(merged_headers.size() + (f.headers().end() - f.headers().begin()));
+      for (auto it = f.headers().begin(); it != f.headers().end(); ++it)
+      {
+        if (it->first != "INFO" || info_fields.insert(savvy::parse_header_id(it->second)).second)
+        {
+          merged_headers.push_back(*it);
+        }
+      }
+    }
+
+
+    if (info_fields.insert("FILTER").second)
+      merged_headers.insert(merged_headers.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
+    if (info_fields.insert("QUAL").second)
+      merged_headers.insert(merged_headers.begin(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
+    if (info_fields.insert("ID").second)
+      merged_headers.insert(merged_headers.begin(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
 
     savvy::sav::writer::options opts;
     opts.compression_level = args.compression_level();
     opts.block_size = args.block_size();
     opts.data_format = args.format();
 
-    savvy::sav::writer compact_output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), opts);
-    // TODO
+    savvy::sav::writer output(args.output_path(), sample_ids.begin(), sample_ids.end(), merged_headers.begin(), merged_headers.end(), opts);
+
+    // TODO: This will only work for single chromosome.
+
+    std::vector<std::size_t> matching_indices;
+    matching_indices.reserve(input_files.size());
+
+    std::size_t min_pos_index = input_files.size();
+    std::uint64_t min_pos = std::numeric_limits<std::uint64_t>::max();
+    for (std::size_t i = 0; i < input_files.size(); ++i)
+    {
+      if (!input_files[i].read(sites[i], genos[i]))
+        genos[i].resize(0);
+
+      if (genos[i].size() && sites[i].position() < min_pos)
+      {
+        min_pos = sites[i].position();
+        min_pos_index = i;
+      }
+    }
+
+    while (min_pos_index < input_files.size())
+    {
+      matching_indices.resize(0);
+      for (std::size_t i = 0; i < input_files.size(); ++i)
+      {
+        if (i == min_pos_index
+          || (genos[i].size()
+          && sites[i].position() == sites[min_pos_index].position()
+          && sites[i].ref() == sites[min_pos_index].ref()
+          && sites[i].alt() == sites[min_pos_index].alt()))
+        {
+          matching_indices.emplace_back(i);
+        }
+      }
+
+      //output.write(sites[min_pos_index]);
+      for (auto it = matching_indices.begin(); it != matching_indices.end(); ++it)
+      {
+        //output.write(genos[*it]);
+        if (!input_files[*it].read(sites[*it], genos[*it]))
+          genos[*it].resize(0);
+      }
+
+      min_pos_index = input_files.size();
+      min_pos = std::numeric_limits<std::uint64_t>::max();
+
+      for (std::size_t i = 0; i < input_files.size(); ++i)
+      {
+        if (genos[i].size() && sites[i].position() < min_pos)
+        {
+          min_pos = sites[i].position();
+          min_pos_index = i;
+        }
+      }
+    }
   }
 
   return EXIT_FAILURE;

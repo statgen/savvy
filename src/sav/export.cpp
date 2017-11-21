@@ -41,7 +41,7 @@ public:
     os << "----------------------------------------------\n";
     os << "Usage: sav export [opts] [in.sav] [out.{vcf,vcf.gz,bcf}]\n";
     os << "\n";
-    //os << " -f, --format     : Format field to copy (GT or GP, default: GT)\n";
+    //os << " -f, --format     : Format field to copy (GT, DS or HDS, default: GT)\n";
     os << " -h, --help       : Print usage\n";
     os << "----------------------------------------------\n";
     os << std::flush;
