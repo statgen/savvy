@@ -255,17 +255,16 @@ int merge_main(int argc, char** argv)
 
     savvy::sav::writer output(args.output_path(), sample_ids.begin(), sample_ids.end(), merged_headers.begin(), merged_headers.end(), opts);
 
-    // TODO: This will only work for single chromosome.
-
-
-
+    std::string current_chrom;
     std::size_t min_pos_index = input_files.size();
     std::uint64_t min_pos = std::numeric_limits<std::uint64_t>::max();
     for (std::size_t i = 0; i < input_files.size(); ++i)
     {
       input_files[i].read_variant_details(sites[i]);
+      if (current_chrom.empty())
+        current_chrom = sites[i].chromosome();
 
-      if (input_files[i].good() && sites[i].position() < min_pos)
+      if (input_files[i].good() && current_chrom == sites[i].chromosome() && sites[i].position() < min_pos)
       {
         min_pos = sites[i].position();
         min_pos_index = i;
@@ -275,28 +274,34 @@ int merge_main(int argc, char** argv)
     while (min_pos_index < input_files.size())
     {
       std::vector<bool> matching(input_files.size(), false);
+      savvy::site_info merged_site = sites[min_pos_index];
       for (std::size_t i = 0; i < input_files.size(); ++i)
       {
         if (i == min_pos_index
           || (input_files[i].good()
+          && sites[i].chromosome() == sites[min_pos_index].chromosome()
           && sites[i].position() == sites[min_pos_index].position()
           && sites[i].ref() == sites[min_pos_index].ref()
           && sites[i].alt() == sites[min_pos_index].alt()))
         {
           matching[i] = true;
+          if (i != min_pos_index)
+          {
+            // TODO: merge props.
+          }
         }
       }
 
       std::size_t offset = 0;
       for (std::size_t i = 0; i < input_files.size(); ++i)
       {
+        compressed_vector_append_wrapper vec_wrapper(output_genos);
         if (!matching[i])
         {
-
+          vec_wrapper.resize(input_files[i].sample_size() * args.ploidy());
         }
         else
         {
-          compressed_vector_append_wrapper vec_wrapper(output_genos);
           input_files[i].read_genotypes(0, vec_wrapper);
           if (!input_files[i].good())
           {
@@ -305,27 +310,39 @@ int merge_main(int argc, char** argv)
         }
       }
 
-      std::size_t non_zero_size = 0;
-      for (std::size_t i : matching_indices)
-        non_zero_size += genos[i].non_zero_size();
-      //output.write(sites[min_pos_index]);
-      for (std::size_t i : matching_indices)
-      {
-        //output.write(genos[*it]);
-        input_files[i].read_genotypes(0, genos[i]);
-        if (!input_files[i].good())
-          genos[i].resize(0);
-      }
+
+      output.write(merged_site, output_genos);
 
       min_pos_index = input_files.size();
       min_pos = std::numeric_limits<std::uint64_t>::max();
 
-      for (std::size_t i = 0; i < input_files.size(); ++i)
+      for (int j = 0; j < 2 && min_pos_index == input_files.size(); ++j)
       {
-        if (genos[i].size() && sites[i].position() < min_pos)
+        for (std::size_t i = 0; i < input_files.size(); ++i)
         {
-          min_pos = sites[i].position();
-          min_pos_index = i;
+          if (matching[i])
+          {
+            input_files[i].read_variant_details(sites[i]);
+            matching[i] = false;
+          }
+
+          if (input_files[i].good() && current_chrom == sites[i].chromosome() && sites[i].position() < min_pos)
+          {
+            min_pos = sites[i].position();
+            min_pos_index = i;
+          }
+        }
+
+        if (min_pos_index == input_files.size())
+        {
+          for (std::size_t i = 0; i < input_files.size(); ++i)
+          {
+            if (input_files[i].good())
+            {
+              current_chrom = sites[i].chromosome();
+              break;
+            }
+          }
         }
       }
     }
