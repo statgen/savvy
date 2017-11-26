@@ -632,9 +632,9 @@ namespace savvy
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   if (gt_[i] == bcf_gt_missing)
-                    destination[subset_map_[sample_index] + (i % ploidy)] = std::numeric_limits<typename T::value_type>::quiet_NaN();
+                    destination[subset_map_[sample_index] * ploidy + (i % ploidy)] = std::numeric_limits<typename T::value_type>::quiet_NaN();
                   else if ((gt_[i] >> 1) == allele_index_plus_one)
-                    destination[subset_map_[sample_index] + (i % ploidy)] = alt_value;
+                    destination[subset_map_[sample_index] * ploidy + (i % ploidy)] = alt_value;
                 }
               }
             }
@@ -805,7 +805,7 @@ namespace savvy
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   if (hds[i] != zero_value)
-                    destination[subset_map_[sample_index] + (i % ploidy)] = hds[i];
+                    destination[subset_map_[sample_index] * ploidy + (i % ploidy)] = hds[i];
                 }
               }
             }
@@ -861,7 +861,7 @@ namespace savvy
               {
                 const std::uint64_t sample_index = i / ploidy_plus_one;
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
-                  destination[subset_map_[sample_index] + (i % ploidy_plus_one)] = gp[i];
+                  destination[subset_map_[sample_index] * ploidy_plus_one + (i % ploidy_plus_one)] = gp[i];
               }
             }
             else
@@ -915,7 +915,7 @@ namespace savvy
               {
                 const std::uint64_t sample_index = i / ploidy_plus_one;
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
-                  destination[subset_map_[sample_index] + (i % ploidy_plus_one)] = gp[i];
+                  destination[subset_map_[sample_index] * ploidy + (i % ploidy_plus_one)] = gp[i];
               }
             }
             else
@@ -969,7 +969,7 @@ namespace savvy
               {
                 const std::uint64_t sample_index = i / ploidy_plus_one;
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
-                  destination[subset_map_[sample_index] + (i % ploidy_plus_one)] = gt_[i];
+                  destination[subset_map_[sample_index] * ploidy + (i % ploidy_plus_one)] = gt_[i];
               }
             }
             else

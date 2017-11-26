@@ -101,7 +101,7 @@ namespace savvy
 //      std::vector<std::string>::const_iterator prop_fields_end() const { return metadata_fields_.end(); }
 
       std::vector<std::string> prop_fields() const { return std::vector<std::string>(metadata_fields_); }
-      std::vector<std::pair<std::string,std::string>> headers() const { return headers_; }
+      const std::vector<std::pair<std::string,std::string>>& headers() const { return headers_; }
 
       /**
        *
@@ -295,7 +295,7 @@ namespace savvy
 
                   const std::uint64_t sample_index = total_offset / ploidy_level;
                   if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
-                    destination[subset_map_[sample_index] + (total_offset % ploidy_level)] = allele; //(allele ? missing_value : alt_value);
+                    destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele; //(allele ? missing_value : alt_value);
                 }
               }
               else
@@ -309,13 +309,13 @@ namespace savvy
 
                   const std::uint64_t sample_index = total_offset / ploidy_level;
                   if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
-                    destination[subset_map_[sample_index] + (total_offset % ploidy_level)] = std::round(allele); //(allele ? missing_value : alt_value);
+                    destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = std::round(allele); //(allele ? missing_value : alt_value);
                 }
               }
             }
             else
             {
-              destination.resize(sample_count() * ploidy_level);
+              destination.resize(sample_size() * ploidy_level);
 
               if (BitWidth == 1)
               {
@@ -402,7 +402,7 @@ namespace savvy
             }
             else
             {
-              destination.resize(sample_count());
+              destination.resize(sample_size());
 
               if (BitWidth == 1)
               {
@@ -521,12 +521,12 @@ namespace savvy
 
                 const std::uint64_t sample_index = total_offset / ploidy_level;
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
-                  destination[subset_map_[sample_index] + (total_offset % ploidy_level)] = allele;
+                  destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele;
               }
             }
             else
             {
-              destination.resize(sample_count() * ploidy_level);
+              destination.resize(sample_size() * ploidy_level);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -585,7 +585,7 @@ namespace savvy
             }
             else
             {
-              destination.resize(sample_count());
+              destination.resize(sample_size());
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
