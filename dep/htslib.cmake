@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.2)
 project(htslib VERSION 1.3.1)
 
-execute_process(COMMAND ./configure --prefix=${CMAKE_INSTALL_PREFIX} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+execute_process(COMMAND ./configure --disable-libcurl --disable-lzma --disable-bz2 --prefix=${CMAKE_INSTALL_PREFIX} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_custom_target(hts ALL COMMAND make WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} COMMENT "Builing htslib ...")
 
