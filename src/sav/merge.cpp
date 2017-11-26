@@ -162,10 +162,14 @@ public:
   using savvy::sav::reader_base<1>::read_genotypes;
 };
 
+template <typename T>
 class compressed_vector_append_wrapper
 {
 public:
-  compressed_vector_append_wrapper(savvy::compressed_vector& vec) :
+  typedef T value_type;
+  static const T const_value_type;
+
+  compressed_vector_append_wrapper(savvy::compressed_vector<T>& vec) :
     vec_(vec),
     offset_(vec.size())
   {
@@ -176,18 +180,22 @@ public:
     vec_.resize(offset_ + sz);
   }
 
-  value_type& operator[](std::size_t pos)
+  T& operator[](std::size_t pos)
   {
     return vec_[offset_ + pos];
   }
 
-  const value_type& operator[](std::size_t pos) const
+  const T& operator[](std::size_t pos) const
   {
     return vec_[offset_ + pos];
   }
 
+  std::size_t size() const
+  {
+    return vec_.size() - offset_;
+  }
 private:
-  savvy::compressed_vector& vec_;
+  savvy::compressed_vector<T>& vec_;
   std::size_t offset_;
 };
 
@@ -230,6 +238,8 @@ int merge_main(int argc, char** argv)
       for (auto it = f.samples_begin(); it != f.samples_end(); ++it)
         sample_ids.emplace_back(*it);
 
+      auto d = f.headers().end() - f.headers().begin();
+      auto s = merged_headers.size();
       merged_headers.reserve(merged_headers.size() + (f.headers().end() - f.headers().begin()));
       for (auto it = f.headers().begin(); it != f.headers().end(); ++it)
       {
@@ -292,10 +302,10 @@ int merge_main(int argc, char** argv)
         }
       }
 
-      std::size_t offset = 0;
+      output_genos.resize(0);
       for (std::size_t i = 0; i < input_files.size(); ++i)
       {
-        compressed_vector_append_wrapper vec_wrapper(output_genos);
+        compressed_vector_append_wrapper<float> vec_wrapper(output_genos);
         if (!matching[i])
         {
           vec_wrapper.resize(input_files[i].sample_size() * args.ploidy());

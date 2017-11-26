@@ -53,6 +53,8 @@ public:
   {
     int long_index = 0;
     int opt = 0;
+    int old_opterr = opterr;
+    opterr = 0;
     while ((opt = getopt_long(argc, argv, "hv", long_options_.data(), &long_index )) != -1)
     {
       std::string str_opt_arg(optarg ? optarg : "");
@@ -65,10 +67,10 @@ public:
       case 'v':
         version_ = true;
         break;
-      default:
-        return false;
       }
     }
+
+    opterr = old_opterr;
 
     int remaining_arg_count = argc - optind;
 

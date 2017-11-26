@@ -1,14 +1,16 @@
 #include <cmath>
 #include "sav/import.hpp"
+#include "sav/utility.hpp"
 #include "savvy/vcf_reader.hpp"
 #include "savvy/sav_reader.hpp"
 #include "savvy/savvy.hpp"
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <getopt.h>
 
 #include <fstream>
 #include <vector>
+#include <set>
 
 class import_prog_args
 {
@@ -17,6 +19,7 @@ private:
   static const int default_block_size = 2048;
 
   std::vector<option> long_options_;
+  std::set<std::string> subset_ids_;
   std::string input_path_;
   std::string output_path_;
   int compression_level_ = -1;
@@ -30,6 +33,7 @@ public:
         {"block-size", required_argument, 0, 'b'},
         {"format", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
+        {"subset", no_argument, 0, 's'},
         {0, 0, 0, 0}
       })
   {
@@ -37,6 +41,7 @@ public:
 
   const std::string& input_path() { return input_path_; }
   const std::string& output_path() { return output_path_; }
+  const std::set<std::string> subset_ids() const { return subset_ids_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
   savvy::fmt format() const { return format_; }
@@ -51,6 +56,7 @@ public:
     os << " -b, --block-size : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
     os << " -f, --format     : Format field to copy (GT or HDS, default: GT)\n";
     os << " -h, --help       : Print usage\n";
+    os << " -s, --subset     : Comma separated list of sample IDs to subset\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -59,9 +65,9 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:f:h", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:f:hs:", long_options_.data(), &long_index )) != -1)
     {
-      std::string str_opt_arg(optarg ? optarg : "");
+      //std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
       switch (copt)
       {
@@ -84,6 +90,8 @@ public:
           block_size_ = std::uint16_t(atoi(optarg) > 0xFFFF ? 0xFFFF : atoi(optarg));
           break;
         case 'f':
+        {
+          std::string str_opt_arg(optarg ? optarg : "");
           if (str_opt_arg == "HDS")
           {
             format_ = savvy::fmt::haplotype_dosage;
@@ -94,8 +102,12 @@ public:
             return false;
           }
           break;
+        }
         case 'h':
           help_ = true;
+          break;
+        case 's':
+          subset_ids_ = split_string_to_set(optarg, ',');
           break;
         default:
           return false;
@@ -152,13 +164,16 @@ int import_main(int argc, char** argv)
 
   savvy::vcf::reader<1> input(args.input_path(), args.format());
 
+  std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
+  std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
+  if (args.subset_ids().size())
+    sample_ids = input.subset_samples(args.subset_ids());
+
   if (input.good())
   {
     savvy::site_info variant;
     std::vector<float> genotypes;
 
-    std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
-    std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
     auto headers = input.headers();
     headers.reserve(headers.size() + 3);
     headers.insert(headers.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
