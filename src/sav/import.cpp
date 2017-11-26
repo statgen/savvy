@@ -20,6 +20,7 @@ private:
 
   std::vector<option> long_options_;
   std::set<std::string> subset_ids_;
+  std::vector<savvy::region> regions_;
   std::string input_path_;
   std::string output_path_;
   int compression_level_ = -1;
@@ -33,6 +34,7 @@ public:
         {"block-size", required_argument, 0, 'b'},
         {"format", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
+        {"regions", required_argument, 0, 'r'},
         {"samples", required_argument, 0, 's'},
         {"samples-file", required_argument, 0, 'S'},
         {0, 0, 0, 0}
@@ -40,15 +42,16 @@ public:
   {
   }
 
-  const std::string& input_path() { return input_path_; }
-  const std::string& output_path() { return output_path_; }
+  const std::string& input_path() const { return input_path_; }
+  const std::string& output_path() const { return output_path_; }
   const std::set<std::string>& subset_ids() const { return subset_ids_; }
+  const std::vector<savvy::region>& regions() const { return regions_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
   savvy::fmt format() const { return format_; }
   bool help_is_set() const { return help_; }
 
-  void print_usage(std::ostream& os)
+  void print_usage(std::ostream& os) const
   {
     os << "----------------------------------------------\n";
     os << "Usage: sav import [opts] [in.{vcf,vcf.gz,bcf}] [out.sav]\n";
@@ -57,6 +60,7 @@ public:
     os << " -b, --block-size   : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
     os << " -f, --format       : Format field to copy (GT or HDS, default: GT)\n";
     os << " -h, --help         : Print usage\n";
+    os << " -r, --regions      : Comma separated list of regions formated as chr[:start-end]\n";
     os << " -s, --samples      : Comma separated list of sample IDs to subset\n";
     os << " -S, --samples-file : Path to file containing list of sample IDs to subset\n";
     os << "----------------------------------------------\n";
@@ -67,7 +71,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:f:hs:S:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:f:hr:s:S:", long_options_.data(), &long_index )) != -1)
     {
       //std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
@@ -89,7 +93,7 @@ public:
           compression_level_ += copt - '0';
           break;
         case 'b':
-          block_size_ = std::uint16_t(atoi(optarg) > 0xFFFF ? 0xFFFF : atoi(optarg));
+          block_size_ = std::uint16_t(std::atoi(optarg) > 0xFFFF ? 0xFFFF : std::atoi(optarg));
           break;
         case 'f':
         {
@@ -108,6 +112,14 @@ public:
         case 'h':
           help_ = true;
           break;
+        case 'r':
+        {
+          std::vector<std::string> tmp = split_string_to_vector(optarg, ',');
+          regions_.reserve(tmp.size());
+          for (const auto& r : tmp)
+            regions_.emplace_back(string_to_region(r));
+          break;
+        }
         case 's':
           subset_ids_ = split_string_to_set(optarg, ',');
           break;
@@ -152,23 +164,36 @@ public:
   }
 };
 
-int import_main(int argc, char** argv)
+
+int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::region>& regions, savvy::site_info& variant, std::vector<float>& genotypes, savvy::sav::writer& out)
 {
-  import_prog_args args;
-  if (!args.parse(argc, argv))
+  while (in.read(variant, genotypes))
+    out.write(variant, genotypes);
+
+  if (regions.size())
   {
-    args.print_usage(std::cerr);
-    return EXIT_FAILURE;
+    for (auto it = regions.begin() + 1; it != regions.end(); ++it)
+    {
+      in.reset_region(*it);
+      while (in.read(variant, genotypes))
+        out.write(variant, genotypes);
+    }
   }
 
-  if (args.help_is_set())
-  {
-    args.print_usage(std::cout);
-    return EXIT_SUCCESS;
-  }
+  return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
+}
 
-  savvy::vcf::reader<1> input(args.input_path(), args.format());
+int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& regions, savvy::site_info& variant, std::vector<float>& genotypes, savvy::sav::writer& out)
+{
+  // TODO: support regions without index.
+  while (in.read(variant, genotypes))
+    out.write(variant, genotypes);
+  return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
+}
 
+template <typename T>
+int import_reader(T& input, const import_prog_args& args)
+{
   std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
   std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
   if (args.subset_ids().size())
@@ -190,15 +215,41 @@ int import_main(int argc, char** argv)
     opts.block_size = args.block_size();
     opts.data_format = args.format();
 
-    savvy::sav::writer compact_output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), opts);
+    savvy::sav::writer output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), opts);
 
-    if (compact_output.good())
+    if (output.good())
     {
-      while (input.read(variant, genotypes))
-        compact_output.write(variant, genotypes);
-      return EXIT_SUCCESS;
+      return import_records(input, args.regions(), variant, genotypes, output);
     }
   }
 
   return EXIT_FAILURE;
+}
+
+int import_main(int argc, char** argv)
+{
+  import_prog_args args;
+  if (!args.parse(argc, argv))
+  {
+    args.print_usage(std::cerr);
+    return EXIT_FAILURE;
+  }
+
+  if (args.help_is_set())
+  {
+    args.print_usage(std::cout);
+    return EXIT_SUCCESS;
+  }
+
+
+  if (args.regions().size())
+  {
+    savvy::vcf::indexed_reader<1> input(args.input_path(), args.regions().front(), args.format());
+    return import_reader(input, args);
+  }
+  else
+  {
+    savvy::vcf::reader<1> input(args.input_path(), args.format());
+    return import_reader(input, args);
+  }
 }
