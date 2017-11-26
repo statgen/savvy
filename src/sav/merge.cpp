@@ -7,6 +7,7 @@
 #include <getopt.h>
 
 #include <fstream>
+#include <deque>
 #include <vector>
 #include <set>
 
@@ -214,8 +215,7 @@ int merge_main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  std::vector<sav_reader> input_files;
-  input_files.reserve(args.input_paths().size());
+  std::deque<sav_reader> input_files;
   for (auto it = args.input_paths().begin(); it != args.input_paths().end(); ++it)
     input_files.emplace_back(*it, args.format());
   std::vector<savvy::site_info> sites(args.input_paths().size());
