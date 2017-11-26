@@ -33,7 +33,8 @@ public:
         {"block-size", required_argument, 0, 'b'},
         {"format", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
-        {"subset", no_argument, 0, 's'},
+        {"samples", required_argument, 0, 's'},
+        {"samples-file", required_argument, 0, 'S'},
         {0, 0, 0, 0}
       })
   {
@@ -41,7 +42,7 @@ public:
 
   const std::string& input_path() { return input_path_; }
   const std::string& output_path() { return output_path_; }
-  const std::set<std::string> subset_ids() const { return subset_ids_; }
+  const std::set<std::string>& subset_ids() const { return subset_ids_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
   savvy::fmt format() const { return format_; }
@@ -52,11 +53,12 @@ public:
     os << "----------------------------------------------\n";
     os << "Usage: sav import [opts] [in.{vcf,vcf.gz,bcf}] [out.sav]\n";
     os << "\n";
-    os << " -#               : # compression level (1-19, default: " << default_compression_level << ")\n";
-    os << " -b, --block-size : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
-    os << " -f, --format     : Format field to copy (GT or HDS, default: GT)\n";
-    os << " -h, --help       : Print usage\n";
-    os << " -s, --subset     : Comma separated list of sample IDs to subset\n";
+    os << " -#                 : # compression level (1-19, default: " << default_compression_level << ")\n";
+    os << " -b, --block-size   : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
+    os << " -f, --format       : Format field to copy (GT or HDS, default: GT)\n";
+    os << " -h, --help         : Print usage\n";
+    os << " -s, --samples      : Comma separated list of sample IDs to subset\n";
+    os << " -S, --samples-file : Path to file containing list of sample IDs to subset\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -65,7 +67,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:f:hs:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:f:hs:S:", long_options_.data(), &long_index )) != -1)
     {
       //std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
@@ -108,6 +110,9 @@ public:
           break;
         case 's':
           subset_ids_ = split_string_to_set(optarg, ',');
+          break;
+        case 'S':
+          subset_ids_ = split_file_to_set(optarg);
           break;
         default:
           return false;

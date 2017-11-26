@@ -1,10 +1,11 @@
 #include <cmath>
 #include "sav/export.hpp"
+#include "sav/utility.hpp"
 #include "savvy/vcf_reader.hpp"
 #include "savvy/sav_reader.hpp"
 #include "savvy/savvy.hpp"
-#include "savvy/utility.hpp"
 
+#include <set>
 #include <fstream>
 #include <ctime>
 #include <getopt.h>
@@ -16,6 +17,7 @@ private:
   static const int default_block_size = 2048;
 
   std::vector<option> long_options_;
+  std::set<std::string> subset_ids_;
   std::string input_path_;
   std::string output_path_;
   bool help_ = false;
@@ -26,6 +28,8 @@ public:
       {
         {"format", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
+        {"samples", required_argument, 0, 's'},
+        {"samples-file", required_argument, 0, 'S'},
         {0, 0, 0, 0}
       })
   {
@@ -33,6 +37,7 @@ public:
 
   const std::string& input_path() { return input_path_; }
   const std::string& output_path() { return output_path_; }
+  const std::set<std::string>& subset_ids() const { return subset_ids_; }
   savvy::fmt format() const { return format_; }
   bool help_is_set() const { return help_; }
 
@@ -42,7 +47,9 @@ public:
     os << "Usage: sav export [opts] [in.sav] [out.{vcf,vcf.gz,bcf}]\n";
     os << "\n";
     //os << " -f, --format     : Format field to copy (GT, DS or HDS, default: GT)\n";
-    os << " -h, --help       : Print usage\n";
+    os << " -h, --help         : Print usage\n";
+    os << " -s, --samples      : Comma separated list of sample IDs to subset\n";
+    os << " -S, --samples-file : Path to file containing list of sample IDs to subset\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -51,7 +58,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "f:h", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "f:hs:S:", long_options_.data(), &long_index )) != -1)
     {
       std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
@@ -70,6 +77,12 @@ public:
           break;
         case 'h':
           help_ = true;
+          break;
+        case 's':
+          subset_ids_ = split_string_to_set(optarg, ',');
+          break;
+        case 'S':
+          subset_ids_ = split_file_to_set(optarg);
           break;
         default:
           return false;

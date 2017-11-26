@@ -31,7 +31,7 @@ public:
         {"block-size", required_argument, 0, 'b'},
         {"format", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
-        {"output", no_argument, 0, 'o'},
+        {"output", required_argument, 0, 'o'},
         {0, 0, 0, 0}
       }),
     output_path_("/dev/stdout")
