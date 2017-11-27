@@ -113,13 +113,9 @@ public:
           help_ = true;
           break;
         case 'r':
-        {
-          std::vector<std::string> tmp = split_string_to_vector(optarg, ',');
-          regions_.reserve(tmp.size());
-          for (const auto& r : tmp)
+          for (const auto& r : split_string_to_vector(optarg, ','))
             regions_.emplace_back(string_to_region(r));
           break;
-        }
         case 's':
           subset_ids_ = split_string_to_set(optarg, ',');
           break;
@@ -135,6 +131,12 @@ public:
 
     if (remaining_arg_count == 0)
     {
+      if (regions_.size())
+      {
+        std::cerr << "Input path must be specified when using --regions option." << std::endl;
+        return false;
+      }
+
       input_path_ = "/dev/stdin";
       output_path_ = "/dev/stdout";
     }
@@ -165,8 +167,10 @@ public:
 };
 
 
-int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::region>& regions, savvy::site_info& variant, std::vector<float>& genotypes, savvy::sav::writer& out)
+int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::region>& regions, savvy::sav::writer& out)
 {
+  savvy::site_info variant;
+  std::vector<float> genotypes;
   while (in.read(variant, genotypes))
     out.write(variant, genotypes);
 
@@ -183,9 +187,11 @@ int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::r
   return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& regions, savvy::site_info& variant, std::vector<float>& genotypes, savvy::sav::writer& out)
+int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& regions, savvy::sav::writer& out)
 {
   // TODO: support regions without index.
+  savvy::site_info variant;
+  std::vector<float> genotypes;
   while (in.read(variant, genotypes))
     out.write(variant, genotypes);
   return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
@@ -201,9 +207,6 @@ int import_reader(T& input, const import_prog_args& args)
 
   if (input.good())
   {
-    savvy::site_info variant;
-    std::vector<float> genotypes;
-
     auto headers = input.headers();
     headers.reserve(headers.size() + 3);
     headers.insert(headers.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
@@ -219,7 +222,7 @@ int import_reader(T& input, const import_prog_args& args)
 
     if (output.good())
     {
-      return import_records(input, args.regions(), variant, genotypes, output);
+      return import_records(input, args.regions(), output);
     }
   }
 
