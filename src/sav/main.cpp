@@ -1,5 +1,6 @@
-#include "sav/import.hpp"
 #include "sav/export.hpp"
+#include "sav/import.hpp"
+#include "sav/index.hpp"
 #include "sav/merge.hpp"
 #include "savvy/utility.hpp"
 
@@ -30,6 +31,7 @@ public:
     os << "\n";
     os << "export  : Converts SAV into VCF or BCF\n";
     os << "import  : Converts VCF or BCF into SAV\n";
+    os << "index   : Indexes SAV file\n";
     os << "merge   : Merges multiple files into one\n";
     os << "\n";
     os << " -h, --help       : Print usage\n";
@@ -85,7 +87,11 @@ int main(int argc, char** argv)
   {
     return import_main(argc, argv);
   }
-  else if (args.sub_command()== "merge")
+  else if (args.sub_command() == "index")
+  {
+    return index_main(argc, argv);
+  }
+  else if (args.sub_command() == "merge")
   {
     return merge_main(argc, argv);
   }

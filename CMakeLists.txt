@@ -35,10 +35,11 @@ target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE
 
 add_executable(sav
                src/sav/main.cpp
-               src/sav/utility.cpp include/sav/utility.hpp
-               src/sav/import.cpp include/sav/import.hpp
                src/sav/export.cpp include/sav/export.hpp
-               src/sav/merge.cpp include/sav/merge.hpp)
+               src/sav/import.cpp include/sav/import.hpp
+               src/sav/index.cpp include/sav/index.hpp
+               src/sav/merge.cpp include/sav/merge.hpp
+               src/sav/utility.cpp include/sav/utility.hpp)
 target_link_libraries(sav savvy)
 
 #add_executable(bcf2m3vcf src/sav/bcf2m3vcf.cpp)
