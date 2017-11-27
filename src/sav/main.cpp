@@ -5,28 +5,17 @@
 
 #include <cmath>
 #include <cstdlib>
-#include <getopt.h>
 #include <vector>
 #include <iostream>
 
 class prog_args
 {
 private:
-  static const int default_compression_level = 3;
-  static const int default_block_size = 2048;
-
-  std::vector<option> long_options_;
   std::string sub_command_;
   bool help_ = false;
   bool version_ = false;
 public:
-  prog_args() :
-    long_options_(
-      {
-        {"help", no_argument, 0, 'h'},
-        {"version", no_argument, 0, 'v'},
-        {0, 0, 0, 0}
-      })
+  prog_args()
   {
   }
 
@@ -49,48 +38,31 @@ public:
     os << std::flush;
   }
 
-  bool parse(int& argc, char** argv)
+  bool parse(int& argc, char**& argv)
   {
-    int long_index = 0;
-    int opt = 0;
-    int old_opterr = opterr;
-    opterr = 0;
-    while ((opt = getopt_long(argc, argv, "hv", long_options_.data(), &long_index )) != -1)
+    if (argc > 1)
     {
-      std::string str_opt_arg(optarg ? optarg : "");
-      char copt = char(opt & 0xFF);
-      switch (copt)
-      {
-      case 'h':
+      std::string str_opt_arg(argv[1]);
+
+      if (str_opt_arg == "-h" || str_opt_arg == "--help")
         help_ = true;
-        break;
-      case 'v':
+      else if (str_opt_arg == "-v" || str_opt_arg == "--version")
         version_ = true;
-        break;
-      }
-    }
-
-    opterr = old_opterr;
-
-    int remaining_arg_count = argc - optind;
-
-    if (remaining_arg_count > 0)
-    {
-      char* tmp = argv[optind];
-      sub_command_ = tmp;
-      int i = optind;
-      for ( ; (i + 1) < argc; ++i)
+      else if (str_opt_arg.size() && str_opt_arg.front() != '-')
       {
-        argv[i] = argv[i + 1];
+        sub_command_ = str_opt_arg;
+        --argc;
+        ++argv;
       }
-      argv[i] = tmp;
-      --argc;
     }
-    else if (!help_is_set() && !version_is_set())
+
+    if (!help_is_set() && !version_is_set() && sub_command_.empty())
     {
       std::cerr << "Missing sub-command\n";
       return false;
     }
+
+
 
     return true;
   }
@@ -105,8 +77,6 @@ int main(int argc, char** argv)
     return EXIT_FAILURE;
   }
 
-  optind = 1;
-
   if (args.sub_command() == "export")
   {
     return export_main(argc, argv);
@@ -117,7 +87,7 @@ int main(int argc, char** argv)
   }
   else if (args.sub_command()== "merge")
   {
-    return merge_main(argc,argv);
+    return merge_main(argc, argv);
   }
 
   if (args.help_is_set())
