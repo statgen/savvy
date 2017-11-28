@@ -1,5 +1,5 @@
-#ifndef LIBSAVVY_CMF_READER_HPP
-#define LIBSAVVY_CMF_READER_HPP
+#ifndef LIBSAVVY_SAV_READER_HPP
+#define LIBSAVVY_SAV_READER_HPP
 
 #include "allele_status.hpp"
 #include "varint.hpp"
@@ -66,12 +66,10 @@ namespace savvy
 //    }
 
     //################################################################//
-    template <std::size_t VecCnt>
     class reader_base
     {
     public:
-      template <typename... T>
-      reader_base(const std::string& file_path, T... data_formats);
+      reader_base(const std::string& file_path, savvy::fmt data_format);
 #if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
       reader_base(reader_base&& source);
       reader_base& operator=(reader_base&& source);
@@ -113,31 +111,6 @@ namespace savvy
       const std::string& file_path() const { return file_path_; }
       std::streampos tellg() { return this->input_stream_.tellg(); }
     protected:
-      template <typename T>
-      void clear_destinations(T& destination)
-      {
-        destination.resize(0);
-      }
-
-      template <typename T, typename... T2>
-      void clear_destinations(T& destination, T2&... other_destinations)
-      {
-        clear_destinations(destination);
-        clear_destinations(other_destinations...);
-      }
-
-      void init_requested_formats(fmt f)
-      {
-        requested_data_formats_[requested_data_formats_.size() - 1] = f;
-      }
-
-      template <typename... T>
-      void init_requested_formats(fmt f, T... args)
-      {
-        requested_data_formats_[requested_data_formats_.size() - (sizeof...(T) + 1)] = f;
-        init_requested_formats(args...);
-      }
-
       void read_variant_details(site_info& annotations)
       {
         if (good())
@@ -632,19 +605,20 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotypes(std::size_t idx, T& destination)
+      void read_genotypes(T& destination)
       {
+        destination.resize(0);
         if (true) //requested_data_formats_[idx] == file_data_format_)
         {
-          if (requested_data_formats_[idx] == fmt::allele)
+          if (requested_data_format_ == fmt::allele)
             file_data_format_ == fmt::allele ? read_genotypes_al<1>(destination) : read_genotypes_al<7>(destination);
-          else if (requested_data_formats_[idx] == fmt::genotype)
+          else if (requested_data_format_== fmt::genotype)
             file_data_format_ == fmt::allele ? read_genotypes_gt<1>(destination) : read_genotypes_gt<7>(destination);
 //          else if (requested_data_formats_[idx] == fmt::genotype_probability && file_data_format_ == fmt::genotype_probability)
 //            read_genotypes_gp(destination);
-          else if (requested_data_formats_[idx] == fmt::dosage)
+          else if (requested_data_format_ == fmt::dosage)
             file_data_format_ == fmt::allele ? read_genotypes_ds<1>(destination) : read_genotypes_ds<7>(destination);
-          else if (requested_data_formats_[idx] == fmt::haplotype_dosage)
+          else if (requested_data_format_ == fmt::haplotype_dosage)
             file_data_format_ == fmt::allele ? read_genotypes_hds<1>(destination) : read_genotypes_hds<7>(destination);
           else
             input_stream_.setstate(std::ios::failbit);
@@ -654,27 +628,12 @@ namespace savvy
           discard_genotypes();
         }
       }
-
-      template <typename T, typename... T2>
-      void read_genotypes(std::size_t idx, T& destination, T2&... other_destinations)
-      {
-        if (requested_data_formats_[idx] == file_data_format_)
-        {
-          read_genotypes(idx, destination);
-        }
-        else
-        {
-          read_genotypes(idx + 1, other_destinations...);
-        }
-      }
-
-
     protected:
       std::vector<std::string> sample_ids_;
       std::vector<std::uint64_t> subset_map_;
       std::uint64_t subset_size_;
       fmt file_data_format_;
-      std::array<fmt, VecCnt> requested_data_formats_;
+      fmt requested_data_format_;
       shrinkwrap::zstd::istream input_stream_;
       std::string file_path_;
       std::vector<std::pair<std::string, std::string>> headers_;
@@ -683,11 +642,10 @@ namespace savvy
     //################################################################//
 
     //################################################################//
-    template <std::size_t VecCnt>
-    class reader : public reader_base<VecCnt>
+    class reader : public reader_base
     {
     public:
-      using reader_base<VecCnt>::reader_base;
+      using reader_base::reader_base;
 #if __cpp_decltype_auto >= 201304
       template <typename... T>
       reader& operator>>(std::tuple<site_info, T...>& destination)
@@ -700,25 +658,21 @@ namespace savvy
         return *this;
       }
 #endif
-      template <typename... T>
-      reader& read(site_info& annotations, T&... destinations)
+      template <typename T>
+      reader& read(site_info& annotations, T& destination)
       {
-        static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
-
         this->read_variant_details(annotations);
-        this->clear_destinations(destinations...);
-        this->read_genotypes(0, destinations...);
+        this->read_genotypes(destination);
         return *this;
       }
     };
 
-    template <std::size_t VecCnt>
-    class indexed_reader : public reader_base<VecCnt>
+    class indexed_reader : public reader_base
     {
     public:
-      template <typename... T>
-      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, coord_bound bounding_type, T... data_formats)  :
-        reader_base<VecCnt>(file_path, data_formats...),
+      template <typename T>
+      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, coord_bound bounding_type, T data_format)  :
+        reader_base(file_path, data_format),
         index_(index_file_path.size() ? index_file_path : file_path + ".s1r"),
         query_(index_.create_query(reg)),
         i_(query_.begin()),
@@ -731,21 +685,18 @@ namespace savvy
           this->input_stream_.setstate(std::ios::badbit);
       }
 
-      template <typename... T>
-      indexed_reader(const std::string& file_path, const region& reg, T... data_formats)  :
-        indexed_reader<VecCnt>(file_path, std::string(""), reg, coord_bound::any, data_formats...)
+      indexed_reader(const std::string& file_path, const region& reg, savvy::fmt data_format)  :
+        indexed_reader(file_path, std::string(""), reg, coord_bound::any, data_format)
       {
       }
 
-      template <typename... T>
-      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, T... data_formats)  :
-        indexed_reader<VecCnt>(file_path, index_file_path, reg, coord_bound::any, data_formats...)
+      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, savvy::fmt data_format)  :
+        indexed_reader(file_path, index_file_path, reg, coord_bound::any, data_format)
       {
       }
 
-      template <typename... T>
-      indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats)  :
-        indexed_reader<VecCnt>(file_path, std::string(""), reg, bounding_type, data_formats...)
+      indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, savvy::fmt data_format)  :
+        indexed_reader(file_path, std::string(""), reg, bounding_type, data_format)
       {
       }
 
@@ -765,11 +716,9 @@ namespace savvy
         return *this;
       }
 #endif
-      template <typename... T>
-      indexed_reader& read(site_info& annotations, T&... destinations)
+      template <typename T>
+      indexed_reader& read(site_info& annotations, T& destination)
       {
-        static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
-
         while (this->good())
         {
           if (current_offset_in_block_ >= total_in_block_)
@@ -786,8 +735,7 @@ namespace savvy
           }
 
           this->read_variant_details(annotations);
-          this->clear_destinations(destinations...);
-          this->read_genotypes(0, destinations...);
+          this->read_genotypes(destination);
           ++current_offset_in_block_;
           if (region_compare(bounding_type_, annotations, reg_))
           {
@@ -797,11 +745,9 @@ namespace savvy
         return *this;
       }
 
-      template <typename Pred, typename... T>
-      indexed_reader& read_if(Pred fn, site_info& annotations, T&... destinations)
+      template <typename Pred, typename T>
+      indexed_reader& read_if(Pred fn, site_info& annotations, T& destination)
       {
-        static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
-
         while (this->good())
         {
           if (current_offset_in_block_ >= total_in_block_)
@@ -822,8 +768,7 @@ namespace savvy
           bool predicate_passed = fn(annotations);
           if (region_compare(bounding_type_, annotations, reg_) && predicate_passed)
           {
-            this->clear_destinations(destinations...);
-            this->read_genotypes(0, destinations...);
+            this->read_genotypes(destination);
             break;
           }
           else
@@ -1302,174 +1247,6 @@ namespace savvy
     };
 
 
-
-
-
-
-    template <std::size_t VecCnt>
-    template <typename... T>
-    reader_base<VecCnt>::reader_base(const std::string& file_path, T... data_formats) :
-      subset_size_(0),
-      input_stream_(file_path),
-      file_path_(file_path),
-      file_data_format_(fmt::allele)
-    {
-      static_assert(VecCnt == sizeof...(T), "Number of requested format fields do not match VecCnt template parameter");
-
-      init_requested_formats(data_formats...);
-
-      std::string version_string(7, '\0');
-      input_stream_.read(&version_string[0], version_string.size());
-
-      std::string uuid(16, '\0');
-      input_stream_.read(&uuid[0], uuid.size());
-
-
-      std::istreambuf_iterator<char> in_it(input_stream_);
-      std::istreambuf_iterator<char> end;
-
-      std::uint64_t headers_size;
-      if (varint_decode(in_it, end, headers_size) != end)
-      {
-        ++in_it;
-        headers_.reserve(headers_size);
-
-        while (headers_size && in_it != end)
-        {
-          std::uint64_t key_size;
-          if (varint_decode(in_it, end, key_size) != end)
-          {
-            ++in_it;
-            if (key_size)
-            {
-              std::string key;
-              key.resize(key_size);
-              input_stream_.read(&key[0], key_size);
-
-              std::uint64_t val_size;
-              if (varint_decode(in_it, end, val_size) != end)
-              {
-                ++in_it;
-                if (key_size)
-                {
-                  std::string val;
-                  val.resize(val_size);
-                  input_stream_.read(&val[0], val_size);
-
-                  if (key == "INFO")
-                  {
-                    std::string info_field = parse_header_id(val);
-                    metadata_fields_.push_back(std::move(info_field));
-                  }
-                  else if (key == "FORMAT")
-                  {
-                    std::string format_field = parse_header_id(val);
-                    if (format_field == "GT")
-                      file_data_format_ = fmt::allele;
-//                    else if (format_field == "GP")
-//                      file_data_format_ = fmt::genotype_probability;
-                    else if (format_field == "HDS")
-                      file_data_format_ = fmt::haplotype_dosage;
-                  }
-                  headers_.emplace_back(std::move(key), std::move(val));
-                }
-              }
-
-            }
-          }
-          --headers_size;
-        }
-
-        if (!headers_size)
-        {
-          std::uint64_t sample_size;
-          if (varint_decode(in_it, end, sample_size) != end)
-          {
-            ++in_it;
-            sample_ids_.reserve(sample_size);
-
-            std::uint64_t id_sz;
-            while (sample_size && varint_decode(in_it, end, id_sz) != end)
-            {
-              ++in_it;
-              sample_ids_.emplace_back();
-              if (id_sz)
-              {
-                sample_ids_.back().resize(id_sz);
-                input_stream_.read(&sample_ids_.back()[0], id_sz);
-              }
-              --sample_size;
-            }
-
-            if (!sample_size)
-              return;
-          }
-        }
-      }
-
-      input_stream_.peek();
-    }
-
-#if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
-    template <std::size_t VecCnt>
-    reader_base<VecCnt>::reader_base(reader_base&& source) :
-      sample_ids_(std::move(source.sample_ids_)),
-      subset_map_(std::move(source.subset_map_)),
-      subset_size_(source.subset_size_),
-      //sbuf_(std::move(source.sbuf_)),
-      //input_stream_(&sbuf_),
-      input_stream_(std::move(source.input_stream_)),
-      file_path_(std::move(source.file_path_)),
-      metadata_fields_(std::move(source.metadata_fields_)),
-      file_data_format_(source.file_data_format_),
-      requested_data_formats_(source.requested_data_formats_)
-    {
-    }
-
-    template <std::size_t VecCnt>
-    reader_base<VecCnt>& reader_base<VecCnt>::operator=(reader_base<VecCnt>&& source)
-    {
-      if (&source != this)
-      {
-        sample_ids_ = std::move(source.sample_ids_);
-        subset_map_ = std::move(source.subset_map_);
-        subset_size_ = source.subset_size_;
-        //sbuf_ = std::move(source.sbuf_);
-        //input_stream_.rdbuf(&sbuf_);
-        input_stream_ = std::move(source.input_stream_);
-        file_path_ = std::move(source.file_path_);
-        metadata_fields_ = std::move(source.metadata_fields_);
-        file_data_format_ = source.file_data_format_;
-        requested_data_formats_ = source.requested_data_formats_;
-      }
-      return *this;
-    }
-#endif
-
-    template <std::size_t VecCnt>
-    std::vector<std::string> reader_base<VecCnt>::subset_samples(const std::set<std::string>& subset)
-    {
-      std::vector<std::string> ret;
-      ret.reserve(std::min(subset.size(), sample_ids_.size()));
-
-      subset_map_.clear();
-      subset_map_.resize(sample_ids_.size(), std::numeric_limits<std::uint64_t>::max());
-      std::uint64_t subset_index = 0;
-      for (auto it = sample_ids_.begin(); it != sample_ids_.end(); ++it)
-      {
-        if (subset.find(*it) != subset.end())
-        {
-          subset_map_[std::distance(sample_ids_.begin(), it)] = subset_index;
-          ret.push_back(*it);
-          ++subset_index;
-        }
-      }
-
-      subset_size_ = subset_index;
-
-      return ret;
-    }
-
     template <>
     template <typename T>
     inline std::tuple<T, std::uint64_t> detail::allele_decoder<0>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
@@ -1558,4 +1335,4 @@ namespace savvy
   }
 }
 
-#endif //LIBSAVVY_CMF_READER_HPP
+#endif //LIBSAVVY_SAV_READER_HPP

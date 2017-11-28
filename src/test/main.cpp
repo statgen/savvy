@@ -503,8 +503,8 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 
 void run_file_checksum_test(const std::string f1, const std::string f2, savvy::fmt format)
 {
-  savvy::reader<1> input_file_reader1(f1, format);
-  savvy::reader<1> input_file_reader2(f2, format);
+  savvy::reader input_file_reader1(f1, format);
+  savvy::reader input_file_reader2(f2, format);
   auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
   std::cout << "Starting checksum test ..." << std::endl;
   auto timed_call = time_procedure(t);
@@ -626,7 +626,7 @@ public:
 
 void sav_random_access_test(savvy::fmt format)
 {
-  savvy::sav::indexed_reader<1> rdr(format == savvy::fmt::allele ? SAVVYT_SAV_FILE_HARD : SAVVYT_SAV_FILE_DOSE, {"20", 17000, 1120000}, format);
+  savvy::sav::indexed_reader rdr(format == savvy::fmt::allele ? SAVVYT_SAV_FILE_HARD : SAVVYT_SAV_FILE_DOSE, {"20", 17000, 1120000}, format);
   savvy::site_info anno;
   std::vector<float> buf;
 
@@ -685,7 +685,7 @@ void sav_random_access_test(savvy::fmt format)
 
 void generic_reader_test(const std::string& path, savvy::fmt format, std::size_t expected_markers)
 {
-  savvy::reader<1> rdr(path, format);
+  savvy::reader rdr(path, format);
   assert(rdr.good());
 
   std::vector<std::string> subset = {"NA00003","NA00005", "FAKE_ID"};
@@ -771,10 +771,10 @@ int main(int argc, char** argv)
   {
     if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::allele>()();
 
-    subset_test<savvy::reader<1>, savvy::fmt::genotype>(SAVVYT_VCF_FILE);
-    subset_test<savvy::reader<1>, savvy::fmt::genotype>(SAVVYT_SAV_FILE_HARD);
+    subset_test<savvy::reader, savvy::fmt::genotype>(SAVVYT_VCF_FILE);
+    subset_test<savvy::reader, savvy::fmt::genotype>(SAVVYT_SAV_FILE_HARD);
     subset_test<savvy::vcf::reader<1>, savvy::fmt::genotype>(SAVVYT_VCF_FILE);
-    subset_test<savvy::sav::reader<1>, savvy::fmt::genotype>(SAVVYT_SAV_FILE_HARD);
+    subset_test<savvy::sav::reader, savvy::fmt::genotype>(SAVVYT_SAV_FILE_HARD);
   }
   else if (cmd == "varint")
   {

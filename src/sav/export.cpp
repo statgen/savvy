@@ -140,7 +140,7 @@ public:
   }
 };
 
-int export_records(savvy::sav::reader<1>& in, const std::vector<savvy::region>& regions, savvy::vcf::writer& out)
+int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, savvy::vcf::writer& out)
 {
   savvy::site_info variant;
   std::vector<float> genotypes;
@@ -151,7 +151,7 @@ int export_records(savvy::sav::reader<1>& in, const std::vector<savvy::region>& 
   return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-int export_records(savvy::sav::indexed_reader<1>& in, const std::vector<savvy::region>& regions, savvy::vcf::writer& out)
+int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, savvy::vcf::writer& out)
 {
   savvy::site_info variant;
   std::vector<float> genotypes;
@@ -235,12 +235,12 @@ int export_main(int argc, char** argv)
 
   if (args.regions().size())
   {
-    savvy::sav::indexed_reader<1> input(args.input_path(), args.regions().front(), args.format());
+    savvy::sav::indexed_reader input(args.input_path(), args.regions().front(), args.format());
     return export_reader(input, args);
   }
   else
   {
-    savvy::sav::reader<1> input(args.input_path(), args.format());
+    savvy::sav::reader input(args.input_path(), args.format());
     return export_reader(input, args);
   }
 }

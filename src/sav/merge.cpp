@@ -155,12 +155,12 @@ void merge_serialize_alleles(const savvy::compressed_vector<T>& m, OutIt os_it, 
 
 }
 
-class sav_reader : public savvy::sav::reader_base<1>
+class sav_reader : public savvy::sav::reader_base
 {
 public:
-  using savvy::sav::reader_base<1>::reader_base;
-  using savvy::sav::reader_base<1>::read_variant_details;
-  using savvy::sav::reader_base<1>::read_genotypes;
+  using savvy::sav::reader_base::reader_base;
+  using savvy::sav::reader_base::read_variant_details;
+  using savvy::sav::reader_base::read_genotypes;
 };
 
 template <typename T>
@@ -312,7 +312,7 @@ int merge_main(int argc, char** argv)
         }
         else
         {
-          input_files[i].read_genotypes(0, vec_wrapper);
+          input_files[i].read_genotypes(vec_wrapper);
           if (!input_files[i].good())
           {
             // TODO: Corrupt File

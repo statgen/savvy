@@ -12,12 +12,161 @@ namespace savvy
   namespace sav
   {
     //================================================================//
+    reader_base::reader_base(const std::string& file_path, savvy::fmt data_format) :
+      subset_size_(0),
+      input_stream_(file_path),
+      file_path_(file_path),
+      file_data_format_(fmt::allele),
+      requested_data_format_(data_format)
+    {
+      std::string version_string(7, '\0');
+      input_stream_.read(&version_string[0], version_string.size());
 
-//    reader& reader_base::operator>>(marker& destination)
-//    {
-//      marker::read(destination, sample_ids_.size() * ploidy_level_, input_stream_);
-//      return *this;
-//    }
+      std::string uuid(16, '\0');
+      input_stream_.read(&uuid[0], uuid.size());
+
+
+      std::istreambuf_iterator<char> in_it(input_stream_);
+      std::istreambuf_iterator<char> end;
+
+      std::uint64_t headers_size;
+      if (varint_decode(in_it, end, headers_size) != end)
+      {
+        ++in_it;
+        headers_.reserve(headers_size);
+
+        while (headers_size && in_it != end)
+        {
+          std::uint64_t key_size;
+          if (varint_decode(in_it, end, key_size) != end)
+          {
+            ++in_it;
+            if (key_size)
+            {
+              std::string key;
+              key.resize(key_size);
+              input_stream_.read(&key[0], key_size);
+
+              std::uint64_t val_size;
+              if (varint_decode(in_it, end, val_size) != end)
+              {
+                ++in_it;
+                if (key_size)
+                {
+                  std::string val;
+                  val.resize(val_size);
+                  input_stream_.read(&val[0], val_size);
+
+                  if (key == "INFO")
+                  {
+                    std::string info_field = parse_header_id(val);
+                    metadata_fields_.push_back(std::move(info_field));
+                  }
+                  else if (key == "FORMAT")
+                  {
+                    std::string format_field = parse_header_id(val);
+                    if (format_field == "GT")
+                      file_data_format_ = fmt::allele;
+//                    else if (format_field == "GP")
+//                      file_data_format_ = fmt::genotype_probability;
+                    else if (format_field == "HDS")
+                      file_data_format_ = fmt::haplotype_dosage;
+                  }
+                  headers_.emplace_back(std::move(key), std::move(val));
+                }
+              }
+
+            }
+          }
+          --headers_size;
+        }
+
+        if (!headers_size)
+        {
+          std::uint64_t sample_size;
+          if (varint_decode(in_it, end, sample_size) != end)
+          {
+            ++in_it;
+            sample_ids_.reserve(sample_size);
+
+            std::uint64_t id_sz;
+            while (sample_size && varint_decode(in_it, end, id_sz) != end)
+            {
+              ++in_it;
+              sample_ids_.emplace_back();
+              if (id_sz)
+              {
+                sample_ids_.back().resize(id_sz);
+                input_stream_.read(&sample_ids_.back()[0], id_sz);
+              }
+              --sample_size;
+            }
+
+            if (!sample_size)
+              return;
+          }
+        }
+      }
+
+      input_stream_.peek();
+    }
+
+#if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
+    reader_base::reader_base(reader_base&& source) :
+      sample_ids_(std::move(source.sample_ids_)),
+      subset_map_(std::move(source.subset_map_)),
+      subset_size_(source.subset_size_),
+      //sbuf_(std::move(source.sbuf_)),
+      //input_stream_(&sbuf_),
+      input_stream_(std::move(source.input_stream_)),
+      file_path_(std::move(source.file_path_)),
+      metadata_fields_(std::move(source.metadata_fields_)),
+      file_data_format_(source.file_data_format_),
+      requested_data_format_(source.requested_data_format_)
+    {
+    }
+
+    reader_base& reader_base::operator=(reader_base&& source)
+    {
+      if (&source != this)
+      {
+        sample_ids_ = std::move(source.sample_ids_);
+        subset_map_ = std::move(source.subset_map_);
+        subset_size_ = source.subset_size_;
+        //sbuf_ = std::move(source.sbuf_);
+        //input_stream_.rdbuf(&sbuf_);
+        input_stream_ = std::move(source.input_stream_);
+        file_path_ = std::move(source.file_path_);
+        metadata_fields_ = std::move(source.metadata_fields_);
+        file_data_format_ = source.file_data_format_;
+        requested_data_format_ = source.requested_data_format_;
+      }
+      return *this;
+    }
+#endif
+
+    std::vector<std::string> reader_base::subset_samples(const std::set<std::string>& subset)
+    {
+      std::vector<std::string> ret;
+      ret.reserve(std::min(subset.size(), sample_ids_.size()));
+
+      subset_map_.clear();
+      subset_map_.resize(sample_ids_.size(), std::numeric_limits<std::uint64_t>::max());
+      std::uint64_t subset_index = 0;
+      for (auto it = sample_ids_.begin(); it != sample_ids_.end(); ++it)
+      {
+        if (subset.find(*it) != subset.end())
+        {
+          subset_map_[std::distance(sample_ids_.begin(), it)] = subset_index;
+          ret.push_back(*it);
+          ++subset_index;
+        }
+      }
+
+      subset_size_ = subset_index;
+
+      return ret;
+    }
     //================================================================//
 
     //================================================================//
@@ -31,7 +180,7 @@ namespace savvy
       if (output_file_path.empty())
         output_file_path = input_file_path + ".s1r";
 
-      reader<1> r(input_file_path, fmt::allele); // TODO: make zero if possible.
+      reader r(input_file_path, fmt::allele); // TODO: make zero if possible.
       std::int64_t start_pos = r.tellg();
 
       std::uint32_t min = std::numeric_limits<std::uint32_t>::max();
