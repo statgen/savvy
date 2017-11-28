@@ -1230,6 +1230,7 @@ namespace savvy
 
 
     //################################################################//
+    template <std::size_t VecCnt>
     class writer
     {
     public:
@@ -1241,11 +1242,22 @@ namespace savvy
         {}
       };
 
-      template <typename RandAccessStringIterator, typename RandAccessKVPIterator>
-      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, const options& opts = options()) :
+      template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename... Fmt>
+      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, Fmt... data_formats) :
+        writer(file_path, options(), samples_beg, samples_end, headers_beg, headers_end, data_formats...)
+      {
+      }
+
+      template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename... Fmt>
+      writer(const std::string& file_path, const options& opts, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, Fmt... data_formats) :
         output_stream_(opts.compression == compression_type::none ? std::unique_ptr<std::ostream>(new std::ofstream(file_path)) : std::unique_ptr<std::ostream>(new shrinkwrap::bgz::ostream(file_path))),
         sample_size_(0)
       {
+        static_assert(VecCnt == sizeof...(Fmt), "Number of requested format fields do not match VecCnt template parameter");
+
+        this->format_fields_.reserve(sizeof...(Fmt));
+        this->init_format_fields(data_formats...);
+
         (*output_stream_) << "##fileformat=VCFv4.2" << std::endl;
 
         std::ostreambuf_iterator<char> out_it(*output_stream_);
@@ -1253,20 +1265,36 @@ namespace savvy
 
         for (auto it = headers_beg; it != headers_end; ++it)
         {
-          (*output_stream_) << (std::string("##") + it->first + "=" + it->second) << std::endl;
-
-          if (it->first == "INFO")
+          if (it->first != "FORMAT")
           {
-            if (it->second.size() && it->second.front() == '<' && it->second.back() == '>')
+            (*output_stream_) << (std::string("##") + it->first + "=" + it->second) << std::endl;
+
+            if (it->first == "INFO")
             {
-              std::string header_value = it->second;
-              header_value.resize(header_value.size() - 1);
-
-              auto curr_pos = header_value.begin() + 1;
-              auto comma_pos = std::find(curr_pos, header_value.end(), ',');
-
-              while (comma_pos != header_value.end())
+              if (it->second.size() && it->second.front() == '<' && it->second.back() == '>')
               {
+                std::string header_value = it->second;
+                header_value.resize(header_value.size() - 1);
+
+                auto curr_pos = header_value.begin() + 1;
+                auto comma_pos = std::find(curr_pos, header_value.end(), ',');
+
+                while (comma_pos != header_value.end())
+                {
+                  auto equals_pos = std::find(curr_pos, comma_pos, '=');
+                  if (equals_pos != comma_pos)
+                  {
+                    std::string key(curr_pos, equals_pos);
+                    std::string val(equals_pos + 1, comma_pos);
+
+                    if (key == "ID")
+                      info_fields_.emplace_back(std::move(val));
+                  }
+
+                  curr_pos = comma_pos + 1;
+                  comma_pos = std::find(curr_pos, header_value.end(), ',');
+                }
+
                 auto equals_pos = std::find(curr_pos, comma_pos, '=');
                 if (equals_pos != comma_pos)
                 {
@@ -1275,25 +1303,22 @@ namespace savvy
 
                   if (key == "ID")
                     info_fields_.emplace_back(std::move(val));
+
+                  curr_pos = comma_pos + 1;
                 }
-
-                curr_pos = comma_pos + 1;
-                comma_pos = std::find(curr_pos, header_value.end(), ',');
-              }
-
-              auto equals_pos = std::find(curr_pos, comma_pos, '=');
-              if (equals_pos != comma_pos)
-              {
-                std::string key(curr_pos, equals_pos);
-                std::string val(equals_pos + 1, comma_pos);
-
-                if (key == "ID")
-                  info_fields_.emplace_back(std::move(val));
-
-                curr_pos = comma_pos + 1;
               }
             }
           }
+        }
+
+        for (auto f : this->format_fields_)
+        {
+          if (f == savvy::fmt::allele)
+            (*output_stream_) << "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">" << std::endl;
+          else if (f == savvy::fmt::haplotype_dosage)
+            (*output_stream_) << "##FORMAT=<ID=HDS,Number=2,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage\">" << std::endl;
+          else if (f == savvy::fmt::dosage)
+            (*output_stream_) << "##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage\">" << std::endl;
         }
 
         (*output_stream_) << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
@@ -1305,24 +1330,58 @@ namespace savvy
         (*output_stream_) << std::endl;
       }
 
-      template <typename T>
-      writer& write(const site_info& anno, const std::vector<T>& data)
+      void init_format_fields(savvy::fmt f)
       {
+        this->format_fields_.push_back(f);
+      }
+
+      template <typename... Fmt>
+      void init_format_fields(savvy::fmt f, Fmt... other)
+      {
+        this->format_fields_.push_back(f);
+        this->init_format_fields(other...);
+      }
+
+      template <typename... T>
+      writer& write(const site_info& anno, const T&... data)
+      {
+        static_assert(VecCnt == sizeof...(T), "The number of source vectors must match class template size");
+
         if (good())
         {
-          if (data.size() % sample_size_ != 0)
+          // VALIDATE VECTOR SIZES
+          std::size_t ploidy = 0;
+          for (std::size_t i = 0; i < format_fields_.size(); ++i)
           {
-            output_stream_->setstate(std::ios::failbit);
+            fmt f = format_fields_[i];
+            if (f == fmt::allele || f == fmt::haplotype_dosage)
+            {
+              if (ploidy)
+              {
+                if ((get_vec_size(i, data...) / sample_size_) != ploidy)
+                  this->output_stream_->setstate(std::ios::failbit);
+              }
+              else
+              {
+                ploidy = (get_vec_size(i, data...) / sample_size_);
+              }
+            }
+            else if (f == fmt::dosage)
+            {
+              if (sample_size_ != get_vec_size(i, data...))
+                this->output_stream_->setstate(std::ios::failbit);
+            }
           }
-          else
+
+          if (good())
           {
             (*output_stream_) << anno.chromosome()
-                           << "\t" << anno.position()
-                           << "\t" << std::string(anno.prop("ID").size() ? anno.prop("ID") : ".")
-                           << "\t" << anno.ref()
-                           << "\t" << anno.alt()
-                           << "\t" << std::string(anno.prop("QUAL").size() ? anno.prop("QUAL") : ".")
-                           << "\t" << std::string(anno.prop("FILTER").size() ? anno.prop("FILTER") : ".");
+                              << "\t" << anno.position()
+                              << "\t" << std::string(anno.prop("ID").size() ? anno.prop("ID") : ".")
+                              << "\t" << anno.ref()
+                              << "\t" << anno.alt()
+                              << "\t" << std::string(anno.prop("QUAL").size() ? anno.prop("QUAL") : ".")
+                              << "\t" << std::string(anno.prop("FILTER").size() ? anno.prop("FILTER") : ".");
 
             std::size_t i = 0;
             for (auto it = info_fields_.begin(); it != info_fields_.end(); ++it)
@@ -1343,9 +1402,22 @@ namespace savvy
             if (i == 0)
               (*output_stream_) << "\t.";
 
-            (*output_stream_) << "\tGT";
-            write_genotypes(data);
-            (*output_stream_) << std::endl;
+            for (auto it = format_fields_.begin(); it != format_fields_.end(); ++it)
+            {
+              if (std::distance(format_fields_.begin(), it) > 0)
+                output_stream_->put(':');
+              (*output_stream_) << (*it == fmt::dosage ? "\tDS" : (*it == fmt::haplotype_dosage ? "\tHDS" : "\tGT"));
+            }
+
+            if (this->good())
+            {
+              std::ostreambuf_iterator<char> out_it(*output_stream_);
+              for (std::size_t i = 0; i < sample_size_; ++i)
+              {
+                write_format_field(out_it, ploidy, i, data...);
+              }
+              (*output_stream_) << std::endl;
+            }
           }
         }
 
@@ -1353,38 +1425,113 @@ namespace savvy
       }
 
       template <typename T>
-      writer& operator<<(const std::tuple<site_info, std::vector<T>>& m)
+      writer& operator<<(const variant<std::vector<T>>& v)
       {
-        return this->write(std::get<0>(m), std::get<1>(m));
+        return this->write(v, v.data());
       }
 
       bool good() { return output_stream_->good(); }
     private:
       template <typename T>
-      void write_genotypes(const std::vector<T>& m)
+      static std::size_t get_vec_size(std::size_t offset, const std::vector<T>& m)
       {
-        std::size_t i = 0;
-        const std::size_t ploidy = m.size() / sample_size_;
-        std::ostreambuf_iterator<char> out_it(*output_stream_);
-        for (auto it = m.begin(); it != m.end(); ++it)
+        if (offset == 0)
+          return m.size();
+        return 0;
+      }
+
+      template <typename T, typename... T2>
+      static std::size_t get_vec_size(std::size_t offset, const std::vector<T>& m, const T2&... other)
+      {
+        if ((sizeof...(T2) + 1) - offset == 0)
+          return m.size();
+        else
+          return get_vec_size(offset - 1, other...);
+      }
+
+      template <typename T>
+      void write_format_field(std::ostreambuf_iterator<char>& out_it, std::uint32_t ploidy, std::size_t sample_index, const std::vector<T>& m)
+      {
+        fmt f = format_fields_[format_fields_.size() - 1];
+        if (f == fmt::allele)
+          write_gt(out_it, ploidy, sample_index, m);
+        else if (f == fmt::haplotype_dosage)
+          write_hds(out_it, ploidy, sample_index, m);
+        else //if (f == fmt::dosage)
+          write_ds(out_it, sample_index, m);
+      }
+
+      template <typename T, typename... T2>
+      void write_format_field(std::ostreambuf_iterator<char>& out_it, std::uint32_t ploidy, std::size_t sample_index, const std::vector<T>& m, const T2&... other)
+      {
+        fmt f = format_fields_[format_fields_.size() - (sizeof...(T2) + 1)];
+        if (f == fmt::allele)
+          write_gt(out_it, ploidy, sample_index, m);
+        else if (f == fmt::haplotype_dosage)
+          write_hds(out_it, ploidy, sample_index, m);
+        else //if (f == fmt::dosage)
+          write_ds(out_it, sample_index, m);
+        write_format_field(out_it, ploidy, sample_index, other...);
+      }
+
+      template <typename T>
+      void write_gt(std::ostreambuf_iterator<char>& out_it, const std::uint32_t ploidy, std::size_t sample_index, const std::vector<T>& m)
+      {
+        std::size_t end = ploidy + sample_index;
+        for (std::size_t i = sample_index; i < end; ++i)
         {
-          if (i % ploidy == 0)
+          if (i == sample_index)
             out_it = '\t';
           else
             out_it = '|';
 
-          if (std::isnan(*it))
+          if (std::isnan(m[i]))
             out_it = '.';
-          else if (*it == 0.0)
+          else if (m[i] == 0.0)
             out_it = '0';
           else
             out_it = '1';
+        }
+      }
 
-          ++i;
+      template <typename T>
+      void write_ds(std::ostreambuf_iterator<char>& out_it, std::size_t sample_index, const std::vector<T>& m)
+      {
+
+        out_it = '\t';
+
+        if (std::isnan(m[sample_index]))
+          out_it = '.';
+        else
+        {
+          for (const auto c : std::to_string(m[sample_index]))
+            out_it = c;
+        }
+      }
+
+      template <typename T>
+      void write_hds(std::ostreambuf_iterator<char>& out_it, const std::uint32_t ploidy, std::size_t sample_index, const std::vector<T>& m)
+      {
+        std::size_t end = ploidy + sample_index;
+        for (std::size_t i = sample_index; i < end; ++i)
+        {
+          if (i == sample_index)
+            out_it = '\t';
+          else
+            out_it = ',';
+
+          if (std::isnan(m[i]))
+            out_it = '.';
+          else
+          {
+            for (const auto c : std::to_string(m[i]))
+              out_it = c;
+          }
         }
       }
     private:
       std::vector<std::string> info_fields_;
+      std::vector<fmt> format_fields_;
       std::unique_ptr<std::ostream> output_stream_;
       std::size_t sample_size_;
     };

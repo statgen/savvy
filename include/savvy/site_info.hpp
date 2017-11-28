@@ -65,6 +65,7 @@ namespace savvy
   {
   public:
     T& data() { return data_; }
+    const T& data() const { return data_; }
   private:
     T data_;
   };

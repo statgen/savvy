@@ -140,7 +140,7 @@ public:
   }
 };
 
-int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, savvy::vcf::writer& out)
+int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, savvy::vcf::writer<1>& out)
 {
   savvy::site_info variant;
   std::vector<float> genotypes;
@@ -151,7 +151,7 @@ int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& reg
   return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, savvy::vcf::writer& out)
+int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, savvy::vcf::writer<1>& out)
 {
   savvy::site_info variant;
   std::vector<float> genotypes;
@@ -214,7 +214,7 @@ int export_reader(T& input, const export_prog_args& args)
 //  else if (args.format() == savvy::fmt::genotype_probability)
 //    headers.emplace_back("FORMAT", "<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1\">"); // TODO: Handle other ploidy levels.
 
-  savvy::vcf::writer vcf_output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end());
+  savvy::vcf::writer<1> vcf_output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
   return export_records(input, args.regions(), vcf_output);
 }
 
