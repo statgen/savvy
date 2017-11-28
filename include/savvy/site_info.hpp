@@ -60,6 +60,15 @@ namespace savvy
     static const std::string empty_string;
   };
 
+  template <typename T>
+  class variant : public site_info
+  {
+  public:
+    T& data() { return data_; }
+  private:
+    T data_;
+  };
+
 //  template <typename T>
 //  class allele_vector : public variant_vector<T>
 //  {

@@ -646,18 +646,13 @@ namespace savvy
     {
     public:
       using reader_base::reader_base;
-#if __cpp_decltype_auto >= 201304
-      template <typename... T>
-      reader& operator>>(std::tuple<site_info, T...>& destination)
+
+      template <typename T>
+      reader& operator>>(variant<T>& destination)
       {
-        ::savvy::detail::apply([this](site_info& anno, auto&... args)
-          {
-            this->read(anno, std::forward<decltype(args)>(args)...);
-          },
-          destination);
-        return *this;
+        return this->read(destination, destination.data());
       }
-#endif
+
       template <typename T>
       reader& read(site_info& annotations, T& destination)
       {
@@ -704,18 +699,12 @@ namespace savvy
       {
         return index_.tree_names();
       }
-#if __cpp_decltype_auto >= 201304
-      template <typename... T>
-      indexed_reader& operator>>(std::tuple<site_info, T...>& destination)
+
+      template <typename T>
+      indexed_reader& operator>>(variant<T>& destination)
       {
-        ::savvy::detail::apply([this](site_info& anno, auto&... args)
-          {
-            this->read(anno, std::forward<decltype(args)>(args)...);
-          },
-          destination);
-        return *this;
+        return this->read(destination, destination.data());
       }
-#endif
       template <typename T>
       indexed_reader& read(site_info& annotations, T& destination)
       {

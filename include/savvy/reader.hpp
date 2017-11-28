@@ -161,10 +161,10 @@ namespace savvy
     template <typename T>
     reader(const std::string& file_path, T data_format);
     ~reader() {}
-#if __cpp_decltype_auto >= 201304
+
     template <typename T>
-    reader& operator>>(std::tuple<site_info, T>& destination);
-#endif
+    reader& operator>>(variant<T>& destination);
+
     template <typename T>
     reader& read(site_info& annotations, T& destination);
   private:
@@ -188,10 +188,10 @@ namespace savvy
     void reset_region(const region& reg);
 
     std::vector<std::string> chromosomes() const;
-#if __cpp_decltype_auto >= 201304
+
     template <typename T>
-    indexed_reader& operator>>(std::tuple<site_info, T>& destination);
-#endif
+    indexed_reader& operator>>(variant<T>& destination);
+
     template <typename T>
     indexed_reader& read(site_info& annotations, T& destination);
 
@@ -264,18 +264,12 @@ namespace savvy
   //################################################################//
 
   //################################################################//
-#if __cpp_decltype_auto >= 201304
   template <typename T>
-  reade& reader::operator>>(std::tuple<site_info, T>& destination)
+  reader& reader::operator>>(variant<T>& destination)
   {
-    ::savvy::detail::apply([this](site_info& anno, auto&... args)
-      {
-        this->read(anno, std::forward<decltype(args)>(args)...);
-      },
-      destination);
-    return *this;
+    return this->read(destination, destination.data());
   }
-#endif
+
   template <typename T>
   reader& reader::read(site_info& annotations, T& destination)
   {
@@ -331,19 +325,13 @@ namespace savvy
     else if (vcf_reader_)
       vcf_reader_->reset_region(reg);
   }
-#if __cpp_decltype_auto >= 201304
-  template <std::size_t VecCnt>
+
   template <typename T>
-  indexed_reader<VecCnt>& indexed_reader::operator>>(std::tuple<site_info, T>& destination)
+  indexed_reader& indexed_reader::operator>>(variant<T>& destination)
   {
-    ::savvy::detail::apply([this](site_info& anno, auto&... args)
-      {
-        this->read(anno, std::forward<decltype(args)>(args)...);
-      },
-      destination);
-    return *this;
+    return this->read(destination, destination.data());
   }
-#endif
+
   template <typename T>
   indexed_reader& indexed_reader::read(site_info& annotations, T& destination)
   {

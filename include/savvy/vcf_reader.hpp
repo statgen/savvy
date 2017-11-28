@@ -156,18 +156,14 @@ namespace savvy
       reader(const reader&) = delete;
       reader& operator=(const reader&) = delete;
       ~reader();
-#if __cpp_decltype_auto >= 201304
-      template <typename... T>
-      reader& operator>>(std::tuple<site_info, T...>& destination)
+
+      template <typename T>
+      reader& operator>>(variant<T>& destination)
       {
-        ::savvy::detail::apply([this](site_info& anno, auto&... args)
-          {
-            this->read(anno, std::forward<decltype(args)>(args)...);
-          },
-          destination);
-        return *this;
+        //static_assert(VecCnt == 1, "Extraction operator only supported with single format field reader");
+        return this->read(destination, destination.data());
       }
-#endif
+
       template <typename... T>
       reader& read(site_info& annotations, T&... destinations);
 
@@ -233,10 +229,9 @@ namespace savvy
       void reset_region(const region& reg);
 
       std::vector<std::string> chromosomes() const;
-#if __cpp_decltype_auto >= 201304
-      template <typename... T>
-      indexed_reader& operator>>(std::tuple<site_info,T...>& destination);
-#endif
+
+      template <typename T>
+      indexed_reader& operator>>(variant<T>& destination);
       template <typename... T>
       indexed_reader<VecCnt>& read(site_info& annotations, T&... destinations);
 
@@ -1087,19 +1082,14 @@ namespace savvy
     //################################################################//
 
     //################################################################//
-#if __cpp_decltype_auto >= 201304
     template <std::size_t VecCnt>
-    template <typename... T>
-    indexed_reader<VecCnt>& indexed_reader<VecCnt>::operator>>(std::tuple<site_info, T...>& destination)
+    template <typename T>
+    indexed_reader<VecCnt>& indexed_reader<VecCnt>::operator>>(variant<T>& destination)
     {
-      ::savvy::detail::apply([this](site_info& anno, auto&... args)
-        {
-          this->read(anno, std::forward<decltype(args)>(args)...);
-        },
-        destination);
-      return *this;
+      //static_assert(VecCnt == 1, "Extraction operator only supported with one format field");
+      return this->read(destination, destination.data());
     }
-#endif
+
     template <std::size_t VecCnt>
     template <typename... T>
     indexed_reader<VecCnt>& indexed_reader<VecCnt>::read(site_info& annotations, T&... destinations)
