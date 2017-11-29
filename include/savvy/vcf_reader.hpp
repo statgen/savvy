@@ -1358,17 +1358,17 @@ namespace savvy
             {
               if (ploidy)
               {
-                if ((get_vec_size(i, data...) / sample_size_) != ploidy)
+                if ((get_vec(i, data...).size() / sample_size_) != ploidy)
                   this->output_stream_->setstate(std::ios::failbit);
               }
               else
               {
-                ploidy = (get_vec_size(i, data...) / sample_size_);
+                ploidy = (get_vec(i, data...).size() / sample_size_);
               }
             }
             else if (f == fmt::dosage)
             {
-              if (sample_size_ != get_vec_size(i, data...))
+              if (sample_size_ != get_vec(i, data...).size())
                 this->output_stream_->setstate(std::ios::failbit);
             }
           }
@@ -1412,10 +1412,64 @@ namespace savvy
             if (this->good())
             {
               std::ostreambuf_iterator<char> out_it(*output_stream_);
-              for (std::size_t i = 0; i < sample_size_; ++i)
+              for (std::size_t sample_index = 0; sample_index < sample_size_; ++sample_index)
               {
-                write_format_field(out_it, ploidy, i, data...);
+                for (std::size_t format_index = 0; format_index < format_fields_.size(); ++format_index)
+                {
+                  auto v = get_vec(format_index, data...);
+                  fmt f = format_fields_[format_index];
+                  if (f == fmt::allele)
+                  {
+                    std::size_t end = ploidy + sample_index * ploidy;
+                    for (std::size_t i = sample_index * ploidy; i < end; ++i)
+                    {
+                      if (i == sample_index * ploidy)
+                        out_it = '\t';
+                      else
+                        out_it = '|';
+
+                      if (std::isnan(v[i]))
+                        out_it = '.';
+                      else if (v[i] == 0.0)
+                        out_it = '0';
+                      else
+                        out_it = '1';
+                    }
+                  }
+                  else if (f == fmt::haplotype_dosage)
+                  {
+                    std::size_t end = ploidy + sample_index * ploidy;
+                    for (std::size_t i = sample_index * ploidy; i < end; ++i)
+                    {
+                      if (i == sample_index * ploidy)
+                        out_it = '\t';
+                      else
+                        out_it = ',';
+
+                      if (std::isnan(v[i]))
+                        out_it = '.';
+                      else
+                      {
+                        for (const auto c : std::to_string(v[i]))
+                          out_it = c;
+                      }
+                    }
+                  }
+                  else //if (f == fmt::dosage)
+                  {
+                    out_it = '\t';
+
+                    if (std::isnan(v[sample_index]))
+                      out_it = '.';
+                    else
+                    {
+                      for (const auto c : std::to_string(v[sample_index]))
+                        out_it = c;
+                    }
+                  }
+                }
               }
+
               (*output_stream_) << std::endl;
             }
           }
@@ -1433,101 +1487,23 @@ namespace savvy
       bool good() { return output_stream_->good(); }
     private:
       template <typename T>
-      static std::size_t get_vec_size(std::size_t offset, const std::vector<T>& m)
+      static const std::vector<T>& get_vec(std::size_t offset, const std::vector<T>& m)
       {
-        if (offset == 0)
-          return m.size();
-        return 0;
+        assert(offset == 0);
+        return m;
+//        if (offset == 0)
+//          return m;
+//        else
+//          throw std::out_of_range("Vector index out of range");
       }
 
       template <typename T, typename... T2>
-      static std::size_t get_vec_size(std::size_t offset, const std::vector<T>& m, const T2&... other)
+      static const std::vector<T>& get_vec(std::size_t offset, const std::vector<T>& m, const T2&... other)
       {
         if ((sizeof...(T2) + 1) - offset == 0)
-          return m.size();
+          return m;
         else
-          return get_vec_size(offset - 1, other...);
-      }
-
-      template <typename T>
-      void write_format_field(std::ostreambuf_iterator<char>& out_it, std::uint32_t ploidy, std::size_t sample_index, const std::vector<T>& m)
-      {
-        fmt f = format_fields_[format_fields_.size() - 1];
-        if (f == fmt::allele)
-          write_gt(out_it, ploidy, sample_index, m);
-        else if (f == fmt::haplotype_dosage)
-          write_hds(out_it, ploidy, sample_index, m);
-        else //if (f == fmt::dosage)
-          write_ds(out_it, sample_index, m);
-      }
-
-      template <typename T, typename... T2>
-      void write_format_field(std::ostreambuf_iterator<char>& out_it, std::uint32_t ploidy, std::size_t sample_index, const std::vector<T>& m, const T2&... other)
-      {
-        fmt f = format_fields_[format_fields_.size() - (sizeof...(T2) + 1)];
-        if (f == fmt::allele)
-          write_gt(out_it, ploidy, sample_index, m);
-        else if (f == fmt::haplotype_dosage)
-          write_hds(out_it, ploidy, sample_index, m);
-        else //if (f == fmt::dosage)
-          write_ds(out_it, sample_index, m);
-        write_format_field(out_it, ploidy, sample_index, other...);
-      }
-
-      template <typename T>
-      void write_gt(std::ostreambuf_iterator<char>& out_it, const std::uint32_t ploidy, std::size_t sample_index, const std::vector<T>& m)
-      {
-        std::size_t end = ploidy + sample_index;
-        for (std::size_t i = sample_index; i < end; ++i)
-        {
-          if (i == sample_index)
-            out_it = '\t';
-          else
-            out_it = '|';
-
-          if (std::isnan(m[i]))
-            out_it = '.';
-          else if (m[i] == 0.0)
-            out_it = '0';
-          else
-            out_it = '1';
-        }
-      }
-
-      template <typename T>
-      void write_ds(std::ostreambuf_iterator<char>& out_it, std::size_t sample_index, const std::vector<T>& m)
-      {
-
-        out_it = '\t';
-
-        if (std::isnan(m[sample_index]))
-          out_it = '.';
-        else
-        {
-          for (const auto c : std::to_string(m[sample_index]))
-            out_it = c;
-        }
-      }
-
-      template <typename T>
-      void write_hds(std::ostreambuf_iterator<char>& out_it, const std::uint32_t ploidy, std::size_t sample_index, const std::vector<T>& m)
-      {
-        std::size_t end = ploidy + sample_index;
-        for (std::size_t i = sample_index; i < end; ++i)
-        {
-          if (i == sample_index)
-            out_it = '\t';
-          else
-            out_it = ',';
-
-          if (std::isnan(m[i]))
-            out_it = '.';
-          else
-          {
-            for (const auto c : std::to_string(m[i]))
-              out_it = c;
-          }
-        }
+          return get_vec(offset - 1, other...);
       }
     private:
       std::vector<std::string> info_fields_;
