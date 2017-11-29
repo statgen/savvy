@@ -1420,13 +1420,21 @@ namespace savvy
                   fmt f = format_fields_[format_index];
                   if (f == fmt::allele)
                   {
-                    std::size_t end = ploidy + sample_index * ploidy;
-                    for (std::size_t i = sample_index * ploidy; i < end; ++i)
+                    out_it = '\t';
+
+                    std::size_t i = sample_index * ploidy;
+                    if (std::isnan(v[i]))
+                      out_it = '.';
+                    else if (v[i] == 0.0)
+                      out_it = '0';
+                    else
+                      out_it = '1';
+
+                    std::size_t end = ploidy + i;
+                    ++i;
+                    for ( ; i < end; ++i)
                     {
-                      if (i == sample_index * ploidy)
-                        out_it = '\t';
-                      else
-                        out_it = '|';
+                      out_it = '|';
 
                       if (std::isnan(v[i]))
                         out_it = '.';
@@ -1438,13 +1446,22 @@ namespace savvy
                   }
                   else if (f == fmt::haplotype_dosage)
                   {
-                    std::size_t end = ploidy + sample_index * ploidy;
-                    for (std::size_t i = sample_index * ploidy; i < end; ++i)
+                    out_it = '\t';
+
+                    std::size_t i = sample_index * ploidy;
+                    if (std::isnan(v[i]))
+                      out_it = '.';
+                    else
                     {
-                      if (i == sample_index * ploidy)
-                        out_it = '\t';
-                      else
-                        out_it = ',';
+                      for (const auto c : std::to_string(v[i]))
+                        out_it = c;
+                    }
+
+                    std::size_t end = ploidy + i;
+                    ++i;
+                    for ( ; i < end; ++i)
+                    {
+                      out_it = ',';
 
                       if (std::isnan(v[i]))
                         out_it = '.';
