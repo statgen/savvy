@@ -39,6 +39,7 @@ add_executable(sav
                src/sav/import.cpp include/sav/import.hpp
                src/sav/index.cpp include/sav/index.hpp
                src/sav/merge.cpp include/sav/merge.hpp
+               src/sav/sort.cpp include/sav/sort.hpp
                src/sav/utility.cpp include/sav/utility.hpp)
 target_link_libraries(sav savvy)
 

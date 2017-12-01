@@ -2,6 +2,7 @@
 #include "sav/import.hpp"
 #include "sav/index.hpp"
 #include "sav/merge.hpp"
+#include "sav/sort.hpp"
 #include "savvy/utility.hpp"
 
 #include <cmath>
@@ -27,13 +28,18 @@ public:
   void print_usage(std::ostream& os)
   {
     os << "----------------------------------------------\n";
-    os << "Usage: sav [sub-command] [args]\n";
+    os << "Usage:\n";
+    os << "sav [sub-command] [args]\n";
+    os << "sav [opts]\n";
     os << "\n";
+    os << "Sub-commands:\n";
     os << "export  : Converts SAV into VCF or BCF\n";
     os << "import  : Converts VCF or BCF into SAV\n";
     os << "index   : Indexes SAV file\n";
     os << "merge   : Merges multiple files into one\n";
+    os << "sort    : Sorts SAV file\n";
     os << "\n";
+    os << "Options:\n";
     os << " -h, --help       : Print usage\n";
     os << " -v, --version    : Print version\n";
     os << "----------------------------------------------\n";
@@ -94,6 +100,10 @@ int main(int argc, char** argv)
   else if (args.sub_command() == "merge")
   {
     return merge_main(argc, argv);
+  }
+  else if (args.sub_command() == "sort")
+  {
+    return sort_main(argc, argv);
   }
 
   if (args.help_is_set())

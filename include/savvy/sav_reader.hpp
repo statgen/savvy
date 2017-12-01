@@ -69,6 +69,7 @@ namespace savvy
     class reader_base
     {
     public:
+      reader_base(const std::string& file_path);
       reader_base(const std::string& file_path, savvy::fmt data_format);
 #if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
       reader_base(reader_base&& source);
@@ -627,7 +628,10 @@ namespace savvy
         {
           discard_genotypes();
         }
+        input_stream_.rdbuf(nullptr);
       }
+    private:
+      void parse_header();
     protected:
       std::vector<std::string> sample_ids_;
       std::vector<std::uint64_t> subset_map_;
@@ -783,16 +787,6 @@ namespace savvy
         if (!index_.good())
           this->input_stream_.setstate(std::ios::badbit);
       }
-
-    private:
-//      bool update_file_position()
-//      {
-//        if (i_ == query_.end())
-//          return false;
-//        input_stream_.seekg(std::streampos(i_->value()));
-//        ++i_;
-//        return true;
-//      }
     private:
       s1r::reader index_;
       s1r::reader::query query_;
@@ -895,9 +889,9 @@ namespace savvy
       }
 
       template <typename T>
-      writer& operator<<(std::tuple<site_info, std::vector<T>>& m)
+      writer& operator<<(const savvy::variant<T>& v)
       {
-        write(std::get<0>(m), std::get<1>(m));
+        write(v, v.data());
         return *this;
       }
 
@@ -1032,7 +1026,7 @@ namespace savvy
       bool eof() const { return output_stream_.eof(); }
 
       static bool create_index(const std::string& input_file_path, std::string output_file_path = "");
-    private:
+    protected:
       template <typename T>
       static std::size_t get_string_size(T str);
 
@@ -1220,7 +1214,7 @@ namespace savvy
     private:
       static const std::array<std::string, 0> empty_string_array;
       static const std::array<std::pair<std::string, std::string>, 0> empty_string_pair_array;
-    private:
+    protected:
       std::unique_ptr<std::streambuf> output_buf_;
       std::ostream output_stream_;
       std::vector<std::pair<std::string, std::string>> headers_;

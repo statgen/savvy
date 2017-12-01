@@ -39,8 +39,8 @@ public:
   {
   }
 
-  const std::vector<std::string>& input_paths() { return input_paths_; }
-  const std::string& output_path() { return output_path_; }
+  const std::vector<std::string>& input_paths() const { return input_paths_; }
+  const std::string& output_path() const { return output_path_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
   savvy::fmt format() const { return format_; }
