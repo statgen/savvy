@@ -128,7 +128,7 @@ typedef savvy::variant<savvy::compressed_vector<float>> var_type;
 
 struct left_comparator
 {
-  bool operator()(const var_type& a, const var_type& b)
+  bool operator()(const savvy::site_info& a, const savvy::site_info& b)
   {
     if (a.chromosome() == b.chromosome())
       return a.position() < b.position();
@@ -138,7 +138,7 @@ struct left_comparator
 
 struct right_comparator
 {
-  bool operator()(const var_type& a, const var_type& b)
+  bool operator()(const savvy::site_info& a, const savvy::site_info& b)
   {
     if (a.chromosome() == b.chromosome())
       return (a.position() + std::max(a.ref().size(), a.alt().size())) < (b.position() + std::max(b.ref().size(), b.alt().size()));
@@ -148,7 +148,7 @@ struct right_comparator
 
 struct mid_comparator
 {
-  bool operator()(const var_type& a, const var_type& b)
+  bool operator()(const savvy::site_info& a, const savvy::site_info& b)
   {
     if (a.chromosome() == b.chromosome())
     {
@@ -247,7 +247,7 @@ int run_sort(const sort_prog_args& args)
   Cmp cmp;
 
   random_string_generator str_gen;
-  std::size_t temp_file_size = 4096;
+  std::size_t temp_file_size = 7;
   savvy::sav::reader r(args.input_path());
   std::deque<headless_writer> temp_writers;
   std::deque<headless_reader> temp_readers;
@@ -259,9 +259,10 @@ int run_sort(const sort_prog_args& args)
   {
     std::vector<var_type> variants(temp_file_size);
 
-    std::size_t read_counter = 0;
-    do
+    std::size_t read_counter = temp_file_size;
+    while (read_counter == temp_file_size)
     {
+      read_counter = 0;
       for (; read_counter < temp_file_size; ++read_counter)
       {
         r >> variants[read_counter];
@@ -276,14 +277,13 @@ int run_sort(const sort_prog_args& args)
         std::string temp_path = "/tmp/tmp-" + str_gen(8) + ".sav";
         temp_writers.emplace_back(temp_path, r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), write_opts);
         temp_readers.emplace_back(temp_path, r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), write_opts.data_format);
-        //std::remove(temp_path.c_str());
+        std::remove(temp_path.c_str());
         for (std::size_t i = 0; i < read_counter; ++i)
         {
           temp_writers.back() << variant_refs[i].get();
         }
       }
     }
-    while (read_counter == temp_file_size);
   }
 
 
@@ -294,7 +294,7 @@ int run_sort(const sort_prog_args& args)
     std::size_t i = 0;
     for (auto it = temp_readers.begin(); it != temp_readers.end(); ++it)
     {
-      temp_readers.back().read(variants[i], variants[i].data());
+      it->read(variants[i], variants[i].data());
       ++i;
     }
 
