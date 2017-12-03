@@ -47,7 +47,7 @@ public:
   void print_usage(std::ostream& os)
   {
     os << "----------------------------------------------\n";
-    os << "Usage: sav sort [opts] [in.sav] [out.sav]\\n\";\n";
+    os << "Usage: sav sort [opts ...] [in.sav] [out.sav]\n";
     os << "\n";
     os << " -#               : # compression level (1-19, default: " << default_compression_level << ")\n";
     os << " -b, --block-size : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
@@ -205,6 +205,41 @@ public:
   const std::string& file_path() const { return this->file_path_; }
 };
 
+class headless_reader : public savvy::sav::reader
+{
+public:
+  template<typename RandAccessStringIterator, typename RandAccessKVPIterator>
+  headless_reader(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, savvy::fmt format) :
+    savvy::sav::reader("", format)
+  {
+    file_data_format_ = format;
+    file_path_ = file_path;
+    input_stream_ = shrinkwrap::zstd::istream(file_path);
+    for (auto it = headers_beg; it != headers_end; ++it)
+    {
+      if (it->first == "INFO")
+      {
+        std::string info_field = savvy::parse_header_id(it->second);
+        metadata_fields_.push_back(std::move(info_field));
+      }
+      else if (it->first == "FORMAT")
+      {
+        std::string format_field = savvy::parse_header_id(it->second);
+        if (format_field == "GT")
+          file_data_format_ = savvy::fmt::allele;
+//                    else if (format_field == "GP")
+//                      file_data_format_ = fmt::genotype_probability;
+        else if (format_field == "HDS")
+          file_data_format_ = savvy::fmt::haplotype_dosage;
+      }
+      headers_.emplace_back(it->first, it->second);
+    }
+
+    this->sample_ids_.assign(samples_beg, samples_end);
+
+  }
+};
+
 
 template <typename Cmp>
 int run_sort(const sort_prog_args& args)
@@ -214,11 +249,11 @@ int run_sort(const sort_prog_args& args)
   random_string_generator str_gen;
   std::size_t temp_file_size = 4096;
   savvy::sav::reader r(args.input_path());
-  std::deque<headless_writer> temp_files;
-  std::deque<savvy::sav::reader> temp_readers;
+  std::deque<headless_writer> temp_writers;
+  std::deque<headless_reader> temp_readers;
 
   savvy::sav::writer::options write_opts;
-  write_opts.data_format = savvy::fmt::haplotype_dosage;
+  write_opts.data_format = r.data_format();
   savvy::sav::writer output(args.output_path(), r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), write_opts);
 
   {
@@ -238,11 +273,13 @@ int run_sort(const sort_prog_args& args)
       {
         std::vector<std::reference_wrapper<var_type>> variant_refs(variants.begin(), variants.end());
         std::sort(variant_refs.begin(), variant_refs.begin() + read_counter, cmp);
-        temp_files.emplace_back("/tmp/tmp-" + str_gen(8) + ".sav", r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), write_opts);
-
+        std::string temp_path = "/tmp/tmp-" + str_gen(8) + ".sav";
+        temp_writers.emplace_back(temp_path, r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), write_opts);
+        temp_readers.emplace_back(temp_path, r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), write_opts.data_format);
+        //std::remove(temp_path.c_str());
         for (std::size_t i = 0; i < read_counter; ++i)
         {
-          temp_files.back() << variant_refs[i].get();
+          temp_writers.back() << variant_refs[i].get();
         }
       }
     }
@@ -252,33 +289,33 @@ int run_sort(const sort_prog_args& args)
 
 
   {
+    temp_writers.clear();
     std::vector<savvy::variant<savvy::compressed_vector<float>>> variants(temp_readers.size());
     std::size_t i = 0;
-    for (auto it = temp_files.begin(); it != temp_files.end(); ++it)
+    for (auto it = temp_readers.begin(); it != temp_readers.end(); ++it)
     {
-      temp_readers.emplace_back(it->file_path(), write_opts.data_format);
-      std::remove(it->file_path().c_str());
       temp_readers.back().read(variants[i], variants[i].data());
       ++i;
     }
 
 
-    std::size_t min_index = variants.size();
+    std::size_t min_index;
 
     do
     {
-      for (std::size_t i = 0; i < variants.size(); ++i)
+      min_index = variants.size();
+      for (std::size_t rdr_index = 0; rdr_index < variants.size(); ++rdr_index)
       {
-        if (temp_readers[i].good())
+        if (temp_readers[rdr_index].good())
         {
           if (min_index < variants.size())
           {
-            if (cmp(variants[i], variants[min_index]))
-              min_index = i;
+            if (cmp(variants[rdr_index], variants[min_index]))
+              min_index = rdr_index;
           }
           else
           {
-            min_index = i;
+            min_index = rdr_index;
           }
         }
       }
@@ -286,7 +323,7 @@ int run_sort(const sort_prog_args& args)
       if (min_index < variants.size())
       {
         output << variants[min_index];
-        temp_readers[i] >> variants[min_index];
+        temp_readers[min_index] >> variants[min_index];
       }
 
     } while (min_index < variants.size());

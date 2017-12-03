@@ -101,6 +101,7 @@ namespace savvy
 
       std::vector<std::string> prop_fields() const { return std::vector<std::string>(metadata_fields_); }
       const std::vector<std::pair<std::string,std::string>>& headers() const { return headers_; }
+      savvy::fmt data_format() const { return file_data_format_; }
 
       /**
        *
@@ -628,7 +629,6 @@ namespace savvy
         {
           discard_genotypes();
         }
-        input_stream_.rdbuf(nullptr);
       }
     private:
       void parse_header();
