@@ -32,7 +32,6 @@ namespace savvy
       parse_header();
     }
 
-#if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
     reader_base::reader_base(reader_base&& source) :
       sample_ids_(std::move(source.sample_ids_)),
       subset_map_(std::move(source.subset_map_)),
@@ -64,7 +63,6 @@ namespace savvy
       }
       return *this;
     }
-#endif
 
     void reader_base::parse_header()
     {

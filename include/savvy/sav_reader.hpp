@@ -71,10 +71,10 @@ namespace savvy
     public:
       reader_base(const std::string& file_path);
       reader_base(const std::string& file_path, savvy::fmt data_format);
-#if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
+
       reader_base(reader_base&& source);
       reader_base& operator=(reader_base&& source);
-#endif
+
       //reader(const reader&) = delete;
       //reader& operator=(const reader&) = delete;
       virtual ~reader_base() {}
