@@ -47,6 +47,25 @@ namespace savvy
     {
     }
 
+    reader_base& reader_base::operator=(reader_base&& source)
+    {
+      if (&source != this)
+      {
+        sample_ids_ = std::move(source.sample_ids_);
+        subset_map_ = std::move(source.subset_map_);
+        subset_size_ = source.subset_size_;
+        //sbuf_ = std::move(source.sbuf_);
+        //input_stream_->rdbuf(&sbuf_);
+        input_stream_ = std::move(source.input_stream_);
+        file_path_ = std::move(source.file_path_);
+        metadata_fields_ = std::move(source.metadata_fields_);
+        file_data_format_ = source.file_data_format_;
+        requested_data_format_ = source.requested_data_format_;
+      }
+      return *this;
+    }
+#endif
+
     void reader_base::parse_header()
     {
       std::string version_string(7, '\0');
@@ -140,25 +159,6 @@ namespace savvy
 
       input_stream_->peek();
     }
-
-    reader_base& reader_base::operator=(reader_base&& source)
-    {
-      if (&source != this)
-      {
-        sample_ids_ = std::move(source.sample_ids_);
-        subset_map_ = std::move(source.subset_map_);
-        subset_size_ = source.subset_size_;
-        //sbuf_ = std::move(source.sbuf_);
-        //input_stream_->rdbuf(&sbuf_);
-        input_stream_ = std::move(source.input_stream_);
-        file_path_ = std::move(source.file_path_);
-        metadata_fields_ = std::move(source.metadata_fields_);
-        file_data_format_ = source.file_data_format_;
-        requested_data_format_ = source.requested_data_format_;
-      }
-      return *this;
-    }
-#endif
 
     std::vector<std::string> reader_base::subset_samples(const std::set<std::string>& subset)
     {
