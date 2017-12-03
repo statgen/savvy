@@ -32,11 +32,11 @@ public:
     long_options_(
       {
         {"block-size", required_argument, 0, 'b'},
-        {"format", required_argument, 0, 'f'},
+        {"data-format", required_argument, 0, 'd'},
         {"help", no_argument, 0, 'h'},
         {"regions", required_argument, 0, 'r'},
-        {"samples", required_argument, 0, 's'},
-        {"samples-file", required_argument, 0, 'S'},
+        {"sample-ids", required_argument, 0, 'i'},
+        {"sample-ids-file", required_argument, 0, 'I'},
         {0, 0, 0, 0}
       })
   {
@@ -56,13 +56,13 @@ public:
     os << "----------------------------------------------\n";
     os << "Usage: sav import [opts ...] [in.{vcf,vcf.gz,bcf}] [out.sav]\n";
     os << "\n";
-    os << " -#                 : # compression level (1-19, default: " << default_compression_level << ")\n";
-    os << " -b, --block-size   : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
-    os << " -f, --format       : Format field to copy (GT or HDS, default: GT)\n";
-    os << " -h, --help         : Print usage\n";
-    os << " -r, --regions      : Comma separated list of regions formated as chr[:start-end]\n";
-    os << " -s, --samples      : Comma separated list of sample IDs to subset\n";
-    os << " -S, --samples-file : Path to file containing list of sample IDs to subset\n";
+    os << " -#                    : # compression level (1-19, default: " << default_compression_level << ")\n";
+    os << " -b, --block-size      : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
+    os << " -d, --data-format     : Format field to copy (GT or HDS, default: GT)\n";
+    os << " -h, --help            : Print usage\n";
+    os << " -r, --regions         : Comma separated list of regions formated as chr[:start-end]\n";
+    os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
+    os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -95,7 +95,7 @@ public:
         case 'b':
           block_size_ = std::uint16_t(std::atoi(optarg) > 0xFFFF ? 0xFFFF : std::atoi(optarg));
           break;
-        case 'f':
+        case 'd':
         {
           std::string str_opt_arg(optarg ? optarg : "");
           if (str_opt_arg == "HDS")
@@ -116,10 +116,10 @@ public:
           for (const auto& r : split_string_to_vector(optarg, ','))
             regions_.emplace_back(string_to_region(r));
           break;
-        case 's':
+        case 'i':
           subset_ids_ = split_string_to_set(optarg, ',');
           break;
-        case 'S':
+        case 'I':
           subset_ids_ = split_file_to_set(optarg);
           break;
         default:
@@ -216,9 +216,8 @@ int import_reader(T& input, const import_prog_args& args)
     savvy::sav::writer::options opts;
     opts.compression_level = args.compression_level();
     opts.block_size = args.block_size();
-    opts.data_format = args.format();
 
-    savvy::sav::writer output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), opts);
+    savvy::sav::writer output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format(), opts);
 
     if (output.good())
     {

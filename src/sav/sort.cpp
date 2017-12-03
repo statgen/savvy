@@ -193,9 +193,9 @@ class headless_writer : public savvy::sav::writer
 {
 public:
   template<typename RandAccessStringIterator, typename RandAccessKVPIterator>
-  headless_writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, options opts = options())
+  headless_writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, savvy::fmt data_format, options opts = options())
     :
-    savvy::sav::writer("", samples_beg, samples_end, headers_beg, headers_end, opts)
+    savvy::sav::writer("", samples_beg, samples_end, headers_beg, headers_end, data_format, opts)
   {
     output_buf_ = (opts.compression_level > 0 ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, opts.compression_level)) : std::unique_ptr<std::streambuf>(savvy::sav::writer::create_std_filebuf(file_path, std::ios::binary | std::ios::out)));
     output_stream_.rdbuf(output_buf_.get());
@@ -252,9 +252,7 @@ int run_sort(const sort_prog_args& args)
   std::deque<headless_writer> temp_writers;
   std::deque<headless_reader> temp_readers;
 
-  savvy::sav::writer::options write_opts;
-  write_opts.data_format = r.data_format();
-  savvy::sav::writer output(args.output_path(), r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), write_opts);
+  savvy::sav::writer output(args.output_path(), r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), r.data_format());
 
   {
     std::vector<var_type> variants(temp_file_size);
@@ -275,8 +273,8 @@ int run_sort(const sort_prog_args& args)
         std::vector<std::reference_wrapper<var_type>> variant_refs(variants.begin(), variants.end());
         std::sort(variant_refs.begin(), variant_refs.begin() + read_counter, cmp);
         std::string temp_path = "/tmp/tmp-" + str_gen(8) + ".sav";
-        temp_writers.emplace_back(temp_path, r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), write_opts);
-        temp_readers.emplace_back(temp_path, r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), write_opts.data_format);
+        temp_writers.emplace_back(temp_path, r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), r.data_format());
+        temp_readers.emplace_back(temp_path, r.samples_begin(), r.samples_end(), r.headers().begin(), r.headers().end(), r.data_format());
         std::remove(temp_path.c_str());
         for (std::size_t i = 0; i < read_counter; ++i)
         {

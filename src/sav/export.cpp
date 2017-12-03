@@ -27,11 +27,12 @@ public:
   export_prog_args() :
     long_options_(
       {
-        {"format", required_argument, 0, 'f'},
+        {"data-format", required_argument, 0, 'd'},
         {"help", no_argument, 0, 'h'},
+        //{"output-file-format", no_argument, 0, 'O'},
         {"regions", required_argument, 0, 'r'},
-        {"samples", required_argument, 0, 's'},
-        {"samples-file", required_argument, 0, 'S'},
+        {"sample-ids", required_argument, 0, 'i'},
+        {"sample-ids-file", required_argument, 0, 'I'},
         {0, 0, 0, 0}
       })
   {
@@ -49,11 +50,11 @@ public:
     os << "----------------------------------------------\n";
     os << "Usage: sav export [opts ...] [in.sav] [out.{vcf,vcf.gz,bcf}]\n";
     os << "\n";
-    //os << " -f, --format     : Format field to copy (GT, DS or HDS, default: GT)\n";
-    os << " -h, --help         : Print usage\n";
-    os << " -r, --regions      : Comma separated list of regions formated as chr[:start-end]\n";
-    os << " -s, --samples      : Comma separated list of sample IDs to subset\n";
-    os << " -S, --samples-file : Path to file containing list of sample IDs to subset\n";
+    os << " -d, --data-format     : Format field to copy (GT, DS or HDS, default: GT)\n";
+    os << " -h, --help            : Print usage\n";
+    os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
+    os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
+    os << " -r, --regions         : Comma separated list of regions formatted as chr[:start-end]\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -62,12 +63,12 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "f:hr:s:S:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "d:hi:I:r:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
       {
-        case 'f':
+        case 'd':
         {
           std::string str_opt_arg(optarg ? optarg : "");
           if (str_opt_arg == "HDS")
@@ -96,10 +97,10 @@ public:
           for (const auto& r : split_string_to_vector(optarg, ','))
             regions_.emplace_back(string_to_region(r));
           break;
-        case 's':
+        case 'i':
           subset_ids_ = split_string_to_set(optarg, ',');
           break;
-        case 'S':
+        case 'I':
           subset_ids_ = split_file_to_set(optarg);
           break;
         default:
@@ -140,7 +141,8 @@ public:
   }
 };
 
-int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, savvy::vcf::writer<1>& out)
+template <typename Writer>
+int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, Writer& out)
 {
   savvy::site_info variant;
   std::vector<float> genotypes;
@@ -151,7 +153,8 @@ int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& reg
   return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, savvy::vcf::writer<1>& out)
+template <typename Writer>
+int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, Writer& out)
 {
   savvy::site_info variant;
   std::vector<float> genotypes;

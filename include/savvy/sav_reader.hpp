@@ -803,11 +803,9 @@ namespace savvy
     public:
       struct options
       {
-        fmt data_format;
         std::int8_t compression_level;
         std::uint16_t block_size;
         options() :
-          data_format(fmt::allele),
           compression_level(3),
           block_size(2048)
         {
@@ -815,7 +813,7 @@ namespace savvy
       };
 
       template <typename RandAccessStringIterator, typename RandAccessKVPIterator>
-      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, options opts = options()) :
+      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, fmt data_format, options opts = options()) :
         output_buf_(opts.compression_level > 0 ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, opts.compression_level)) : std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out))), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         output_stream_(output_buf_.get()),
         file_path_(file_path),
@@ -823,7 +821,7 @@ namespace savvy
         allele_count_(0),
         record_count_(0),
         block_size_(opts.block_size),
-        data_format_(opts.data_format)
+        data_format_(data_format)
       {
         std::string version_string("sav\x00\x01\x00\x00", 7);
         output_stream_.write(version_string.data(), version_string.size());
