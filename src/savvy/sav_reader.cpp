@@ -14,7 +14,7 @@ namespace savvy
     //================================================================//
     reader_base::reader_base(const std::string& file_path) :
       subset_size_(0),
-      input_stream_(file_path),
+      input_stream_(savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path)),
       file_path_(file_path),
       file_data_format_(fmt::allele)
     {
@@ -24,7 +24,7 @@ namespace savvy
 
     reader_base::reader_base(const std::string& file_path, savvy::fmt data_format) :
       subset_size_(0),
-      input_stream_(file_path),
+      input_stream_(savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path)),
       file_path_(file_path),
       file_data_format_(fmt::allele),
       requested_data_format_(data_format)
@@ -50,13 +50,13 @@ namespace savvy
     void reader_base::parse_header()
     {
       std::string version_string(7, '\0');
-      input_stream_.read(&version_string[0], version_string.size());
+      input_stream_->read(&version_string[0], version_string.size());
 
       std::string uuid(16, '\0');
-      input_stream_.read(&uuid[0], uuid.size());
+      input_stream_->read(&uuid[0], uuid.size());
 
 
-      std::istreambuf_iterator<char> in_it(input_stream_);
+      std::istreambuf_iterator<char> in_it(*input_stream_);
       std::istreambuf_iterator<char> end;
 
       std::uint64_t headers_size;
@@ -75,7 +75,7 @@ namespace savvy
             {
               std::string key;
               key.resize(key_size);
-              input_stream_.read(&key[0], key_size);
+              input_stream_->read(&key[0], key_size);
 
               std::uint64_t val_size;
               if (varint_decode(in_it, end, val_size) != end)
@@ -85,7 +85,7 @@ namespace savvy
                 {
                   std::string val;
                   val.resize(val_size);
-                  input_stream_.read(&val[0], val_size);
+                  input_stream_->read(&val[0], val_size);
 
                   if (key == "INFO")
                   {
@@ -127,7 +127,7 @@ namespace savvy
               if (id_sz)
               {
                 sample_ids_.back().resize(id_sz);
-                input_stream_.read(&sample_ids_.back()[0], id_sz);
+                input_stream_->read(&sample_ids_.back()[0], id_sz);
               }
               --sample_size;
             }
@@ -138,7 +138,7 @@ namespace savvy
         }
       }
 
-      input_stream_.peek();
+      input_stream_->peek();
     }
 
     reader_base& reader_base::operator=(reader_base&& source)
@@ -149,7 +149,7 @@ namespace savvy
         subset_map_ = std::move(source.subset_map_);
         subset_size_ = source.subset_size_;
         //sbuf_ = std::move(source.sbuf_);
-        //input_stream_.rdbuf(&sbuf_);
+        //input_stream_->rdbuf(&sbuf_);
         input_stream_ = std::move(source.input_stream_);
         file_path_ = std::move(source.file_path_);
         metadata_fields_ = std::move(source.metadata_fields_);

@@ -88,11 +88,11 @@ namespace savvy
 //        return good();
 //      }
 
-      explicit operator bool() const { return input_stream_.good(); }
-      bool good() const { return input_stream_.good(); }
-      bool fail() const { return input_stream_.fail(); }
-      bool bad() const { return input_stream_.bad(); }
-      bool eof() const { return input_stream_.eof(); }
+      explicit operator bool() const { return input_stream_->good(); }
+      bool good() const { return input_stream_->good(); }
+      bool fail() const { return input_stream_->fail(); }
+      bool bad() const { return input_stream_->bad(); }
+      bool eof() const { return input_stream_->eof(); }
       std::uint64_t sample_size() const { return this->sample_ids_.size(); }
       std::vector<std::string>::const_iterator samples_begin() const { return sample_ids_.begin(); }
       std::vector<std::string>::const_iterator samples_end() const { return sample_ids_.end(); }
@@ -111,19 +111,19 @@ namespace savvy
       std::vector<std::string> subset_samples(const std::set<std::string>& subset);
 
       const std::string& file_path() const { return file_path_; }
-      std::streampos tellg() { return this->input_stream_.tellg(); }
+      std::streampos tellg() { return this->input_stream_->tellg(); }
     protected:
       void read_variant_details(site_info& annotations)
       {
         if (good())
         {
-          std::istreambuf_iterator<char> in_it(input_stream_);
+          std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t sz;
           if (varint_decode(in_it, end_it, sz) == end_it)
           {
-            this->input_stream_.setstate(std::ios::badbit);
+            this->input_stream_->setstate(std::ios::badbit);
           }
           else
           {
@@ -131,19 +131,19 @@ namespace savvy
             std::string chrom;
             chrom.resize(sz);
             if (sz)
-              input_stream_.read(&chrom[0], sz);
+              input_stream_->read(&chrom[0], sz);
 
             std::uint64_t locus;
             if (varint_decode(in_it, end_it, locus) == end_it)
             {
-              this->input_stream_.setstate(std::ios::badbit);
+              this->input_stream_->setstate(std::ios::badbit);
             }
             else
             {
               ++in_it;
               if (varint_decode(in_it, end_it, sz) == end_it)
               {
-                this->input_stream_.setstate(std::ios::badbit);
+                this->input_stream_->setstate(std::ios::badbit);
               }
               else
               {
@@ -151,11 +151,11 @@ namespace savvy
                 std::string ref;
                 ref.resize(sz);
                 if (sz)
-                  input_stream_.read(&ref[0], sz);
+                  input_stream_->read(&ref[0], sz);
 
                 if (varint_decode(in_it, end_it, sz) == end_it)
                 {
-                  this->input_stream_.setstate(std::ios::badbit);
+                  this->input_stream_->setstate(std::ios::badbit);
                 }
                 else
                 {
@@ -163,7 +163,7 @@ namespace savvy
                   std::string alt;
                   alt.resize(sz);
                   if (sz)
-                    input_stream_.read(&alt[0], sz);
+                    input_stream_->read(&alt[0], sz);
 
                   std::unordered_map<std::string, std::string> props;
                   props.reserve(this->metadata_fields_.size());
@@ -172,7 +172,7 @@ namespace savvy
                   {
                     if (varint_decode(in_it, end_it, sz) == end_it)
                     {
-                      this->input_stream_.setstate(std::ios::badbit);
+                      this->input_stream_->setstate(std::ios::badbit);
                       break;
                     }
                     else
@@ -181,7 +181,7 @@ namespace savvy
                       if (sz)
                       {
                         prop_val.resize(sz);
-                        input_stream_.read(&prop_val[0], sz);
+                        input_stream_->read(&prop_val[0], sz);
                         props[key] = prop_val;
                       }
                     }
@@ -200,13 +200,13 @@ namespace savvy
       {
         if (good())
         {
-          std::istreambuf_iterator<char> in_it(input_stream_);
+          std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t ploidy_level;
           if (varint_decode(in_it, end_it, ploidy_level) == end_it)
           {
-            this->input_stream_.setstate(std::ios::badbit);
+            this->input_stream_->setstate(std::ios::badbit);
           }
           else
           {
@@ -221,7 +221,7 @@ namespace savvy
               in_it = prefixed_varint<BitWidth>::decode(in_it, end_it, allele, offset);
             }
 
-            input_stream_.get();
+            input_stream_->get();
           }
         }
       }
@@ -241,13 +241,13 @@ namespace savvy
         {
           const typename T::value_type alt_value = typename T::value_type(1);
           const auto missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN();
-          std::istreambuf_iterator<char> in_it(input_stream_);
+          std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t ploidy_level;
           if (varint_decode(in_it, end_it, ploidy_level) == end_it)
           {
-            this->input_stream_.setstate(std::ios::badbit);
+            this->input_stream_->setstate(std::ios::badbit);
           }
           else
           {
@@ -316,7 +316,7 @@ namespace savvy
               }
             }
 
-            input_stream_.get();
+            input_stream_->get();
           }
         }
       }
@@ -328,13 +328,13 @@ namespace savvy
         {
           const typename T::value_type alt_value{1};
           const auto missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN();
-          std::istreambuf_iterator<char> in_it(input_stream_);
+          std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t ploidy_level;
           if (varint_decode(in_it, end_it, ploidy_level) == end_it)
           {
-            this->input_stream_.setstate(std::ios::badbit);
+            this->input_stream_->setstate(std::ios::badbit);
           }
           else
           {
@@ -403,7 +403,7 @@ namespace savvy
               }
             }
 
-            input_stream_.get();
+            input_stream_->get();
           }
         }
       }
@@ -412,7 +412,7 @@ namespace savvy
 //      void read_genotypes_gp(T& destination)
 //      {
 //        if (file_data_format_ != fmt::genotype_probability)
-//          input_stream_.setstate(std::ios::failbit);
+//          input_stream_->setstate(std::ios::failbit);
 //
 //        if (good())
 //        {
@@ -423,7 +423,7 @@ namespace savvy
 //          std::uint64_t ploidy_level;
 //          if (varint_decode(in_it, end_it, ploidy_level) == end_it)
 //          {
-//            this->input_stream_.setstate(std::ios::badbit);
+//            this->input_stream_->setstate(std::ios::badbit);
 //          }
 //          else
 //          {
@@ -456,7 +456,7 @@ namespace savvy
 //              destination[(total_offset / stride) * stride] -= allele;
 //            }
 //
-//            input_stream_.get();
+//            input_stream_->get();
 //          }
 //        }
 //      }
@@ -467,13 +467,13 @@ namespace savvy
         if (good())
         {
           const typename T::value_type alt_value = typename T::value_type(1);
-          std::istreambuf_iterator<char> in_it(input_stream_);
+          std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t ploidy_level;
           if (varint_decode(in_it, end_it, ploidy_level) == end_it)
           {
-            this->input_stream_.setstate(std::ios::badbit);
+            this->input_stream_->setstate(std::ios::badbit);
           }
           else
           {
@@ -516,7 +516,7 @@ namespace savvy
               }
             }
 
-            input_stream_.get();
+            input_stream_->get();
           }
         }
       }
@@ -528,13 +528,13 @@ namespace savvy
         {
           const typename T::value_type alt_value(1);
           const typename T::value_type missing_value(std::numeric_limits<typename T::value_type>::quiet_NaN());
-          std::istreambuf_iterator<char> in_it(input_stream_);
+          std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t ploidy_level;
           if (varint_decode(in_it, end_it, ploidy_level) == end_it)
           {
-            this->input_stream_.setstate(std::ios::badbit);
+            this->input_stream_->setstate(std::ios::badbit);
           }
           else
           {
@@ -601,7 +601,7 @@ namespace savvy
 //              }
 //            }
 
-            input_stream_.get();
+            input_stream_->get();
           }
         }
       }
@@ -623,7 +623,7 @@ namespace savvy
           else if (requested_data_format_ == fmt::haplotype_dosage)
             file_data_format_ == fmt::allele ? read_genotypes_hds<1>(destination) : read_genotypes_hds<7>(destination);
           else
-            input_stream_.setstate(std::ios::failbit);
+            input_stream_->setstate(std::ios::failbit);
         }
         else
         {
@@ -638,7 +638,7 @@ namespace savvy
       std::uint64_t subset_size_;
       fmt file_data_format_;
       fmt requested_data_format_;
-      shrinkwrap::zstd::istream input_stream_;
+      std::unique_ptr<shrinkwrap::zstd::istream> input_stream_;
       std::string file_path_;
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> metadata_fields_;
@@ -681,7 +681,7 @@ namespace savvy
         bounding_type_(bounding_type)
       {
         if (!index_.good())
-          this->input_stream_.setstate(std::ios::badbit);
+          this->input_stream_->setstate(std::ios::badbit);
       }
 
       indexed_reader(const std::string& file_path, const region& reg, savvy::fmt data_format)  :
@@ -717,12 +717,12 @@ namespace savvy
           if (current_offset_in_block_ >= total_in_block_)
           {
             if (i_ == query_.end())
-              this->input_stream_.setstate(std::ios::eofbit);
+              this->input_stream_->setstate(std::ios::eofbit);
             else
             {
               total_in_block_ = std::uint32_t(0x000000000000FFFF & i_->value()) + 1;
               current_offset_in_block_ = 0;
-              this->input_stream_.seekg(std::streampos((i_->value() >> 16) & 0x0000FFFFFFFFFFFF));
+              this->input_stream_->seekg(std::streampos((i_->value() >> 16) & 0x0000FFFFFFFFFFFF));
               ++i_;
             }
           }
@@ -746,12 +746,12 @@ namespace savvy
           if (current_offset_in_block_ >= total_in_block_)
           {
             if (i_ == query_.end())
-              this->input_stream_.setstate(std::ios::eofbit);
+              this->input_stream_->setstate(std::ios::eofbit);
             else
             {
               total_in_block_ = std::uint32_t(0x000000000000FFFF & i_->value()) + 1;
               current_offset_in_block_ = 0;
-              this->input_stream_.seekg(std::streampos((i_->value() >> 16) & 0x0000FFFFFFFFFFFF));
+              this->input_stream_->seekg(std::streampos((i_->value() >> 16) & 0x0000FFFFFFFFFFFF));
               ++i_;
             }
           }
@@ -781,11 +781,11 @@ namespace savvy
         current_offset_in_block_ = 0;
         total_in_block_ = 0;
         reg_ = reg;
-        this->input_stream_.clear();
+        this->input_stream_->clear();
         query_ = index_.create_query(reg);
         i_ = query_.begin();
         if (!index_.good())
-          this->input_stream_.setstate(std::ios::badbit);
+          this->input_stream_->setstate(std::ios::badbit);
       }
     private:
       s1r::reader index_;

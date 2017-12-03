@@ -4,17 +4,12 @@
 #include <string>
 #include <functional>
 #include <memory>
+#include "utility.hpp"
 
 namespace savvy
 {
   namespace detail
   {
-    template<typename T, typename ...Args>
-    std::unique_ptr<T> make_unique(Args&& ...args)
-    {
-      return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-    }
-
     bool has_extension(const std::string& fullString, const std::string& ext);
 
 #if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4

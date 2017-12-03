@@ -214,7 +214,7 @@ public:
   {
     file_data_format_ = format;
     file_path_ = file_path;
-    input_stream_ = shrinkwrap::zstd::istream(file_path);
+    input_stream_ = savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path);
     for (auto it = headers_beg; it != headers_end; ++it)
     {
       if (it->first == "INFO")
