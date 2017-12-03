@@ -47,7 +47,7 @@ public:
   void print_usage(std::ostream& os)
   {
     os << "----------------------------------------------\n";
-    os << "Usage: sav export [opts] [in.sav] [out.{vcf,vcf.gz,bcf}]\n";
+    os << "Usage: sav export [opts ...] [in.sav] [out.{vcf,vcf.gz,bcf}]\n";
     os << "\n";
     //os << " -f, --format     : Format field to copy (GT, DS or HDS, default: GT)\n";
     os << " -h, --help         : Print usage\n";

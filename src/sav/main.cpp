@@ -29,8 +29,8 @@ public:
   {
     os << "----------------------------------------------\n";
     os << "Usage:\n";
-    os << "sav [sub-command] [args]\n";
-    os << "sav [opts]\n";
+    os << "sav <sub-command> [args ...]\n";
+    os << "sav [opts ...]\n";
     os << "\n";
     os << "Sub-commands:\n";
     os << "export  : Converts SAV into VCF or BCF\n";
@@ -40,8 +40,8 @@ public:
     os << "sort    : Sorts SAV file\n";
     os << "\n";
     os << "Options:\n";
-    os << " -h, --help       : Print usage\n";
-    os << " -v, --version    : Print version\n";
+    os << " -h, --help    : Print usage\n";
+    os << " -v, --version : Print version\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
