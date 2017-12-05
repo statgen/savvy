@@ -1319,6 +1319,8 @@ namespace savvy
             (*output_stream_) << "##FORMAT=<ID=HDS,Number=2,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage\">" << std::endl;
           else if (f == savvy::fmt::dosage)
             (*output_stream_) << "##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage\">" << std::endl;
+          //else if (f == savvy::fmt::genotype_probability)
+          //  (*output_stream_) << "##FORMAT"="<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1\">" << std::endl; // TODO: Handle other ploidy levels.
         }
 
         (*output_stream_) << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";

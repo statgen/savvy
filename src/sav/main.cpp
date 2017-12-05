@@ -21,7 +21,7 @@ public:
   {
   }
 
-  const std::string& sub_command() { return sub_command_; }
+  const std::string& sub_command() const { return sub_command_; }
   bool help_is_set() const { return help_; }
   bool version_is_set() const { return version_; }
 
@@ -33,11 +33,10 @@ public:
     os << "sav [opts ...]\n";
     os << "\n";
     os << "Sub-commands:\n";
-    os << "export  : Converts SAV into VCF or BCF\n";
-    os << "import  : Converts VCF or BCF into SAV\n";
+    os << "export  : Exports SAV to VCF or SAV\n";
+    os << "import  : Imports VCF or BCF into SAV\n";
     os << "index   : Indexes SAV file\n";
     os << "merge   : Merges multiple files into one\n";
-    os << "sort    : Sorts SAV file\n";
     os << "\n";
     os << "Options:\n";
     os << " -h, --help    : Print usage\n";
@@ -100,10 +99,6 @@ int main(int argc, char** argv)
   else if (args.sub_command() == "merge")
   {
     return merge_main(argc, argv);
-  }
-  else if (args.sub_command() == "sort")
-  {
-    return sort_main(argc, argv);
   }
 
   if (args.help_is_set())
