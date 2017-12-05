@@ -85,7 +85,7 @@ public:
 };
 
 template <typename VecType, typename Reader, typename Writer>
-bool sort_and_write_records(savvy::s1r::sort_type sort, Reader& in, const std::vector<savvy::region>& regions, Writer& out)
+bool sort_and_write_records(savvy::s1r::sort_type sort, Reader& in, savvy::fmt in_format, const std::vector<savvy::region>& regions, Writer& out, savvy::fmt out_format)
 {
   less_than_comparator less_than(sort);
 
@@ -112,16 +112,14 @@ bool sort_and_write_records(savvy::s1r::sort_type sort, Reader& in, const std::v
     if (read_counter)
     {
       std::sort(in_mem_variant_refs.begin(), in_mem_variant_refs.begin() + read_counter, less_than);
-      if (read_counter == temp_file_size)
+
+      std::string temp_path = "/tmp/tmp-" + str_gen(8) + ".sav";
+      temp_writers.emplace_back(temp_path, in.samples_begin(), in.samples_end(), in.headers().begin(), in.headers().end(), in_format);
+      temp_readers.emplace_back(temp_path, in.samples_begin(), in.samples_end(), in.headers().begin(), in.headers().end(), out_format);
+      std::remove(temp_path.c_str());
+      for (std::size_t i = 0; i<read_counter; ++i)
       {
-        std::string temp_path = "/tmp/tmp-"+str_gen(8)+".sav";
-        temp_writers.emplace_back(temp_path, in.samples_begin(), in.samples_end(), in.headers().begin(), in.headers().end(), in.data_format());
-        temp_readers.emplace_back(temp_path, in.samples_begin(), in.samples_end(), in.headers().begin(), in.headers().end(), in.data_format());
-        std::remove(temp_path.c_str());
-        for (std::size_t i = 0; i<read_counter; ++i)
-        {
-          temp_writers.back() << in_mem_variant_refs[i].get();
-        }
+        temp_writers.back() << in_mem_variant_refs[i].get();
       }
     }
   }
@@ -130,7 +128,6 @@ bool sort_and_write_records(savvy::s1r::sort_type sort, Reader& in, const std::v
 
   temp_writers.clear();
 
-  auto next_in_mem_variant = in_mem_variant_refs.begin();
   std::vector<savvy::variant<VecType>> write_variants(temp_readers.size());
   std::size_t i = 0;
   for (auto it = temp_readers.begin(); it != temp_readers.end(); ++it)
@@ -163,25 +160,11 @@ bool sort_and_write_records(savvy::s1r::sort_type sort, Reader& in, const std::v
 
     if (min_index < write_variants.size())
     {
-      if (next_in_mem_variant == (in_mem_variant_refs.begin() + read_counter) || less_than(write_variants[min_index], *next_in_mem_variant))
-      {
-        out << write_variants[min_index];
-        temp_readers[min_index] >> write_variants[min_index];
-      }
-      else
-      {
-        out << next_in_mem_variant->get();
-        ++next_in_mem_variant;
-      }
+      out << write_variants[min_index];
+      temp_readers[min_index] >> write_variants[min_index];
     }
 
   } while (min_index < write_variants.size());
-
-  while (next_in_mem_variant != (in_mem_variant_refs.begin() + read_counter))
-  {
-    out << next_in_mem_variant->get();
-    ++next_in_mem_variant;
-  }
 
   return false;
 }
