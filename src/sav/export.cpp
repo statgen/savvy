@@ -229,7 +229,7 @@ int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::stri
 {
   if (args.sort_type())
   {
-    return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, args.regions(), output) ? EXIT_SUCCESS : EXIT_FAILURE);
+    return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, input.data_format(), args.regions(), output, args.format()) ? EXIT_SUCCESS : EXIT_FAILURE);
   }
   else
   {

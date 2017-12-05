@@ -1,5 +1,6 @@
 #include <cmath>
 #include "sav/import.hpp"
+#include "sav/sort.hpp"
 #include "sav/utility.hpp"
 #include "savvy/vcf_reader.hpp"
 #include "savvy/sav_reader.hpp"
@@ -27,6 +28,7 @@ private:
   std::uint16_t block_size_ = default_block_size;
   bool help_ = false;
   savvy::fmt format_ = savvy::fmt::allele;
+  std::unique_ptr<savvy::s1r::sort_type> sort_type_ = nullptr;
 public:
   import_prog_args() :
     long_options_(
@@ -37,6 +39,7 @@ public:
         {"regions", required_argument, 0, 'r'},
         {"sample-ids", required_argument, 0, 'i'},
         {"sample-ids-file", required_argument, 0, 'I'},
+        {"sort", required_argument, 0, 's'},
         {0, 0, 0, 0}
       })
   {
@@ -49,6 +52,7 @@ public:
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
   savvy::fmt format() const { return format_; }
+  const std::unique_ptr<savvy::s1r::sort_type>& sort_type() const { return sort_type_; }
   bool help_is_set() const { return help_; }
 
   void print_usage(std::ostream& os) const
@@ -60,9 +64,10 @@ public:
     os << " -b, --block-size      : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
     os << " -d, --data-format     : Format field to copy (GT or HDS, default: GT)\n";
     os << " -h, --help            : Print usage\n";
-    os << " -r, --regions         : Comma separated list of regions formated as chr[:start-end]\n";
     os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
+    os << " -r, --regions         : Comma separated list of regions formated as chr[:start-end]\n";
+    os << " -s, --sort            : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -71,7 +76,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:f:hr:s:S:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:f:hi:I:r:s:", long_options_.data(), &long_index )) != -1)
     {
       //std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
@@ -122,6 +127,31 @@ public:
         case 'I':
           subset_ids_ = split_file_to_set(optarg);
           break;
+        case 's':
+        {
+          std::string sort_str(optarg);
+          if (sort_str.size())
+          {
+            if (sort_str.front()=='b')
+            {
+              sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_type>(savvy::s1r::sort_type::left_point);
+            }
+            else if (sort_str.front()=='e')
+            {
+              sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_type>(savvy::s1r::sort_type::right_point);
+            }
+            else if (sort_str.front()=='m')
+            {
+              sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_type>(savvy::s1r::sort_type::midpoint);
+            }
+            else
+            {
+              std::cerr << "Invalid --sort argument (" << sort_str << ")." << std::endl;
+              return false;
+            }
+          }
+          break;
+        }
         default:
           return false;
       }
@@ -198,7 +228,7 @@ int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& 
 }
 
 template <typename T>
-int import_reader(T& input, const import_prog_args& args)
+int prep_reader_for_import(T& input, const import_prog_args& args)
 {
   std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
   std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
@@ -221,7 +251,14 @@ int import_reader(T& input, const import_prog_args& args)
 
     if (output.good())
     {
-      return import_records(input, args.regions(), output);
+      if (args.sort_type())
+      {
+        return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, args.format(), args.regions(), output, args.format()) ? EXIT_SUCCESS : EXIT_FAILURE);
+      }
+      else
+      {
+        return import_records(input, args.regions(), output);
+      }
     }
   }
 
@@ -247,11 +284,11 @@ int import_main(int argc, char** argv)
   if (args.regions().size())
   {
     savvy::vcf::indexed_reader<1> input(args.input_path(), args.regions().front(), args.format());
-    return import_reader(input, args);
+    return prep_reader_for_import(input, args);
   }
   else
   {
     savvy::vcf::reader<1> input(args.input_path(), args.format());
-    return import_reader(input, args);
+    return prep_reader_for_import(input, args);
   }
 }
