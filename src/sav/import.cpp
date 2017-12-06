@@ -24,9 +24,11 @@ private:
   std::vector<savvy::region> regions_;
   std::string input_path_;
   std::string output_path_;
+  std::string index_path_;
   int compression_level_ = -1;
   std::uint16_t block_size_ = default_block_size;
   bool help_ = false;
+  bool index_ = false;
   savvy::fmt format_ = savvy::fmt::allele;
   std::unique_ptr<savvy::s1r::sort_type> sort_type_ = nullptr;
 public:
@@ -36,10 +38,13 @@ public:
         {"block-size", required_argument, 0, 'b'},
         {"data-format", required_argument, 0, 'd'},
         {"help", no_argument, 0, 'h'},
+        {"index", no_argument, 0, 'x'},
+        {"index-file", required_argument, 0, 'X'},
         {"regions", required_argument, 0, 'r'},
         {"sample-ids", required_argument, 0, 'i'},
         {"sample-ids-file", required_argument, 0, 'I'},
-        {"sort", required_argument, 0, 's'},
+        {"sort", no_argument, 0, 's'},
+        {"sort-point", required_argument, 0, 'S'},
         {0, 0, 0, 0}
       })
   {
@@ -47,12 +52,14 @@ public:
 
   const std::string& input_path() const { return input_path_; }
   const std::string& output_path() const { return output_path_; }
+  const std::string& index_path() const { return index_path_; }
   const std::set<std::string>& subset_ids() const { return subset_ids_; }
   const std::vector<savvy::region>& regions() const { return regions_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
   savvy::fmt format() const { return format_; }
   const std::unique_ptr<savvy::s1r::sort_type>& sort_type() const { return sort_type_; }
+  bool index_is_set() const { return index_; }
   bool help_is_set() const { return help_; }
 
   void print_usage(std::ostream& os) const
@@ -67,7 +74,10 @@ public:
     os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
     os << " -r, --regions         : Comma separated list of regions formated as chr[:start-end]\n";
-    os << " -s, --sort            : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
+    os << " -s, --sort            : Enables sorting\n";
+    os << " -S, --sort-point      : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
+    os << " -x, --index           : Enbales indexing\n";
+    os << " -X, --index-file      : Enables indexing and specifies index output file\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -76,9 +86,8 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:f:hi:I:r:s:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:f:hi:I:r:sS:xX:", long_options_.data(), &long_index )) != -1)
     {
-      //std::string str_opt_arg(optarg ? optarg : "");
       char copt = char(opt & 0xFF);
       switch (copt)
       {
@@ -128,6 +137,9 @@ public:
           subset_ids_ = split_file_to_set(optarg);
           break;
         case 's':
+          sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_type>(savvy::s1r::sort_type::midpoint);
+          break;
+        case 'S':
         {
           std::string sort_str(optarg);
           if (sort_str.size())
@@ -146,12 +158,19 @@ public:
             }
             else
             {
-              std::cerr << "Invalid --sort argument (" << sort_str << ")." << std::endl;
+              std::cerr << "Invalid --sort-point argument (" << sort_str << ")." << std::endl;
               return false;
             }
           }
           break;
         }
+        case 'x':
+          index_ = true;
+          break;
+        case 'X':
+          index_ = true;
+          index_path_ = optarg;
+          break;
         default:
           return false;
       }
@@ -164,6 +183,12 @@ public:
       if (regions_.size())
       {
         std::cerr << "Input path must be specified when using --regions option." << std::endl;
+        return false;
+      }
+
+      if (index_ && index_path_.empty())
+      {
+        std::cerr << "--index-file must be specified in input path is not." << std::endl;
         return false;
       }
 
@@ -185,6 +210,9 @@ public:
       std::cerr << "Too many arguments\n";
       return false;
     }
+
+    if (index_ && index_path_.empty())
+      index_path_ = input_path_ + ".s1r";
 
 
     if (compression_level_ < 0)
@@ -247,7 +275,7 @@ int prep_reader_for_import(T& input, const import_prog_args& args)
     opts.compression_level = args.compression_level();
     opts.block_size = args.block_size();
 
-    savvy::sav::writer output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format(), opts);
+    savvy::sav::writer output(args.output_path(), opts, sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
 
     if (output.good())
     {

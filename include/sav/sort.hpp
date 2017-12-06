@@ -37,11 +37,11 @@ class headless_sav_writer : public savvy::sav::writer
 {
 public:
   template<typename RandAccessStringIterator, typename RandAccessKVPIterator>
-  headless_sav_writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, savvy::fmt data_format, options opts = options())
+  headless_sav_writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, savvy::fmt data_format)
       :
-      savvy::sav::writer("", samples_beg, samples_end, headers_beg, headers_end, data_format, opts)
+      savvy::sav::writer("", samples_beg, samples_end, headers_beg, headers_end, data_format)
   {
-    output_buf_ = (opts.compression_level > 0 ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, opts.compression_level)) : std::unique_ptr<std::streambuf>(savvy::sav::writer::create_std_filebuf(file_path, std::ios::binary | std::ios::out)));
+    output_buf_ = std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path));
     output_stream_.rdbuf(output_buf_.get());
     file_path_ = file_path;
   }

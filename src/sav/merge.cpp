@@ -262,7 +262,7 @@ int merge_main(int argc, char** argv)
     opts.compression_level = args.compression_level();
     opts.block_size = args.block_size();
 
-    savvy::sav::writer output(args.output_path(), sample_ids.begin(), sample_ids.end(), merged_headers.begin(), merged_headers.end(), args.format(), opts);
+    savvy::sav::writer output(args.output_path(), opts, sample_ids.begin(), sample_ids.end(), merged_headers.begin(), merged_headers.end(), args.format());
 
     std::string current_chrom;
     std::size_t min_pos_index = input_files.size();

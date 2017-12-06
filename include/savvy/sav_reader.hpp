@@ -805,6 +805,7 @@ namespace savvy
       {
         std::int8_t compression_level;
         std::uint16_t block_size;
+        std::string index_path;
         options() :
           compression_level(3),
           block_size(2048)
@@ -813,13 +814,21 @@ namespace savvy
       };
 
       template <typename RandAccessStringIterator, typename RandAccessKVPIterator>
-      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, fmt data_format, options opts = options()) :
+      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, fmt data_format) :
+        writer(file_path, options(), samples_beg, samples_end, headers_beg, headers_end, data_format)
+      {
+      }
+
+      template <typename RandAccessStringIterator, typename RandAccessKVPIterator>
+      writer(const std::string& file_path, const options& opts, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, fmt data_format) :
         output_buf_(opts.compression_level > 0 ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, opts.compression_level)) : std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out))), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         output_stream_(output_buf_.get()),
         file_path_(file_path),
+        index_file_path_(opts.index_path),
         sample_size_(samples_end - samples_beg),
         allele_count_(0),
         record_count_(0),
+        record_count_in_block_(0),
         block_size_(opts.block_size),
         data_format_(data_format)
       {
@@ -884,6 +893,13 @@ namespace savvy
         writer(file_path, std::forward<RandAccessStringIterator>(samples_beg), std::forward<RandAccessStringIterator>(samples_end), empty_string_pair_array.end(), empty_string_pair_array.end(), opts)
       {
 
+      }
+
+      ~writer()
+      {
+        // TODO: This is only a temp solution.
+        if (index_file_path_.size())
+          s1r::create_file(index_file_path_, index_entries_, 32 - 1);
       }
 
       template <typename T>
@@ -969,9 +985,30 @@ namespace savvy
             //if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
             if (block_size_ != 0 && ((record_count_ % block_size_) == 0 || annotations.chromosome() != current_chromosome_))
             {
+              if (index_file_path_.size() && record_count_in_block_)
+              {
+                auto file_pos = std::uint64_t(output_stream_.tellp());
+                if (record_count_in_block_ > 0x10000) // Max records per block: 64*1024
+                {
+                  assert(!"Too many records in zstd frame to be indexed!");
+                  output_stream_.setstate(std::ios::badbit);
+                }
+
+                if (file_pos > 0x0000FFFFFFFFFFFF) // Max file size: 256 TiB
+                {
+                  assert(!"File size to large to be indexed!");
+                  output_stream_.setstate(std::ios::badbit);
+                }
+
+                s1r::tree_base::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
+                index_entries_[annotations.chromosome()].emplace_back(std::move(e));
+              }
               output_stream_.flush();
               allele_count_ = 0;
               current_chromosome_ = annotations.chromosome();
+              record_count_in_block_ = 0;
+              current_block_min_ = std::numeric_limits<std::uint64_t>::max();
+              current_block_max_ = 0;
             }
 
             std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
@@ -1012,6 +1049,8 @@ namespace savvy
               write_alleles(data);
             }
 
+            current_block_min_ = std::min(current_block_min_, annotations.position());
+            current_block_max_ = std::max(current_block_max_, annotations.position() + std::max(annotations.ref().size(), annotations.alt().size()));
             ++record_count_;
           }
         }
@@ -1218,11 +1257,16 @@ namespace savvy
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> property_fields_;
       std::string file_path_;
+      std::string index_file_path_;
+      std::map<std::string, std::vector<s1r::tree_base::entry>> index_entries_;
       std::string current_chromosome_;
+      std::uint64_t current_block_min_;
+      std::uint64_t current_block_max_;
       std::uint64_t sample_size_;
       std::uint32_t metadata_fields_cnt_;
       std::size_t allele_count_;
       std::size_t record_count_;
+      std::size_t record_count_in_block_;
       std::uint16_t block_size_;
       fmt data_format_;
     };
