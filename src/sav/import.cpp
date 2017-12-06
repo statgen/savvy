@@ -178,17 +178,17 @@ public:
 
     int remaining_arg_count = argc - optind;
 
+    if (remaining_arg_count < 2 && index_ && index_path_.empty())
+    {
+      std::cerr << "--index-file must be specified in output path is not." << std::endl;
+      return false;
+    }
+
     if (remaining_arg_count == 0)
     {
       if (regions_.size())
       {
         std::cerr << "Input path must be specified when using --regions option." << std::endl;
-        return false;
-      }
-
-      if (index_ && index_path_.empty())
-      {
-        std::cerr << "--index-file must be specified in input path is not." << std::endl;
         return false;
       }
 
@@ -204,15 +204,15 @@ public:
     {
       input_path_ = argv[optind];
       output_path_ = argv[optind + 1];
+
+      if (index_ && index_path_.empty())
+        index_path_ = output_path_ + ".s1r";
     }
     else
     {
       std::cerr << "Too many arguments\n";
       return false;
     }
-
-    if (index_ && index_path_.empty())
-      index_path_ = input_path_ + ".s1r";
 
 
     if (compression_level_ < 0)
@@ -274,6 +274,8 @@ int prep_reader_for_import(T& input, const import_prog_args& args)
     savvy::sav::writer::options opts;
     opts.compression_level = args.compression_level();
     opts.block_size = args.block_size();
+    if (args.index_path().size())
+      opts.index_path = args.index_path();
 
     savvy::sav::writer output(args.output_path(), opts, sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
 
