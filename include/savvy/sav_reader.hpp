@@ -1051,6 +1051,7 @@ namespace savvy
 
             current_block_min_ = std::min(current_block_min_, annotations.position());
             current_block_max_ = std::max(current_block_max_, annotations.position() + std::max(annotations.ref().size(), annotations.alt().size()));
+            ++record_count_in_block_;
             ++record_count_;
           }
         }
