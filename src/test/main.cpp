@@ -624,27 +624,27 @@ public:
 
 void sav_random_access_test(savvy::fmt format)
 {
-  savvy::sav::indexed_reader rdr(format == savvy::fmt::allele ? SAVVYT_SAV_FILE_HARD : SAVVYT_SAV_FILE_DOSE, {"20", 17000, 1120000}, format);
+  savvy::sav::indexed_reader rdr(format == savvy::fmt::allele ? SAVVYT_SAV_FILE_HARD : SAVVYT_SAV_FILE_DOSE, {"20", 1234600, 2230300}, format);
   savvy::site_info anno;
   std::vector<float> buf;
 
   assert(rdr.read(anno, buf));
   assert(anno.chromosome() == "20");
-  assert(anno.position() == 17330);
+  assert(anno.position() == 1234667);
+  assert(anno.ref() == "G");
+  assert(anno.alt() == "A");
+
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "20");
+  assert(anno.position() == 1234767);
   assert(anno.ref() == "T");
   assert(anno.alt() == "A");
 
   assert(rdr.read(anno, buf));
   assert(anno.chromosome() == "20");
-  assert(anno.position() == 1110696);
-  assert(anno.ref() == "A");
-  assert(anno.alt() == "G");
-
-  assert(rdr.read(anno, buf));
-  assert(anno.chromosome() == "20");
-  assert(anno.position() == 1110696);
-  assert(anno.ref() == "A");
-  assert(anno.alt() == "T");
+  assert(anno.position() == 2230237);
+  assert(anno.ref() == "T");
+  assert(anno.alt() == "");
 
   assert(rdr.good());
 
