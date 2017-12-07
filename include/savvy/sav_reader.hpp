@@ -825,6 +825,8 @@ namespace savvy
         output_stream_(output_buf_.get()),
         file_path_(file_path),
         index_file_path_(opts.index_path),
+        current_block_min_(std::numeric_limits<std::uint32_t>::max()),
+        current_block_max_(0),
         sample_size_(samples_end - samples_beg),
         allele_count_(0),
         record_count_(0),
@@ -899,7 +901,25 @@ namespace savvy
       {
         // TODO: This is only a temp solution.
         if (index_file_path_.size())
-          s1r::create_file(index_file_path_, index_entries_, 32 - 1);
+        {
+          if (record_count_in_block_)
+          {
+            auto file_pos = std::uint64_t(output_stream_.tellp());
+            if (record_count_in_block_ > 0x10000) // Max records per block: 64*1024
+            {
+              assert(!"Too many records in zstd frame to be indexed!");
+            }
+
+            if (file_pos > 0x0000FFFFFFFFFFFF) // Max file size: 256 TiB
+            {
+              assert(!"File size to large to be indexed!");
+            }
+
+            s1r::tree_base::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
+            index_entries_[current_chromosome_].emplace_back(std::move(e));
+          }
+          s1r::create_file(index_file_path_, index_entries_, 32-1);
+        }
       }
 
       template <typename T>
@@ -1001,13 +1021,13 @@ namespace savvy
                 }
 
                 s1r::tree_base::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
-                index_entries_[annotations.chromosome()].emplace_back(std::move(e));
+                index_entries_[current_chromosome_].emplace_back(std::move(e));
               }
               output_stream_.flush();
               allele_count_ = 0;
               current_chromosome_ = annotations.chromosome();
               record_count_in_block_ = 0;
-              current_block_min_ = std::numeric_limits<std::uint64_t>::max();
+              current_block_min_ = std::numeric_limits<std::uint32_t>::max();
               current_block_max_ = 0;
             }
 
@@ -1049,8 +1069,8 @@ namespace savvy
               write_alleles(data);
             }
 
-            current_block_min_ = std::min(current_block_min_, annotations.position());
-            current_block_max_ = std::max(current_block_max_, annotations.position() + std::max(annotations.ref().size(), annotations.alt().size()));
+            current_block_min_ = std::min(current_block_min_, std::uint32_t(annotations.position()));
+            current_block_max_ = std::max(current_block_max_, std::uint32_t(annotations.position() + std::max(annotations.ref().size(), annotations.alt().size())) - 1);
             ++record_count_in_block_;
             ++record_count_;
           }
@@ -1261,8 +1281,8 @@ namespace savvy
       std::string index_file_path_;
       std::map<std::string, std::vector<s1r::tree_base::entry>> index_entries_;
       std::string current_chromosome_;
-      std::uint64_t current_block_min_;
-      std::uint64_t current_block_max_;
+      std::uint32_t current_block_min_;
+      std::uint32_t current_block_max_;
       std::uint64_t sample_size_;
       std::uint32_t metadata_fields_cnt_;
       std::size_t allele_count_;

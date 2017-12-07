@@ -212,8 +212,10 @@ namespace savvy
           // TODO: Possibly make this an error case.
           s1r::tree_base::entry e(min, max, (static_cast<std::uint64_t>(start_pos) << 16) | std::uint16_t(records_in_block - 1));
           index_data[current_chromosome].emplace_back(std::move(e));
+          records_in_block = 0;
           min = std::numeric_limits<std::uint32_t>::max();
           max = 0;
+          start_pos = r.tellg();
         }
 
         ++records_in_block;
@@ -242,8 +244,8 @@ namespace savvy
           records_in_block = 0;
           min = std::numeric_limits<std::uint32_t>::max();
           max = 0;
+          start_pos = end_pos;
         }
-        start_pos = end_pos;
       }
 
       if (start_pos < 0)
