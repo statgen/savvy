@@ -27,10 +27,10 @@ Internal nodes contain at most (block size / 8) entries. Entries are made up of 
 Each chromosome is described with the following.
 ```
 +vvvvvvvvvvv+-------------------------------------------------------------------------+
-| CHROM_STR | 00000000 RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR |
+| CHROM_STR | RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR RRRRRRRR |
 +vvvvvvvvvvv+-------------------------------------------------------------------------+
 CHROM_STR: Chromosome byte array terminated by null byte.
-R: Number of records stored in 7 bytes (big endian).
+R: Number of records stored in 8 bytes (big endian).
 ```
 ## Footer Format
 ```

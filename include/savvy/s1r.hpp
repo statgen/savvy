@@ -10,14 +10,17 @@
 #include "portable_endian.hpp"
 #include "region.hpp"
 
+#include <iostream>
 #include <fstream>
-#include <cstring>
+#include <string>
 #include <stack>
 #include <vector>
 #include <algorithm>
 #include <iostream>
-#include <errno.h>
+#include <cerrno>
 #include <map>
+#include <cassert>
+#include <array>
 
 namespace savvy
 {
@@ -105,7 +108,6 @@ namespace savvy
         std::uint64_t entry_offset;
       };
 
-      std::uint64_t header_block_count() const { return root_block_offset_; }
       std::uint64_t entry_count() const { return entry_count_; }
       std::uint64_t bucket_size() const { return block_size_; }
       std::uint64_t entry_count_at_level(std::size_t level) const { return entry_counts_per_level_[level]; }
@@ -141,27 +143,29 @@ namespace savvy
 
       std::streampos calculate_file_position(node_position input) const
       {
-        std::uint64_t ret = root_block_offset_ * block_size_;
+        std::streampos ret = root_block_end_pos_;
 
         if (input.level > 0)
         {
-          ret += block_size_; // for root node
+          ret -= block_size_; // for root node
 
           for (auto it = entry_counts_per_level_.begin(); it != entry_counts_per_level_.end(); ++it)
           {
             if (1 + std::distance(entry_counts_per_level_.begin(), it) < input.level)
             {
-              ret += *it * block_size_;
+              ret -= (*it * block_size_);
             }
             else
             {
-              ret += input.node_offset * block_size_;
+              ret -= input.node_offset * block_size_;
               break;
             }
           }
         }
 
-        return std::streampos(ret);
+        assert(ret >= (block_offset_ * block_size_));
+
+        return ret;
       }
 
 
@@ -174,7 +178,8 @@ namespace savvy
     protected:
       std::string name_;
 
-      std::uint64_t root_block_offset_;
+      std::streampos root_block_end_pos_;
+      std::uint64_t block_offset_;
       std::uint32_t block_size_;
       std::vector<std::uint64_t> entry_counts_per_level_;
       std::uint64_t entry_count_;
@@ -183,17 +188,21 @@ namespace savvy
       {
         //const std::uint16_t header_data_size = 7 + 2 + 8;
         block_size_ = 1024u * (std::uint32_t(block_size_in_kib) + 1);
-        root_block_offset_ = block_offset; //ceil_divide(header_data_size, block_size_);
+        block_offset_ = block_offset; //ceil_divide(header_data_size, block_size_);
         name_ = name;
 
+        std::size_t node_count = 1;
         entry_counts_per_level_.clear();
         this->entry_counts_per_level_.insert(this->entry_counts_per_level_.begin(), entry_count_);
         for (std::uint64_t nodes_at_current_level = ceil_divide(entry_count_, (std::uint64_t) this->entries_per_leaf_node());
              nodes_at_current_level > 1;
              nodes_at_current_level = ceil_divide(nodes_at_current_level, (std::uint64_t) this->entries_per_internal_node()))
         {
+          node_count += nodes_at_current_level;
           this->entry_counts_per_level_.insert(this->entry_counts_per_level_.begin(), nodes_at_current_level);
         }
+
+        root_block_end_pos_ = (block_offset + node_count) * block_size_;
       }
 
       static std::uint64_t ceil_divide(std::uint64_t x, std::uint64_t y)
@@ -416,27 +425,29 @@ namespace savvy
         file_path_(file_path),
         input_file_(file_path, std::ios::binary)
       {
-        std::string version(7, '\0');
-        input_file_.read(&version[0], version.size());
-        std::string uuid(16, '\0');
-        input_file_.read(&uuid[0], uuid.size());
+        std::array<char, 28> footer;
+        input_file_.seekg(-(footer.size()), std::ios::end);
+        input_file_.read(footer.data(), footer.size());
 
-        std::uint8_t sort_byte;
-        input_file_.read((char*)(&sort_byte), 1);
 
-        switch (sort_byte)
-        {
-          case (std::uint8_t)sort_type::left_point: sort_ = sort_type::left_point; break;
-          case (std::uint8_t)sort_type::right_point: sort_ = sort_type::right_point; break;
-          default: sort_ = sort_type::midpoint;
-        }
+        std::size_t bytes_parsed = 0;
+        std::string version(footer.begin() + (footer.size() - 7), footer.begin() + footer.size());
+        bytes_parsed += version.size();
+
+        std::string uuid(footer.begin() + (footer.size() - bytes_parsed - 16), footer.begin() + (footer.size() - bytes_parsed));
+        bytes_parsed += uuid.size();
+
+        std::uint16_t tree_details_size_be;
+        std::memcpy((char*)(&tree_details_size_be), footer.data() + (footer.size() - bytes_parsed - sizeof(tree_details_size_be)), sizeof(tree_details_size_be));
+        bytes_parsed += sizeof(tree_details_size_be);
+
+        std::uint16_t tree_details_size = be16toh(tree_details_size_be);
 
         std::uint8_t block_size_byte;
-        input_file_.read((char*)(&block_size_byte), 1);
+        std::memcpy((char*)(&block_size_byte), footer.data() + (footer.size() - bytes_parsed - sizeof(block_size_byte)), sizeof(block_size_byte));
+        bytes_parsed += sizeof(block_size_byte);
 
         const std::uint32_t block_size = 1024u * (std::uint32_t(block_size_byte) + 1);
-
-        std::uint64_t header_size = 7 + 16 + 2;
 
         struct tree_details
         {
@@ -444,31 +455,29 @@ namespace savvy
           std::uint64_t entry_count = 0;
         };
 
+        input_file_.seekg(-(std::int64_t(footer.size()) + tree_details_size), std::ios::end);
         std::vector<tree_details> tree_details_array;
-        std::uint8_t name_size;
+
+        int tree_details_bytes_left = tree_details_size;
         do
         {
-          input_file_.read((char*)(&name_size), 1);
+          tree_details details;
+          std::getline(input_file_, details.name, '\0');
 
-          if (name_size)
-          {
-            tree_details details;
-            details.name.resize(name_size);
-            input_file_.read(&details.name[0], name_size);
+          std::uint64_t entry_count_be = 0;
+          input_file_.read((char*)(&entry_count_be), 8);
+          details.entry_count = be64toh(entry_count_be);
 
-            std::uint64_t entry_count_be = 0;
-            input_file_.read((char*)(&entry_count_be), 8);
-            details.entry_count = be64toh(entry_count_be);
+          tree_details_bytes_left -= (details.name.size() + 1 + 8);
 
-            tree_details_array.emplace_back(std::move(details));
-            header_size += (name_size + 8);
-          }
 
-          header_size += 1;
+          tree_details_array.emplace_back(std::move(details));
         }
-        while (name_size > 0);
+        while (tree_details_bytes_left > 0);
 
-        std::uint64_t block_count = detail::ceil_divide(header_size, block_size);
+        assert(tree_details_bytes_left == 0);
+
+        std::uint64_t block_count = 0;
 
         trees_.reserve(tree_details_array.size());
         for (auto it = tree_details_array.begin(); it != tree_details_array.end(); ++it)
