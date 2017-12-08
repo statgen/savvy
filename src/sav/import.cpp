@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 #include <cmath>
 #include "sav/import.hpp"
 #include "sav/sort.hpp"
@@ -74,9 +80,9 @@ public:
     os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
     os << " -r, --regions         : Comma separated list of regions formated as chr[:start-end]\n";
-    os << " -s, --sort            : Enables sorting\n";
+    os << " -s, --sort            : Enables sorting by midpoint\n";
     os << " -S, --sort-point      : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
-    os << " -x, --index           : Enbales indexing\n";
+    os << " -x, --index           : Enables indexing\n";
     os << " -X, --index-file      : Enables indexing and specifies index output file\n";
     os << "----------------------------------------------\n";
     os << std::flush;
