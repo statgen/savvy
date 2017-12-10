@@ -131,17 +131,17 @@ namespace savvy
         return ret;
       }
 
-      tree_position calculate_parent_position(node_position input) const
+      tree_position calculate_parent_position(const node_position& input) const
       {
         return tree_position(input.level - 1, input.node_offset / this->entries_per_internal_node(), input.node_offset % this->entries_per_internal_node());
       }
 
-      node_position calculate_child_position(tree_position input) const
+      node_position calculate_child_position(const tree_position& input) const
       {
         return node_position(input.level + 1, this->entries_per_internal_node() * input.node_offset + input.entry_offset);
       }
 
-      std::streampos calculate_file_position(node_position input) const
+      std::streampos calculate_file_position(const node_position& input) const
       {
         std::streampos ret = root_block_end_pos_;
 
@@ -163,7 +163,9 @@ namespace savvy
           }
         }
 
-        assert(ret >= (block_offset_ * block_size_));
+        ret -= block_size_;
+
+        assert(ret >= block_offset_);
 
         return ret;
       }
@@ -194,25 +196,15 @@ namespace savvy
         std::size_t node_count = 1;
         entry_counts_per_level_.clear();
         this->entry_counts_per_level_.insert(this->entry_counts_per_level_.begin(), entry_count_);
-        for (std::uint64_t nodes_at_current_level = ceil_divide(entry_count_, (std::uint64_t) this->entries_per_leaf_node());
+        for (std::uint64_t nodes_at_current_level = detail::ceil_divide(entry_count_, (std::uint64_t) this->entries_per_leaf_node());
              nodes_at_current_level > 1;
-             nodes_at_current_level = ceil_divide(nodes_at_current_level, (std::uint64_t) this->entries_per_internal_node()))
+             nodes_at_current_level = detail::ceil_divide(nodes_at_current_level, (std::uint64_t) this->entries_per_internal_node()))
         {
           node_count += nodes_at_current_level;
           this->entry_counts_per_level_.insert(this->entry_counts_per_level_.begin(), nodes_at_current_level);
         }
 
         root_block_end_pos_ = (block_offset + node_count) * block_size_;
-      }
-
-      static std::uint64_t ceil_divide(std::uint64_t x, std::uint64_t y)
-      {
-        return (x + y - 1) / y;
-      }
-
-      static std::uint16_t ceil_divide(std::uint16_t x, std::uint16_t y)
-      {
-        return (x + y - std::uint16_t(1)) / y;
       }
     };
 
@@ -425,8 +417,12 @@ namespace savvy
         file_path_(file_path),
         input_file_(file_path, std::ios::binary)
       {
-        std::array<char, 28> footer;
+        std::array<char, 26> footer;
+        input_file_.seekg(0, std::ios::end);
+        auto g = input_file_.tellg();
         input_file_.seekg(-(footer.size()), std::ios::end);
+        assert(input_file_.good());
+        g = input_file_.tellg();
         input_file_.read(footer.data(), footer.size());
 
 
@@ -627,8 +623,10 @@ namespace savvy
       writer(const std::string& file_path, std::map<std::string, std::vector<tree_base::entry>>& chrom_data, std::uint8_t block_size_in_kib) :
         ofs_(file_path, std::ios::binary)
       {
+        assert(ofs_.good());
         const std::uint32_t block_size = 1024u * (std::uint32_t(block_size_in_kib) + 1);
-        std::uint64_t header_size = 7 + 16 + 2;
+        //std::uint64_t header_size = 7 + 16 + 2;
+
         for (auto it = chrom_data.begin(); it != chrom_data.end(); ++it)
         {
           auto beg = it->second.begin();
@@ -640,53 +638,12 @@ namespace savvy
 
             return mid_a < mid_b;
           });
-
-          header_size += (1 + it->first.size() + 8);
         }
 
-        header_size += 1;
-        std::string header_block(detail::ceil_divide(header_size, std::uint64_t(block_size)) * block_size, '\0');
-
-        std::size_t cur = 0;
-        std::memcpy(&header_block[cur], "s1r\x00\x01\x00\x00", 7);
-
-        cur += 7;
-
-        std::memset(&header_block[cur], '\0', 16); // uuid
-        cur += 16;
-
-        std::uint8_t sort = 0;
-        std::memcpy(&header_block[cur], (char*)(&sort), 1);
-        cur += 1;
-
-        std::memcpy(&header_block[cur], (char*)(&block_size_in_kib), 1);
-        cur += 1;
-
-        for (auto it = chrom_data.begin(); it != chrom_data.end(); ++it)
-        {
-          std::uint8_t str_sz = it->first.size();
-          std::memcpy(&header_block[cur], (char*)(&str_sz), 1);
-          cur += 1;
-
-          std::memcpy(&header_block[cur], it->first.data(), str_sz);
-          cur += str_sz;
-
-          std::uint64_t entry_count_be = htobe64((std::uint64_t)std::distance(it->second.begin(), it->second.end()));
-          std::memcpy(&header_block[cur], (char*)(&entry_count_be), 8);
-          cur += 8;
-        }
-
-        std::memset(&header_block[cur], '\0', 1);
-
-        ofs_.write(header_block.data(), header_block.size());
-
-        std::uint64_t block_offset = header_block.size() / std::uint64_t(1024u * (std::uint32_t(block_size_in_kib) + 1));
-
-        header_block.clear();
-        header_block.shrink_to_fit();
 
 
-
+        //std::uint64_t block_offset = header_block.size() / std::uint64_t(1024u * (std::uint32_t(block_size_in_kib) + 1));
+        std::size_t block_offset = 0;
         for (auto it = chrom_data.begin(); it != chrom_data.end(); ++it)
         {
           auto beg = it->second.begin();
@@ -769,6 +726,33 @@ namespace savvy
 
           block_offset += node_counter;
         }
+
+        std::uint16_t index_size = 0;
+        for (auto it = chrom_data.begin(); it != chrom_data.end(); ++it)
+        {
+          ofs_.write(it->first.c_str(), it->first.size() + 1);
+
+          std::uint64_t entry_count_be = htobe64((std::uint64_t)std::distance(it->second.begin(), it->second.end()));
+          ofs_.write((char*)(&entry_count_be), 8);
+
+          index_size += (1 + it->first.size() + 8);
+        }
+
+        std::string footer_block(26, '\0');
+        std::size_t cur = 0;
+
+        std::memcpy(&footer_block[cur], (char*)(&block_size_in_kib), 1);
+        cur += 1;
+
+        std::uint16_t index_size_be = htobe16(index_size);
+        std::memcpy(&footer_block[cur], (char*)(&index_size_be), 2);
+        cur += 2;
+
+        std::memset(&footer_block[cur], '\0', 16); // uuid
+        cur += 16;
+
+        std::memcpy(&footer_block[cur], "s1r\x00\x01\x00\x00", 7);
+        ofs_.write(footer_block.data(), footer_block.size());
       }
 
       bool flush()
