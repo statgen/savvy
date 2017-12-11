@@ -202,6 +202,8 @@ namespace savvy
       reader r(input_file_path, fmt::allele); // TODO: make zero if possible.
       std::int64_t start_pos = r.tellg();
 
+      s1r::writer idx(output_file_path, 32-1);
+
       std::uint32_t min = std::numeric_limits<std::uint32_t>::max();
       std::uint32_t max = 0;
       std::map<std::string, std::vector<s1r::tree_base::entry>> index_data;
@@ -245,7 +247,7 @@ namespace savvy
           }
 
           s1r::tree_base::entry e(min, max, (static_cast<std::uint64_t>(start_pos) << 16) | std::uint16_t(records_in_block - 1));
-          index_data[variant.chromosome()].emplace_back(std::move(e));
+          idx.write(variant.chromosome(), std::move(e));
 
           records_in_block = 0;
           min = std::numeric_limits<std::uint32_t>::max();
@@ -260,7 +262,7 @@ namespace savvy
       }
       else
       {
-        ret = s1r::create_file(output_file_path, index_data, 32 - 1);
+        ret = idx.good();
       }
 
       return ret;

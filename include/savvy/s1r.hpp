@@ -59,10 +59,12 @@ namespace savvy
         std::uint32_t region_start() const { return be32toh(region_start_); }
         std::uint32_t region_length() const { return be32toh(region_length_); }
         std::uint32_t region_end() const { return this->region_start() + this->region_length(); }
+
         internal_entry() :
           region_start_(0),
           region_length_(0)
         { }
+
         internal_entry(std::uint32_t beg, std::uint32_t end) :
           region_start_(htobe32(beg)),
           region_length_(end > beg ? htobe32(end - beg) : 0)
@@ -86,7 +88,7 @@ namespace savvy
           value_(0)
         { }
 
-        entry(std::uint64_t beg, std::uint64_t end, std::uint64_t value) :
+        entry(std::uint32_t beg, std::uint32_t end, std::uint64_t value) :
           internal_entry(beg, end),
           value_(htobe64(value))
         { }
@@ -424,6 +426,7 @@ namespace savvy
 
         input_file_.seekg(-(footer.size()), std::ios::end);
         input_file_.read(footer.data(), footer.size());
+        assert(input_file_.good());
 
         std::size_t bytes_parsed = 0;
         std::string version(footer.begin() + (footer.size() - 7), footer.begin() + footer.size());
@@ -454,7 +457,7 @@ namespace savvy
         std::vector<tree_details> tree_details_array;
 
         int tree_details_bytes_left = tree_details_size;
-        do
+        while (tree_details_bytes_left > 0 && input_file_.good())
         {
           tree_details details;
           std::getline(input_file_, details.name, '\0');
@@ -468,7 +471,6 @@ namespace savvy
 
           tree_details_array.emplace_back(std::move(details));
         }
-        while (tree_details_bytes_left > 0 && input_file_.good());
 
         assert(tree_details_bytes_left == 0);
 
@@ -618,120 +620,30 @@ namespace savvy
     class writer : public tree_base
     {
     public:
-      //writer(const std::string& file_path, const std::string& chrom, EntryIter beg, EntryIter end) :
-      writer(const std::string& file_path, std::map<std::string, std::vector<tree_base::entry>>& chrom_data, std::uint8_t block_size_in_kib) :
-        ofs_(file_path, std::ios::binary)
+      writer(const std::string& file_path, std::uint8_t block_size_in_kib) :
+        file_path_(file_path),
+        ofs_(file_path, std::ios::binary),
+        block_size_in_kib_(block_size_in_kib)
       {
-        const std::uint32_t block_size = 1024u * (std::uint32_t(block_size_in_kib) + 1);
-        //std::uint64_t header_size = 7 + 16 + 2;
+        this->block_size_ = 1024u * (std::uint32_t(block_size_in_kib) + 1);
 
-        for (auto it = chrom_data.begin(); it != chrom_data.end(); ++it)
+        current_leaf_node_.reserve(detail::entries_per_leaf_node(block_size_));
+      }
+
+      ~writer()
+      {
+        if (chromosomes_.size())
         {
-          auto beg = it->second.begin();
-          auto end = it->second.end();
-          std::sort(beg, end, [](const tree_reader::entry& a, const tree_reader::entry& b)
-          {
-            double mid_a = static_cast<double>(a.region_start()) + (static_cast<double>(a.region_length()) / 2.0);
-            double mid_b = static_cast<double>(b.region_start()) + (static_cast<double>(b.region_length()) / 2.0);
-
-            return mid_a < mid_b;
-          });
-        }
-
-
-
-        //std::uint64_t block_offset = header_block.size() / std::uint64_t(1024u * (std::uint32_t(block_size_in_kib) + 1));
-        std::size_t block_offset = 0;
-        for (auto it = chrom_data.begin(); it != chrom_data.end(); ++it)
-        {
-          auto beg = it->second.begin();
-          auto end = it->second.end();
-
-          entry_count_ = (std::uint64_t) std::distance(beg, end);
-
-          tree_base::init(block_size_in_kib, block_offset, it->first);
-
-          std::vector<std::pair<std::vector<internal_entry>, tree_position>> current_nodes_at_each_internal_level;
-          current_nodes_at_each_internal_level.reserve(this->tree_height() - 1);
-          for (std::size_t i = 0; i < this->tree_height() - 1; ++i)
-            current_nodes_at_each_internal_level.emplace_back(std::make_pair(std::vector<internal_entry>(this->entries_per_internal_node()), tree_position(i, 0, 0)));
-
-          std::vector<entry> current_leaf_node(this->entries_per_leaf_node());
-          tree_position current_leaf_position(this->tree_height() - 1, 0, 0);
-
-          std::size_t node_counter = 0;
-          for (auto entry_it = beg; entry_it != end; ++entry_it)
-          {
-            const bool last_entry = entry_it + 1 == end;
-            const tree_reader::entry& e = *entry_it;
-
-            current_leaf_node[current_leaf_position.entry_offset] = e;
-
-            if (current_leaf_position.entry_offset + 1 == current_leaf_node.size() || last_entry)
-            {
-              ofs_.seekp(this->calculate_file_position(current_leaf_position));
-              ofs_.write((char*)(current_leaf_node.data()), block_size_);
-              ++node_counter;
-
-              std::uint32_t node_range_min = (std::uint32_t)-1;
-              std::uint32_t node_range_max = 0;
-              for (std::size_t i = 0; i <= current_leaf_position.entry_offset; ++i)
-              {
-                node_range_min = std::min(node_range_min, current_leaf_node[i].region_start());
-                node_range_max = std::max(node_range_max, current_leaf_node[i].region_end());
-              }
-
-              for (auto rit = current_nodes_at_each_internal_level.rbegin(); rit != current_nodes_at_each_internal_level.rend(); ++rit)
-              {
-                rit->first[rit->second.entry_offset] = internal_entry(node_range_min, node_range_max);
-
-
-
-                if (rit->second.entry_offset + 1 == rit->first.size() || last_entry)
-                {
-                  ofs_.seekp(this->calculate_file_position(rit->second));
-                  ofs_.write((char*)(rit->first.data()), block_size_);
-                  ++node_counter;
-
-                  node_range_min = (std::uint32_t)-1;
-                  node_range_max = 0;
-                  for (std::size_t i = 0; i <= rit->second.entry_offset; ++i)
-                  {
-                    node_range_min = std::min(node_range_min, rit->first[i].region_start());
-                    node_range_max = std::max(node_range_max, rit->first[i].region_end());
-                  }
-
-                  rit->first = std::vector<internal_entry>(this->entries_per_internal_node());
-                  ++(rit->second.node_offset);
-                  rit->second.entry_offset = 0;
-                }
-                else
-                {
-                  ++(rit->second.entry_offset);
-                  break;
-                }
-              }
-
-              current_leaf_node = std::vector<entry>(this->entries_per_leaf_node());
-              ++(current_leaf_position.node_offset);
-              current_leaf_position.entry_offset = 0;
-            }
-            else
-            {
-              ++(current_leaf_position.entry_offset);
-            }
-          }
-
-          block_offset += node_counter;
+          this->write_internal_nodes();
         }
 
         std::uint16_t index_size = 0;
-        for (auto it = chrom_data.begin(); it != chrom_data.end(); ++it)
+        for (auto it = chromosomes_.begin(); it != chromosomes_.end(); ++it)
         {
           ofs_.write(it->first.c_str(), it->first.size() + 1);
 
-          std::uint64_t entry_count_be = htobe64((std::uint64_t)std::distance(it->second.begin(), it->second.end()));
-          ofs_.write((char*)(&entry_count_be), 8);
+          std::uint64_t entry_count_be = htobe64(it->second);
+          ofs_.write((char *) (&entry_count_be), 8);
 
           index_size += (1 + it->first.size() + 8);
         }
@@ -739,11 +651,11 @@ namespace savvy
         std::string footer_block(26, '\0');
         std::size_t cur = 0;
 
-        std::memcpy(&footer_block[cur], (char*)(&block_size_in_kib), 1);
+        std::memcpy(&footer_block[cur], (char *) (&block_size_in_kib_), 1);
         cur += 1;
 
         std::uint16_t index_size_be = htobe16(index_size);
-        std::memcpy(&footer_block[cur], (char*)(&index_size_be), 2);
+        std::memcpy(&footer_block[cur], (char *) (&index_size_be), 2);
         cur += 2;
 
         std::memset(&footer_block[cur], '\0', 16); // uuid
@@ -753,22 +665,272 @@ namespace savvy
         ofs_.write(footer_block.data(), footer_block.size());
       }
 
+      writer& write(const std::string& chrom, const entry& e)
+      {
+        return write(chrom, entry(e));
+      }
+
+      writer& write(const std::string& chrom, entry&& e)
+      {
+        if (chromosomes_.empty())
+          chromosomes_.emplace_back(chrom, 0);
+
+        if (chrom != chromosomes_.back().first)
+        {
+          this->write_internal_nodes();
+          this->chromosomes_.emplace_back(chrom, 0);
+        }
+
+
+        current_leaf_node_.emplace_back(std::move(e));
+        if (current_leaf_node_.size() == detail::entries_per_leaf_node(block_size_))
+        {
+          ofs_.write((char *)(current_leaf_node_.data()), block_size_);
+
+          current_leaf_node_.resize(0);
+        }
+
+        ++(chromosomes_.back().second);
+
+        return *this;
+      }
+
+      void write_internal_nodes()
+      {
+        if (this->current_leaf_node_.size())
+        {
+          this->current_leaf_node_.resize(detail::entries_per_leaf_node(block_size_));
+          ofs_.write((char *)(current_leaf_node_.data()), block_size_);
+
+          current_leaf_node_.resize(0);
+        }
+
+        this->entry_count_ = this->chromosomes_.back().second;
+
+        tree_base::init(block_size_in_kib_, std::uint64_t(ofs_.tellp()) - this->chromosomes_.back().second * sizeof(entry), this->chromosomes_.back().first);
+        ofs_.flush();
+
+        std::vector<std::pair<std::vector<internal_entry>, tree_position>> current_nodes_at_each_internal_level;
+        current_nodes_at_each_internal_level.reserve(this->tree_height() - 1);
+        for (std::size_t i = 0; i < this->tree_height() - 1; ++i)
+          current_nodes_at_each_internal_level.emplace_back(std::make_pair(std::vector<internal_entry>(this->entries_per_internal_node()), tree_position(i, 0, 0)));
+
+        std::vector<entry> current_leaf_node(this->entries_per_leaf_node());
+        tree_position current_leaf_position(this->tree_height() - 1, 0, 0);
+
+        std::ifstream ifs(file_path_, std::ios::binary);
+
+        std::uint64_t num_leaf_nodes = detail::ceil_divide(this->chromosomes_.back().second, std::uint64_t(this->entries_per_leaf_node()));
+        ifs.seekg(ofs_.tellp() - std::streamoff(block_size_ * num_leaf_nodes));
+        std::vector<entry> leaf_node(detail::entries_per_leaf_node(block_size_));
+
+        for (std::size_t i = 0; i < num_leaf_nodes && ifs.good(); ++i)
+        {
+          bool last_leaf_node = (i + 1) == num_leaf_nodes;
+
+          ifs.read((char*)leaf_node.data(), block_size_);
+
+          std::uint32_t node_range_min = (std::uint32_t)-1;
+          std::uint32_t node_range_max = 0;
+          for (std::size_t i = 0; i <= current_leaf_position.entry_offset; ++i)
+          {
+            node_range_min = std::min(node_range_min, current_leaf_node[i].region_start());
+            node_range_max = std::max(node_range_max, current_leaf_node[i].region_end());
+          }
+
+          for (auto rit = current_nodes_at_each_internal_level.rbegin(); rit != current_nodes_at_each_internal_level.rend(); ++rit)
+          {
+            rit->first[rit->second.entry_offset] = internal_entry(node_range_min, node_range_max);
+
+            if (rit->second.entry_offset + 1 == rit->first.size() || last_leaf_node)
+            {
+              ofs_.seekp(this->calculate_file_position(rit->second));
+              ofs_.write((char*)(rit->first.data()), block_size_);
+
+              node_range_min = (std::uint32_t)-1;
+              node_range_max = 0;
+              for (std::size_t i = 0; i <= rit->second.entry_offset; ++i)
+              {
+                node_range_min = std::min(node_range_min, rit->first[i].region_start());
+                node_range_max = std::max(node_range_max, rit->first[i].region_end());
+              }
+
+              rit->first = std::vector<internal_entry>(this->entries_per_internal_node());
+              ++(rit->second.node_offset);
+              rit->second.entry_offset = 0;
+            }
+            else
+            {
+              ++(rit->second.entry_offset);
+              break;
+            }
+          }
+
+        }
+
+        if (!ifs.good())
+          ofs_.setstate(std::ios::badbit);
+      }
+
+
+
+
+
+
+//      writer(const std::string& file_path, std::map<std::string, std::vector<tree_base::entry>>& chrom_data, std::uint8_t block_size_in_kib) :
+//        ofs_(file_path, std::ios::binary)
+//      {
+//        const std::uint32_t block_size = 1024u * (std::uint32_t(block_size_in_kib) + 1);
+//        //std::uint64_t header_size = 7 + 16 + 2;
+//
+//        for (auto it = chrom_data.begin(); it != chrom_data.end(); ++it)
+//        {
+//          auto beg = it->second.begin();
+//          auto end = it->second.end();
+//          std::sort(beg, end, [](const tree_reader::entry& a, const tree_reader::entry& b)
+//          {
+//            double mid_a = static_cast<double>(a.region_start()) + (static_cast<double>(a.region_length()) / 2.0);
+//            double mid_b = static_cast<double>(b.region_start()) + (static_cast<double>(b.region_length()) / 2.0);
+//
+//            return mid_a < mid_b;
+//          });
+//        }
+//
+//
+//
+//        //std::uint64_t block_offset = header_block.size() / std::uint64_t(1024u * (std::uint32_t(block_size_in_kib) + 1));
+//        std::size_t block_offset = 0;
+//        for (auto it = chrom_data.begin(); it != chrom_data.end(); ++it)
+//        {
+//          auto beg = it->second.begin();
+//          auto end = it->second.end();
+//
+//          entry_count_ = (std::uint64_t) std::distance(beg, end);
+//
+//          tree_base::init(block_size_in_kib, block_offset, it->first);
+//
+//          std::vector<std::pair<std::vector<internal_entry>, tree_position>> current_nodes_at_each_internal_level;
+//          current_nodes_at_each_internal_level.reserve(this->tree_height() - 1);
+//          for (std::size_t i = 0; i < this->tree_height() - 1; ++i)
+//            current_nodes_at_each_internal_level.emplace_back(std::make_pair(std::vector<internal_entry>(this->entries_per_internal_node()), tree_position(i, 0, 0)));
+//
+//          std::vector<entry> current_leaf_node(this->entries_per_leaf_node());
+//          tree_position current_leaf_position(this->tree_height() - 1, 0, 0);
+//
+//          std::size_t node_counter = 0;
+//          for (auto entry_it = beg; entry_it != end; ++entry_it)
+//          {
+//            const bool last_entry = entry_it + 1 == end;
+//            const tree_reader::entry& e = *entry_it;
+//
+//            current_leaf_node[current_leaf_position.entry_offset] = e;
+//
+//            if (current_leaf_position.entry_offset + 1 == current_leaf_node.size() || last_entry)
+//            {
+//              ofs_.seekp(this->calculate_file_position(current_leaf_position));
+//              ofs_.write((char*)(current_leaf_node.data()), block_size_);
+//              ++node_counter;
+//
+//              std::uint32_t node_range_min = (std::uint32_t)-1;
+//              std::uint32_t node_range_max = 0;
+//              for (std::size_t i = 0; i <= current_leaf_position.entry_offset; ++i)
+//              {
+//                node_range_min = std::min(node_range_min, current_leaf_node[i].region_start());
+//                node_range_max = std::max(node_range_max, current_leaf_node[i].region_end());
+//              }
+//
+//              for (auto rit = current_nodes_at_each_internal_level.rbegin(); rit != current_nodes_at_each_internal_level.rend(); ++rit)
+//              {
+//                rit->first[rit->second.entry_offset] = internal_entry(node_range_min, node_range_max);
+//
+//
+//
+//                if (rit->second.entry_offset + 1 == rit->first.size() || last_entry)
+//                {
+//                  ofs_.seekp(this->calculate_file_position(rit->second));
+//                  ofs_.write((char*)(rit->first.data()), block_size_);
+//                  ++node_counter;
+//
+//                  node_range_min = (std::uint32_t)-1;
+//                  node_range_max = 0;
+//                  for (std::size_t i = 0; i <= rit->second.entry_offset; ++i)
+//                  {
+//                    node_range_min = std::min(node_range_min, rit->first[i].region_start());
+//                    node_range_max = std::max(node_range_max, rit->first[i].region_end());
+//                  }
+//
+//                  rit->first = std::vector<internal_entry>(this->entries_per_internal_node());
+//                  ++(rit->second.node_offset);
+//                  rit->second.entry_offset = 0;
+//                }
+//                else
+//                {
+//                  ++(rit->second.entry_offset);
+//                  break;
+//                }
+//              }
+//
+//              current_leaf_node = std::vector<entry>(this->entries_per_leaf_node());
+//              ++(current_leaf_position.node_offset);
+//              current_leaf_position.entry_offset = 0;
+//            }
+//            else
+//            {
+//              ++(current_leaf_position.entry_offset);
+//            }
+//          }
+//
+//          block_offset += node_counter;
+//        }
+//
+//        std::uint16_t index_size = 0;
+//        for (auto it = chrom_data.begin(); it != chrom_data.end(); ++it)
+//        {
+//          ofs_.write(it->first.c_str(), it->first.size() + 1);
+//
+//          std::uint64_t entry_count_be = htobe64((std::uint64_t)std::distance(it->second.begin(), it->second.end()));
+//          ofs_.write((char*)(&entry_count_be), 8);
+//
+//          index_size += (1 + it->first.size() + 8);
+//        }
+//
+//        std::string footer_block(26, '\0');
+//        std::size_t cur = 0;
+//
+//        std::memcpy(&footer_block[cur], (char*)(&block_size_in_kib), 1);
+//        cur += 1;
+//
+//        std::uint16_t index_size_be = htobe16(index_size);
+//        std::memcpy(&footer_block[cur], (char*)(&index_size_be), 2);
+//        cur += 2;
+//
+//        std::memset(&footer_block[cur], '\0', 16); // uuid
+//        cur += 16;
+//
+//        std::memcpy(&footer_block[cur], "s1r\x00\x01\x00\x00", 7);
+//        ofs_.write(footer_block.data(), footer_block.size());
+//      }
+
+      explicit operator bool() const { return ofs_.good(); }
+      bool good() { return ofs_.good(); }
+
       bool flush()
       {
         return ofs_.flush().good();
       }
     private:
+      std::string file_path_;
       std::ofstream ofs_;
+      std::uint8_t block_size_in_kib_;
+      std::vector<entry> current_leaf_node_;
       std::vector<std::pair<std::string, std::uint64_t>> chromosomes_;
-      std::uint32_t current_max_;
-      std::uint32_t current_min_;
     };
 
-    inline bool create_file(const std::string& file_path, std::map<std::string, std::vector<s1r::tree_base::entry>>& entries, std::uint8_t block_size_in_kib)
-    {
-      writer w(file_path, entries, block_size_in_kib);
-      return w.flush();
-    }
+//    inline bool create_file(const std::string& file_path, std::map<std::string, std::vector<s1r::tree_base::entry>>& entries, std::uint8_t block_size_in_kib)
+//    {
+//      writer w(file_path, block_size_in_kib);
+//      return w.flush();
+//    }
 
 
     inline reader::query reader::create_query(region reg)

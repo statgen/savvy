@@ -15,6 +15,7 @@
 #include "variant_iterator.hpp"
 #include "utility.hpp"
 #include "data_format.hpp"
+#include "utility.hpp"
 
 #include <shrinkwrap/istream.hpp>
 
@@ -830,7 +831,7 @@ namespace savvy
         output_buf_(opts.compression_level > 0 ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, opts.compression_level)) : std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out))), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         output_stream_(output_buf_.get()),
         file_path_(file_path),
-        index_file_path_(opts.index_path),
+        index_file_(opts.index_path.size() ? ::savvy::detail::make_unique<s1r::writer>(opts.index_path, 32-1) : nullptr),
         current_block_min_(std::numeric_limits<std::uint32_t>::max()),
         current_block_max_(0),
         sample_size_(samples_end - samples_beg),
@@ -906,7 +907,7 @@ namespace savvy
       ~writer()
       {
         // TODO: This is only a temp solution.
-        if (index_file_path_.size())
+        if (index_file_)
         {
           if (record_count_in_block_)
           {
@@ -922,9 +923,8 @@ namespace savvy
             }
 
             s1r::tree_base::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
-            index_entries_[current_chromosome_].emplace_back(std::move(e));
+            index_file_->write(current_chromosome_, std::move(e));
           }
-          s1r::create_file(index_file_path_, index_entries_, 32-1);
         }
       }
 
@@ -999,7 +999,7 @@ namespace savvy
       template <typename VecT>
       void write(const site_info& annotations, const VecT& data)
       {
-        if (output_stream_.good())
+        if (this->good())
         {
           if (data.size() % sample_size_ != 0)
           {
@@ -1011,7 +1011,7 @@ namespace savvy
             //if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
             if (block_size_ != 0 && ((record_count_ % block_size_) == 0 || annotations.chromosome() != current_chromosome_))
             {
-              if (index_file_path_.size() && record_count_in_block_)
+              if (index_file_ && record_count_in_block_)
               {
                 auto file_pos = std::uint64_t(output_stream_.tellp());
                 if (record_count_in_block_ > 0x10000) // Max records per block: 64*1024
@@ -1027,7 +1027,7 @@ namespace savvy
                 }
 
                 s1r::tree_base::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
-                index_entries_[current_chromosome_].emplace_back(std::move(e));
+                index_file_->write(current_chromosome_, std::move(e));
               }
               output_stream_.flush();
               allele_count_ = 0;
@@ -1084,7 +1084,7 @@ namespace savvy
       }
 #endif
       explicit operator bool() const { return good(); }
-      bool good() const { return output_stream_.good(); }
+      bool good() const { return output_stream_.good() && (!index_file_ || index_file_->good()); }
       bool fail() const { return output_stream_.fail(); }
       bool bad() const { return output_stream_.bad(); }
       bool eof() const { return output_stream_.eof(); }
@@ -1284,8 +1284,7 @@ namespace savvy
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> property_fields_;
       std::string file_path_;
-      std::string index_file_path_;
-      std::map<std::string, std::vector<s1r::tree_base::entry>> index_entries_;
+      std::unique_ptr<s1r::writer> index_file_;
       std::string current_chromosome_;
       std::uint32_t current_block_min_;
       std::uint32_t current_block_max_;
