@@ -206,7 +206,7 @@ namespace savvy
 
       std::uint32_t min = std::numeric_limits<std::uint32_t>::max();
       std::uint32_t max = 0;
-      std::map<std::string, std::vector<s1r::tree_base::entry>> index_data;
+      std::map<std::string, std::vector<s1r::entry>> index_data;
 
       site_info variant;
       std::vector<float> variant_data;
@@ -218,7 +218,7 @@ namespace savvy
         if (records_in_block > 0 && variant.chromosome() != current_chromosome)
         {
           // TODO: Possibly make this an error case.
-          s1r::tree_base::entry e(min, max, (static_cast<std::uint64_t>(start_pos) << 16) | std::uint16_t(records_in_block - 1));
+          s1r::entry e(min, max, (static_cast<std::uint64_t>(start_pos) << 16) | std::uint16_t(records_in_block - 1));
           index_data[current_chromosome].emplace_back(std::move(e));
           records_in_block = 0;
           min = std::numeric_limits<std::uint32_t>::max();
@@ -246,7 +246,7 @@ namespace savvy
             return false;
           }
 
-          s1r::tree_base::entry e(min, max, (static_cast<std::uint64_t>(start_pos) << 16) | std::uint16_t(records_in_block - 1));
+          s1r::entry e(min, max, (static_cast<std::uint64_t>(start_pos) << 16) | std::uint16_t(records_in_block - 1));
           idx.write(variant.chromosome(), std::move(e));
 
           records_in_block = 0;

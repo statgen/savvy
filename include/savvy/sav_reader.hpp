@@ -922,7 +922,7 @@ namespace savvy
               assert(!"File size to large to be indexed!");
             }
 
-            s1r::tree_base::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
+            s1r::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
             index_file_->write(current_chromosome_, std::move(e));
           }
         }
@@ -1026,7 +1026,7 @@ namespace savvy
                   output_stream_.setstate(std::ios::badbit);
                 }
 
-                s1r::tree_base::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
+                s1r::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
                 index_file_->write(current_chromosome_, std::move(e));
               }
               output_stream_.flush();

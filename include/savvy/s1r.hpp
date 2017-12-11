@@ -50,53 +50,53 @@ namespace savvy
       }
     }
 
+    class internal_entry
+    {
+    public:
+      std::uint32_t region_start() const { return be32toh(region_start_); }
+      std::uint32_t region_length() const { return be32toh(region_length_); }
+      std::uint32_t region_end() const { return this->region_start() + this->region_length(); }
+
+      internal_entry() :
+        region_start_(0),
+        region_length_(0)
+      { }
+
+      internal_entry(std::uint32_t beg, std::uint32_t end) :
+        region_start_(htobe32(beg)),
+        region_length_(end > beg ? htobe32(end - beg) : 0)
+      { }
+    private:
+      std::uint32_t region_start_;
+      std::uint32_t region_length_;
+    };
+
+    static_assert(sizeof(internal_entry) == 8, "Alignment issue (internal_entry)");
+
+    class entry : public internal_entry
+    {
+    public:
+      std::uint64_t value() const
+      {
+        return be64toh(value_);
+      }
+
+      entry() :
+        value_(0)
+      { }
+
+      entry(std::uint32_t beg, std::uint32_t end, std::uint64_t value) :
+        internal_entry(beg, end),
+        value_(htobe64(value))
+      { }
+    private:
+      std::uint64_t value_;
+    };
+    static_assert(sizeof(entry) == 16, "Alignment issue (entry)");
+
     class tree_base
     {
     public:
-
-      class internal_entry
-      {
-      public:
-        std::uint32_t region_start() const { return be32toh(region_start_); }
-        std::uint32_t region_length() const { return be32toh(region_length_); }
-        std::uint32_t region_end() const { return this->region_start() + this->region_length(); }
-
-        internal_entry() :
-          region_start_(0),
-          region_length_(0)
-        { }
-
-        internal_entry(std::uint32_t beg, std::uint32_t end) :
-          region_start_(htobe32(beg)),
-          region_length_(end > beg ? htobe32(end - beg) : 0)
-        { }
-      private:
-        std::uint32_t region_start_;
-        std::uint32_t region_length_;
-      };
-
-      static_assert(sizeof(internal_entry) == 8, "Alignment issue (internal_entry)");
-
-      class entry : public internal_entry
-      {
-      public:
-        std::uint64_t value() const
-        {
-          return be64toh(value_);
-        }
-
-        entry() :
-          value_(0)
-        { }
-
-        entry(std::uint32_t beg, std::uint32_t end, std::uint64_t value) :
-          internal_entry(beg, end),
-          value_(htobe64(value))
-        { }
-      private:
-        std::uint64_t value_;
-      };
-      static_assert(sizeof(entry) == 16, "Alignment issue (entry)");
 
       struct node_position
       {
@@ -572,7 +572,7 @@ namespace savvy
     public:
       typedef iterator self_type;
       typedef std::ptrdiff_t difference_type;
-      typedef tree_reader::entry value_type;
+      typedef entry value_type;
       typedef const value_type& reference;
       typedef const value_type* pointer;
       typedef std::bidirectional_iterator_tag iterator_category;
