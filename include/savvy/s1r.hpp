@@ -21,6 +21,7 @@
 #include <map>
 #include <cassert>
 #include <array>
+#include <cstring>
 
 namespace savvy
 {
