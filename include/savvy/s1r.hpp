@@ -56,21 +56,23 @@ namespace savvy
       class internal_entry
       {
       public:
-        std::uint64_t region_start() const { return be64toh(region_start_); }
-        std::uint64_t region_length() const { return be64toh(region_length_); }
-        std::uint64_t region_end() const { return this->region_start() + this->region_length(); }
+        std::uint32_t region_start() const { return be32toh(region_start_); }
+        std::uint32_t region_length() const { return be32toh(region_length_); }
+        std::uint32_t region_end() const { return this->region_start() + this->region_length(); }
         internal_entry() :
           region_start_(0),
           region_length_(0)
         { }
-        internal_entry(std::uint64_t beg, std::uint64_t end) :
-          region_start_(htobe64(beg)),
-          region_length_(end > beg ? htobe64(end - beg) : 0)
+        internal_entry(std::uint32_t beg, std::uint32_t end) :
+          region_start_(htobe32(beg)),
+          region_length_(end > beg ? htobe32(end - beg) : 0)
         { }
       private:
-        std::uint64_t region_start_;
-        std::uint64_t region_length_;
+        std::uint32_t region_start_;
+        std::uint32_t region_length_;
       };
+
+      static_assert(sizeof(internal_entry) == 8, "Alignment issue (internal_entry)");
 
       class entry : public internal_entry
       {
@@ -91,6 +93,7 @@ namespace savvy
       private:
         std::uint64_t value_;
       };
+      static_assert(sizeof(entry) == 16, "Alignment issue (entry)");
 
       struct node_position
       {
@@ -111,8 +114,8 @@ namespace savvy
       std::uint64_t entry_count() const { return entry_count_; }
       std::uint64_t bucket_size() const { return block_size_; }
       std::uint64_t entry_count_at_level(std::size_t level) const { return entry_counts_per_level_[level]; }
-      std::uint16_t entries_per_leaf_node() const { return block_size_ / std::uint16_t(16); }
-      std::uint16_t entries_per_internal_node() const { return block_size_ / std::uint16_t(8); }
+      std::uint16_t entries_per_leaf_node() const { return std::uint16_t(block_size_ / sizeof(entry)); }
+      std::uint16_t entries_per_internal_node() const { return std::uint16_t(block_size_ / sizeof(internal_entry)); }
 
       std::uint64_t calculate_node_size(node_position input) const
       {
@@ -418,13 +421,9 @@ namespace savvy
         input_file_(file_path, std::ios::binary)
       {
         std::array<char, 26> footer;
-        input_file_.seekg(0, std::ios::end);
-        auto g = input_file_.tellg();
-        input_file_.seekg(-(footer.size()), std::ios::end);
-        assert(input_file_.good());
-        g = input_file_.tellg();
-        input_file_.read(footer.data(), footer.size());
 
+        input_file_.seekg(-(footer.size()), std::ios::end);
+        input_file_.read(footer.data(), footer.size());
 
         std::size_t bytes_parsed = 0;
         std::string version(footer.begin() + (footer.size() - 7), footer.begin() + footer.size());
@@ -469,7 +468,7 @@ namespace savvy
 
           tree_details_array.emplace_back(std::move(details));
         }
-        while (tree_details_bytes_left > 0);
+        while (tree_details_bytes_left > 0 && input_file_.good());
 
         assert(tree_details_bytes_left == 0);
 
@@ -623,7 +622,6 @@ namespace savvy
       writer(const std::string& file_path, std::map<std::string, std::vector<tree_base::entry>>& chrom_data, std::uint8_t block_size_in_kib) :
         ofs_(file_path, std::ios::binary)
       {
-        assert(ofs_.good());
         const std::uint32_t block_size = 1024u * (std::uint32_t(block_size_in_kib) + 1);
         //std::uint64_t header_size = 7 + 16 + 2;
 
@@ -675,8 +673,8 @@ namespace savvy
               ofs_.write((char*)(current_leaf_node.data()), block_size_);
               ++node_counter;
 
-              std::uint64_t node_range_min = (std::uint64_t)-1;
-              std::uint64_t node_range_max = 0;
+              std::uint32_t node_range_min = (std::uint32_t)-1;
+              std::uint32_t node_range_max = 0;
               for (std::size_t i = 0; i <= current_leaf_position.entry_offset; ++i)
               {
                 node_range_min = std::min(node_range_min, current_leaf_node[i].region_start());
@@ -695,7 +693,7 @@ namespace savvy
                   ofs_.write((char*)(rit->first.data()), block_size_);
                   ++node_counter;
 
-                  node_range_min = (std::uint64_t)-1;
+                  node_range_min = (std::uint32_t)-1;
                   node_range_max = 0;
                   for (std::size_t i = 0; i <= rit->second.entry_offset; ++i)
                   {
@@ -761,6 +759,9 @@ namespace savvy
       }
     private:
       std::ofstream ofs_;
+      std::vector<std::pair<std::string, std::uint64_t>> chromosomes_;
+      std::uint32_t current_max_;
+      std::uint32_t current_min_;
     };
 
     inline bool create_file(const std::string& file_path, std::map<std::string, std::vector<s1r::tree_base::entry>>& entries, std::uint8_t block_size_in_kib)
