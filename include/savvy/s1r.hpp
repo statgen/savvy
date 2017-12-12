@@ -97,7 +97,6 @@ namespace savvy
     class tree_base
     {
     public:
-
       struct node_position
       {
         node_position(std::uint64_t lev, std::uint64_t node_off) : level(lev), node_offset(node_off) {}
@@ -113,6 +112,27 @@ namespace savvy
         bool operator!=(const tree_position& other) const { return !(*this == other); }
         std::uint64_t entry_offset;
       };
+
+      tree_base(std::uint8_t block_size_in_kib, std::uint64_t block_offset, std::uint64_t entry_count)
+      {
+        //const std::uint16_t header_data_size = 7 + 2 + 8;
+        block_size_ = 1024u * (std::uint32_t(block_size_in_kib) + 1);
+        block_offset_ = block_offset; //ceil_divide(header_data_size, block_size_);
+        entry_count_ = entry_count;
+
+        std::size_t node_count = 1;
+        entry_counts_per_level_.clear();
+        this->entry_counts_per_level_.insert(this->entry_counts_per_level_.begin(), entry_count_);
+        for (std::uint64_t nodes_at_current_level = detail::ceil_divide(entry_count_, (std::uint64_t) this->entries_per_leaf_node());
+             nodes_at_current_level > 1;
+             nodes_at_current_level = detail::ceil_divide(nodes_at_current_level, (std::uint64_t) this->entries_per_internal_node()))
+        {
+          node_count += nodes_at_current_level;
+          this->entry_counts_per_level_.insert(this->entry_counts_per_level_.begin(), nodes_at_current_level);
+        }
+
+        root_block_end_pos_ = (block_offset + node_count) * block_size_;
+      }
 
       std::uint64_t entry_count() const { return entry_count_; }
       std::uint64_t bucket_size() const { return block_size_; }
@@ -178,36 +198,13 @@ namespace savvy
         return entry_counts_per_level_.size();
       }
 
-      const std::string& name() const { return name_; }
-    protected:
-      std::string name_;
 
+    private:
       std::streampos root_block_end_pos_;
       std::uint64_t block_offset_;
       std::uint32_t block_size_;
       std::vector<std::uint64_t> entry_counts_per_level_;
       std::uint64_t entry_count_;
-
-      void init(std::uint8_t block_size_in_kib, std::uint64_t block_offset, const std::string& name)
-      {
-        //const std::uint16_t header_data_size = 7 + 2 + 8;
-        block_size_ = 1024u * (std::uint32_t(block_size_in_kib) + 1);
-        block_offset_ = block_offset; //ceil_divide(header_data_size, block_size_);
-        name_ = name;
-
-        std::size_t node_count = 1;
-        entry_counts_per_level_.clear();
-        this->entry_counts_per_level_.insert(this->entry_counts_per_level_.begin(), entry_count_);
-        for (std::uint64_t nodes_at_current_level = detail::ceil_divide(entry_count_, (std::uint64_t) this->entries_per_leaf_node());
-             nodes_at_current_level > 1;
-             nodes_at_current_level = detail::ceil_divide(nodes_at_current_level, (std::uint64_t) this->entries_per_internal_node()))
-        {
-          node_count += nodes_at_current_level;
-          this->entry_counts_per_level_.insert(this->entry_counts_per_level_.begin(), nodes_at_current_level);
-        }
-
-        root_block_end_pos_ = (block_offset + node_count) * block_size_;
-      }
     };
 
     class tree_reader : public tree_base
@@ -240,11 +237,11 @@ namespace savvy
               ifs_->seekg(reader_->calculate_file_position(position_));
 
               if (position_.level == leaf_level)
-                ifs_->read((char*) leaf_node_.data(), reader_->block_size_);
+                ifs_->read((char*) leaf_node_.data(), reader_->bucket_size());
               else
               {
                 traversal_chain_.emplace(reader_->entries_per_internal_node());
-                ifs_->read((char*) (traversal_chain_.top().data()), reader_->block_size_);
+                ifs_->read((char*) (traversal_chain_.top().data()), reader_->bucket_size());
               }
 
               traverse_right();
@@ -318,11 +315,11 @@ namespace savvy
 
                   ifs_->seekg(reader_->calculate_file_position(position_));
                   if (position_.level == leaf_level)
-                    ifs_->read((char*) leaf_node_.data(), reader_->block_size_);
+                    ifs_->read((char*) leaf_node_.data(), reader_->bucket_size());
                   else
                   {
                     traversal_chain_.emplace(reader_->entries_per_internal_node());
-                    ifs_->read((char*) (traversal_chain_.top().data()), reader_->block_size_);
+                    ifs_->read((char*) (traversal_chain_.top().data()), reader_->bucket_size());
                   }
                 }
               }
@@ -376,7 +373,9 @@ namespace savvy
       };
 
       tree_reader(std::ifstream& file, std::uint8_t block_size_in_kib, std::uint64_t block_offset, const std::string& name, std::uint64_t entry_count) :
-        ifs_(file)
+        tree_base(block_size_in_kib, block_offset, entry_count),
+        ifs_(file),
+        name_(name)
       {
 //        std::string version(7, '\0');
 //        ifs_.read(&version[0], version.size());
@@ -385,9 +384,6 @@ namespace savvy
 //        block_size_ = static_cast<std::uint16_t>(std::pow(8.0, (0x03 & block_size_exponent) + 2));
 //        ifs_.read((char*)(&entry_count_), 8);
 //        entry_count_ = be64toh(entry_count_);
-        entry_count_ = entry_count;
-
-        tree_base::init(block_size_in_kib, block_offset, name);
       }
 
       bool good() const { return ifs_.good(); }
@@ -402,8 +398,11 @@ namespace savvy
         query ret(*this, ifs_, beg, end);
         return ret;
       }
+
+      const std::string& name() const { return name_; }
     private:
       std::ifstream& ifs_;
+      std::string name_;
     };
 
     enum class sort_type : std::uint8_t
@@ -618,7 +617,7 @@ namespace savvy
       std::istream* ifs_;
     };
 
-    class writer : public tree_base
+    class writer
     {
     public:
       writer(const std::string& file_path, std::uint8_t block_size_in_kib) :
@@ -706,19 +705,16 @@ namespace savvy
 
         ofs_.flush();
 
-        this->entry_count_ = this->chromosomes_.back().second;
-
-
         std::uint64_t num_leaf_nodes = detail::ceil_divide(this->chromosomes_.back().second, std::uint64_t(detail::entries_per_leaf_node(block_size_)));
-        tree_base::init(block_size_in_kib_, std::uint64_t(ofs_.tellp()) - block_size_ * num_leaf_nodes, this->chromosomes_.back().first);
+        tree_base tree(block_size_in_kib_, std::uint64_t(ofs_.tellp()) - block_size_ * num_leaf_nodes, this->chromosomes_.back().second);
 
-        std::vector<std::pair<std::vector<internal_entry>, tree_position>> current_nodes_at_each_internal_level;
-        current_nodes_at_each_internal_level.reserve(this->tree_height() - 1);
-        for (std::size_t i = 0; i < this->tree_height() - 1; ++i)
-          current_nodes_at_each_internal_level.emplace_back(std::make_pair(std::vector<internal_entry>(this->entries_per_internal_node()), tree_position(i, 0, 0)));
+        std::vector<std::pair<std::vector<internal_entry>, tree_base::tree_position>> current_nodes_at_each_internal_level;
+        current_nodes_at_each_internal_level.reserve(tree.tree_height() - 1);
+        for (std::size_t i = 0; i < tree.tree_height() - 1; ++i)
+          current_nodes_at_each_internal_level.emplace_back(std::make_pair(std::vector<internal_entry>(tree.entries_per_internal_node()), tree_base::tree_position(i, 0, 0)));
 
         std::vector<entry> current_leaf_node(detail::entries_per_leaf_node(block_size_));
-        tree_position current_leaf_position(this->tree_height() - 1, 0, 0);
+        tree_base::tree_position current_leaf_position(tree.tree_height() - 1, 0, 0);
 
         std::ifstream ifs(file_path_, std::ios::binary);
 
@@ -733,7 +729,10 @@ namespace savvy
 
           std::uint32_t node_range_min = (std::uint32_t)-1;
           std::uint32_t node_range_max = 0;
-          for (std::size_t i = 0; i < (last_leaf_node ? detail::entries_per_leaf_node(block_size_) - (this->chromosomes_.back().second % detail::entries_per_leaf_node(block_size_)) : detail::entries_per_leaf_node(block_size_)); ++i)
+          const std::size_t current_leaf_node_end = last_leaf_node
+            ? detail::entries_per_leaf_node(block_size_) - (this->chromosomes_.back().second % detail::entries_per_leaf_node(block_size_))
+            : detail::entries_per_leaf_node(block_size_);
+          for (std::size_t i = 0; i < current_leaf_node_end; ++i)
           {
             node_range_min = std::min(node_range_min, current_leaf_node[i].region_start());
             node_range_max = std::max(node_range_max, current_leaf_node[i].region_end());
@@ -745,7 +744,7 @@ namespace savvy
 
             if (rit->second.entry_offset + 1 == rit->first.size() || last_leaf_node)
             {
-              ofs_.seekp(this->calculate_file_position(rit->second));
+              ofs_.seekp(tree.calculate_file_position(rit->second));
               ofs_.write((char*)(rit->first.data()), block_size_);
 
               node_range_min = (std::uint32_t)-1;
@@ -756,7 +755,7 @@ namespace savvy
                 node_range_max = std::max(node_range_max, rit->first[i].region_end());
               }
 
-              rit->first = std::vector<internal_entry>(this->entries_per_internal_node());
+              rit->first = std::vector<internal_entry>(tree.entries_per_internal_node());
               ++(rit->second.node_offset);
               rit->second.entry_offset = 0;
             }
@@ -923,6 +922,7 @@ namespace savvy
       std::string file_path_;
       std::ofstream ofs_;
       std::uint8_t block_size_in_kib_;
+      std::uint32_t block_size_;
       std::vector<entry> current_leaf_node_;
       std::vector<std::pair<std::string, std::uint64_t>> chromosomes_;
     };
