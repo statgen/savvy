@@ -620,10 +620,9 @@ namespace savvy
     class writer
     {
     public:
-      writer(const std::string& file_path, std::uint8_t block_size_in_kib) :
+      writer(const std::string& file_path, std::uint8_t block_size_in_kib = 4 - 1) :
         file_path_(file_path),
-        ofs_(file_path, std::ios::binary),
-        block_size_in_kib_(block_size_in_kib)
+        ofs_(file_path, std::ios::binary)
       {
         this->block_size_ = 1024u * (std::uint32_t(block_size_in_kib) + 1);
 
@@ -651,7 +650,8 @@ namespace savvy
         std::string footer_block(26, '\0');
         std::size_t cur = 0;
 
-        std::memcpy(&footer_block[cur], (char *) (&block_size_in_kib_), 1);
+        std::uint8_t block_size_in_kib = std::uint8_t(block_size_ / 1024 - 1);
+        std::memcpy(&footer_block[cur], (char *) (&block_size_in_kib), 1);
         cur += 1;
 
         std::uint16_t index_size_be = htobe16(index_size);
@@ -706,7 +706,7 @@ namespace savvy
         ofs_.flush();
 
         std::uint64_t num_leaf_nodes = detail::ceil_divide(this->chromosomes_.back().second, std::uint64_t(detail::entries_per_leaf_node(block_size_)));
-        tree_base tree(block_size_in_kib_, std::uint64_t(ofs_.tellp()) - block_size_ * num_leaf_nodes, this->chromosomes_.back().second);
+        tree_base tree(std::uint8_t(block_size_ / 1024 - 1), std::uint64_t(ofs_.tellp()) - block_size_ * num_leaf_nodes, this->chromosomes_.back().second);
 
         std::vector<std::pair<std::vector<internal_entry>, tree_base::tree_position>> current_nodes_at_each_internal_level;
         current_nodes_at_each_internal_level.reserve(tree.tree_height() - 1);
@@ -921,7 +921,6 @@ namespace savvy
     private:
       std::string file_path_;
       std::ofstream ofs_;
-      std::uint8_t block_size_in_kib_;
       std::uint32_t block_size_;
       std::vector<entry> current_leaf_node_;
       std::vector<std::pair<std::string, std::uint64_t>> chromosomes_;

@@ -202,7 +202,7 @@ namespace savvy
       reader r(input_file_path, fmt::allele); // TODO: make zero if possible.
       std::int64_t start_pos = r.tellg();
 
-      s1r::writer idx(output_file_path, 32-1);
+      s1r::writer idx(output_file_path);
 
       std::uint32_t min = std::numeric_limits<std::uint32_t>::max();
       std::uint32_t max = 0;

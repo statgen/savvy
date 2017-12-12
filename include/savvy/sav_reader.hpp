@@ -831,7 +831,7 @@ namespace savvy
         output_buf_(opts.compression_level > 0 ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, opts.compression_level)) : std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out))), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         output_stream_(output_buf_.get()),
         file_path_(file_path),
-        index_file_(opts.index_path.size() ? ::savvy::detail::make_unique<s1r::writer>(opts.index_path, 32-1) : nullptr),
+        index_file_(opts.index_path.size() ? ::savvy::detail::make_unique<s1r::writer>(opts.index_path) : nullptr),
         current_block_min_(std::numeric_limits<std::uint32_t>::max()),
         current_block_max_(0),
         sample_size_(samples_end - samples_beg),
