@@ -247,7 +247,7 @@ namespace savvy
           }
 
           s1r::entry e(min, max, (static_cast<std::uint64_t>(start_pos) << 16) | std::uint16_t(records_in_block - 1));
-          idx.write(variant.chromosome(), std::move(e));
+          idx.write(variant.chromosome(), e);
 
           records_in_block = 0;
           min = std::numeric_limits<std::uint32_t>::max();

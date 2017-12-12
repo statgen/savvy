@@ -27,29 +27,6 @@ namespace savvy
 {
   namespace s1r
   {
-    namespace detail
-    {
-      inline std::uint64_t ceil_divide(std::uint64_t x, std::uint64_t y)
-      {
-        return (x + y - 1) / y;
-      }
-
-      inline std::uint16_t ceil_divide(std::uint16_t x, std::uint16_t y)
-      {
-        return (x + y - std::uint16_t(1)) / y;
-      }
-
-      inline std::size_t entries_per_leaf_node(std::size_t block_size)
-      {
-        return block_size / std::size_t(16);
-      }
-
-      inline std::size_t entries_per_internal_node(std::size_t block_size)
-      {
-        return block_size / std::uint16_t(8);
-      }
-    }
-
     class internal_entry
     {
     public:
@@ -93,6 +70,29 @@ namespace savvy
       std::uint64_t value_;
     };
     static_assert(sizeof(entry) == 16, "Alignment issue (entry)");
+
+    namespace detail
+    {
+      inline std::uint64_t ceil_divide(std::uint64_t x, std::uint64_t y)
+      {
+        return (x + y - 1) / y;
+      }
+
+      inline std::uint16_t ceil_divide(std::uint16_t x, std::uint16_t y)
+      {
+        return (x + y - std::uint16_t(1)) / y;
+      }
+
+      inline std::size_t entries_per_leaf_node(std::size_t block_size)
+      {
+        return std::uint16_t(block_size / sizeof(entry));
+      }
+
+      inline std::size_t entries_per_internal_node(std::size_t block_size)
+      {
+        return std::uint16_t(block_size / sizeof(internal_entry));
+      }
+    }
 
     class tree_base
     {
@@ -149,12 +149,10 @@ namespace savvy
 
       std::streampos calculate_file_position(const node_position& input) const
       {
-        std::streampos ret = root_block_end_pos_;
+        std::streampos ret = root_block_end_pos_ - std::streampos(block_size_);
 
         if (input.level > 0)
         {
-          ret -= block_size_; // for root node
-
           for (auto it = entry_counts_per_level_.begin(); it != entry_counts_per_level_.end(); ++it)
           {
             if (1 + std::distance(entry_counts_per_level_.begin(), it) < input.level)
@@ -163,15 +161,13 @@ namespace savvy
             }
             else
             {
-              ret -= input.node_offset * block_size_;
+              ret -= (*it * block_size_ - input.node_offset * block_size_);
               break;
             }
           }
         }
 
-        ret -= block_size_;
-
-        assert(ret >= block_offset_);
+        assert(ret >= std::streampos(block_offset_));
 
         return ret;
       }
@@ -267,6 +263,8 @@ namespace savvy
                 const auto entry_end_it = leaf_node_.begin() + reader_->calculate_node_size(position_);
                 for (; entry_it != entry_end_it; ++entry_it)
                 {
+                  auto s = entry_it->region_start();
+                  auto e = entry_it->region_end();
                   if (entry_it->region_start() <= end_ && entry_it->region_end() >= beg_)
                     break;
                 }
@@ -295,6 +293,8 @@ namespace savvy
                 const auto entry_end_it = traversal_chain_.top().begin() + reader_->calculate_node_size(position_);
                 for (; entry_it != entry_end_it; ++entry_it)
                 {
+                  auto s = entry_it->region_start();
+                  auto e = entry_it->region_end();
                   if (entry_it->region_start() <= end_ && entry_it->region_end() >= beg_)
                     break;
                 }
@@ -666,13 +666,11 @@ namespace savvy
         ofs_.write(footer_block.data(), footer_block.size());
       }
 
+
       writer& write(const std::string& chrom, const entry& e)
       {
-        return write(chrom, entry(e));
-      }
-
-      writer& write(const std::string& chrom, entry&& e)
-      {
+        auto es = e.region_start();
+        auto ee = e.region_end();
         if (chromosomes_.empty())
           chromosomes_.emplace_back(chrom, 0);
 
@@ -683,7 +681,7 @@ namespace savvy
         }
 
 
-        current_leaf_node_.emplace_back(std::move(e));
+        current_leaf_node_.emplace_back(e);
         if (current_leaf_node_.size() == detail::entries_per_leaf_node(block_size_))
         {
           ofs_.write((char *)(current_leaf_node_.data()), block_size_);
@@ -706,34 +704,36 @@ namespace savvy
           current_leaf_node_.resize(0);
         }
 
+        ofs_.flush();
+
         this->entry_count_ = this->chromosomes_.back().second;
 
-        tree_base::init(block_size_in_kib_, std::uint64_t(ofs_.tellp()) - this->chromosomes_.back().second * sizeof(entry), this->chromosomes_.back().first);
-        ofs_.flush();
+
+        std::uint64_t num_leaf_nodes = detail::ceil_divide(this->chromosomes_.back().second, std::uint64_t(detail::entries_per_leaf_node(block_size_)));
+        tree_base::init(block_size_in_kib_, std::uint64_t(ofs_.tellp()) - block_size_ * num_leaf_nodes, this->chromosomes_.back().first);
 
         std::vector<std::pair<std::vector<internal_entry>, tree_position>> current_nodes_at_each_internal_level;
         current_nodes_at_each_internal_level.reserve(this->tree_height() - 1);
         for (std::size_t i = 0; i < this->tree_height() - 1; ++i)
           current_nodes_at_each_internal_level.emplace_back(std::make_pair(std::vector<internal_entry>(this->entries_per_internal_node()), tree_position(i, 0, 0)));
 
-        std::vector<entry> current_leaf_node(this->entries_per_leaf_node());
+        std::vector<entry> current_leaf_node(detail::entries_per_leaf_node(block_size_));
         tree_position current_leaf_position(this->tree_height() - 1, 0, 0);
 
         std::ifstream ifs(file_path_, std::ios::binary);
 
-        std::uint64_t num_leaf_nodes = detail::ceil_divide(this->chromosomes_.back().second, std::uint64_t(this->entries_per_leaf_node()));
+
         ifs.seekg(ofs_.tellp() - std::streamoff(block_size_ * num_leaf_nodes));
-        std::vector<entry> leaf_node(detail::entries_per_leaf_node(block_size_));
 
         for (std::size_t i = 0; i < num_leaf_nodes && ifs.good(); ++i)
         {
           bool last_leaf_node = (i + 1) == num_leaf_nodes;
 
-          ifs.read((char*)leaf_node.data(), block_size_);
+          ifs.read((char*)current_leaf_node.data(), block_size_);
 
           std::uint32_t node_range_min = (std::uint32_t)-1;
           std::uint32_t node_range_max = 0;
-          for (std::size_t i = 0; i <= current_leaf_position.entry_offset; ++i)
+          for (std::size_t i = 0; i < (last_leaf_node ? detail::entries_per_leaf_node(block_size_) - (this->chromosomes_.back().second % detail::entries_per_leaf_node(block_size_)) : detail::entries_per_leaf_node(block_size_)); ++i)
           {
             node_range_min = std::min(node_range_min, current_leaf_node[i].region_start());
             node_range_max = std::max(node_range_max, current_leaf_node[i].region_end());
