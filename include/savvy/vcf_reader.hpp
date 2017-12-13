@@ -1335,6 +1335,7 @@ namespace savvy
           (*output_stream_) << (std::string("\t") + *it);
           ++sample_size_;
         }
+
         (*output_stream_) << std::endl;
       }
 
@@ -1351,157 +1352,7 @@ namespace savvy
       }
 
       template <typename... T>
-      writer& write(const site_info& anno, const T&... data)
-      {
-        static_assert(VecCnt == sizeof...(T), "The number of source vectors must match class template size");
-
-        if (good())
-        {
-          // VALIDATE VECTOR SIZES
-          std::size_t ploidy = 0;
-          for (std::size_t i = 0; i < format_fields_.size(); ++i)
-          {
-            fmt f = format_fields_[i];
-            if (f == fmt::allele || f == fmt::haplotype_dosage)
-            {
-              if (ploidy)
-              {
-                if ((get_vec(i, data...).size() / sample_size_) != ploidy)
-                  this->output_stream_->setstate(std::ios::failbit);
-              }
-              else
-              {
-                ploidy = (get_vec(i, data...).size() / sample_size_);
-              }
-            }
-            else if (f == fmt::dosage)
-            {
-              if (sample_size_ != get_vec(i, data...).size())
-                this->output_stream_->setstate(std::ios::failbit);
-            }
-          }
-
-          if (good())
-          {
-            (*output_stream_) << anno.chromosome()
-                              << "\t" << anno.position()
-                              << "\t" << std::string(anno.prop("ID").size() ? anno.prop("ID") : ".")
-                              << "\t" << anno.ref()
-                              << "\t" << anno.alt()
-                              << "\t" << std::string(anno.prop("QUAL").size() ? anno.prop("QUAL") : ".")
-                              << "\t" << std::string(anno.prop("FILTER").size() ? anno.prop("FILTER") : ".");
-
-            std::size_t i = 0;
-            for (auto it = info_fields_.begin(); it != info_fields_.end(); ++it)
-            {
-              if (anno.prop(*it).size())
-              {
-                if (i == 0)
-                  (*output_stream_) << "\t";
-                else
-                  (*output_stream_) << ";";
-
-                (*output_stream_) << (*it + "=" + anno.prop(*it));
-
-                ++i;
-              }
-            }
-
-            if (i == 0)
-              (*output_stream_) << "\t.";
-
-            for (auto it = format_fields_.begin(); it != format_fields_.end(); ++it)
-            {
-              if (std::distance(format_fields_.begin(), it) > 0)
-                output_stream_->put(':');
-              (*output_stream_) << (*it == fmt::dosage ? "\tDS" : (*it == fmt::haplotype_dosage ? "\tHDS" : "\tGT"));
-            }
-
-            if (this->good())
-            {
-              std::ostreambuf_iterator<char> out_it(*output_stream_);
-              for (std::size_t sample_index = 0; sample_index < sample_size_; ++sample_index)
-              {
-                for (std::size_t format_index = 0; format_index < format_fields_.size(); ++format_index)
-                {
-                  auto v = get_vec(format_index, data...);
-                  fmt f = format_fields_[format_index];
-                  if (f == fmt::allele)
-                  {
-                    out_it = '\t';
-
-                    std::size_t i = sample_index * ploidy;
-                    if (std::isnan(v[i]))
-                      out_it = '.';
-                    else if (v[i] == 0.0)
-                      out_it = '0';
-                    else
-                      out_it = '1';
-
-                    std::size_t end = ploidy + i;
-                    ++i;
-                    for ( ; i < end; ++i)
-                    {
-                      out_it = '|';
-
-                      if (std::isnan(v[i]))
-                        out_it = '.';
-                      else if (v[i] == 0.0)
-                        out_it = '0';
-                      else
-                        out_it = '1';
-                    }
-                  }
-                  else if (f == fmt::haplotype_dosage)
-                  {
-                    out_it = '\t';
-
-                    std::size_t i = sample_index * ploidy;
-                    if (std::isnan(v[i]))
-                      out_it = '.';
-                    else
-                    {
-                      for (const auto c : std::to_string(v[i]))
-                        out_it = c;
-                    }
-
-                    std::size_t end = ploidy + i;
-                    ++i;
-                    for ( ; i < end; ++i)
-                    {
-                      out_it = ',';
-
-                      if (std::isnan(v[i]))
-                        out_it = '.';
-                      else
-                      {
-                        for (const auto c : std::to_string(v[i]))
-                          out_it = c;
-                      }
-                    }
-                  }
-                  else //if (f == fmt::dosage)
-                  {
-                    out_it = '\t';
-
-                    if (std::isnan(v[sample_index]))
-                      out_it = '.';
-                    else
-                    {
-                      for (const auto c : std::to_string(v[sample_index]))
-                        out_it = c;
-                    }
-                  }
-                }
-              }
-
-              (*output_stream_) << std::endl;
-            }
-          }
-        }
-
-        return *this;
-      }
+      writer& write(const site_info& anno, const T&... data);
 
       template <typename T>
       writer& operator<<(const variant<std::vector<T>>& v)
@@ -1530,12 +1381,273 @@ namespace savvy
         else
           return get_vec(offset - 1, other...);
       }
+
+      template <typename... T>
+      void write_multi_sample_level_data(const std::size_t ploidy, const T&... data);
+
+      template <typename T>
+      void write_single_sample_level_data(const std::size_t ploidy, const T& data);
     private:
       std::vector<std::string> info_fields_;
       std::vector<fmt> format_fields_;
       std::unique_ptr<std::ostream> output_stream_;
       std::size_t sample_size_;
     };
+
+    template <std::size_t VecCnt>
+    template <typename... T>
+    writer<VecCnt>& writer<VecCnt>::write(const site_info& anno, const T&... data)
+    {
+      static_assert(VecCnt == sizeof...(T), "The number of source vectors must match class template size");
+
+      if (good())
+      {
+        // VALIDATE VECTOR SIZES
+        std::size_t ploidy = 0;
+        for (std::size_t i = 0; i < format_fields_.size(); ++i)
+        {
+          fmt f = format_fields_[i];
+          if (f == fmt::allele || f == fmt::haplotype_dosage)
+          {
+            if (ploidy)
+            {
+              if ((get_vec(i, data...).size() / sample_size_) != ploidy)
+                this->output_stream_->setstate(std::ios::failbit);
+            }
+            else
+            {
+              ploidy = (get_vec(i, data...).size() / sample_size_);
+            }
+          }
+          else if (f == fmt::dosage)
+          {
+            if (sample_size_ != get_vec(i, data...).size())
+              this->output_stream_->setstate(std::ios::failbit);
+          }
+        }
+
+        if (good())
+        {
+          (*output_stream_) << anno.chromosome()
+            << "\t" << anno.position()
+            << "\t" << std::string(anno.prop("ID").size() ? anno.prop("ID") : ".")
+            << "\t" << anno.ref()
+            << "\t" << anno.alt()
+            << "\t" << std::string(anno.prop("QUAL").size() ? anno.prop("QUAL") : ".")
+            << "\t" << std::string(anno.prop("FILTER").size() ? anno.prop("FILTER") : ".");
+
+          std::size_t i = 0;
+          for (auto it = info_fields_.begin(); it != info_fields_.end(); ++it)
+          {
+            if (anno.prop(*it).size())
+            {
+              if (i == 0)
+                (*output_stream_) << "\t";
+              else
+                (*output_stream_) << ";";
+
+              (*output_stream_) << (*it + "=" + anno.prop(*it));
+
+              ++i;
+            }
+          }
+
+          if (i == 0)
+            (*output_stream_) << "\t.";
+
+          for (auto it = format_fields_.begin(); it != format_fields_.end(); ++it)
+          {
+            if (std::distance(format_fields_.begin(), it) > 0)
+              output_stream_->put(':');
+            (*output_stream_) << (*it == fmt::dosage ? "\tDS" : (*it == fmt::haplotype_dosage ? "\tHDS" : "\tGT"));
+          }
+
+          if (VecCnt == 1)
+          {
+            this->write_single_sample_level_data(ploidy, data...);
+          }
+          else
+          {
+            this->write_multi_sample_level_data(ploidy, data...);
+          }
+        }
+      }
+
+      return *this;
+    }
+
+    template <std::size_t VecCnt>
+    template <typename... T>
+    void writer<VecCnt>::write_multi_sample_level_data(const std::size_t ploidy, const T&... data)
+    {
+      if (this->good())
+      {
+        std::ostreambuf_iterator<char> out_it(*output_stream_);
+        for (std::size_t sample_index = 0; sample_index < sample_size_; ++sample_index)
+        {
+          for (std::size_t format_index = 0; format_index < format_fields_.size(); ++format_index)
+          {
+            auto v = get_vec(format_index, data...);
+            fmt f = format_fields_[format_index];
+            if (f == fmt::allele)
+            {
+              out_it = '\t';
+
+              std::size_t i = sample_index * ploidy;
+              if (std::isnan(v[i]))
+                out_it = '.';
+              else if (v[i] == 0.0)
+                out_it = '0';
+              else
+                out_it = '1';
+
+              std::size_t end = ploidy + i;
+              ++i;
+              for ( ; i < end; ++i)
+              {
+                out_it = '|';
+
+                if (std::isnan(v[i]))
+                  out_it = '.';
+                else if (v[i] == 0.0)
+                  out_it = '0';
+                else
+                  out_it = '1';
+              }
+            }
+            else if (f == fmt::haplotype_dosage)
+            {
+              out_it = '\t';
+
+              std::size_t i = sample_index * ploidy;
+              if (std::isnan(v[i]))
+                out_it = '.';
+              else
+              {
+                for (const auto c : std::to_string(v[i]))
+                  out_it = c;
+              }
+
+              std::size_t end = ploidy + i;
+              ++i;
+              for ( ; i < end; ++i)
+              {
+                out_it = ',';
+
+                if (std::isnan(v[i]))
+                  out_it = '.';
+                else
+                {
+                  for (const auto c : std::to_string(v[i]))
+                    out_it = c;
+                }
+              }
+            }
+            else //if (f == fmt::dosage)
+            {
+              out_it = '\t';
+
+              if (std::isnan(v[sample_index]))
+                out_it = '.';
+              else
+              {
+                for (const auto c : std::to_string(v[sample_index]))
+                  out_it = c;
+              }
+            }
+          }
+        }
+
+        (*output_stream_) << std::endl;
+      }
+    }
+
+    template <std::size_t VecCnt>
+    template <typename T>
+    void writer<VecCnt>::write_single_sample_level_data(const std::size_t ploidy, const T& data)
+    {
+      if (good())
+      {
+        std::ostreambuf_iterator<char> out_it(*output_stream_);
+        if (format_fields_[0] == fmt::allele)
+        {
+          for (std::size_t sample_index = 0; sample_index < sample_size_; ++sample_index)
+          {
+            out_it = '\t';
+
+            std::size_t i = sample_index * ploidy;
+            if (std::isnan(data[i]))
+              out_it = '.';
+            else if (data[i] == 0.0)
+              out_it = '0';
+            else
+              out_it = '1';
+
+            std::size_t end = ploidy + i;
+            ++i;
+            for (; i < end; ++i)
+            {
+              out_it = '|';
+
+              if (std::isnan(data[i]))
+                out_it = '.';
+              else if (data[i] == 0.0)
+                out_it = '0';
+              else
+                out_it = '1';
+            }
+          }
+        }
+        else if (format_fields_[0] == fmt::haplotype_dosage)
+        {
+          for (std::size_t sample_index = 0; sample_index < sample_size_; ++sample_index)
+          {
+            out_it = '\t';
+
+            std::size_t i = sample_index * ploidy;
+            if (std::isnan(data[i]))
+              out_it = '.';
+            else
+            {
+              for (const auto c : std::to_string(data[i]))
+                out_it = c;
+            }
+
+            std::size_t end = ploidy + i;
+            ++i;
+            for (; i < end; ++i)
+            {
+              out_it = ',';
+
+              if (std::isnan(data[i]))
+                out_it = '.';
+              else
+              {
+                for (const auto c : std::to_string(data[i]))
+                  out_it = c;
+              }
+            }
+          }
+        }
+        else //if (f == fmt::dosage)
+        {
+          for (std::size_t sample_index = 0; sample_index < sample_size_; ++sample_index)
+          {
+            out_it = '\t';
+
+            if (std::isnan(data[sample_index]))
+              out_it = '.';
+            else
+            {
+              for (const auto c : std::to_string(data[sample_index]))
+                out_it = c;
+            }
+          }
+        }
+
+        (*output_stream_) << std::endl;
+      }
+    }
     //################################################################//
   }
 }
