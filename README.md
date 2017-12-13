@@ -1,4 +1,4 @@
-# libsavvy
+# Savvy Library
 Interface to various variant calling formats.
 
 ## Installing
@@ -33,7 +33,6 @@ while (f >> var)
 ## Indexed Files
 ```c++
 savvy::indexed_reader f("chr1.sav", {"X", 100000, 199999}, savvy::fmt::allele);
-
 savvy::variant<std::vector<float>> var;
 
 while (f >> v)
@@ -53,6 +52,7 @@ while (f >> v)
 savvy::reader f("chr1.sav", savvy::fmt::allele);
 savvy::site_info anno;
 std::vector<float> alleles;
+
 while (f.read(anno, alleles))
 {
   anno.locus();
@@ -226,3 +226,21 @@ savvy::vcf::reader f("chr1.sav", savvy::fmt::allele, savvy::fmt::genotype_likeli
 savvy::vcf::reader<1> f("chr1.sav", savvy::fmt::allele);
 savvy::vcf::reader<2> f("chr1.sav", savvy::fmt::allele, savvy::fmt::genotype_likelilhoods);
 ``` 
+
+# SAV Command Line Interface
+File manipulation for SAV format.
+
+## Import
+```shell
+sav import --sort --index file.bcf file.sav
+```
+
+## Merge
+```shell
+sav merge file1.sav file2.sav > merged.sav
+```
+
+## Export
+```shell
+sav export --regions chr1,chr2:10000-20000 --sample-ids ID1,ID2,ID3 file.sav > file.vcf
+```
