@@ -259,6 +259,57 @@ namespace savvy
     };
     //################################################################//
 
+    //################################################################//
+    template <std::size_t VecCnt>
+    class writer
+    {
+    public:
+      struct options
+      {
+        compression_type compression;
+        options() :
+          compression(compression_type::none)
+        {}
+      };
+
+      template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename... Fmt>
+      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, Fmt... data_formats);
+
+      template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename... Fmt>
+      writer(const std::string& file_path, const options& opts, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, Fmt... data_formats);
+
+      void init_format_fields(savvy::fmt f);
+
+      template <typename... Fmt>
+      void init_format_fields(savvy::fmt f, Fmt... other);
+
+      template <typename... T>
+      writer& write(const site_info& anno, const T&... data);
+
+      template <typename T>
+      writer& operator<<(const variant<std::vector<T>>& v);
+
+      bool good() { return output_stream_->good(); }
+    private:
+      template <typename T>
+      static const std::vector<T>& get_vec(std::size_t offset, const std::vector<T>& m);
+
+      template <typename T, typename... T2>
+      static const std::vector<T>& get_vec(std::size_t offset, const std::vector<T>& m, const T2&... other);
+
+      template <typename... T>
+      void write_multi_sample_level_data(const std::size_t ploidy, const T&... data);
+
+      template <typename T>
+      void write_single_sample_level_data(const std::size_t ploidy, const T& data);
+    private:
+      std::vector<std::string> info_fields_;
+      std::vector<fmt> format_fields_;
+      std::unique_ptr<std::ostream> output_stream_;
+      std::size_t sample_size_;
+    };
+    //################################################################//
+
 
 
 
@@ -1087,6 +1138,8 @@ namespace savvy
     }
     //################################################################//
 
+
+
     //################################################################//
     template <std::size_t VecCnt>
     template <typename T>
@@ -1232,75 +1285,48 @@ namespace savvy
 
 
 
-
-
-
     //################################################################//
     template <std::size_t VecCnt>
-    class writer
+    template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename... Fmt>
+    writer<VecCnt>::writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, Fmt... data_formats) :
+      writer(file_path, options(), samples_beg, samples_end, headers_beg, headers_end, data_formats...)
     {
-    public:
-      struct options
+    }
+
+    template <std::size_t VecCnt>
+    template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename... Fmt>
+    writer<VecCnt>::writer(const std::string& file_path, const options& opts, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, Fmt... data_formats) :
+      output_stream_(opts.compression == compression_type::none ? std::unique_ptr<std::ostream>(new std::ofstream(file_path)) : std::unique_ptr<std::ostream>(new shrinkwrap::bgz::ostream(file_path))),
+      sample_size_(0)
+    {
+      static_assert(VecCnt == sizeof...(Fmt), "Number of requested format fields do not match VecCnt template parameter");
+
+      this->format_fields_.reserve(sizeof...(Fmt));
+      this->init_format_fields(data_formats...);
+
+      (*output_stream_) << "##fileformat=VCFv4.2" << std::endl;
+
+      std::ostreambuf_iterator<char> out_it(*output_stream_);
+
+
+      for (auto it = headers_beg; it != headers_end; ++it)
       {
-        compression_type compression;
-        options() :
-          compression(compression_type::none)
-        {}
-      };
-
-      template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename... Fmt>
-      writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, Fmt... data_formats) :
-        writer(file_path, options(), samples_beg, samples_end, headers_beg, headers_end, data_formats...)
-      {
-      }
-
-      template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename... Fmt>
-      writer(const std::string& file_path, const options& opts, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, Fmt... data_formats) :
-        output_stream_(opts.compression == compression_type::none ? std::unique_ptr<std::ostream>(new std::ofstream(file_path)) : std::unique_ptr<std::ostream>(new shrinkwrap::bgz::ostream(file_path))),
-        sample_size_(0)
-      {
-        static_assert(VecCnt == sizeof...(Fmt), "Number of requested format fields do not match VecCnt template parameter");
-
-        this->format_fields_.reserve(sizeof...(Fmt));
-        this->init_format_fields(data_formats...);
-
-        (*output_stream_) << "##fileformat=VCFv4.2" << std::endl;
-
-        std::ostreambuf_iterator<char> out_it(*output_stream_);
-
-
-        for (auto it = headers_beg; it != headers_end; ++it)
+        if (it->first != "FORMAT")
         {
-          if (it->first != "FORMAT")
+          (*output_stream_) << (std::string("##") + it->first + "=" + it->second) << std::endl;
+
+          if (it->first == "INFO")
           {
-            (*output_stream_) << (std::string("##") + it->first + "=" + it->second) << std::endl;
-
-            if (it->first == "INFO")
+            if (it->second.size() && it->second.front() == '<' && it->second.back() == '>')
             {
-              if (it->second.size() && it->second.front() == '<' && it->second.back() == '>')
+              std::string header_value = it->second;
+              header_value.resize(header_value.size() - 1);
+
+              auto curr_pos = header_value.begin() + 1;
+              auto comma_pos = std::find(curr_pos, header_value.end(), ',');
+
+              while (comma_pos != header_value.end())
               {
-                std::string header_value = it->second;
-                header_value.resize(header_value.size() - 1);
-
-                auto curr_pos = header_value.begin() + 1;
-                auto comma_pos = std::find(curr_pos, header_value.end(), ',');
-
-                while (comma_pos != header_value.end())
-                {
-                  auto equals_pos = std::find(curr_pos, comma_pos, '=');
-                  if (equals_pos != comma_pos)
-                  {
-                    std::string key(curr_pos, equals_pos);
-                    std::string val(equals_pos + 1, comma_pos);
-
-                    if (key == "ID")
-                      info_fields_.emplace_back(std::move(val));
-                  }
-
-                  curr_pos = comma_pos + 1;
-                  comma_pos = std::find(curr_pos, header_value.end(), ',');
-                }
-
                 auto equals_pos = std::find(curr_pos, comma_pos, '=');
                 if (equals_pos != comma_pos)
                 {
@@ -1309,90 +1335,70 @@ namespace savvy
 
                   if (key == "ID")
                     info_fields_.emplace_back(std::move(val));
-
-                  curr_pos = comma_pos + 1;
                 }
+
+                curr_pos = comma_pos + 1;
+                comma_pos = std::find(curr_pos, header_value.end(), ',');
+              }
+
+              auto equals_pos = std::find(curr_pos, comma_pos, '=');
+              if (equals_pos != comma_pos)
+              {
+                std::string key(curr_pos, equals_pos);
+                std::string val(equals_pos + 1, comma_pos);
+
+                if (key == "ID")
+                  info_fields_.emplace_back(std::move(val));
+
+                curr_pos = comma_pos + 1;
               }
             }
           }
         }
-
-        for (auto f : this->format_fields_)
-        {
-          if (f == savvy::fmt::allele)
-            (*output_stream_) << "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">" << std::endl;
-          else if (f == savvy::fmt::haplotype_dosage)
-            (*output_stream_) << "##FORMAT=<ID=HDS,Number=2,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage\">" << std::endl;
-          else if (f == savvy::fmt::dosage)
-            (*output_stream_) << "##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage\">" << std::endl;
-          //else if (f == savvy::fmt::genotype_probability)
-          //  (*output_stream_) << "##FORMAT"="<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1\">" << std::endl; // TODO: Handle other ploidy levels.
-        }
-
-        (*output_stream_) << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
-        for (auto it = samples_beg; it != samples_end; ++it)
-        {
-          (*output_stream_) << (std::string("\t") + *it);
-          ++sample_size_;
-        }
-
-        (*output_stream_) << std::endl;
       }
 
-      void init_format_fields(savvy::fmt f)
+      for (auto f : this->format_fields_)
       {
-        this->format_fields_.push_back(f);
+        if (f == savvy::fmt::allele)
+          (*output_stream_) << "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">" << std::endl;
+        else if (f == savvy::fmt::haplotype_dosage)
+          (*output_stream_) << "##FORMAT=<ID=HDS,Number=2,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage\">" << std::endl;
+        else if (f == savvy::fmt::dosage)
+          (*output_stream_) << "##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage\">" << std::endl;
+        //else if (f == savvy::fmt::genotype_probability)
+        //  (*output_stream_) << "##FORMAT"="<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1\">" << std::endl; // TODO: Handle other ploidy levels.
       }
 
-      template <typename... Fmt>
-      void init_format_fields(savvy::fmt f, Fmt... other)
+      (*output_stream_) << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
+      for (auto it = samples_beg; it != samples_end; ++it)
       {
-        this->format_fields_.push_back(f);
-        this->init_format_fields(other...);
+        (*output_stream_) << (std::string("\t") + *it);
+        ++sample_size_;
       }
 
-      template <typename... T>
-      writer& write(const site_info& anno, const T&... data);
+      (*output_stream_) << std::endl;
+    }
 
-      template <typename T>
-      writer& operator<<(const variant<std::vector<T>>& v)
-      {
-        return this->write(v, v.data());
-      }
+    template <std::size_t VecCnt>
+    void writer<VecCnt>::init_format_fields(savvy::fmt f)
+    {
+      this->format_fields_.push_back(f);
+    }
 
-      bool good() { return output_stream_->good(); }
-    private:
-      template <typename T>
-      static const std::vector<T>& get_vec(std::size_t offset, const std::vector<T>& m)
-      {
-        assert(offset == 0);
-        return m;
-//        if (offset == 0)
-//          return m;
-//        else
-//          throw std::out_of_range("Vector index out of range");
-      }
+    template <std::size_t VecCnt>
+    template <typename... Fmt>
+    void writer<VecCnt>::init_format_fields(savvy::fmt f, Fmt... other)
+    {
+      this->format_fields_.push_back(f);
+      this->init_format_fields(other...);
+    }
 
-      template <typename T, typename... T2>
-      static const std::vector<T>& get_vec(std::size_t offset, const std::vector<T>& m, const T2&... other)
-      {
-        if ((sizeof...(T2) + 1) - offset == 0)
-          return m;
-        else
-          return get_vec(offset - 1, other...);
-      }
-
-      template <typename... T>
-      void write_multi_sample_level_data(const std::size_t ploidy, const T&... data);
-
-      template <typename T>
-      void write_single_sample_level_data(const std::size_t ploidy, const T& data);
-    private:
-      std::vector<std::string> info_fields_;
-      std::vector<fmt> format_fields_;
-      std::unique_ptr<std::ostream> output_stream_;
-      std::size_t sample_size_;
-    };
+    template <std::size_t VecCnt>
+    template <typename T>
+    writer<VecCnt>& writer<VecCnt>::operator<<(const variant<std::vector<T>>& v)
+    {
+      return this->write(v, v.data());
+    }
 
     template <std::size_t VecCnt>
     template <typename... T>
@@ -1647,6 +1653,24 @@ namespace savvy
 
         (*output_stream_) << std::endl;
       }
+    }
+
+    template <std::size_t VecCnt>
+    template <typename T>
+    const std::vector<T>& writer<VecCnt>::get_vec(std::size_t offset, const std::vector<T>& m)
+    {
+      assert(offset == 0);
+      return m;
+    }
+
+    template <std::size_t VecCnt>
+    template <typename T, typename... T2>
+    const std::vector<T>& writer<VecCnt>::get_vec(std::size_t offset, const std::vector<T>& m, const T2&... other)
+    {
+      if ((sizeof...(T2) + 1) - offset == 0)
+        return m;
+      else
+        return get_vec(offset - 1, other...);
     }
     //################################################################//
   }
