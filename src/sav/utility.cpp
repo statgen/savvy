@@ -25,7 +25,9 @@ savvy::region string_to_region(const std::string& s)
     const std::size_t hyphen_pos = s.find('-', colon_pos + 1);
     if (hyphen_pos == std::string::npos)
     {
-      return savvy::region(chr);
+      std::string slocus = s.substr(colon_pos + 1);
+      std::uint64_t ilocus = std::uint64_t(std::atoll(slocus.c_str()));
+      return savvy::region(chr, ilocus, ilocus);
     }
     else
     {
@@ -33,11 +35,11 @@ savvy::region string_to_region(const std::string& s)
       std::string send = s.substr(hyphen_pos + 1);
       if (send.empty())
       {
-        return savvy::region(chr, std::atoll(sbeg.c_str()));
+        return savvy::region(chr, std::uint64_t(std::atoll(sbeg.c_str())));
       }
       else
       {
-        return savvy::region(chr, std::atoll(sbeg.c_str()), std::atoll(send.c_str()));
+        return savvy::region(chr, std::uint64_t(std::atoll(sbeg.c_str())), std::uint64_t(std::atoll(send.c_str())));
       }
     }
   }
