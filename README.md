@@ -219,12 +219,12 @@ while (f.read(anno, genotypes, dosages))
 C++ 17 supports class template argument deduction, which means that template arguments can be deduced by constructor arguments. Compilers that do not support this must specify the number of data vectors to read as a template argument to the reader.
 ```c++
 // With C++ 17
-savvy::vcf::reader f("chr1.sav", savvy::fmt::allele);
-savvy::vcf::reader f("chr1.sav", savvy::fmt::allele, savvy::fmt::genotype_likelilhoods);
+savvy::vcf::reader f("chr1.bcf", savvy::fmt::allele);
+savvy::vcf::reader f("chr1.bcf", savvy::fmt::allele, savvy::fmt::genotype_likelilhoods);
 
 // Without C++ 17
-savvy::vcf::reader<1> f("chr1.sav", savvy::fmt::allele);
-savvy::vcf::reader<2> f("chr1.sav", savvy::fmt::allele, savvy::fmt::genotype_likelilhoods);
+savvy::vcf::reader<1> f("chr1.bcf", savvy::fmt::allele);
+savvy::vcf::reader<2> f("chr1.bcf", savvy::fmt::allele, savvy::fmt::genotype_likelilhoods);
 ``` 
 
 # SAV Command Line Interface

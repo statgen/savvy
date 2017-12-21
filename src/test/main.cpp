@@ -475,7 +475,7 @@ private:
     savvy::site_info anno;
     std::vector<float> data;
 
-    auto prop_fields = reader.prop_fields();
+    auto prop_fields = reader.info_fields();
 
     std::size_t num_markers = 0;
     while (reader.read(anno, data))
@@ -533,7 +533,7 @@ public:
       file_info.insert(file_info.begin(), {"INFO", "<ID=FILTER,Description=\"Variant filter\">"});
       file_info.insert(file_info.begin(), {"INFO", "<ID=QUAL,Description=\"Variant quality\">"});
       file_info.insert(file_info.begin(), {"INFO", "<ID=ID,Description=\"Variant ID\">"});
-      savvy::sav::writer output(Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD, input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end(), Fmt);
+      savvy::sav::writer output(Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD, input.samples().begin(), input.samples().end(), file_info.begin(), file_info.end(), Fmt);
 
       std::size_t cnt = 0;
       while (input.read(anno, data))

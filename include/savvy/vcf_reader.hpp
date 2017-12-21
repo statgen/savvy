@@ -88,20 +88,16 @@ namespace savvy
       bool bad() const { return (state_ & std::ios::badbit) != 0; }
       bool eof() const { return (state_ & std::ios::eofbit) != 0; }
 
-      const char** samples_begin() const;
-      const char** samples_end() const;
-
       std::vector<std::string> subset_samples(const std::set<std::string>& subset);
 
-      std::vector<std::string> prop_fields() const;
+      const std::vector<std::string>& samples() const;
+      const std::vector<std::string>& info_fields() const;
       const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
-//      std::vector<std::string>::const_iterator prop_fields_begin() const { return property_fields_.begin(); }
-//      std::vector<std::string>::const_iterator prop_fields_end() const { return property_fields_.end(); }
-      std::uint64_t sample_size() const;
     protected:
       virtual bcf_hdr_t* hts_hdr() const = 0;
       virtual bcf1_t* hts_rec() const = 0;
       virtual bool read_hts_record() = 0;
+      void init_sample_ids();
       void init_property_fields();
       void init_headers();
 
@@ -139,14 +135,15 @@ namespace savvy
       void init_requested_formats(fmt f, T2... args);
     protected:
       std::vector<std::pair<std::string, std::string>> headers_;
+      std::vector<std::string> sample_ids_;
+      std::vector<std::string> property_fields_;
+      std::array<fmt, VecCnt> requested_data_formats_;
       std::vector<std::uint64_t> subset_map_;
       std::uint64_t subset_size_;
       std::ios::iostate state_;
       int* gt_;
       int gt_sz_;
       int allele_index_;
-      std::vector<std::string> property_fields_; // TODO: This member is no longer necessary not that prop_fields_{begin,end}() methods are gone. Eventually remove this and init_property_fileds()
-      std::array<fmt, VecCnt> requested_data_formats_;
     };
     //################################################################//
 
@@ -317,24 +314,6 @@ namespace savvy
 
     //################################################################//
     template <std::size_t VecCnt>
-    const char** reader_base<VecCnt>::samples_begin() const
-    {
-      return hts_hdr() ? (const char**) hts_hdr()->samples : nullptr;
-    }
-
-    template <std::size_t VecCnt>
-    const char** reader_base<VecCnt>::samples_end() const
-    {
-      return hts_hdr() ? (const char**) ((hts_hdr()->samples) + bcf_hdr_nsamples(hts_hdr())) : nullptr;
-    }
-
-    template <std::size_t VecCnt>
-    std::uint64_t reader_base<VecCnt>::sample_size() const
-    {
-      return static_cast<std::uint64_t>(bcf_hdr_nsamples(hts_hdr()));
-    }
-
-    template <std::size_t VecCnt>
     void reader_base<VecCnt>::init_headers()
     {
       bcf_hdr_t* hdr = hts_hdr();
@@ -404,10 +383,32 @@ namespace savvy
     }
 
     template <std::size_t VecCnt>
-    std::vector<std::string> reader_base<VecCnt>::prop_fields() const
+    const std::vector<std::string>& reader_base<VecCnt>::samples() const
     {
-      std::vector<std::string> ret(property_fields_);
-      return ret;
+      return sample_ids_;
+    }
+
+    template <std::size_t VecCnt>
+    const std::vector<std::string>& reader_base<VecCnt>::info_fields() const
+    {
+      return property_fields_;
+    }
+
+    template <std::size_t VecCnt>
+    void reader_base<VecCnt>::init_sample_ids()
+    {
+      bcf_hdr_t* hdr = hts_hdr();
+      if (hdr)
+      {
+        const char **beg = (const char **) (hdr->samples);
+        const char **end = (const char **) (hdr->samples + bcf_hdr_nsamples(hdr));
+        sample_ids_.reserve(end - beg);
+
+        for (; beg != end; ++beg)
+        {
+          sample_ids_.emplace_back(*beg);
+        }
+      }
     }
 
     template <std::size_t VecCnt>
@@ -416,6 +417,7 @@ namespace savvy
       bcf_hdr_t* hdr = hts_hdr();
       if (hdr)
       {
+
         this->property_fields_ = {"ID", "QUAL", "FILTER"};
         for (int i = 0; i < hdr->nhrec; ++i)
         {
@@ -666,14 +668,14 @@ namespace savvy
         const typename T::value_type alt_value = typename T::value_type(1);
         if (allele_index_ > 1 || bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
         {
-          if (gt_sz_ % sample_size() != 0)
+          if (gt_sz_ % samples().size() != 0)
           {
             // TODO: mixed ploidy at site error.
           }
           else
           {
             const int allele_index_plus_one = allele_index_ + 1;
-            const std::uint64_t ploidy(gt_sz_ / sample_size());
+            const std::uint64_t ploidy(gt_sz_ / samples().size());
             if (subset_map_.size())
             {
               destination.resize(subset_size_ * ploidy);
@@ -719,13 +721,13 @@ namespace savvy
         const typename T::value_type alt_value = typename T::value_type(1);
         if (allele_index_ > 1 || bcf_get_genotypes(hts_hdr(), hts_rec(), &(gt_), &(gt_sz_)) >= 0)
         {
-          if (gt_sz_ % sample_size() != 0)
+          if (gt_sz_ % samples().size() != 0)
           {
             // TODO: mixed ploidy at site error.
           }
           else
           {
-            const std::uint64_t ploidy(gt_sz_ / sample_size());
+            const std::uint64_t ploidy(gt_sz_ / samples().size());
             const int allele_index_plus_one = allele_index_ + 1;
 
             if (subset_map_.size())
@@ -746,7 +748,7 @@ namespace savvy
             }
             else
             {
-              destination.resize(sample_size());
+              destination.resize(samples().size());
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
@@ -1065,6 +1067,7 @@ namespace savvy
         {
           this->init_property_fields();
           this->init_headers();
+          this->init_sample_ids();
         }
       }
     }
@@ -1216,6 +1219,7 @@ namespace savvy
       {
         this->init_property_fields();
         this->init_headers();
+        this->init_sample_ids();
       }
       else
         this->state_ = std::ios::badbit;

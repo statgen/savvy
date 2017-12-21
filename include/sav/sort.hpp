@@ -120,8 +120,8 @@ bool sort_and_write_records(savvy::s1r::sort_type sort, Reader& in, savvy::fmt i
       std::sort(in_mem_variant_refs.begin(), in_mem_variant_refs.begin() + read_counter, less_than);
 
       std::string temp_path = "/tmp/tmp-" + str_gen(8) + ".sav";
-      temp_writers.emplace_back(temp_path, in.samples_begin(), in.samples_end(), in.headers().begin(), in.headers().end(), in_format);
-      temp_readers.emplace_back(temp_path, in.samples_begin(), in.samples_end(), in.headers().begin(), in.headers().end(), out_format);
+      temp_writers.emplace_back(temp_path, in.samples().begin(), in.samples().end(), in.headers().begin(), in.headers().end(), in_format);
+      temp_readers.emplace_back(temp_path, in.samples().begin(), in.samples().end(), in.headers().begin(), in.headers().end(), out_format);
       std::remove(temp_path.c_str());
       for (std::size_t i = 0; i<read_counter; ++i)
       {

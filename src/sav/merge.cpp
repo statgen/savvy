@@ -231,7 +231,7 @@ int merge_main(int argc, char** argv)
   {
     std::size_t num_samples = 0;
     for (auto& f : input_files)
-      num_samples += f.sample_size();
+      num_samples += f.samples().size();
     std::vector<std::string> sample_ids;
     sample_ids.reserve(num_samples);
 
@@ -241,7 +241,7 @@ int merge_main(int argc, char** argv)
 
     for (auto& f : input_files)
     {
-      for (auto it = f.samples_begin(); it != f.samples_end(); ++it)
+      for (auto it = f.samples().begin(); it != f.samples().end(); ++it)
         sample_ids.emplace_back(*it);
 
       auto d = f.headers().end() - f.headers().begin();
@@ -313,7 +313,7 @@ int merge_main(int argc, char** argv)
         compressed_vector_append_wrapper<float> vec_wrapper(output_genos);
         if (!matching[i])
         {
-          vec_wrapper.resize(input_files[i].sample_size() * args.ploidy());
+          vec_wrapper.resize(input_files[i].samples().size() * args.ploidy());
         }
         else
         {

@@ -246,12 +246,12 @@ int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::stri
 template <typename T>
 int prep_reader_for_export(T& input, const export_prog_args& args)
 {
-  std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
-  std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
+  std::vector<std::string> sample_ids(input.samples().size());
+  std::copy(input.samples().begin(), input.samples().end(), sample_ids.begin());
   if (args.subset_ids().size())
     sample_ids = input.subset_samples(args.subset_ids());
 
-  auto variant_metadata = input.prop_fields();
+  auto variant_metadata = input.info_fields();
 
   auto headers = input.headers();
 

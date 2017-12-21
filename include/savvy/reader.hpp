@@ -147,12 +147,12 @@ namespace savvy
 //      return good();
 //    }
 
-    std::vector<std::string> prop_fields() const;
-    sample_iterator samples_begin() const;
-    sample_iterator samples_end() const;
-    std::size_t sample_size() const;
+    const std::vector<std::string>& info_fields() const;
+    const std::vector<std::string>& samples() const;
 
     std::vector<std::string> subset_samples(const std::set<std::string>& subset);
+  private:
+    static const std::vector<std::string> empty_string_vector;
   protected:
     virtual savvy::sav::reader_base* sav_impl() const = 0;
     virtual savvy::vcf::reader_base<1>* vcf_impl() const = 0;
@@ -213,62 +213,6 @@ namespace savvy
   //################################################################//
 
 
-
-
-
-
-
-
-  //################################################################//
-  std::vector<std::string> reader_base::prop_fields() const
-  {
-    if (sav_impl())
-      return sav_impl()->prop_fields();
-    else if (vcf_impl())
-      return vcf_impl()->prop_fields();
-    return {};
-  }
-
-  typename reader_base::sample_iterator reader_base::samples_begin() const
-  {
-    reader_base::sample_iterator ret;
-    if (sav_impl())
-      ret = reader_base::sample_iterator(sav_impl()->samples_begin());
-    else if (vcf_impl())
-      ret = reader_base::sample_iterator(vcf_impl()->samples_begin());
-    return ret;
-  }
-
-  typename reader_base::sample_iterator reader_base::samples_end() const
-  {
-    reader_base::sample_iterator ret;
-    if (sav_impl())
-      ret = reader_base::sample_iterator(sav_impl()->samples_end());
-    else if (vcf_impl())
-      ret = reader_base::sample_iterator(vcf_impl()->samples_end());
-    return ret;
-  }
-
-  std::size_t reader_base::sample_size() const
-  {
-    std::size_t ret{};
-    if (sav_impl())
-      ret = static_cast<std::size_t>(sav_impl()->samples_end() - sav_impl()->samples_begin());
-    else if (vcf_impl())
-      ret = static_cast<std::size_t>(vcf_impl()->samples_end() - vcf_impl()->samples_begin());
-    return ret;
-  }
-
-  std::vector<std::string> reader_base::subset_samples(const std::set<std::string>& subset)
-  {
-    if (sav_impl())
-      return sav_impl()->subset_samples(subset);
-    else if (vcf_impl())
-      return vcf_impl()->subset_samples(subset);
-    return std::vector<std::string>();
-  }
-  //################################################################//
-
   //################################################################//
   template <typename T>
   reader& reader::operator>>(variant<T>& destination)
@@ -297,15 +241,6 @@ namespace savvy
   //################################################################//
 
   //################################################################//
-  std::vector<std::string> indexed_reader::chromosomes() const
-  {
-    if (sav_reader_)
-      return sav_reader_->chromosomes();
-    else if (vcf_reader_)
-      return vcf_reader_->chromosomes();
-    return {};
-  }
-
   template <typename T>
   indexed_reader::indexed_reader(const std::string& file_path, const region& reg, T data_format)
   {
@@ -322,14 +257,6 @@ namespace savvy
       sav_reader_ = ::savvy::detail::make_unique<sav::indexed_reader>(file_path, reg, bounding_type, data_format);
     else if (::savvy::detail::has_extension(file_path, ".vcf") || ::savvy::detail::has_extension(file_path, ".vcf.gz") || ::savvy::detail::has_extension(file_path, ".bcf"))
       vcf_reader_ = ::savvy::detail::make_unique<vcf::indexed_reader<1>>(file_path, reg, bounding_type, data_format);
-  }
-
-  void indexed_reader::reset_region(const region& reg)
-  {
-    if (sav_reader_)
-      sav_reader_->reset_region(reg);
-    else if (vcf_reader_)
-      vcf_reader_->reset_region(reg);
   }
 
   template <typename T>
@@ -358,6 +285,7 @@ namespace savvy
 
     return *this;
   }
+  //################################################################//
 }
 
 #endif //VC_READER_HPP

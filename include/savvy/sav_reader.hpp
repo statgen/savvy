@@ -100,13 +100,11 @@ namespace savvy
       bool fail() const { return input_stream_->fail(); }
       bool bad() const { return input_stream_->bad(); }
       bool eof() const { return input_stream_->eof(); }
-      std::uint64_t sample_size() const { return this->sample_ids_.size(); }
-      std::vector<std::string>::const_iterator samples_begin() const { return sample_ids_.begin(); }
-      std::vector<std::string>::const_iterator samples_end() const { return sample_ids_.end(); }
+      const std::vector<std::string>& samples() const { return sample_ids_; }
 //      std::vector<std::string>::const_iterator prop_fields_begin() const { return metadata_fields_.begin(); }
 //      std::vector<std::string>::const_iterator prop_fields_end() const { return metadata_fields_.end(); }
 
-      std::vector<std::string> prop_fields() const { return std::vector<std::string>(metadata_fields_); }
+      const std::vector<std::string>& info_fields() const { return metadata_fields_; }
       const std::vector<std::pair<std::string,std::string>>& headers() const { return headers_; }
       savvy::fmt data_format() const { return file_data_format_; }
 
@@ -297,7 +295,7 @@ namespace savvy
             }
             else
             {
-              destination.resize(sample_size() * ploidy_level);
+              destination.resize(samples().size() * ploidy_level);
 
               if (BitWidth == 1)
               {
@@ -384,7 +382,7 @@ namespace savvy
             }
             else
             {
-              destination.resize(sample_size());
+              destination.resize(samples().size());
 
               if (BitWidth == 1)
               {
@@ -508,7 +506,7 @@ namespace savvy
             }
             else
             {
-              destination.resize(sample_size() * ploidy_level);
+              destination.resize(samples().size() * ploidy_level);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -567,7 +565,7 @@ namespace savvy
             }
             else
             {
-              destination.resize(sample_size());
+              destination.resize(samples().size());
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {

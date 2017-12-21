@@ -264,8 +264,8 @@ int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& 
 template <typename T>
 int prep_reader_for_import(T& input, const import_prog_args& args)
 {
-  std::vector<std::string> sample_ids(input.samples_end() - input.samples_begin());
-  std::copy(input.samples_begin(), input.samples_end(), sample_ids.begin());
+  std::vector<std::string> sample_ids(input.samples().size());
+  std::copy(input.samples().begin(), input.samples().end(), sample_ids.begin());
   if (args.subset_ids().size())
     sample_ids = input.subset_samples(args.subset_ids());
 
