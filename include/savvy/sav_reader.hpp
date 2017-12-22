@@ -244,7 +244,6 @@ namespace savvy
       {
         if (good())
         {
-          const typename T::value_type alt_value = typename T::value_type(1);
           const auto missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN();
           std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
@@ -331,7 +330,6 @@ namespace savvy
       {
         if (good())
         {
-          const typename T::value_type alt_value{1};
           const auto missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN();
           std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
@@ -471,7 +469,6 @@ namespace savvy
       {
         if (good())
         {
-          const typename T::value_type alt_value = typename T::value_type(1);
           std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
 
@@ -531,7 +528,6 @@ namespace savvy
       {
         if (good())
         {
-          const typename T::value_type alt_value(1);
           const typename T::value_type missing_value(std::numeric_limits<typename T::value_type>::quiet_NaN());
           std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
@@ -640,13 +636,13 @@ namespace savvy
     protected:
       std::vector<std::string> sample_ids_;
       std::vector<std::uint64_t> subset_map_;
-      std::uint64_t subset_size_;
-      fmt file_data_format_;
-      fmt requested_data_format_;
-      std::unique_ptr<shrinkwrap::zstd::istream> input_stream_;
-      std::string file_path_;
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> metadata_fields_;
+      std::string file_path_;
+      std::uint64_t subset_size_;
+      std::unique_ptr<shrinkwrap::zstd::istream> input_stream_;
+      fmt file_data_format_;
+      fmt requested_data_format_;
     };
     //################################################################//
 
@@ -681,9 +677,9 @@ namespace savvy
         query_(index_.create_query(reg)),
         i_(query_.begin()),
         reg_(reg),
+        bounding_type_(bounding_type),
         current_offset_in_block_(0),
-        total_in_block_(0),
-        bounding_type_(bounding_type)
+        total_in_block_(0)
       {
         if (!index_.good())
           this->input_stream_->setstate(std::ios::badbit);
@@ -847,8 +843,6 @@ namespace savvy
 
         std::ostreambuf_iterator<char> out_it(output_stream_);
 
-
-        bool format_header_added = false;
         headers_.resize(std::distance(headers_beg, headers_end));
         auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string,std::string>& kvp) { return kvp.first != "FORMAT"; });
         headers_.resize(std::distance(headers_.begin(), copy_res));
@@ -1160,8 +1154,6 @@ namespace savvy
       template <typename T>
       void write_alleles(const savvy::compressed_vector<T>& m)
       {
-        const T ref_value = T();
-
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
         std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF);
@@ -1178,8 +1170,6 @@ namespace savvy
       template <typename T>
       void write_hap_dosages(const std::vector<T>& m)
       {
-        const T ref_value = T();
-
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
         std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF);
@@ -1187,7 +1177,6 @@ namespace savvy
         // TODO: check modulus and set error if needed.
         varint_encode(ploidy, os_it);
 
-        auto beg = m.begin();
         std::uint64_t non_zero_count = 0;
         for (auto it = m.begin(); it != m.end(); ++it)
         {
@@ -1204,8 +1193,6 @@ namespace savvy
       template <typename T>
       void write_hap_dosages(const savvy::compressed_vector<T>& m)
       {
-        const T ref_value = T();
-
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
         std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF);
@@ -1213,7 +1200,6 @@ namespace savvy
         // TODO: check modulus and set error if needed.
         varint_encode(ploidy, os_it);
 
-        auto beg = m.begin();
         std::uint64_t non_zero_count = 0;
         for (auto it = m.begin(); it != m.end(); ++it)
         {

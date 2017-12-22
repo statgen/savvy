@@ -33,11 +33,11 @@ namespace savvy
       std::string&& alt,
       std::unordered_map<std::string, std::string>&& properties)
       :
+      properties_(std::move(properties)),
       chromosome_(std::move(chromosome)),
-      position_(pos),
       ref_(std::move(ref)),
       alt_(std::move(alt)),
-      properties_(std::move(properties))
+      position_(pos)
     {
 
     }
@@ -57,10 +57,10 @@ namespace savvy
       return it->second;
     }
   private:
+    std::unordered_map<std::string, std::string> properties_;
     std::string chromosome_;
     std::string ref_;
     std::string alt_;
-    std::unordered_map<std::string, std::string> properties_;
     std::uint64_t position_;
     static const std::string empty_string;
   };

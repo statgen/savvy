@@ -19,9 +19,9 @@ namespace savvy
   {
     //================================================================//
     reader_base::reader_base(const std::string& file_path) :
+      file_path_(file_path),
       subset_size_(0),
       input_stream_(savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path)),
-      file_path_(file_path),
       file_data_format_(fmt::allele)
     {
       parse_header();
@@ -29,9 +29,9 @@ namespace savvy
     }
 
     reader_base::reader_base(const std::string& file_path, savvy::fmt data_format) :
+      file_path_(file_path),
       subset_size_(0),
       input_stream_(savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path)),
-      file_path_(file_path),
       file_data_format_(fmt::allele),
       requested_data_format_(data_format)
     {
@@ -41,12 +41,12 @@ namespace savvy
     reader_base::reader_base(reader_base&& source) :
       sample_ids_(std::move(source.sample_ids_)),
       subset_map_(std::move(source.subset_map_)),
-      subset_size_(source.subset_size_),
+      metadata_fields_(std::move(source.metadata_fields_)),
       //sbuf_(std::move(source.sbuf_)),
       //input_stream_(&sbuf_),
-      input_stream_(std::move(source.input_stream_)),
       file_path_(std::move(source.file_path_)),
-      metadata_fields_(std::move(source.metadata_fields_)),
+      subset_size_(source.subset_size_),
+      input_stream_(std::move(source.input_stream_)),
       file_data_format_(source.file_data_format_),
       requested_data_format_(source.requested_data_format_)
     {

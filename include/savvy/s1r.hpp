@@ -260,8 +260,6 @@ namespace savvy
                 const auto entry_end_it = leaf_node_.begin() + reader_->calculate_node_size(position_);
                 for (; entry_it != entry_end_it; ++entry_it)
                 {
-                  auto s = entry_it->region_start();
-                  auto e = entry_it->region_end();
                   if (entry_it->region_start() <= end_ && entry_it->region_end() >= beg_)
                     break;
                 }
@@ -290,8 +288,6 @@ namespace savvy
                 const auto entry_end_it = traversal_chain_.top().begin() + reader_->calculate_node_size(position_);
                 for (; entry_it != entry_end_it; ++entry_it)
                 {
-                  auto s = entry_it->region_start();
-                  auto e = entry_it->region_end();
                   if (entry_it->region_start() <= end_ && entry_it->region_end() >= beg_)
                     break;
                 }
@@ -527,8 +523,6 @@ namespace savvy
       std::string file_path_;
       std::ifstream input_file_;
       std::vector<tree_reader> trees_;
-      std::size_t tree_index_;
-      sort_type sort_;
     };
 
     class reader::query
@@ -577,10 +571,10 @@ namespace savvy
       typedef std::bidirectional_iterator_tag iterator_category;
 
       iterator(std::istream& ifs, std::vector<tree_reader::query>::iterator tree_query_it, tree_reader::query::iterator tree_query_beg, tree_reader::query::iterator tree_query_end) :
-        ifs_(&ifs),
         tree_it_(tree_query_it),
         tree_query_it_(tree_query_beg),
-        tree_query_end_(tree_query_end)
+        tree_query_end_(tree_query_end),
+        ifs_(&ifs)
       {
 
       }
@@ -668,8 +662,6 @@ namespace savvy
 
       writer& write(const std::string& chrom, const entry& e)
       {
-        auto es = e.region_start();
-        auto ee = e.region_end();
         if (chromosomes_.empty())
           chromosomes_.emplace_back(chrom, 0);
 

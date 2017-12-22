@@ -555,37 +555,6 @@ public:
   }
 };
 
-class triple_file_handler_functor
-{
-public:
-  template <typename T, typename T2, typename T3>
-  void operator()(T&& input_file_reader, T2&& input_file_reader2, T3&& input_file_reader3)
-  {
-    input_file_reader.sample_count();
-    input_file_reader2.sample_count();
-    input_file_reader3.sample_count();
-
-    std::tuple<T, T2, T3> file_readers(std::move(input_file_reader), std::move(input_file_reader2), std::move(input_file_reader3));
-
-  }
-};
-
-class marker_handler_functor
-{
-public:
-  template <typename T>
-  void operator()(const T& mrkr)
-  {
-    std::uint64_t pos = mrkr.pos();
-    std::string ref = mrkr.ref();
-    std::string alt = mrkr.alt();
-    std::for_each(mrkr.begin(), mrkr.end(), [](const savvy::allele_status& s)
-    {
-
-    });
-  }
-};
-
 //class marker_counter
 //{
 //public:

@@ -244,8 +244,6 @@ int merge_main(int argc, char** argv)
       for (auto it = f.samples().begin(); it != f.samples().end(); ++it)
         sample_ids.emplace_back(*it);
 
-      auto d = f.headers().end() - f.headers().begin();
-      auto s = merged_headers.size();
       merged_headers.reserve(merged_headers.size() + (f.headers().end() - f.headers().begin()));
       for (auto it = f.headers().begin(); it != f.headers().end(); ++it)
       {

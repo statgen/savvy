@@ -476,7 +476,6 @@ namespace savvy
       bcf_unpack(hts_rec(), BCF_UN_ALL);
       for (int i = 0; i < hts_rec()->n_fmt; ++i)
       {
-        auto rec_ptr = hts_rec();
         int fmt_id = hts_rec()->d.fmt[i].id;
         std::string fmt_key = hts_hdr()->id[BCF_DT_ID][fmt_id].key;
 
@@ -1309,8 +1308,6 @@ namespace savvy
       this->init_format_fields(data_formats...);
 
       (*output_stream_) << "##fileformat=VCFv4.2" << std::endl;
-
-      std::ostreambuf_iterator<char> out_it(*output_stream_);
 
 
       for (auto it = headers_beg; it != headers_end; ++it)
