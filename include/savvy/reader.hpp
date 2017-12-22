@@ -149,10 +149,12 @@ namespace savvy
 
     const std::vector<std::string>& info_fields() const;
     const std::vector<std::string>& samples() const;
+    const std::vector<std::pair<std::string, std::string>>& headers() const;
 
     std::vector<std::string> subset_samples(const std::set<std::string>& subset);
   private:
     static const std::vector<std::string> empty_string_vector;
+    static const std::vector<std::pair<std::string, std::string>> empty_string_pair_vector;
   protected:
     virtual savvy::sav::reader_base* sav_impl() const = 0;
     virtual savvy::vcf::reader_base<1>* vcf_impl() const = 0;

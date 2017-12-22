@@ -10,6 +10,7 @@ namespace savvy
 {
   //################################################################//
   const std::vector<std::string> reader_base::empty_string_vector;
+  const std::vector<std::pair<std::string, std::string>> reader_base::empty_string_pair_vector;
 
   const std::vector<std::string>& reader_base::info_fields() const
   {
@@ -28,6 +29,16 @@ namespace savvy
     else if (vcf_impl())
       return vcf_impl()->samples();
     return empty_string_vector;
+  }
+
+  const std::vector<std::pair<std::string,std::string>>& reader_base::headers() const
+  {
+    reader_base::sample_iterator ret;
+    if (sav_impl())
+      return sav_impl()->headers();
+    else if (vcf_impl())
+      return vcf_impl()->headers();
+    return empty_string_pair_vector;
   }
 
   std::vector<std::string> reader_base::subset_samples(const std::set<std::string>& subset)
