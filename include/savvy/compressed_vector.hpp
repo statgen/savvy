@@ -20,6 +20,90 @@ namespace savvy
     typedef compressed_vector<T> self_type;
     static const T const_value_type;
 
+    class iterator
+    {
+    public:
+      typedef iterator self_type;
+      typedef std::ptrdiff_t difference_type;
+      typedef T value_type;
+      typedef value_type& reference;
+      typedef value_type* pointer;
+      typedef std::input_iterator_tag iterator_category;
+
+      iterator() : vec_(nullptr), beg_(nullptr), cur_(beg_) {}
+      iterator(compressed_vector& file_reader, std::size_t off) :
+        vec_(&file_reader),
+        beg_(file_reader.values_.data()),
+        cur_(file_reader.values_.data() + off)
+      {
+
+      }
+
+      std::size_t offset() const
+      {
+        return vec_->offsets_[cur_ - beg_];
+      }
+
+      self_type operator++()
+      {
+        self_type ret = *this;
+        ++cur_;
+        return ret;
+      }
+
+      void operator++(int) { ++cur_; }
+      reference operator*() { return *cur_; }
+      pointer operator->() { return cur_; }
+      bool operator==(const self_type& rhs) const { return (cur_ == rhs.cur_); }
+      bool operator!=(const self_type& rhs) const { return (cur_ != rhs.cur_); }
+    private:
+      compressed_vector* vec_;
+      const value_type*const beg_;
+      value_type* cur_;
+    };
+
+    class const_iterator
+    {
+    public:
+      typedef const_iterator self_type;
+      typedef std::ptrdiff_t difference_type;
+      typedef T value_type;
+      typedef const value_type& reference;
+      typedef const value_type* pointer;
+      typedef std::input_iterator_tag iterator_category;
+
+      const_iterator() : vec_(nullptr), beg_(nullptr), cur_(beg_) {}
+      const_iterator(const compressed_vector& file_reader, std::size_t off) :
+        vec_(&file_reader),
+        beg_(file_reader.values_.data()),
+        cur_(beg_ + off)
+      {
+
+      }
+
+      std::size_t offset() const
+      {
+        return vec_->offsets_[cur_ - beg_];
+      }
+
+      self_type operator++()
+      {
+        self_type ret = *this;
+        ++cur_;
+        return ret;
+      }
+
+      void operator++(int) { ++cur_; }
+      reference operator*() const { return *cur_; }
+      const pointer operator->() const { return cur_; }
+      bool operator==(const self_type& rhs) const { return (cur_ == rhs.cur_); }
+      bool operator!=(const self_type& rhs) const { return (cur_ != rhs.cur_); }
+    private:
+      const compressed_vector* vec_;
+      const value_type*const beg_;
+      const value_type* cur_;
+    };
+
     compressed_vector() :
       size_(0)
     {
@@ -45,11 +129,14 @@ namespace savvy
       }
     }
 
-    typename std::vector<value_type>::const_iterator begin() const  { return this->values_.cbegin(); }
-    typename std::vector<value_type>::const_iterator end() const { return this->values_.cend(); }
+    const_iterator cbegin() const  { return const_iterator(*this, 0); }
+    const_iterator cend() const { return const_iterator(*this, this->values_.size()); }
 
-    typename std::vector<value_type>::iterator begin() { return this->values_.begin(); }
-    typename std::vector<value_type>::iterator end() { return this->values_.end(); }
+    const_iterator begin() const  { return this->cbegin(); }
+    const_iterator end() const { return this->cend(); }
+
+    iterator begin() { return iterator(*this, 0); }
+    iterator end() { return iterator(*this, this->values_.size()); }
 
     const value_type& operator[](std::size_t pos) const
     {

@@ -1116,14 +1116,13 @@ namespace savvy
       static void serialize_alleles(const savvy::compressed_vector<T>& m, OutIt os_it)
       {
         std::uint64_t last_pos = 0;
-        auto idx_it = m.index_data();
-        auto val_end = m.value_data() + m.non_zero_size();
-        for (auto val_it = m.value_data(); val_it != val_end; ++val_it, ++idx_it)
+        auto end = m.end();
+        for (auto it = m.begin(); it != end; ++it)
         {
-          std::int8_t signed_allele = detail::allele_encoder<BitWidth>::encode(*val_it);
+          std::int8_t signed_allele = detail::allele_encoder<BitWidth>::encode(*it);
           if (signed_allele >= 0)
           {
-            std::uint64_t dist = static_cast<std::uint64_t>(*idx_it);
+            std::uint64_t dist = it.offset();
             std::uint64_t offset = dist - last_pos;
             last_pos = dist + 1;
             prefixed_varint<BitWidth>::encode((std::uint8_t)(signed_allele), offset, os_it);

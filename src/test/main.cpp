@@ -526,7 +526,7 @@ public:
     {
       savvy::vcf::reader<1> input(SAVVYT_VCF_FILE, Fmt);
       savvy::site_info anno;
-      std::vector<float> data;
+      savvy::compressed_vector<float> data;
 
       auto file_info = input.headers();
       file_info.reserve(file_info.size() + 3);
