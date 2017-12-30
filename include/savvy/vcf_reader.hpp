@@ -599,9 +599,16 @@ namespace savvy
           std::unordered_map<std::string, std::string> props;
           props.reserve(n_info + 2);
 
-          std::string qual(std::to_string(hts_rec()->qual));
-          qual.erase(qual.find_last_not_of(".0") + 1); // rtrim zeros.
-          props["QUAL"] = std::move(qual);
+          if (std::isnan(hts_rec()->qual))
+          {
+            props["QUAL"] = ".";
+          }
+          else
+          {
+            std::string qual(std::to_string(hts_rec()->qual));
+            qual.erase(qual.find_last_not_of(".0") + 1); // rtrim zeros.
+            props["QUAL"] = std::move(qual);
+          }
 
           std::stringstream ss;
           for (std::size_t i = 0; i < n_flt; ++i)
