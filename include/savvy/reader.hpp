@@ -1,5 +1,11 @@
-#ifndef VC_READER_HPP
-#define VC_READER_HPP
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+#ifndef LIBSAVVY_READER_HPP
+#define LIBSAVVY_READER_HPP
 
 #include "site_info.hpp"
 #include "sav_reader.hpp"
@@ -13,7 +19,6 @@
 namespace savvy
 {
   //################################################################//
-  template <std::size_t VecCnt>
   class reader_base
   {
   public:
@@ -142,246 +147,147 @@ namespace savvy
 //      return good();
 //    }
 
-    std::vector<std::string> prop_fields() const;
-    sample_iterator samples_begin() const;
-    sample_iterator samples_end() const;
-    std::size_t sample_size() const;
+    const std::vector<std::string>& info_fields() const;
+    const std::vector<std::string>& samples() const;
+    const std::vector<std::pair<std::string, std::string>>& headers() const;
+
+    std::vector<std::string> subset_samples(const std::set<std::string>& subset);
+  private:
+    static const std::vector<std::string> empty_string_vector;
+    static const std::vector<std::pair<std::string, std::string>> empty_string_pair_vector;
   protected:
-    virtual savvy::sav::reader_base<VecCnt>* sav_impl() const = 0;
-    virtual savvy::vcf::reader_base<VecCnt>* vcf_impl() const = 0;
+    virtual savvy::sav::reader_base* sav_impl() const = 0;
+    virtual savvy::vcf::reader_base<1>* vcf_impl() const = 0;
   };
   //################################################################//
 
   //################################################################//
-
-  template <std::size_t VecCnt>
-  class reader : public reader_base<VecCnt>
+  class reader : public reader_base
   {
   public:
     reader() {}
-    template <typename... T>
-    reader(const std::string& file_path, T... data_formats);
+    template <typename T>
+    reader(const std::string& file_path, T data_format);
     ~reader() {}
 
-    template <typename... T>
-    reader& operator>>(std::tuple<site_info, T...>& destination);
+    template <typename T>
+    reader& operator>>(variant<T>& destination);
 
-    template <typename... T>
-    reader& read(site_info& annotations, T&... destinations);
+    template <typename T>
+    reader& read(site_info& annotations, T& destination);
   private:
-    savvy::sav::reader_base<VecCnt>* sav_impl() const { return sav_reader_.get(); }
-    savvy::vcf::reader_base<VecCnt>* vcf_impl() const { return vcf_reader_.get(); }
+    savvy::sav::reader_base* sav_impl() const { return sav_reader_.get(); }
+    savvy::vcf::reader_base<1>* vcf_impl() const { return vcf_reader_.get(); }
   private:
-    std::unique_ptr<sav::reader<VecCnt>> sav_reader_;
-    std::unique_ptr<vcf::reader<VecCnt>> vcf_reader_;
+    std::unique_ptr<sav::reader> sav_reader_;
+    std::unique_ptr<vcf::reader<1>> vcf_reader_;
   };
-
-#if __cpp_deduction_guides >= 201606
-  template <typename... T>
-  reader(const std::string& file_path, T... data_formats) -> reader<sizeof...(T)>;
-#endif
   //################################################################//
 
   //################################################################//
-  template <std::size_t VecCnt>
-  class indexed_reader : public reader_base<VecCnt>
+  class indexed_reader : public reader_base
   {
   public:
     indexed_reader() {}
-    template <typename... T>
-    indexed_reader(const std::string& file_path, const region& reg, T... data_formats);
-    template <typename... T>
-    indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats);
+    template <typename T>
+    indexed_reader(const std::string& file_path, const region& reg, T data_format);
+    template <typename T>
+    indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T data_format);
     void reset_region(const region& reg);
 
     std::vector<std::string> chromosomes() const;
 
-    template <typename... T>
-    indexed_reader& operator>>(std::tuple<site_info, T...>& destination);
+    template <typename T>
+    indexed_reader& operator>>(variant<T>& destination);
 
-    template <typename... T>
-    indexed_reader& read(site_info& annotations, T&... destinations);
+    template <typename T>
+    indexed_reader& read(site_info& annotations, T& destination);
 
-    template <typename Pred, typename... T>
-    indexed_reader& read_if(Pred fn, site_info& annotations, T&... destinations);
+    template <typename Pred, typename T>
+    indexed_reader& read_if(Pred fn, site_info& annotations, T& destination);
   private:
-    savvy::sav::reader_base<VecCnt>* sav_impl() const { return sav_reader_.get(); }
-    savvy::vcf::reader_base<VecCnt>* vcf_impl() const { return vcf_reader_.get(); }
+    savvy::sav::reader_base* sav_impl() const { return sav_reader_.get(); }
+    savvy::vcf::reader_base<1>* vcf_impl() const { return vcf_reader_.get(); }
   private:
-    std::unique_ptr<sav::indexed_reader<VecCnt>> sav_reader_;
-    std::unique_ptr<vcf::indexed_reader<VecCnt>> vcf_reader_;
+    std::unique_ptr<sav::indexed_reader> sav_reader_;
+    std::unique_ptr<vcf::indexed_reader<1>> vcf_reader_;
   };
-
-#if __cpp_deduction_guides >= 201606
-  template <typename... T>
-  indexed_reader(const std::string& file_path, const region& reg, T... data_formats) -> indexed_reader<sizeof...(T)>;
-
-  template <typename... T>
-  indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats) -> indexed_reader<sizeof...(T)>;
-#endif
   //################################################################//
 
 
-
-
-
-
-
-
   //################################################################//
-  template <std::size_t VecCnt>
-  std::vector<std::string> reader_base<VecCnt>::prop_fields() const
+  template <typename T>
+  reader& reader::operator>>(variant<T>& destination)
   {
-    if (sav_impl())
-      return sav_impl()->prop_fields();
-    else if (vcf_impl())
-      return vcf_impl()->prop_fields();
-    return {};
+    return this->read(destination, destination.data());
   }
 
-  template <std::size_t VecCnt>
-  typename reader_base<VecCnt>::sample_iterator reader_base<VecCnt>::samples_begin() const
+  template <typename T>
+  reader& reader::read(site_info& annotations, T& destination)
   {
-    reader_base::sample_iterator ret;
     if (sav_impl())
-      ret = reader_base::sample_iterator(sav_impl()->samples_begin());
+      sav_reader_->read(annotations, destination);
     else if (vcf_impl())
-      ret = reader_base::sample_iterator(vcf_impl()->samples_begin());
-    return ret;
-  }
-
-  template <std::size_t VecCnt>
-  typename reader_base<VecCnt>::sample_iterator reader_base<VecCnt>::samples_end() const
-  {
-    reader_base<VecCnt>::sample_iterator ret;
-    if (sav_impl())
-      ret = reader_base::sample_iterator(sav_impl()->samples_end());
-    else if (vcf_impl())
-      ret = reader_base::sample_iterator(vcf_impl()->samples_end());
-    return ret;
-  }
-
-  template <std::size_t VecCnt>
-  std::size_t reader_base<VecCnt>::sample_size() const
-  {
-    std::size_t ret{};
-    if (sav_impl())
-      ret = static_cast<std::size_t>(sav_impl()->samples_end() - sav_impl()->samples_begin());
-    else if (vcf_impl())
-      ret = static_cast<std::size_t>(vcf_impl()->samples_end() - vcf_impl()->samples_begin());
-    return ret;
-  }
-  //################################################################//
-
-  //################################################################//
-  template <std::size_t VecCnt>
-  template <typename... T>
-  reader<VecCnt>& reader<VecCnt>::operator>>(std::tuple<site_info, T...>& destination)
-  {
-    ::savvy::detail::apply([this](site_info& anno, auto&... args)
-      {
-        this->read(anno, std::forward<decltype(args)>(args)...);
-      },
-      destination);
+      vcf_reader_->read(annotations, destination);
     return *this;
   }
 
-  template <std::size_t VecCnt>
-  template <typename... T>
-  reader<VecCnt>& reader<VecCnt>::read(site_info& annotations, T&... destinations)
-  {
-    if (sav_impl())
-      sav_reader_->read(annotations, destinations...);
-    else if (vcf_impl())
-      vcf_reader_->read(annotations, destinations...);
-    return *this;
-  }
-
-  template <std::size_t VecCnt>
-  template <typename... T>
-  reader<VecCnt>::reader(const std::string& file_path, T... data_formats)
+  template <typename T>
+  reader::reader(const std::string& file_path, T data_format)
   {
     if (::savvy::detail::has_extension(file_path, ".sav"))
-      sav_reader_ = ::savvy::detail::make_unique<sav::reader<VecCnt>>(file_path, data_formats...);
+      sav_reader_ = ::savvy::detail::make_unique<sav::reader>(file_path, data_format);
     else if (::savvy::detail::has_extension(file_path, ".vcf") || ::savvy::detail::has_extension(file_path, ".vcf.gz") || ::savvy::detail::has_extension(file_path, ".bcf"))
-      vcf_reader_ = detail::make_unique<vcf::reader<VecCnt>>(file_path, data_formats...);
+      vcf_reader_ = detail::make_unique<vcf::reader<1>>(file_path, data_format);
   }
   //################################################################//
 
   //################################################################//
-  template <std::size_t VecCnt>
-  std::vector<std::string> indexed_reader<VecCnt>::chromosomes() const
-  {
-    if (sav_reader_)
-      return sav_reader_->chromosomes();
-    else if (vcf_reader_)
-      return vcf_reader_->chromosomes();
-    return {};
-  }
-
-  template <std::size_t VecCnt>
-  template <typename... T>
-  indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const region& reg, T... data_formats)
+  template <typename T>
+  indexed_reader::indexed_reader(const std::string& file_path, const region& reg, T data_format)
   {
     if (::savvy::detail::has_extension(file_path, ".sav"))
-      sav_reader_ = ::savvy::detail::make_unique<sav::indexed_reader<VecCnt>>(file_path, reg, data_formats...);
+      sav_reader_ = ::savvy::detail::make_unique<sav::indexed_reader>(file_path, reg, data_format);
     else if (::savvy::detail::has_extension(file_path, ".vcf") || ::savvy::detail::has_extension(file_path, ".vcf.gz") || ::savvy::detail::has_extension(file_path, ".bcf"))
-      vcf_reader_ = ::savvy::detail::make_unique<vcf::indexed_reader<VecCnt>>(file_path, reg, data_formats...);
+      vcf_reader_ = ::savvy::detail::make_unique<vcf::indexed_reader<1>>(file_path, reg, data_format);
   }
 
-  template <std::size_t VecCnt>
-  template <typename... T>
-  indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats)
+  template <typename T>
+  indexed_reader::indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T data_format)
   {
     if (::savvy::detail::has_extension(file_path, ".sav"))
-      sav_reader_ = ::savvy::detail::make_unique<sav::indexed_reader<VecCnt>>(file_path, reg, bounding_type, data_formats...);
+      sav_reader_ = ::savvy::detail::make_unique<sav::indexed_reader>(file_path, reg, bounding_type, data_format);
     else if (::savvy::detail::has_extension(file_path, ".vcf") || ::savvy::detail::has_extension(file_path, ".vcf.gz") || ::savvy::detail::has_extension(file_path, ".bcf"))
-      vcf_reader_ = ::savvy::detail::make_unique<vcf::indexed_reader<VecCnt>>(file_path, reg, bounding_type, data_formats...);
+      vcf_reader_ = ::savvy::detail::make_unique<vcf::indexed_reader<1>>(file_path, reg, bounding_type, data_format);
   }
 
-  template <std::size_t VecCnt>
-  void indexed_reader<VecCnt>::reset_region(const region& reg)
+  template <typename T>
+  indexed_reader& indexed_reader::operator>>(variant<T>& destination)
   {
-    if (sav_reader_)
-      sav_reader_->reset_region(reg);
-    else if (vcf_reader_)
-      vcf_reader_->reset_region(reg);
+    return this->read(destination, destination.data());
   }
 
-  template <std::size_t VecCnt>
-  template <typename... T>
-  indexed_reader<VecCnt>& indexed_reader<VecCnt>::operator>>(std::tuple<site_info, T...>& destination)
-  {
-    ::savvy::detail::apply([this](site_info& anno, auto&... args)
-      {
-        this->read(anno, std::forward<decltype(args)>(args)...);
-      },
-      destination);
-    return *this;
-  }
-
-  template <std::size_t VecCnt>
-  template <typename... T>
-  indexed_reader<VecCnt>& indexed_reader<VecCnt>::read(site_info& annotations, T&... destinations)
+  template <typename T>
+  indexed_reader& indexed_reader::read(site_info& annotations, T& destination)
   {
     if (sav_impl())
-      sav_reader_->read(annotations, destinations...);
+      sav_reader_->read(annotations, destination);
     else if (vcf_impl())
-      vcf_reader_->read(annotations, destinations...);
+      vcf_reader_->read(annotations, destination);
     return *this;
   }
 
-  template <std::size_t VecCnt>
-  template <typename Pred, typename... T>
-  indexed_reader<VecCnt>& indexed_reader<VecCnt>::read_if(Pred fn, site_info& annoations, T&... destinations)
+  template <typename Pred, typename T>
+  indexed_reader& indexed_reader::read_if(Pred fn, site_info& annoations, T& destination)
   {
     if (sav_reader_)
-      sav_reader_->read_if(fn, annoations, destinations... );
+      sav_reader_->read_if(fn, annoations, destination);
     else if (vcf_reader_)
-      vcf_reader_->read_if(fn, annoations, destinations...);
+      vcf_reader_->read_if(fn, annoations, destination);
 
     return *this;
   }
+  //################################################################//
 }
 
 #endif //VC_READER_HPP

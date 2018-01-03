@@ -1,13 +1,19 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
 
 #include "savvy/sav_reader.hpp"
 #include "savvy/m3vcf_reader.hpp"
 #include "savvy/vcf_reader.hpp"
-#include "savvy/test_class.hpp"
+#include "test/test_class.hpp"
 #include "savvy/varint.hpp"
 #include "savvy/savvy.hpp"
 #include "savvy/variant_iterator.hpp"
 #include "savvy/reader.hpp"
 #include "savvy/site_info.hpp"
+#include "savvy/data_format.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -18,6 +24,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <sys/stat.h>
 
 #include <htslib/synced_bcf_reader.h>
 #include <htslib/tbx.h>
@@ -163,6 +170,12 @@
 //  //----------------------------------------------------------------//
 //  return 0;
 //}
+
+bool file_exists(const std::string& file_path)
+{
+  struct stat st;
+  return (stat(file_path.c_str(), &st) == 0);
+}
 
 int varint_test()
 {
@@ -459,16 +472,15 @@ private:
   {
     std::size_t ret = 0;
 
-    std::tuple<savvy::site_info, std::vector<float>> variant;
-    auto& anno = std::get<0>(variant);
-    auto& data = std::get<1>(variant);
+    savvy::site_info anno;
+    std::vector<float> data;
 
-    auto prop_fields = reader.prop_fields();
+    auto prop_fields = reader.info_fields();
 
     std::size_t num_markers = 0;
-    while (reader >> variant)
+    while (reader.read(anno, data))
     {
-      ret = hash_combine(ret, anno.locus());
+      ret = hash_combine(ret, anno.position());
       ret = hash_combine(ret, anno.ref());
       ret = hash_combine(ret, anno.alt());
 
@@ -476,7 +488,7 @@ private:
         ret = hash_combine(ret, anno.prop(prop_key));
 
       for (auto gt = data.begin(); gt != data.end(); ++gt)
-        ret = hash_combine(ret, static_cast<int>(*gt));
+        ret = hash_combine(ret, savvy::sav::detail::allele_encoder<7>::encode(*gt));
 
       ++num_markers;
     }
@@ -494,10 +506,10 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
   return file_checksum_test<T1, T2>(a, b);
 }
 
-void run_file_checksum_test()
+void run_file_checksum_test(const std::string f1, const std::string f2, savvy::fmt format)
 {
-  savvy::reader<1> input_file_reader1("test_file.vcf", savvy::fmt::allele);
-  savvy::reader<1> input_file_reader2("test_file.sav", savvy::fmt::allele);
+  savvy::reader input_file_reader1(f1, format);
+  savvy::reader input_file_reader2(f2, format);
   auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
   std::cout << "Starting checksum test ..." << std::endl;
   auto timed_call = time_procedure(t);
@@ -505,121 +517,41 @@ void run_file_checksum_test()
   std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
 }
 
-void convert_file_test()
+template <savvy::fmt Fmt>
+class convert_file_test
 {
+public:
+  void operator()()
   {
-    savvy::vcf::reader<1> input("test_file.vcf", savvy::fmt::allele);
-    savvy::site_info anno;
-    std::vector<float> data;
-
-    auto file_info = input.headers();
-    file_info.reserve(file_info.size() + 3);
-    file_info.insert(file_info.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
-    file_info.insert(file_info.begin(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
-    file_info.insert(file_info.begin(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
-    savvy::sav::writer compact_output("test_file.sav", input.samples_begin(), input.samples_end(), file_info.begin(), file_info.end());
-
-    while (input.read(anno, data))
     {
-      //    savvy::allele_vector<std::vector<float>> m(std::string(chrom), cur->locus(), std::string(cur->ref()), std::string(cur->alt()), sample_ids.size(), ploidy, std::vector<float>());
-      //    for (auto it = cur->begin(); it != cur->end(); ++it)
-      //    {
-      //      switch (*it)
-      //      {
-      //        case savvy::allele_status::has_alt:
-      //          m[std::distance(cur->begin(), it)] = 1.0;
-      //          break;
-      //        case savvy::allele_status::is_missing:
-      //          m[std::distance(cur->begin(), it)] = std::numeric_limits<float>::quiet_NaN();
-      //          break;
-      //      }
-      //    }
+      savvy::vcf::reader<1> input(SAVVYT_VCF_FILE, Fmt);
+      savvy::site_info anno;
+      savvy::compressed_vector<float> data;
 
-      compact_output.write(anno, data);
+      auto file_info = input.headers();
+      file_info.reserve(file_info.size() + 3);
+      file_info.insert(file_info.begin(), {"INFO", "<ID=FILTER,Description=\"Variant filter\">"});
+      file_info.insert(file_info.begin(), {"INFO", "<ID=QUAL,Description=\"Variant quality\">"});
+      file_info.insert(file_info.begin(), {"INFO", "<ID=ID,Description=\"Variant ID\">"});
+      savvy::sav::writer output(Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD, input.samples().begin(), input.samples().end(), file_info.begin(), file_info.end(), Fmt);
+
+      std::size_t cnt = 0;
+      while (input.read(anno, data))
+      {
+        output.write(anno, data);
+        ++cnt;
+      }
+
+      assert(output.good());
+      assert(cnt == (Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
     }
-  }
 
-  run_file_checksum_test();
-}
+    if (Fmt == savvy::fmt::haplotype_dosage)
+      run_file_checksum_test(SAVVYT_VCF_FILE, SAVVYT_SAV_FILE_DOSE, savvy::fmt::haplotype_dosage);
+    else
+      run_file_checksum_test(SAVVYT_VCF_FILE, SAVVYT_SAV_FILE_HARD, savvy::fmt::allele);
 
-//template <typename M>
-//double inner_product(const M& mrkr, std::vector<double>& vec, const double start_val = 0.0)
-//{
-//  double ret = start_val;
-//
-//  std::size_t i = 0;
-//  for (const savvy::allele_status& gt : mrkr)
-//  {
-//    if (gt == savvy::allele_status::has_alt)
-//      ret += 1.0 * vec[i];
-//    ++i;
-//  }
-//
-//  return ret;
-//}
-//
-//template <>
-//double inner_product<savvy::sav::marker>(const savvy::sav::marker& mrkr, std::vector<double>& vec, const double start_val)
-//{
-//  double ret = start_val;
-//
-//  for (auto it = mrkr.non_ref_begin(); it != mrkr.non_ref_end(); ++it)
-//  {
-//    if (it->status == savvy::allele_status::has_alt)
-//      ret += 1.0 * vec[it->offset];
-//    else
-//      ret += 0.04 * vec[it->offset];
-//  }
-//
-//  return ret;
-//}
-
-//class file_handler_functor
-//{
-//public:
-//  template <typename T>
-//  void operator()(T&& input_file_reader)
-//  {
-//    typedef typename T::input_iterator input_iterator_type;
-//    typename T::input_iterator::buffer buf{};
-//
-//    for (auto it = input_iterator_type(input_file_reader, buf); it != input_iterator_type(); ++it)
-//    {
-//      inner_product(*it, phenotypes_);
-//    }
-//  };
-//private:
-//  std::vector<double> phenotypes_;
-//};
-
-class triple_file_handler_functor
-{
-public:
-  template <typename T, typename T2, typename T3>
-  void operator()(T&& input_file_reader, T2&& input_file_reader2, T3&& input_file_reader3)
-  {
-    input_file_reader.sample_count();
-    input_file_reader2.sample_count();
-    input_file_reader3.sample_count();
-
-    std::tuple<T, T2, T3> file_readers(std::move(input_file_reader), std::move(input_file_reader2), std::move(input_file_reader3));
-
-  }
-};
-
-class marker_handler_functor
-{
-public:
-  template <typename T>
-  void operator()(const T& mrkr)
-  {
-    std::uint64_t pos = mrkr.pos();
-    std::string ref = mrkr.ref();
-    std::string alt = mrkr.alt();
-    std::for_each(mrkr.begin(), mrkr.end(), [](const savvy::allele_status& s)
-    {
-
-    });
+    savvy::sav::writer::create_index(Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD);
   }
 };
 
@@ -663,137 +595,170 @@ public:
 //  std::size_t file2_cnt_ = 0;
 //};
 
-void random_access_test()
+
+void sav_random_access_test(savvy::fmt format)
 {
-  savvy::sav::writer::create_index("test_file.sav");
-
-  savvy::indexed_reader<1> rdr("", {"", 0, 0}, savvy::fmt::allele);
-  savvy::indexed_reader<1> tmp("test_file.sav", {"20", 17000, 1120000}, savvy::fmt::allele);
+  savvy::sav::indexed_reader rdr(format == savvy::fmt::allele ? SAVVYT_SAV_FILE_HARD : SAVVYT_SAV_FILE_DOSE, {"20", 1234600, 2230300}, format);
   savvy::site_info anno;
-  std::vector<float> b;
-  rdr.read_if([](const auto& m) { return true; }, anno, b);
-  rdr = std::move(tmp);
+  std::vector<float> buf;
 
-  while (rdr.read(anno, b))
-  {
-    std::cout << anno.chromosome() << " " << anno.locus()  << " " << anno.ref()  << " " << anno.alt() << std::endl;
-  }
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "20");
+  assert(anno.position() == 1234667);
+  assert(anno.ref() == "G");
+  assert(anno.alt() == "A");
 
-  std::cout << "--------------------------------" << std::endl;
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "20");
+  assert(anno.position() == 1234767);
+  assert(anno.ref() == "T");
+  assert(anno.alt() == "A");
+
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "20");
+  assert(anno.position() == 2230237);
+  assert(anno.ref() == "T");
+  assert(anno.alt() == "");
+
+  assert(rdr.good());
+
+  assert(!rdr.read(anno, buf));
 
   rdr.reset_region({"18", 2234600, 2234700});
-  std::vector<float> v;
-  while (rdr.read(anno, v))
-  {
-    std::cout << anno.chromosome() << " " << anno.locus()  << " " << anno.ref()  << " " << anno.alt() << std::endl;
-  }
+
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "18");
+  assert(anno.position() == 2234668);
+  assert(anno.ref() == "G");
+  assert(anno.alt() == "A");
+
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "18");
+  assert(anno.position() == 2234679);
+  assert(anno.ref() == "G");
+  assert(anno.alt() == "T");
+
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "18");
+  assert(anno.position() == 2234687);
+  assert(anno.ref() == "G");
+  assert(anno.alt() == "A");
+
+  assert(rdr.read(anno, buf));
+  assert(anno.chromosome() == "18");
+  assert(anno.position() == 2234697);
+  assert(anno.ref() == "T");
+  assert(anno.alt() == "A");
+
+  assert(rdr.good());
+
+  assert(!rdr.read(anno, buf));
 }
 
-void generic_reader_test()
+void generic_reader_test(const std::string& path, savvy::fmt format, std::size_t expected_markers)
 {
-  savvy::reader<1> rdr1("test_file.sav", savvy::fmt::allele);
-  savvy::reader<1> rdr2("test_file.vcf", savvy::fmt::allele);
+  savvy::reader rdr(path, format);
+  assert(rdr.good());
 
+  std::vector<std::string> subset = {"NA00003","NA00005", "FAKE_ID"};
+  auto intersect = rdr.subset_samples({subset.begin(), subset.end()});
+  assert(intersect.size() == 2);
 
-  auto t = make_file_checksum_test(rdr1, rdr2);
-  std::cout << "Starting checksum test ..." << std::endl;
-  auto timed_call = time_procedure(t);
-  std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
-  std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
+  savvy::site_info i;
+  std::vector<float> d;
+  std::size_t cnt{};
+  while (rdr.read(i, d))
+  {
+    assert(d.size() == intersect.size() * savvy::sample_stride(format, 2));
+    ++cnt;
+  }
+  assert(cnt == expected_markers);
 }
 
-//#include <boost/numeric/ublas/vector_sparse.hpp>
+template <typename R, savvy::fmt F>
+void subset_test(const std::string& path)
+{
+  R rdr(path, F);
+  assert(rdr.good());
+
+  std::vector<std::string> subset = {"NA00003","NA00005", "FAKE_ID"};
+  auto intersect = rdr.subset_samples({subset.begin(), subset.end()});
+  assert(intersect.size() == 2);
+
+  savvy::site_info i;
+  std::vector<float> d;
+  std::size_t cnt{};
+  while (rdr.read(i, d))
+  {
+    assert(d.size() == intersect.size() * savvy::sample_stride(F, 2));
+    ++cnt;
+  }
+  assert(cnt == (F == savvy::fmt::haplotype_dosage ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
+}
 
 int main(int argc, char** argv)
 {
-  std::cout << "[0] Run all tests." << std::endl;
-  std::cout << "[1] Run varint test." << std::endl;
-  std::cout << "[2] Run file conversion test." << std::endl;
-  std::cout << "[3] Run generic reader test." << std::endl;
-  std::cout << "[4] Run random access test." << std::endl;
+  std::string cmd = (argc < 2) ? "" : argv[1];
 
-  char t = '0';
-  std::cin >> t;
-
-  switch (t)
+  if (cmd.empty())
   {
-    case '0':
-      varint_test();
-      convert_file_test();
-      break;
-    case '1':
-      varint_test();
-      break;
-    case '2':
-      convert_file_test();
-      break;
-    case '3':
-      generic_reader_test();
-      break;
-    case '4':
-      random_access_test();
-      break;
-    default:
-      std::cout << "Invalid Input" << std::endl;
+    std::cout << "Enter Command:" << std::endl;
+    std::cout << "- convert-file" << std::endl;
+    std::cout << "- generic-reader" << std::endl;
+    std::cout << "- random-access" << std::endl;
+    std::cout << "- subset" << std::endl;
+    std::cout << "- varint" << std::endl;
+    std::cin >> cmd;
   }
 
 
+  if (cmd == "convert-file")
+  {
+    convert_file_test<savvy::fmt::allele>()();
+    convert_file_test<savvy::fmt::haplotype_dosage>()();
+  }
+  else if (cmd == "generic-reader")
+  {
+    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::allele>()();
+    if (!file_exists(SAVVYT_SAV_FILE_DOSE)) convert_file_test<savvy::fmt::haplotype_dosage>()();
 
-//  savvy::open_marker_files(triple_file_handler_functor(), "chr1.bcf", "chr1.cmf", "chr1.m3vcf");
-//
-//  savvy::open_marker_files(std::make_tuple("chr1.cmf", "chr1.m3vcf"), [](auto&& input_file_reader1, auto&& input_file_reader2)
-//  {
-//    typedef typename std::remove_reference<decltype(input_file_reader1)>::type R1;
-//    typename R1::input_iterator::buffer buf{};
-//    typename R1::input_iterator eof{};
-//    typename R1::input_iterator it(input_file_reader1, buf);
-//
-//    typedef typename std::remove_reference<decltype(input_file_reader2)>::type R2;
-//    typename R2::input_iterator::buffer buf2{};
-//    typename R2::input_iterator eof2{};
-//    typename R2::input_iterator it2(input_file_reader2, buf2);
-//
-//    while (it != eof)
-//    {
-//
-//      ++it;
-//    }
-//
-//    while (it2 != eof2)
-//    {
-//
-//      ++it2;
-//    }
-//
-//  });
-//
-//  savvy::open_marker_file("chr1.bcf", [](auto&& input_file_reader)
-//  {
-//    typedef typename std::remove_reference<decltype(input_file_reader)>::type R;
-//    typename R::input_iterator::buffer buf{};
-//    typename R::input_iterator eof{};
-//    typename R::input_iterator it(input_file_reader, buf);
-//
-//    while (it != eof)
-//    {
-//      it->pos();
-//      it->ref() + ":" + it->alt();
-//      for (const savvy::allele_status& gt : *it)
-//      {
-//
-//      }
-//      ++it;
-//    }
-//  });
-//
-//  savvy::open_marker_file("chr1.bcf", file_handler_functor());
-//  file_handler_functor f;
-//  savvy::open_marker_file("chr1.bcf", f);
-//
-//  savvy::iterate_marker_file("chr1.bcf", marker_handler_functor());
+    generic_reader_test(SAVVYT_VCF_FILE, savvy::fmt::allele, SAVVYT_MARKER_COUNT_HARD);
+    generic_reader_test(SAVVYT_VCF_FILE, savvy::fmt::haplotype_dosage, SAVVYT_MARKER_COUNT_DOSE);
+
+    generic_reader_test(SAVVYT_SAV_FILE_HARD, savvy::fmt::allele, SAVVYT_MARKER_COUNT_HARD);
+    generic_reader_test(SAVVYT_SAV_FILE_HARD, savvy::fmt::haplotype_dosage, SAVVYT_MARKER_COUNT_HARD);
+
+    generic_reader_test(SAVVYT_SAV_FILE_DOSE, savvy::fmt::allele, SAVVYT_MARKER_COUNT_DOSE);
+    generic_reader_test(SAVVYT_SAV_FILE_DOSE, savvy::fmt::haplotype_dosage, SAVVYT_MARKER_COUNT_DOSE);
+  }
+  else if (cmd == "random-access")
+  {
+    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::allele>()();
+    if (!file_exists(SAVVYT_SAV_FILE_DOSE)) convert_file_test<savvy::fmt::haplotype_dosage>()();
+
+    sav_random_access_test(savvy::fmt::allele);
+    sav_random_access_test(savvy::fmt::haplotype_dosage);
+  }
+  else if (cmd == "subset")
+  {
+    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::allele>()();
+
+    subset_test<savvy::reader, savvy::fmt::genotype>(SAVVYT_VCF_FILE);
+    subset_test<savvy::reader, savvy::fmt::genotype>(SAVVYT_SAV_FILE_HARD);
+    subset_test<savvy::vcf::reader<1>, savvy::fmt::genotype>(SAVVYT_VCF_FILE);
+    subset_test<savvy::sav::reader, savvy::fmt::genotype>(SAVVYT_SAV_FILE_HARD);
+  }
+  else if (cmd == "varint")
+  {
+    varint_test();
+  }
+  else
+  {
+    std::cerr << "Invalid Command" << std::endl;
+    return EXIT_FAILURE;
+  }
 
 
-
-  return 0;
+  return EXIT_SUCCESS;
 }
 

@@ -1,3 +1,8 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
 
 #include "savvy/utility.hpp"
 
@@ -5,6 +10,11 @@
 
 namespace savvy
 {
+  std::string savvy_version()
+  {
+    return std::string(SAVVY_VERSION);
+  }
+
   std::string parse_header_id(std::string header_value)
   {
     if (header_value.size())

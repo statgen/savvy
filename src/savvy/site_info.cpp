@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 #include "savvy/site_info.hpp"
 
 namespace savvy
@@ -8,7 +14,7 @@ namespace savvy
     void print_vcf_site_info(std::ostream& out, const site_info& in, const std::vector<std::string>& info_fields)
     {
       out << in.chromosome() << "\t"
-          << in.locus() << "\t"
+          << in.position() << "\t"
           << (in.prop("ID").size() ? in.prop("ID") : ".") << "\t"
           << in.ref() << "\t"
           << in.alt() << "\t"

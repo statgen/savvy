@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 #include <cmath>
 #include "savvy/reader.hpp"
 #include "savvy/savvy.hpp"
@@ -126,7 +132,7 @@ int main(int argc, char** argv)
 
   if (args.version_is_set())
   {
-    std::cout << "Savvy Speed Test v" << savvy::version << std::endl;
+    std::cout << "Savvy Speed Test v" << savvy::savvy_version() << std::endl;
     return EXIT_SUCCESS;
   }
 

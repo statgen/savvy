@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 #ifndef LIBSAVVY_UTILITY_HPP
 #define LIBSAVVY_UTILITY_HPP
 
@@ -7,18 +13,22 @@
 
 namespace savvy
 {
-//  template<typename T, typename... Args>
-//  std::unique_ptr<T> make_unique(Args&&... args)
-//  {
-//    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-//  }
+  namespace detail
+  {
+    template<typename T, typename... Args>
+    std::unique_ptr<T> make_unique(Args&&... args)
+    {
+      return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+    }
+  }
 
-  static const std::string version = SAVVY_VERSION;
+  std::string savvy_version();
 
   std::string parse_header_id(std::string header_value);
 
   namespace detail
   {
+#if __cpp_decltype_auto >= 201304
     template<typename F, typename Tuple, std::size_t... S>
     decltype(auto) apply_impl(F&& fn, Tuple&& t, std::index_sequence<S...>)
     {
@@ -34,6 +44,7 @@ namespace savvy
         std::forward<Tuple>(t),
         std::make_index_sequence<tuple_size>());
     }
+#endif
   }
 }
 

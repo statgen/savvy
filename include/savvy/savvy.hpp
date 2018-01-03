@@ -1,20 +1,21 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 #ifndef LIBSAVVY_SAVVY_HPP
 #define LIBSAVVY_SAVVY_HPP
 
 #include <string>
 #include <functional>
 #include <memory>
+#include "utility.hpp"
 
 namespace savvy
 {
   namespace detail
   {
-    template<typename T, typename ...Args>
-    std::unique_ptr<T> make_unique(Args&& ...args)
-    {
-      return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-    }
-
     bool has_extension(const std::string& fullString, const std::string& ext);
 
 #if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4

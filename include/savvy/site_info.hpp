@@ -1,3 +1,8 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
 
 #ifndef LIBSAVVY_SITE_INFO_HPP
 #define LIBSAVVY_SITE_INFO_HPP
@@ -23,16 +28,16 @@ namespace savvy
 
     site_info(
       std::string&& chromosome,
-      std::uint64_t locus,
+      std::uint64_t pos,
       std::string&& ref,
       std::string&& alt,
       std::unordered_map<std::string, std::string>&& properties)
       :
+      properties_(std::move(properties)),
       chromosome_(std::move(chromosome)),
-      locus_(locus),
       ref_(std::move(ref)),
       alt_(std::move(alt)),
-      properties_(std::move(properties))
+      position_(pos)
     {
 
     }
@@ -42,7 +47,8 @@ namespace savvy
     const std::string& chromosome() const { return chromosome_; }
     const std::string& ref() const { return ref_; }
     const std::string& alt() const { return alt_; }
-    std::uint64_t locus() const { return locus_; }
+    //[[deprecated]] std::uint64_t locus() const { return position_; }
+    std::uint64_t position() const { return position_; }
     const std::string& prop(const std::string& key) const
     {
       auto it = properties_.find(key);
@@ -51,12 +57,22 @@ namespace savvy
       return it->second;
     }
   private:
+    std::unordered_map<std::string, std::string> properties_;
     std::string chromosome_;
     std::string ref_;
     std::string alt_;
-    std::unordered_map<std::string, std::string> properties_;
-    std::uint64_t locus_;
+    std::uint64_t position_;
     static const std::string empty_string;
+  };
+
+  template <typename T>
+  class variant : public site_info
+  {
+  public:
+    T& data() { return data_; }
+    const T& data() const { return data_; }
+  private:
+    T data_;
   };
 
 //  template <typename T>

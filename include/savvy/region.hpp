@@ -1,3 +1,8 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
 
 #ifndef LIBSAVVY_REGION_HPP
 #define LIBSAVVY_REGION_HPP
@@ -42,7 +47,7 @@ namespace savvy
     {
       static bool compare(const site_info& var, const region& reg)
       {
-        return (var.locus() <= reg.to() && (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1) >= reg.from() && var.chromosome() == reg.chromosome());
+        return (var.position() <= reg.to() && (var.position() + std::max(var.ref().size(), var.alt().size()) - 1) >= reg.from() && var.chromosome() == reg.chromosome());
       }
     };
 
@@ -50,7 +55,7 @@ namespace savvy
     {
       static bool compare(const site_info& var, const region& reg)
       {
-        return (var.locus() >= reg.from() && (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1) <= reg.to() && var.chromosome() == reg.chromosome());
+        return (var.position() >= reg.from() && (var.position() + std::max(var.ref().size(), var.alt().size()) - 1) <= reg.to() && var.chromosome() == reg.chromosome());
       }
     };
 
@@ -58,7 +63,7 @@ namespace savvy
     {
       static bool compare(const site_info& var, const region& reg)
       {
-        return (var.locus() >= reg.from() && var.locus() <= reg.to() && var.chromosome() == reg.chromosome());
+        return (var.position() >= reg.from() && var.position() <= reg.to() && var.chromosome() == reg.chromosome());
       }
     };
 
@@ -66,7 +71,7 @@ namespace savvy
     {
       static bool compare(const site_info& var, const region& reg)
       {
-        std::uint64_t right = (var.locus() + std::max(var.ref().size(), var.alt().size()) - 1);
+        std::uint64_t right = (var.position() + std::max(var.ref().size(), var.alt().size()) - 1);
         return (right >= reg.from() && right <= reg.to() && var.chromosome() == reg.chromosome());
       }
     };
