@@ -218,12 +218,11 @@ namespace savvy
 
             std::uint64_t sz;
             varint_decode(++in_it, end_it, sz);
-            std::uint64_t total_offset = 0;
-            for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+            for (std::size_t i = 0; i < sz && in_it != end_it; ++i)
             {
               std::uint8_t allele;
               std::uint64_t offset;
-              in_it = prefixed_varint<BitWidth>::decode(in_it, end_it, allele, offset);
+              in_it = prefixed_varint<BitWidth>::decode(++in_it, end_it, allele, offset);
             }
 
             input_stream_->get();
@@ -729,11 +728,15 @@ namespace savvy
           }
 
           this->read_variant_details(annotations);
-          this->read_genotypes(destination);
           ++current_offset_in_block_;
           if (region_compare(bounding_type_, annotations, reg_))
           {
+            this->read_genotypes(destination);
             break;
+          }
+          else
+          {
+            this->discard_genotypes();
           }
         }
         return *this;
@@ -767,10 +770,7 @@ namespace savvy
           }
           else
           {
-            if (this->file_data_format_ == fmt::allele)
-              this->discard_genotypes();
-            else
-              this->discard_genotypes();
+            this->discard_genotypes();
           }
         }
 
