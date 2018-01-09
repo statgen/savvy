@@ -1266,6 +1266,8 @@ namespace savvy
     {
       if (this->good())
       {
+        region_ = reg;
+
         if (synced_readers_)
           bcf_sr_destroy(synced_readers_);
         synced_readers_ = bcf_sr_init();
