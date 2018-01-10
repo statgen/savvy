@@ -1512,7 +1512,7 @@ namespace savvy
               std::size_t i = sample_index * ploidy;
               if (std::isnan(v[i]))
                 out_it = '.';
-              else if (v[i] == 0.0)
+              else if (v[i] == 0)
                 out_it = '0';
               else
                 out_it = '1';
@@ -1525,7 +1525,7 @@ namespace savvy
 
                 if (std::isnan(v[i]))
                   out_it = '.';
-                else if (v[i] == 0.0)
+                else if (v[i] == 0)
                   out_it = '0';
                 else
                   out_it = '1';
@@ -1536,11 +1536,13 @@ namespace savvy
               out_it = '\t';
 
               std::size_t i = sample_index * ploidy;
-              if (std::isnan(v[i]))
+              if (v[i] == 0)
+                out_it = '0';
+              else if (std::isnan(v[i]))
                 out_it = '.';
               else
               {
-                for (const auto c : std::to_string(v[i]))
+                for (const char c : std::to_string(v[i]))
                   out_it = c;
               }
 
@@ -1550,11 +1552,13 @@ namespace savvy
               {
                 out_it = ',';
 
-                if (std::isnan(v[i]))
+                if (v[i] == 0)
+                  out_it = '0';
+                else if (std::isnan(v[i]))
                   out_it = '.';
                 else
                 {
-                  for (const auto c : std::to_string(v[i]))
+                  for (const char c : std::to_string(v[i]))
                     out_it = c;
                 }
               }
@@ -1563,11 +1567,13 @@ namespace savvy
             {
               out_it = '\t';
 
-              if (std::isnan(v[sample_index]))
+              if (v[sample_index] == 0)
+                out_it = '0';
+              else if (std::isnan(v[sample_index]))
                 out_it = '.';
               else
               {
-                for (const auto c : std::to_string(v[sample_index]))
+                for (const char c : std::to_string(v[sample_index]))
                   out_it = c;
               }
             }
@@ -1594,7 +1600,7 @@ namespace savvy
             std::size_t i = sample_index * ploidy;
             if (std::isnan(data[i]))
               out_it = '.';
-            else if (data[i] == 0.0)
+            else if (data[i] == 0)
               out_it = '0';
             else
               out_it = '1';
@@ -1607,7 +1613,7 @@ namespace savvy
 
               if (std::isnan(data[i]))
                 out_it = '.';
-              else if (data[i] == 0.0)
+              else if (data[i] == 0)
                 out_it = '0';
               else
                 out_it = '1';
@@ -1621,11 +1627,13 @@ namespace savvy
             out_it = '\t';
 
             std::size_t i = sample_index * ploidy;
-            if (std::isnan(data[i]))
+            if (data[i] == 0)
+              out_it = '0';
+            else if (std::isnan(data[i]))
               out_it = '.';
             else
             {
-              for (const auto c : std::to_string(data[i]))
+              for (const char c : std::to_string(data[i]))
                 out_it = c;
             }
 
@@ -1635,11 +1643,13 @@ namespace savvy
             {
               out_it = ',';
 
-              if (std::isnan(data[i]))
+              if (data[i] == 0)
+                out_it = '0';
+              else if (std::isnan(data[i]))
                 out_it = '.';
               else
               {
-                for (const auto c : std::to_string(data[i]))
+                for (const char c : std::to_string(data[i]))
                   out_it = c;
               }
             }
@@ -1651,11 +1661,13 @@ namespace savvy
           {
             out_it = '\t';
 
-            if (std::isnan(data[sample_index]))
+            if (data[sample_index] == 0)
+              out_it = '0';
+            else if (std::isnan(data[sample_index]))
               out_it = '.';
             else
             {
-              for (const auto c : std::to_string(data[sample_index]))
+              for (const char c : std::to_string(data[sample_index]))
                 out_it = c;
             }
           }
