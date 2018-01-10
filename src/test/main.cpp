@@ -700,6 +700,15 @@ int main(int argc, char** argv)
 {
   std::string cmd = (argc < 2) ? "" : argv[1];
 
+  savvy::site_info s;
+  std::vector<float> a;
+  std::vector<float> b;
+  savvy::vcf::reader<2> r("", savvy::fmt::genotype, savvy::fmt::phred_scaled_genotype_likelihood);
+  r.read(s, a, b);
+
+  savvy::vcf::writer<2> w("", r.samples().begin(), r.samples().end(), r.headers().begin(), r.headers().end(), savvy::fmt::genotype, savvy::fmt::dosage);
+  w.write(s, a, b);
+
   if (cmd.empty())
   {
     std::cout << "Enter Command:" << std::endl;

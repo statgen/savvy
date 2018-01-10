@@ -1478,11 +1478,11 @@ namespace savvy
             (*output_stream_) << (*it == fmt::dosage ? "\tDS" : (*it == fmt::haplotype_dosage ? "\tHDS" : "\tGT"));
           }
 
-          if (VecCnt == 1)
-          {
-            this->write_single_sample_level_data(ploidy, data...);
-          }
-          else
+//          if (VecCnt == 1)
+//          {
+//            this->write_single_sample_level_data(ploidy, data...);
+//          }
+//          else
           {
             this->write_multi_sample_level_data(ploidy, data...);
           }
@@ -1503,7 +1503,7 @@ namespace savvy
         {
           for (std::size_t format_index = 0; format_index < format_fields_.size(); ++format_index)
           {
-            auto v = get_vec(format_index, data...);
+            const auto& v = get_vec(format_index, data...);
             fmt f = format_fields_[format_index];
             if (f == fmt::allele)
             {
