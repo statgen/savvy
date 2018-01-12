@@ -14,6 +14,9 @@ endif()
 
 #list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX})
 #find_package(shrinkwrap CONFIG REQUIRED)
+if (NOT BUILD_SHARED_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a;${CMAKE_FIND_LIBRARY_SUFFIXES}") # Prefer libz.a when both are available
+endif()
 find_library(HTS_LIBRARY hts)
 find_library(ZLIB_LIBRARY z)
 find_library(ZSTD_LIBRARY zstd)
