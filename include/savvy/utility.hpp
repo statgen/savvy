@@ -27,35 +27,36 @@ namespace savvy
 
   std::string parse_header_id(std::string header_value);
 
+  template <typename T>
   class hds_to_gp
   {
   public:
-    static float get_first_prob(const std::vector<float>& hap_probs)
+    static T get_first_prob(const std::vector<T>& hap_probs)
     {
-      float ret = (1 - hap_probs[0]);
+      T ret = (T(1) - hap_probs[0]);
       for (std::size_t i = 1; i < hap_probs.size(); ++i)
-        ret *= (1 - hap_probs[i]);
+        ret *= (T(1) - hap_probs[i]);
       return ret;
     }
 
-    static float get_prob(const std::vector<float>& hap_probs, std::size_t num_alleles)
+    static T get_prob(const std::vector<T>& hap_probs, std::size_t num_alleles)
     {
       return choose(hap_probs, num_alleles);
     }
 
-    static float get_last_prob(const std::vector<float>& hap_probs)
+    static T get_last_prob(const std::vector<T>& hap_probs)
     {
-      float ret = hap_probs[0];
+      T ret = hap_probs[0];
       for (std::size_t i = 1; i < hap_probs.size(); ++i)
         ret *= hap_probs[i];
       return ret;
     }
   private:
-    static void choose(const std::vector<float>& input, std::vector<float>& buf, float& output, std::size_t k, std::size_t offset)
+    static void choose(const std::vector<T>& input, std::vector<T>& buf, T& output, std::size_t k, std::size_t offset)
     {
       if (k == 0)
       {
-        float product = 1.f;
+        T product = T(1);
         std::size_t j = 0;
         for (std::size_t i = 0; i < input.size(); ++i)
         {
@@ -66,7 +67,7 @@ namespace savvy
           }
           else
           {
-            product *= (1 - input[i]);
+            product *= (T(1) - input[i]);
           }
         }
         output += product;
@@ -81,10 +82,10 @@ namespace savvy
       }
     }
 
-    static float choose(const std::vector<float>& input, std::size_t k)
+    static T choose(const std::vector<T>& input, std::size_t k)
     {
-      float ret = 0.f;
-      std::vector<float> buf;
+      T ret = T(0);
+      std::vector<T> buf;
       buf.reserve(k);
       choose(input, buf, ret, k, 0);
       return ret;

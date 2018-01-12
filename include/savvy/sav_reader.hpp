@@ -441,10 +441,10 @@ namespace savvy
 
               auto write_gp_to_dest = [this, stride, ploidy_level](std::size_t hap_index, const std::vector<typename T::value_type>& hap_probs, T& destination)
               {
-                const std::uint64_t sample_index = hap_index / stride;
+                const std::uint64_t sample_index = hap_index / ploidy_level;
                 if (this->subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
-                  typename T::value_type gp = hds_to_gp::get_first_prob(hap_probs);
+                  typename T::value_type gp = hds_to_gp<typename T::value_type>::get_first_prob(hap_probs);
                   if (gp != typename T::value_type(0))
                     destination[this->subset_map_[sample_index] * stride] = gp;
 
@@ -458,7 +458,7 @@ namespace savvy
                   {
                     for (std::size_t g = 1; g < ploidy_level; ++g)
                     {
-                      gp = hds_to_gp::get_prob(hap_probs, g);
+                      gp = hds_to_gp<typename T::value_type>::get_prob(hap_probs, g);
                       if (gp != typename T::value_type(0))
                       {
                         destination[this->subset_map_[sample_index] * stride + g] = gp;
@@ -466,7 +466,7 @@ namespace savvy
                     }
                   }
 
-                  gp = hds_to_gp::get_last_prob(hap_probs);
+                  gp = hds_to_gp<typename T::value_type>::get_last_prob(hap_probs);
                   if (gp != typename T::value_type(0))
                     destination[this->subset_map_[sample_index] * stride + ploidy_level] = gp;
                 }
@@ -501,6 +501,7 @@ namespace savvy
                 ++h;
               }
 
+              // TODO: This section can be optimized. After hap_tmp is cleared out, the rest will be 1,0,0.
               for ( ; h < num_haps; ++h)
               {
                 hap_tmp.push_back(typename T::value_type(0));
