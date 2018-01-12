@@ -63,7 +63,7 @@ public:
     os << "----------------------------------------------\n";
     os << "Usage: sav export [opts ...] [in.sav] [out.{vcf,sav}]\n";
     os << "\n";
-    os << " -d, --data-format     : Format field to copy (GT, DS or HDS, default: GT)\n";
+    os << " -d, --data-format     : Format field to export (GT, DS, HDS or GP, default: GT)\n";
     //os << " -e, --filter-expression : File format (vcf or sav, default: vcf)\n";
     os << " -f, --file-format     : File format (vcf or sav, default: vcf)\n";
     os << " -h, --help            : Print usage\n";
@@ -95,10 +95,10 @@ public:
           {
             format_ = savvy::fmt::dosage;
           }
-//          else if (str_opt_arg == "GP")
-//          {
-//            format_ = savvy::fmt::genotype_probability;
-//          }
+          else if (str_opt_arg == "GP")
+          {
+            format_ = savvy::fmt::genotype_probability;
+          }
           else if (str_opt_arg != "GT")
           {
             std::cerr << "Invalid format field value (" << str_opt_arg << ")\n";

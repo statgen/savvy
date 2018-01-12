@@ -10,6 +10,7 @@
 #include <string>
 #include <functional>
 #include <memory>
+#include <vector>
 
 namespace savvy
 {
@@ -25,6 +26,70 @@ namespace savvy
   std::string savvy_version();
 
   std::string parse_header_id(std::string header_value);
+
+  class hds_to_gp
+  {
+  public:
+    static float get_first_prob(const std::vector<float>& hap_probs)
+    {
+      float ret = (1 - hap_probs[0]);
+      for (std::size_t i = 1; i < hap_probs.size(); ++i)
+        ret *= (1 - hap_probs[i]);
+      return ret;
+    }
+
+    static float get_prob(const std::vector<float>& hap_probs, std::size_t num_alleles)
+    {
+      return choose(hap_probs, num_alleles);
+    }
+
+    static float get_last_prob(const std::vector<float>& hap_probs)
+    {
+      float ret = hap_probs[0];
+      for (std::size_t i = 1; i < hap_probs.size(); ++i)
+        ret *= hap_probs[i];
+      return ret;
+    }
+  private:
+    static void choose(const std::vector<float>& input, std::vector<float>& buf, float& output, std::size_t k, std::size_t offset)
+    {
+      if (k == 0)
+      {
+        float product = 1.f;
+        std::size_t j = 0;
+        for (std::size_t i = 0; i < input.size(); ++i)
+        {
+          if (j < buf.size() && i == buf[j])
+          {
+            product *= input[i];
+            ++j;
+          }
+          else
+          {
+            product *= (1 - input[i]);
+          }
+        }
+        output += product;
+        return;
+      }
+
+      for (std::size_t i = offset; i <= input.size() - k; ++i)
+      {
+        buf.push_back(i);
+        choose(input, buf, output, k-1, i+1);
+        buf.pop_back();
+      }
+    }
+
+    static float choose(const std::vector<float>& input, std::size_t k)
+    {
+      float ret = 0.f;
+      std::vector<float> buf;
+      buf.reserve(k);
+      choose(input, buf, ret, k, 0);
+      return ret;
+    }
+  };
 
   namespace detail
   {

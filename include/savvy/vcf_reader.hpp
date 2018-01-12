@@ -1369,11 +1369,11 @@ namespace savvy
         if (f == savvy::fmt::allele)
           (*output_stream_) << "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">" << std::endl;
         else if (f == savvy::fmt::haplotype_dosage)
-          (*output_stream_) << "##FORMAT=<ID=HDS,Number=2,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage\">" << std::endl;
+          (*output_stream_) << "##FORMAT=<ID=HDS,Number=.,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage\">" << std::endl;
         else if (f == savvy::fmt::dosage)
           (*output_stream_) << "##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage\">" << std::endl;
-        //else if (f == savvy::fmt::genotype_probability)
-        //  (*output_stream_) << "##FORMAT"="<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1\">" << std::endl; // TODO: Handle other ploidy levels.
+        else if (f == savvy::fmt::genotype_probability)
+          (*output_stream_) << "##FORMAT=<ID=GP,Number=.,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes\">" << std::endl;
       }
 
       (*output_stream_) << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
@@ -1488,7 +1488,14 @@ namespace savvy
           {
             if (std::distance(format_fields_.begin(), it) > 0)
               output_stream_->put(':');
-            (*output_stream_) << (*it == fmt::dosage ? "\tDS" : (*it == fmt::haplotype_dosage ? "\tHDS" : "\tGT"));
+            if (*it == fmt::dosage)
+              (*output_stream_) << "\tDS";
+            else if (*it == fmt::haplotype_dosage)
+              (*output_stream_) << "\tHDS";
+            else if (*it == fmt::genotype_probability)
+              (*output_stream_) << "\tGP";
+            else
+              (*output_stream_) << "\tGT";
           }
 
 //          if (VecCnt == 1)
@@ -1552,6 +1559,8 @@ namespace savvy
               std::size_t i = sample_index * ploidy_plus_one;
               if (v[i] == 0)
                 out_it = '0';
+              else if (v[i] == 1)
+                out_it = '1';
               else if (std::isnan(v[i]))
                 out_it = '.';
               else
@@ -1568,6 +1577,8 @@ namespace savvy
 
                 if (v[i] == 0)
                   out_it = '0';
+                else if (v[i] == 1)
+                  out_it = '1';
                 else if (std::isnan(v[i]))
                   out_it = '.';
                 else

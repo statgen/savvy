@@ -410,58 +410,131 @@ namespace savvy
         }
       }
 
-//      template <typename T>
-//      void read_genotypes_gp(T& destination)
-//      {
-//        if (file_data_format_ != fmt::genotype_probability)
-//          input_stream_->setstate(std::ios::failbit);
+      template <std::size_t BitWidth, typename T>
+      void read_genotypes_gp(T& destination)
+      {
+        if (good())
+        {
+          const typename T::value_type alt_value = typename T::value_type(1);
+          std::istreambuf_iterator<char> in_it(*input_stream_);
+          std::istreambuf_iterator<char> end_it;
+
+          std::uint64_t ploidy_level;
+          if (varint_decode(in_it, end_it, ploidy_level) == end_it)
+          {
+            this->input_stream_->setstate(std::ios::badbit);
+          }
+          else
+          {
+            std::size_t stride = ploidy_level + 1;
+
+            std::uint64_t sz;
+            varint_decode(++in_it, end_it, sz);
+            std::uint64_t total_offset = 0;
+
+            if (subset_map_.size())
+            {
+//              destination.resize(subset_size_ * stride);
 //
-//        if (good())
-//        {
-//          const typename T::value_type alt_value = typename T::value_type(1);
-//          std::istreambuf_iterator<char> in_it(input_stream_);
-//          std::istreambuf_iterator<char> end_it;
+//              for (std::size_t i = 0; i < samples().size(); ++i)
+//              {
+//                if (subset_map_[i] != std::numeric_limits<std::uint64_t>::max())
+//                {
+//                  assert(subset_map_[i] * stride  < destination.size());
+//                  destination[subset_map_[i] * stride] = typename T::value_type(1);
+//                }
+//              }
 //
-//          std::uint64_t ploidy_level;
-//          if (varint_decode(in_it, end_it, ploidy_level) == end_it)
-//          {
-//            this->input_stream_->setstate(std::ios::badbit);
-//          }
-//          else
-//          {
-//            std::size_t stride = ploidy_level + 1;
-//            destination.resize(sample_count() * stride);
+//              for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+//              {
+//                typename T::value_type allele;
+//                std::uint64_t offset;
+//                std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
 //
-//            std::uint64_t sz;
-//            varint_decode(++in_it, end_it, sz);
-//            std::uint64_t total_offset = 0;
-//            //std::uint64_t next_ref_value_offset = 0;
-//            //std::uint64_t last_stride_offset = 0;
+//                total_offset += offset;
 //
-//            for (std::size_t i = 0; i < sample_count(); ++i)
-//            {
-//              assert(i < destination.size());
-//              destination[i * stride] = typename T::value_type(1);
-//            }
-//
-//
-//            for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
-//            {
-//              typename T::value_type allele;
-//              std::uint64_t offset;
-//              std::tie(allele, offset) = detail::allele_decoder<7>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
-//
-//              total_offset += offset;
-//
-//              assert(total_offset < destination.size());
-//              destination[total_offset] = allele;
-//              destination[(total_offset / stride) * stride] -= allele;
-//            }
-//
-//            input_stream_->get();
-//          }
-//        }
-//      }
+//                const std::uint64_t sample_index = total_offset / stride;
+//                if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
+//                {
+//                  assert(total_offset < destination.size());
+//                  destination[subset_map_[sample_index] * stride + (total_offset % stride)] = allele;
+//                  destination[subset_map_[sample_index] * stride] -= allele;
+//                }
+//              }
+            }
+            else
+            {
+              std::size_t num_haps = samples().size() * ploidy_level;
+              destination.resize(samples().size() * stride);
+
+              std::vector<typename T::value_type> hap_tmp;
+              hap_tmp.reserve(ploidy_level);
+
+              std::size_t h = 0;
+              for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+              {
+                typename T::value_type allele;
+                std::uint64_t offset;
+                std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
+                total_offset += offset;
+
+
+                assert(total_offset < num_haps);
+                for ( ; h < total_offset; ++h)
+                {
+                  hap_tmp.push_back(typename T::value_type(0));
+                  if (hap_tmp.size() == ploidy_level)
+                  {
+                    for (std::size_t g = 0; g < stride; ++g)
+                    {
+                      typename T::value_type gp = hds_to_gp::get_prob(hap_tmp, g);
+                      if (gp != typename T::value_type(0))
+                      {
+                        destination[(h / ploidy_level) * stride + g] = gp;
+                      }
+                    }
+                    hap_tmp.resize(0);
+                  }
+                }
+
+                hap_tmp.push_back(allele);
+                if (hap_tmp.size() == ploidy_level)
+                {
+                  for (std::size_t g = 0; g < stride; ++g)
+                  {
+                    typename T::value_type gp = hds_to_gp::get_prob(hap_tmp, g);
+                    if (gp != typename T::value_type(0))
+                    {
+                      destination[(h / ploidy_level) * stride + g] = gp;
+                    }
+                  }
+                  hap_tmp.resize(0);
+                }
+                ++h;
+              }
+
+              for ( ; h < num_haps; ++h)
+              {
+                hap_tmp.push_back(typename T::value_type(0));
+                if (hap_tmp.size() == ploidy_level)
+                {
+                  for (std::size_t g = 0; g < stride; ++g)
+                  {
+                    typename T::value_type gp = hds_to_gp::get_prob(hap_tmp, g);
+                    if (gp != typename T::value_type(0))
+                    {
+                      destination[(h / ploidy_level) * stride + g] = gp;
+                    }
+                  }
+                  hap_tmp.resize(0);
+                }
+              }
+            }
+
+            input_stream_->get();
+          }
+        }
+      }
 
       template <std::size_t BitWidth, typename T>
       void read_genotypes_hds(T& destination)
@@ -616,8 +689,8 @@ namespace savvy
             file_data_format_ == fmt::allele ? read_genotypes_al<1>(destination) : read_genotypes_al<7>(destination);
           else if (requested_data_format_== fmt::genotype)
             file_data_format_ == fmt::allele ? read_genotypes_gt<1>(destination) : read_genotypes_gt<7>(destination);
-//          else if (requested_data_formats_[idx] == fmt::genotype_probability && file_data_format_ == fmt::genotype_probability)
-//            read_genotypes_gp(destination);
+          else if (requested_data_format_ == fmt::genotype_probability)
+            file_data_format_ == fmt::allele ? read_genotypes_gp<1>(destination) : read_genotypes_gp<7>(destination);
           else if (requested_data_format_ == fmt::dosage)
             file_data_format_ == fmt::allele ? read_genotypes_ds<1>(destination) : read_genotypes_ds<7>(destination);
           else if (requested_data_format_ == fmt::haplotype_dosage)
