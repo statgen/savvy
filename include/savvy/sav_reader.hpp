@@ -258,7 +258,7 @@ namespace savvy
             varint_decode(++in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
-            if (subset_map_.size())
+            if (subset_size_ != samples().size())
             {
               destination.resize(subset_size_ * ploidy_level);
 
@@ -344,7 +344,7 @@ namespace savvy
             varint_decode(++in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
-            if (subset_map_.size())
+            if (subset_size_ != samples().size())
             {
               destination.resize(subset_size_);
 
@@ -426,49 +426,51 @@ namespace savvy
           }
           else
           {
-            std::size_t stride = ploidy_level + 1;
+            const std::size_t stride = ploidy_level + 1;
 
             std::uint64_t sz;
             varint_decode(++in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
-            if (subset_map_.size())
-            {
-//              destination.resize(subset_size_ * stride);
-//
-//              for (std::size_t i = 0; i < samples().size(); ++i)
-//              {
-//                if (subset_map_[i] != std::numeric_limits<std::uint64_t>::max())
-//                {
-//                  assert(subset_map_[i] * stride  < destination.size());
-//                  destination[subset_map_[i] * stride] = typename T::value_type(1);
-//                }
-//              }
-//
-//              for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
-//              {
-//                typename T::value_type allele;
-//                std::uint64_t offset;
-//                std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, std::numeric_limits<typename T::value_type>::quiet_NaN());
-//
-//                total_offset += offset;
-//
-//                const std::uint64_t sample_index = total_offset / stride;
-//                if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
-//                {
-//                  assert(total_offset < destination.size());
-//                  destination[subset_map_[sample_index] * stride + (total_offset % stride)] = allele;
-//                  destination[subset_map_[sample_index] * stride] -= allele;
-//                }
-//              }
-            }
-            else
             {
               std::size_t num_haps = samples().size() * ploidy_level;
-              destination.resize(samples().size() * stride);
+              destination.resize(subset_size_ * stride);
 
               std::vector<typename T::value_type> hap_tmp;
               hap_tmp.reserve(ploidy_level);
+
+              auto write_gp_to_dest = [this, stride, ploidy_level](std::size_t hap_index, const std::vector<typename T::value_type>& hap_probs, T& destination)
+              {
+                const std::uint64_t sample_index = hap_index / stride;
+                if (this->subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
+                {
+                  typename T::value_type gp = hds_to_gp::get_first_prob(hap_probs);
+                  if (gp != typename T::value_type(0))
+                    destination[this->subset_map_[sample_index] * stride] = gp;
+
+                  if (ploidy_level == 2)
+                  {
+                    gp = hap_probs[0] * (typename T::value_type(1) - hap_probs[1]) + hap_probs[1] * (typename T::value_type(1) - hap_probs[0]);
+                    if (gp != typename T::value_type(0))
+                      destination[this->subset_map_[sample_index] * stride + 1] = gp;
+                  }
+                  else
+                  {
+                    for (std::size_t g = 1; g < ploidy_level; ++g)
+                    {
+                      gp = hds_to_gp::get_prob(hap_probs, g);
+                      if (gp != typename T::value_type(0))
+                      {
+                        destination[this->subset_map_[sample_index] * stride + g] = gp;
+                      }
+                    }
+                  }
+
+                  gp = hds_to_gp::get_last_prob(hap_probs);
+                  if (gp != typename T::value_type(0))
+                    destination[this->subset_map_[sample_index] * stride + ploidy_level] = gp;
+                }
+              };
 
               std::size_t h = 0;
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
@@ -485,14 +487,7 @@ namespace savvy
                   hap_tmp.push_back(typename T::value_type(0));
                   if (hap_tmp.size() == ploidy_level)
                   {
-                    for (std::size_t g = 0; g < stride; ++g)
-                    {
-                      typename T::value_type gp = hds_to_gp::get_prob(hap_tmp, g);
-                      if (gp != typename T::value_type(0))
-                      {
-                        destination[(h / ploidy_level) * stride + g] = gp;
-                      }
-                    }
+                    write_gp_to_dest(h, hap_tmp, destination);
                     hap_tmp.resize(0);
                   }
                 }
@@ -500,14 +495,7 @@ namespace savvy
                 hap_tmp.push_back(allele);
                 if (hap_tmp.size() == ploidy_level)
                 {
-                  for (std::size_t g = 0; g < stride; ++g)
-                  {
-                    typename T::value_type gp = hds_to_gp::get_prob(hap_tmp, g);
-                    if (gp != typename T::value_type(0))
-                    {
-                      destination[(h / ploidy_level) * stride + g] = gp;
-                    }
-                  }
+                  write_gp_to_dest(h, hap_tmp, destination);
                   hap_tmp.resize(0);
                 }
                 ++h;
@@ -518,14 +506,7 @@ namespace savvy
                 hap_tmp.push_back(typename T::value_type(0));
                 if (hap_tmp.size() == ploidy_level)
                 {
-                  for (std::size_t g = 0; g < stride; ++g)
-                  {
-                    typename T::value_type gp = hds_to_gp::get_prob(hap_tmp, g);
-                    if (gp != typename T::value_type(0))
-                    {
-                      destination[(h / ploidy_level) * stride + g] = gp;
-                    }
-                  }
+                  write_gp_to_dest(h, hap_tmp, destination);
                   hap_tmp.resize(0);
                 }
               }
@@ -555,7 +536,7 @@ namespace savvy
             varint_decode(++in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
-            if (subset_map_.size())
+            if (subset_size_ != samples().size())
             {
               destination.resize(subset_size_ * ploidy_level);
 
@@ -615,7 +596,7 @@ namespace savvy
             varint_decode(++in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
-            if (subset_map_.size())
+            if (subset_size_ != samples().size())
             {
               destination.resize(subset_size_);
 
@@ -705,6 +686,7 @@ namespace savvy
       }
     private:
       void parse_header();
+      void init_subset_map();
     protected:
       std::vector<std::string> sample_ids_;
       std::vector<std::uint64_t> subset_map_;

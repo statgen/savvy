@@ -26,6 +26,7 @@ namespace savvy
     {
       parse_header();
       requested_data_format_ = file_data_format_;
+      init_subset_map();
     }
 
     reader_base::reader_base(const std::string& file_path, savvy::fmt data_format) :
@@ -36,6 +37,7 @@ namespace savvy
       requested_data_format_(data_format)
     {
       parse_header();
+      init_subset_map();
     }
 
     reader_base::reader_base(reader_base&& source) :
@@ -162,6 +164,14 @@ namespace savvy
       }
 
       input_stream_->peek();
+    }
+
+    void reader_base::init_subset_map()
+    {
+      subset_map_.resize(samples().size());
+      for (std::size_t i = 0; i < subset_map_.size(); ++i)
+        subset_map_[i] = i;
+      subset_size_ = subset_map_.size();
     }
 
     std::vector<std::string> reader_base::subset_samples(const std::set<std::string>& subset)
