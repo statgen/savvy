@@ -567,7 +567,7 @@ namespace savvy
 
                 total_offset += offset;
 
-                assert(total_offset < destination.size());
+                assert(total_offset < (samples().size() * ploidy_level));
                 destination[total_offset] = allele;
               }
             }
