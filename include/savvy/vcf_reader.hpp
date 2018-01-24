@@ -317,7 +317,7 @@ namespace savvy
       if (hdr)
       {
         this->headers_.reserve(std::size_t(hdr->nhrec - 1));
-        for (int i = 1; i < hdr->nhrec; ++i)
+        for (int i = 0; i < hdr->nhrec; ++i)
         {
           std::string key, val;
           if (hdr->hrec[i]->key && hdr->hrec[i]->value)
@@ -325,7 +325,7 @@ namespace savvy
             key = hdr->hrec[i]->key;
             val = hdr->hrec[i]->value;
           }
-          else if (hdr->hrec[i]->key && (hdr->hrec[i]->type == BCF_HL_INFO || hdr->hrec[i]->type == BCF_HL_FLT || hdr->hrec[i]->type == BCF_HL_STR))
+          else if (hdr->hrec[i]->key && hdr->hrec[i]->nkeys) // (hdr->hrec[i]->type == BCF_HL_INFO || hdr->hrec[i]->type == BCF_HL_FLT || hdr->hrec[i]->type == BCF_HL_STR))
           {
             bcf_hrec_t* r = hdr->hrec[i];
             key = r->key;
@@ -1318,22 +1318,47 @@ namespace savvy
 
       for (auto it = headers_beg; it != headers_end; ++it)
       {
-        if (it->first != "FORMAT")
+        if (it->first != "FORMAT" && it->first != "fileformat")
         {
-          (*output_stream_) << (std::string("##") + it->first + "=" + it->second) << std::endl;
-
-          if (it->first == "INFO")
+          if (it->first == "fileDate")
           {
-            if (it->second.size() && it->second.front() == '<' && it->second.back() == '>')
+            std::time_t t = std::time(nullptr);
+            char datestr[11];
+            if (std::strftime(datestr, sizeof(datestr), "%Y%m%d", std::localtime(&t)))
             {
-              std::string header_value = it->second;
-              header_value.resize(header_value.size() - 1);
+              (*output_stream_) << (std::string("##") + it->first + "=" + std::string(datestr)) << std::endl;
+            }
+          }
+          else
+          {
+            (*output_stream_) << (std::string("##") + it->first + "=" + it->second) << std::endl;
 
-              auto curr_pos = header_value.begin() + 1;
-              auto comma_pos = std::find(curr_pos, header_value.end(), ',');
-
-              while (comma_pos != header_value.end())
+            if (it->first == "INFO")
+            {
+              if (it->second.size() && it->second.front() == '<' && it->second.back() == '>')
               {
+                std::string header_value = it->second;
+                header_value.resize(header_value.size() - 1);
+
+                auto curr_pos = header_value.begin() + 1;
+                auto comma_pos = std::find(curr_pos, header_value.end(), ',');
+
+                while (comma_pos != header_value.end())
+                {
+                  auto equals_pos = std::find(curr_pos, comma_pos, '=');
+                  if (equals_pos != comma_pos)
+                  {
+                    std::string key(curr_pos, equals_pos);
+                    std::string val(equals_pos + 1, comma_pos);
+
+                    if (key == "ID")
+                      info_fields_.emplace_back(std::move(val));
+                  }
+
+                  curr_pos = comma_pos + 1;
+                  comma_pos = std::find(curr_pos, header_value.end(), ',');
+                }
+
                 auto equals_pos = std::find(curr_pos, comma_pos, '=');
                 if (equals_pos != comma_pos)
                 {
@@ -1342,22 +1367,9 @@ namespace savvy
 
                   if (key == "ID")
                     info_fields_.emplace_back(std::move(val));
+
+                  curr_pos = comma_pos + 1;
                 }
-
-                curr_pos = comma_pos + 1;
-                comma_pos = std::find(curr_pos, header_value.end(), ',');
-              }
-
-              auto equals_pos = std::find(curr_pos, comma_pos, '=');
-              if (equals_pos != comma_pos)
-              {
-                std::string key(curr_pos, equals_pos);
-                std::string val(equals_pos + 1, comma_pos);
-
-                if (key == "ID")
-                  info_fields_.emplace_back(std::move(val));
-
-                curr_pos = comma_pos + 1;
               }
             }
           }
