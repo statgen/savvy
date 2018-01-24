@@ -900,7 +900,7 @@ namespace savvy
         std::ostreambuf_iterator<char> out_it(output_stream_);
 
         headers_.resize(std::distance(headers_beg, headers_end));
-        auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string,std::string>& kvp) { return kvp.first != "FORMAT"; });
+        auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string,std::string>& kvp) { return kvp.first != "FORMAT" && kvp.first != "fileformat"; });
         headers_.resize(std::distance(headers_.begin(), copy_res));
 
         // TODO: Handle unsupported formats.
