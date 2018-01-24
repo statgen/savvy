@@ -1134,7 +1134,7 @@ namespace savvy
     {
       static_assert(VecCnt == sizeof...(T), "The number of destination vectors must match class template size");
       std::size_t vecs_read = 0;
-      while (vecs_read == 0)
+      while (vecs_read == 0 && this->good())
       {
         this->read_variant_details(annotations);
         vecs_read = this->read_requested_genos(destinations...);
