@@ -9,6 +9,7 @@
 #include "sav/index.hpp"
 #include "sav/merge.hpp"
 #include "sav/sort.hpp"
+#include "sav/stat.hpp"
 #include "savvy/utility.hpp"
 
 #include <cmath>
@@ -39,10 +40,11 @@ public:
     os << "sav [opts ...]\n";
     os << "\n";
     os << "Sub-commands:\n";
-    os << "export  : Exports SAV to VCF or SAV\n";
-    os << "import  : Imports VCF or BCF into SAV\n";
-    os << "index   : Indexes SAV file\n";
-    os << "merge   : Merges multiple files into one\n";
+    os << "export     : Exports SAV to VCF or SAV\n";
+    os << "import     : Imports VCF or BCF into SAV\n";
+    os << "index      : Indexes SAV file\n";
+    os << "merge      : Merges multiple files into one\n";
+    os << "stat-index : Gathers statistics on s1r index\n";
     os << "\n";
     os << "Options:\n";
     os << " -h, --help    : Print usage\n";
@@ -105,6 +107,10 @@ int main(int argc, char** argv)
   else if (args.sub_command() == "merge")
   {
     return merge_main(argc, argv);
+  }
+  else if (args.sub_command() == "stat-index")
+  {
+    return stat_index_main(argc, argv);
   }
 
   if (args.help_is_set())

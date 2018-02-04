@@ -415,7 +415,6 @@ namespace savvy
       {
         if (good())
         {
-          const typename T::value_type alt_value = typename T::value_type(1);
           std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
 

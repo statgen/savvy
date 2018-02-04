@@ -516,6 +516,18 @@ namespace savvy
         return ret;
       }
 
+      std::vector<tree_reader>::iterator trees_begin()
+      {
+        return trees_.begin();
+      }
+
+      std::vector<tree_reader>::iterator trees_end()
+      {
+        if (trees_.size())
+          return trees_.begin() + trees_.size() - 1;
+        return trees_.begin();
+      }
+
       class query;
       query create_query(region reg);
       query create_query(std::vector<region> regs);
