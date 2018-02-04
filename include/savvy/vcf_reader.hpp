@@ -34,6 +34,7 @@
 #include <cmath>
 #include <algorithm>
 #include <set>
+#include <ctime>
 
 namespace savvy
 {
