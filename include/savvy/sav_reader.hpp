@@ -125,39 +125,33 @@ namespace savvy
           std::istreambuf_iterator<char> in_it(*input_stream_);
           std::istreambuf_iterator<char> end_it;
 
-          std::uint64_t sz;
-          if (varint_decode(in_it, end_it, sz) == end_it)
+          if (in_it == end_it)
           {
-            this->input_stream_->setstate(std::ios::badbit);
+            this->input_stream_->setstate(std::ios::eofbit); // No more markers to read.
           }
           else
           {
-            ++in_it;
-            std::string chrom;
-            chrom.resize(sz);
-            if (sz)
-              input_stream_->read(&chrom[0], sz);
-
-            std::uint64_t locus;
-            if (varint_decode(in_it, end_it, locus) == end_it)
+            std::uint64_t sz;
+            if (varint_decode(in_it, end_it, sz) == end_it)
             {
               this->input_stream_->setstate(std::ios::badbit);
             }
             else
             {
               ++in_it;
-              if (varint_decode(in_it, end_it, sz) == end_it)
+              std::string chrom;
+              chrom.resize(sz);
+              if (sz)
+                input_stream_->read(&chrom[0], sz);
+
+              std::uint64_t locus;
+              if (varint_decode(in_it, end_it, locus) == end_it)
               {
                 this->input_stream_->setstate(std::ios::badbit);
               }
               else
               {
                 ++in_it;
-                std::string ref;
-                ref.resize(sz);
-                if (sz)
-                  input_stream_->read(&ref[0], sz);
-
                 if (varint_decode(in_it, end_it, sz) == end_it)
                 {
                   this->input_stream_->setstate(std::ios::badbit);
@@ -165,34 +159,50 @@ namespace savvy
                 else
                 {
                   ++in_it;
-                  std::string alt;
-                  alt.resize(sz);
+                  std::string ref;
+                  ref.resize(sz);
                   if (sz)
-                    input_stream_->read(&alt[0], sz);
+                    input_stream_->read(&ref[0], sz);
 
-                  std::unordered_map<std::string, std::string> props;
-                  props.reserve(this->metadata_fields_.size());
-                  std::string prop_val;
-                  for (const std::string& key : metadata_fields_)
+                  if (varint_decode(in_it, end_it, sz) == end_it)
                   {
-                    if (varint_decode(in_it, end_it, sz) == end_it)
+                    this->input_stream_->setstate(std::ios::badbit);
+                  }
+                  else
+                  {
+                    ++in_it;
+                    std::string alt;
+                    alt.resize(sz);
+                    if (sz)
+                      input_stream_->read(&alt[0], sz);
+
+                    std::unordered_map<std::string, std::string> props;
+                    props.reserve(this->metadata_fields_.size());
+                    std::string prop_val;
+                    for (const std::string& key : metadata_fields_)
                     {
-                      this->input_stream_->setstate(std::ios::badbit);
-                      break;
-                    }
-                    else
-                    {
-                      ++in_it;
-                      if (sz)
+                      if (varint_decode(in_it, end_it, sz) == end_it)
                       {
-                        prop_val.resize(sz);
-                        input_stream_->read(&prop_val[0], sz);
-                        props[key] = prop_val;
+                        this->input_stream_->setstate(std::ios::badbit);
+                        break;
+                      }
+                      else
+                      {
+                        ++in_it;
+                        if (sz)
+                        {
+                          prop_val.resize(sz);
+                          input_stream_->read(&prop_val[0], sz);
+                          props[key] = prop_val;
+                        }
                       }
                     }
-                  }
 
-                  annotations = site_info(std::move(chrom), locus, std::move(ref), std::move(alt), std::move(props));
+                    annotations = site_info(std::move(chrom), locus, std::move(ref), std::move(alt), std::move(props));
+
+                    if (!this->input_stream_->good())
+                      this->input_stream_->setstate(std::ios::badbit);
+                  }
                 }
               }
             }
@@ -225,7 +235,11 @@ namespace savvy
               in_it = prefixed_varint<BitWidth>::decode(++in_it, end_it, allele, offset);
             }
 
-            input_stream_->get();
+            if (input_stream_->get() == std::char_traits<char>::eof())
+            {
+              assert(!"Truncated file");
+              this->input_stream_->setstate(std::ios::badbit);
+            }
           }
         }
       }
@@ -319,7 +333,11 @@ namespace savvy
               }
             }
 
-            input_stream_->get();
+            if (input_stream_->get() == std::char_traits<char>::eof())
+            {
+              assert(!"Truncated file");
+              this->input_stream_->setstate(std::ios::badbit);
+            }
           }
         }
       }
@@ -405,7 +423,11 @@ namespace savvy
               }
             }
 
-            input_stream_->get();
+            if (input_stream_->get() == std::char_traits<char>::eof())
+            {
+              assert(!"Truncated file");
+              this->input_stream_->setstate(std::ios::badbit);
+            }
           }
         }
       }
@@ -512,7 +534,11 @@ namespace savvy
               }
             }
 
-            input_stream_->get();
+            if (input_stream_->get() == std::char_traits<char>::eof())
+            {
+              assert(!"Truncated file");
+              this->input_stream_->setstate(std::ios::badbit);
+            }
           }
         }
       }
@@ -571,7 +597,11 @@ namespace savvy
               }
             }
 
-            input_stream_->get();
+            if (input_stream_->get() == std::char_traits<char>::eof())
+            {
+              assert(!"Truncated file");
+              this->input_stream_->setstate(std::ios::badbit);
+            }
           }
         }
       }
@@ -655,7 +685,11 @@ namespace savvy
 //              }
 //            }
 
-            input_stream_->get();
+            if (input_stream_->get() == std::char_traits<char>::eof())
+            {
+              assert(!"Truncated file");
+              this->input_stream_->setstate(std::ios::badbit);
+            }
           }
         }
       }
@@ -783,15 +817,26 @@ namespace savvy
           }
 
           this->read_variant_details(annotations);
-          ++current_offset_in_block_;
-          if (region_compare(bounding_type_, annotations, reg_))
+          if (!this->good())
           {
-            this->read_genotypes(destination);
-            break;
+            if (current_offset_in_block_ < total_in_block_)
+            {
+              assert(!"Truncated block");
+              this->input_stream_->setstate(std::ios::badbit);
+            }
           }
           else
           {
-            this->discard_genotypes();
+            ++current_offset_in_block_;
+            if (region_compare(bounding_type_, annotations, reg_))
+            {
+              this->read_genotypes(destination);
+              break;
+            }
+            else
+            {
+              this->discard_genotypes();
+            }
           }
         }
         return *this;
@@ -816,16 +861,27 @@ namespace savvy
           }
 
           this->read_variant_details(annotations);
-          ++current_offset_in_block_;
-          bool predicate_passed = fn(annotations);
-          if (region_compare(bounding_type_, annotations, reg_) && predicate_passed)
+          if (!this->good())
           {
-            this->read_genotypes(destination);
-            break;
+            if (current_offset_in_block_ < total_in_block_)
+            {
+              assert(!"Truncated block");
+              this->input_stream_->setstate(std::ios::badbit);
+            }
           }
           else
           {
-            this->discard_genotypes();
+            ++current_offset_in_block_;
+            bool predicate_passed = fn(annotations);
+            if (region_compare(bounding_type_, annotations, reg_) && predicate_passed)
+            {
+              this->read_genotypes(destination);
+              break;
+            }
+            else
+            {
+              this->discard_genotypes();
+            }
           }
         }
 
