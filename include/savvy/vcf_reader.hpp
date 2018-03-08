@@ -1262,8 +1262,8 @@ namespace savvy
     template <std::size_t VecCnt>
     void indexed_reader<VecCnt>::reset_region(const region& reg)
     {
-      if (this->good())
-      {
+//      if (this->good())
+//      {
         region_ = reg;
 
         if (synced_readers_)
@@ -1279,7 +1279,7 @@ namespace savvy
 
         if (bcf_sr_set_regions(synced_readers_, contigs.str().c_str(), 0) != 0 || bcf_sr_add_reader(synced_readers_, file_path_.c_str()) != 1)
           this->state_ = std::ios::failbit;
-      }
+//      }
     }
 
     template <std::size_t VecCnt>
