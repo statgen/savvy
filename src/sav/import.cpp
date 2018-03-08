@@ -47,6 +47,7 @@ public:
         {"index", no_argument, 0, 'x'},
         {"index-file", required_argument, 0, 'X'},
         {"regions", required_argument, 0, 'r'},
+        {"regions-file", required_argument, 0, 'R'},
         {"sample-ids", required_argument, 0, 'i'},
         {"sample-ids-file", required_argument, 0, 'I'},
         {"sort", no_argument, 0, 's'},
@@ -80,6 +81,7 @@ public:
     os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
     os << " -r, --regions         : Comma separated list of regions formated as chr[:start-end]\n";
+    os << " -R, --regions-file    : Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
     os << " -s, --sort            : Enables sorting by midpoint\n";
     os << " -S, --sort-point      : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
     os << " -x, --index           : Enables indexing\n";
@@ -92,7 +94,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:f:hi:I:r:sS:xX:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:f:hi:I:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -135,6 +137,21 @@ public:
         case 'r':
           for (const auto& r : split_string_to_vector(optarg, ','))
             regions_.emplace_back(string_to_region(r));
+          break;
+        case 'R':
+          for (const auto& r : split_file_to_set(optarg))
+          {
+            std::string s = r;
+            std::size_t pos = s.find('\t');
+            if (pos != std::string::npos)
+            {
+              s[pos] = ':';
+              pos = s.find('\t', pos + 1);
+              if (pos != std::string::npos)
+                s[pos] = '-';
+            }
+            regions_.emplace_back(string_to_region(s));
+          }
           break;
         case 'i':
           subset_ids_ = split_string_to_set(optarg, ',');

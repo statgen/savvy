@@ -139,4 +139,4 @@ int stat_index_main(int argc, char** argv)
   return EXIT_SUCCESS;
 }
 
-// sav stat-index ./test_file_hard.sav.s1r | grep "^marker count" | cut -f 2- | awk 't=0; {for(i=1;i<=NF;i++) t+=$i; print t}'
+// sav stat-index ./test_file_hard.sav.s1r | grep "^marker count" | cut -f 2- | xargs echo | awk 't=0; {for(i=1;i<=NF;i++) t+=$i; print t}'
