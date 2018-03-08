@@ -139,7 +139,7 @@ public:
             regions_.emplace_back(string_to_region(r));
           break;
         case 'R':
-          for (const auto& r : split_file_to_set(optarg))
+          for (const auto& r : split_file_to_vector(optarg))
           {
             std::string s = r;
             std::size_t pos = s.find('\t');

@@ -91,3 +91,17 @@ std::set<std::string> split_file_to_set(const char* in)
 
   return ret;
 }
+
+std::vector<std::string> split_file_to_vector(const char* in)
+{
+  std::vector<std::string> ret;
+
+  std::string s;
+  std::ifstream ifs(in);
+  while (std::getline(ifs, s))
+  {
+    ret.emplace_back(s);
+  }
+
+  return ret;
+}
