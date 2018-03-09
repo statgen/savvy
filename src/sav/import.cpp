@@ -36,12 +36,14 @@ private:
   bool help_ = false;
   bool index_ = false;
   savvy::fmt format_ = savvy::fmt::allele;
-  std::unique_ptr<savvy::s1r::sort_type> sort_type_ = nullptr;
+  savvy::bounding_point bounding_point_ = savvy::bounding_point::beg;
+  std::unique_ptr<savvy::s1r::sort_point> sort_type_ = nullptr;
 public:
   import_prog_args() :
     long_options_(
       {
         {"block-size", required_argument, 0, 'b'},
+        {"bounding-point", required_argument, 0, 'p'},
         {"data-format", required_argument, 0, 'd'},
         {"help", no_argument, 0, 'h'},
         {"index", no_argument, 0, 'x'},
@@ -65,7 +67,8 @@ public:
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
   savvy::fmt format() const { return format_; }
-  const std::unique_ptr<savvy::s1r::sort_type>& sort_type() const { return sort_type_; }
+  savvy::bounding_point bounding_point() const { return bounding_point_; }
+  const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
   bool index_is_set() const { return index_; }
   bool help_is_set() const { return help_; }
 
@@ -80,9 +83,10 @@ public:
     os << " -h, --help            : Print usage\n";
     os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
+    os << " -p, --bounding-point  : Determines the inclusion policy of indels during region queries (any, all, beg or end, default: beg)\n";
     os << " -r, --regions         : Comma separated list of regions formated as chr[:start-end]\n";
     os << " -R, --regions-file    : Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
-    os << " -s, --sort            : Enables sorting by midpoint\n";
+    os << " -s, --sort            : Enables sorting by first position of allele\n";
     os << " -S, --sort-point      : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
     os << " -x, --index           : Enables indexing\n";
     os << " -X, --index-file      : Enables indexing and specifies index output file\n";
@@ -94,7 +98,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:f:hi:I:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:f:hi:I:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -159,8 +163,34 @@ public:
         case 'I':
           subset_ids_ = split_file_to_set(optarg);
           break;
+        case 'p':
+        {
+          std::string str_opt_arg(optarg ? optarg : "");
+          if (str_opt_arg == "any")
+          {
+            bounding_point_ = savvy::bounding_point::any;
+          }
+          else if (str_opt_arg == "all")
+          {
+            bounding_point_ = savvy::bounding_point::all;
+          }
+          else if (str_opt_arg == "beg")
+          {
+            bounding_point_ = savvy::bounding_point::beg;
+          }
+          else if (str_opt_arg == "end")
+          {
+            bounding_point_ = savvy::bounding_point::end;
+          }
+          else
+          {
+            std::cerr << "Invalid format field value (" << str_opt_arg << ")\n";
+            return false;
+          }
+          break;
+        }
         case 's':
-          sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_type>(savvy::s1r::sort_type::midpoint);
+          sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_point>(savvy::s1r::sort_point::beg);
           break;
         case 'S':
         {
@@ -169,15 +199,15 @@ public:
           {
             if (sort_str.front()=='b')
             {
-              sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_type>(savvy::s1r::sort_type::left_point);
+              sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_point>(savvy::s1r::sort_point::beg);
             }
             else if (sort_str.front()=='e')
             {
-              sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_type>(savvy::s1r::sort_type::right_point);
+              sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_point>(savvy::s1r::sort_point::end);
             }
             else if (sort_str.front()=='m')
             {
-              sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_type>(savvy::s1r::sort_type::midpoint);
+              sort_type_ = savvy::detail::make_unique<savvy::s1r::sort_point>(savvy::s1r::sort_point::mid);
             }
             else
             {
@@ -336,7 +366,7 @@ int import_main(int argc, char** argv)
 
   if (args.regions().size())
   {
-    savvy::vcf::indexed_reader<1> input(args.input_path(), args.regions().front(), args.format());
+    savvy::vcf::indexed_reader<1> input(args.input_path(), args.regions().front(), args.bounding_point(), args.format());
     return prep_reader_for_import(input, args);
   }
   else

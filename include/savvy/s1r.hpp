@@ -401,11 +401,11 @@ namespace savvy
       std::string name_;
     };
 
-    enum class sort_type : std::uint8_t
+    enum class sort_point : std::uint8_t
     {
-      midpoint = 0,
-      left_point = 0x10,
-      right_point = 0x01
+      mid = 0,
+      beg = 0x10,
+      end = 0x01
     };
 
     class reader

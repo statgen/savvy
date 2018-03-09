@@ -15,12 +15,12 @@
 
 namespace savvy
 {
-  enum class coord_bound : std::uint8_t
+  enum class bounding_point : std::uint8_t
   {
     any = 0,
     all,
-    left,
-    right
+    beg,
+    end
   };
 
   class region
@@ -77,7 +77,7 @@ namespace savvy
     };
   }
 
-  bool region_compare(coord_bound bounding_type, const site_info& var, const region& reg);
+  bool region_compare(bounding_point bounding_type, const site_info& var, const region& reg);
 }
 
 #endif //LIBSAVVY_REGION_HPP

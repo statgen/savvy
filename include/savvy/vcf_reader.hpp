@@ -226,7 +226,7 @@ namespace savvy
       template <typename... T>
       indexed_reader(const std::string& file_path, const region& reg, T... data_formats);
       template <typename... T>
-      indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats);
+      indexed_reader(const std::string& file_path, const region& reg, bounding_point bounding_type, T... data_formats);
       //template <typename PathItr, typename RegionItr>
       //region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end);
       ~indexed_reader();
@@ -253,7 +253,7 @@ namespace savvy
       std::string file_path_;
       bcf_srs_t* synced_readers_;
       bcf1_t* hts_rec_;
-      coord_bound bounding_type_;
+      bounding_point bounding_type_;
     };
     //################################################################//
 
@@ -1197,13 +1197,13 @@ namespace savvy
     template <std::size_t VecCnt>
     template <typename... T>
     indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const region& reg, T... data_formats) :
-      indexed_reader<VecCnt>(file_path, reg, coord_bound::any, data_formats...)
+      indexed_reader<VecCnt>(file_path, reg, bounding_point::beg, data_formats...)
     {
     }
 
     template <std::size_t VecCnt>
     template <typename... T>
-    indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, T... data_formats) :
+    indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const region& reg, bounding_point bounding_type, T... data_formats) :
       region_(reg),
       file_path_(file_path),
       synced_readers_(bcf_sr_init()),

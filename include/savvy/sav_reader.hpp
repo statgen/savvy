@@ -759,13 +759,13 @@ namespace savvy
     {
     public:
       template <typename T>
-      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, coord_bound bounding_type, T data_format)  :
+      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, bounding_point bound_type, T data_format)  :
         reader_base(file_path, data_format),
         index_(index_file_path.size() ? index_file_path : file_path + ".s1r"),
         query_(index_.create_query(reg)),
         i_(query_.begin()),
         reg_(reg),
-        bounding_type_(bounding_type),
+        bounding_type_(bound_type),
         current_offset_in_block_(0),
         total_in_block_(0)
       {
@@ -774,16 +774,16 @@ namespace savvy
       }
 
       indexed_reader(const std::string& file_path, const region& reg, savvy::fmt data_format)  :
-        indexed_reader(file_path, std::string(""), reg, coord_bound::any, data_format)
+        indexed_reader(file_path, std::string(""), reg, bounding_point::beg, data_format)
       {
       }
 
       indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, savvy::fmt data_format)  :
-        indexed_reader(file_path, index_file_path, reg, coord_bound::any, data_format)
+        indexed_reader(file_path, index_file_path, reg, bounding_point::beg, data_format)
       {
       }
 
-      indexed_reader(const std::string& file_path, const region& reg, coord_bound bounding_type, savvy::fmt data_format)  :
+      indexed_reader(const std::string& file_path, const region& reg, bounding_point bounding_type, savvy::fmt data_format)  :
         indexed_reader(file_path, std::string(""), reg, bounding_type, data_format)
       {
       }
@@ -904,7 +904,7 @@ namespace savvy
       s1r::reader::query query_;
       s1r::reader::query::iterator i_;
       region reg_; //TODO: make this a default template argument when vector type is also a reader template.
-      coord_bound bounding_type_;
+      bounding_point bounding_type_;
       std::uint32_t current_offset_in_block_;
       std::uint32_t total_in_block_;
     };

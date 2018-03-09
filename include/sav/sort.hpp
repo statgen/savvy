@@ -15,14 +15,14 @@
 class less_than_comparator
 {
 public:
-  less_than_comparator(savvy::s1r::sort_type type);
+  less_than_comparator(savvy::s1r::sort_point type);
   bool operator()(const savvy::site_info& a, const savvy::site_info& b);
 private:
   bool left(const savvy::site_info& a, const savvy::site_info& b);
   bool right(const savvy::site_info& a, const savvy::site_info& b);
   bool mid(const savvy::site_info& a, const savvy::site_info& b);
 private:
-  savvy::s1r::sort_type sort_type_;
+  savvy::s1r::sort_point sort_type_;
 };
 
 class random_string_generator
@@ -91,7 +91,7 @@ public:
 };
 
 template <typename VecType, typename Reader, typename Writer>
-bool sort_and_write_records(savvy::s1r::sort_type sort, Reader& in, savvy::fmt in_format, const std::vector<savvy::region>& regions, Writer& out, savvy::fmt out_format)
+bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt in_format, const std::vector<savvy::region>& regions, Writer& out, savvy::fmt out_format)
 {
   less_than_comparator less_than(sort);
 

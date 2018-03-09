@@ -7,7 +7,7 @@
 #include "sav/sort.hpp"
 
 
-  less_than_comparator::less_than_comparator(savvy::s1r::sort_type type) :
+  less_than_comparator::less_than_comparator(savvy::s1r::sort_point type) :
     sort_type_(type)
   {
   }
@@ -16,8 +16,8 @@
   {
     switch (sort_type_)
     {
-    case savvy::s1r::sort_type::midpoint: return mid(a, b);
-    case savvy::s1r::sort_type::left_point: return left(a, b);
+    case savvy::s1r::sort_point::mid: return mid(a, b);
+    case savvy::s1r::sort_point::beg: return left(a, b);
     default: return right(a, b);
     }
   }
