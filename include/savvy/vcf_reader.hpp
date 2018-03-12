@@ -1306,7 +1306,7 @@ namespace savvy
     template <std::size_t VecCnt>
     template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename... Fmt>
     writer<VecCnt>::writer(const std::string& file_path, const options& opts, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, Fmt... data_formats) :
-      output_stream_(opts.compression == compression_type::none ? std::unique_ptr<std::ostream>(new std::ofstream(file_path)) : std::unique_ptr<std::ostream>(new shrinkwrap::bgz::ostream(file_path))),
+      output_stream_(opts.compression == compression_type::none ? std::unique_ptr<std::ostream>(new std::ofstream(file_path)) : std::unique_ptr<std::ostream>(new shrinkwrap::bgzf::ostream(file_path))),
       sample_size_(0)
     {
       static_assert(VecCnt == sizeof...(Fmt), "Number of requested format fields do not match VecCnt template parameter");

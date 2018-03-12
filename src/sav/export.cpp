@@ -71,7 +71,7 @@ public:
     os << "\n";
     os << " -d, --data-format     : Format field to export (GT, DS, HDS or GP, default: GT)\n";
     //os << " -e, --filter-expression : File format (vcf or sav, default: vcf)\n";
-    os << " -f, --file-format     : File format (vcf or sav, default: vcf)\n";
+    os << " -f, --file-format     : File format (vcf, vcf.gz or sav, default: vcf)\n";
     os << " -h, --help            : Print usage\n";
     os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
@@ -118,7 +118,7 @@ public:
         case 'f':
         {
           std::string str_opt_arg(optarg ? optarg : "");
-          if (str_opt_arg == "sav" || str_opt_arg == "vcf")
+          if (str_opt_arg == "sav" || str_opt_arg == "vcf" || str_opt_arg == "vcf.gz")
           {
             file_format_ = str_opt_arg;
           }
@@ -346,7 +346,10 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
   }
   else
   {
-    savvy::vcf::writer<1> output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
+    savvy::vcf::writer<1>::options opts;
+    if (args.file_format() == "vcf.gz")
+      opts.compression = savvy::vcf::compression_type::bgzip;
+    savvy::vcf::writer<1> output(args.output_path(), opts, sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
     return prep_writer_for_export(input, output, sample_ids, headers, args);
   }
 }
