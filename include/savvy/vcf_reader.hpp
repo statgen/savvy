@@ -13,6 +13,7 @@
 #include "variant_iterator.hpp"
 #include "utility.hpp"
 #include "data_format.hpp"
+#include "savvy.hpp"
 
 //namespace savvy
 //{
@@ -35,6 +36,7 @@
 #include <algorithm>
 #include <set>
 #include <ctime>
+#include <htslib/hts.h>
 
 namespace savvy
 {
@@ -47,6 +49,8 @@ namespace savvy
       bgzip
     };
     //################################################################//
+
+    std::vector<std::string> query_chromosomes(const std::string& file_path);
 
     //################################################################//
     template <std::size_t VecCnt>
@@ -1243,17 +1247,7 @@ namespace savvy
 
       if (this->good())
       {
-        hts_idx_t* idx = bcf_index_load(file_path_.c_str());
-        if (idx)
-        {
-          int n{};
-          const char** arr = bcf_index_seqnames(idx, hts_hdr(), &n);
-          ret.resize(n);
-          for (int i = 0; i < n; ++i)
-          {
-            ret[i] = arr[i];
-          }
-        }
+        return query_chromosomes(file_path_);
       }
 
       return ret;

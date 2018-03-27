@@ -17,8 +17,53 @@ namespace savvy
 {
   namespace vcf
   {
+    std::vector<std::string> query_chromosomes(const std::string& file_path)
+    {
+      std::vector<std::string> ret;
 
+      if (::savvy::detail::has_extension(file_path, ".vcf") || ::savvy::detail::has_extension(file_path, ".vcf.gz"))
+      {
+        tbx_t *tbx = tbx_index_load(file_path.c_str());
+        if (tbx)
+        {
+          const char **seq;
+          int nseq{};
+          seq = tbx_seqnames(tbx, &nseq);
+          ret.resize(nseq);
+          for (int i = 0; i < nseq; ++i)
+            ret[i] = seq[i];
+          tbx_destroy(tbx);
+          free(seq);
+        }
+      }
+      else if (::savvy::detail::has_extension(file_path, ".bcf"))
+      {
+        htsFile *fp = hts_open(file_path.c_str(),"r");
+        if (fp)
+        {
+          bcf_hdr_t *hdr = bcf_hdr_read(fp);
+          if (hdr)
+          {
+            hts_idx_t *idx = bcf_index_load(file_path.c_str());
+            if (idx)
+            {
+              const char **seq;
+              int nseq{};
+              seq = bcf_index_seqnames(idx, hdr, &nseq);
+              ret.resize(nseq);
+              for (int i = 0; i < nseq; ++i)
+                ret[i] = seq[i];
+              hts_idx_destroy(idx);
+              free(seq);
+            }
+            bcf_hdr_destroy(hdr);
+          }
+          hts_close(fp);
+        }
+      }
 
+      return ret;
+    }
   }
 }
 

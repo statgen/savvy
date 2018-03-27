@@ -72,6 +72,8 @@ namespace savvy
 //      template <> struct static_base2_pow<7> : public std::integral_constant<std::uint8_t, 128> {};
 //    }
 
+    std::vector<std::string> query_chromosomes(const std::string& file_path);
+
     //################################################################//
     class reader_base
     {

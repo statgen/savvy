@@ -18,6 +18,14 @@ namespace savvy
   namespace sav
   {
     //================================================================//
+    std::vector<std::string> query_chromosomes(const std::string& file_path)
+    {
+      s1r::reader index(file_path + ".s1r");
+      return index.tree_names();
+    }
+    //================================================================//
+
+    //================================================================//
     reader_base::reader_base(const std::string& file_path) :
       file_path_(file_path),
       subset_size_(0),
