@@ -17,6 +17,7 @@ namespace savvy
 {
   namespace vcf
   {
+    // https://github.com/samtools/htslib/blob/master/tabix.c#L229-L262
     std::vector<std::string> query_chromosomes(const std::string& file_path)
     {
       std::vector<std::string> ret;
