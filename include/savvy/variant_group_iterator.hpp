@@ -22,6 +22,28 @@ namespace savvy
     typedef const value_type *pointer;
     typedef std::input_iterator_tag iterator_category;
 
+    basic_variant_group_iterator(const basic_variant_group_iterator<RdrT, VecT>& src) :
+      rdr_(src.rdr_),
+      group_id_(src.group_id_),
+      sites_(src.sites_),
+      merged_regions_(src.merged_regions_),
+      region_offset_(src.region_offset_),
+      variant_(src.variant_)
+    {
+
+    }
+
+    basic_variant_group_iterator(basic_variant_group_iterator<RdrT, VecT>&& src) :
+      rdr_(src.rdr_),
+      group_id_(std::move(src.group_id_)),
+      sites_(std::move(src.sites_)),
+      merged_regions_(std::move(src.merged_regions_)),
+      region_offset_(src.region_offset_),
+      variant_(std::move(src.variant_))
+    {
+      src.rdr_ = nullptr;
+    }
+
     basic_variant_group_iterator(savvy::indexed_reader& rdr, std::string marker_group_file_line) :
       rdr_(&rdr)
     {
@@ -78,48 +100,47 @@ namespace savvy
         *out_it = site_info_to_region(*in_it);
 
       merged_regions_ = merge_regions(un_merged_regions);
-      site_it_ = sites_.begin();
-      region_it_ = merged_regions_.begin();
+      region_offset_ = 0;
 
-      rdr_->reset_region(*region_it_);
+      rdr_->reset_region(merged_regions_[region_offset_]);
 
       increment();
     }
 
     void increment()
     {
-      while (region_it_ != merged_regions_.end())
+      while (region_offset_ < merged_regions_.size())
       {
-        while (rdr_->read(variant_, variant_.data()) && site_it_ != sites_.end())
+        while (!sites_.empty() && rdr_->read(variant_, variant_.data()))
         {
-          while (site_it_ != sites_.end())
+          while (!sites_.empty())
           {
-            if (site_it_->position() >= variant_.position() || site_it_->chromosome() != variant_.chromosome())
+            if (sites_.front().position() >= variant_.position() || sites_.front().chromosome() != variant_.chromosome())
               break;
-            ++site_it_;
+            sites_.pop_front();
           }
 
-          if (site_it_->chromosome() != variant_.chromosome())
+          if (sites_.empty() || sites_.front().chromosome() != variant_.chromosome())
             break;
 
-          for (auto pos_it = site_it_; pos_it != sites_.end() && site_it_->position() == pos_it->position(); ++pos_it)
+          for (auto sites_it = sites_.begin(); sites_it != sites_.end() && sites_.front().position() == sites_it->position(); ++sites_it)
           {
-            std::string target_id = pos_it->chromosome() + ":" + std::to_string(pos_it->position()) + "_" + pos_it->ref() + "/" + pos_it->alt();
+            std::string target_id = sites_it->chromosome() + ":" + std::to_string(sites_it->position()) + "_" + sites_it->ref() + "/" + sites_it->alt();
             std::string current_id = variant_.chromosome() + ":" + std::to_string(variant_.position()) + "_" + variant_.ref() + "/" + variant_.alt();
             if (
-              pos_it->chromosome() == variant_.chromosome() &&
-              pos_it->position() == variant_.position() &&
-              pos_it->ref() == variant_.ref() &&
-              pos_it->alt() == variant_.alt())
+              sites_it->chromosome() == variant_.chromosome() &&
+              sites_it->position() == variant_.position() &&
+              sites_it->ref() == variant_.ref() &&
+              sites_it->alt() == variant_.alt())
             {
               return;
             }
           }
         }
 
-        ++region_it_;
-        if (region_it_ != merged_regions_.end())
-          rdr_->reset_region(*region_it_);
+        ++region_offset_;
+        if (region_offset_ < merged_regions_.size())
+          rdr_->reset_region(merged_regions_[region_offset_]);
       }
 
       rdr_ = nullptr;
@@ -208,11 +229,23 @@ namespace savvy
     RdrT* rdr_;
     std::string group_id_;
     std::list<site_info> sites_;
-    std::list<site_info>::iterator site_it_;
     std::vector<region> merged_regions_;
-    std::vector<region>::iterator region_it_;
+    std::size_t region_offset_;
     value_type variant_;
   };
+
+  template<typename RdrT, typename VecT>
+  basic_variant_group_iterator<RdrT, VecT> begin(basic_variant_group_iterator<RdrT, VecT> iter)
+  {
+    return iter;
+  }
+
+  template<typename RdrT, typename VecT>
+  basic_variant_group_iterator<RdrT, VecT> end(const basic_variant_group_iterator<RdrT, VecT>& iter)
+  {
+    return basic_variant_group_iterator<RdrT, VecT>{};
+  }
+
 
   template <typename VecT>
   using variant_group_iterator = basic_variant_group_iterator<indexed_reader, VecT>;

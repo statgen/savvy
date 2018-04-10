@@ -22,7 +22,7 @@ while (std::getline(marker_group_file, marker_group_line))
     it.group_id();
     it.sites();
 
-    std::cerr << it->chromosome() << ":" << it->position() << "_" << it->ref() << "/" << it->alt() << std::endl;
+    std::string marker_id = it->chromosome() + ":" + std::to_string(it->position()) + "_" + it->ref() + "/" + it->alt();
     
     for (auto dose_it = it->data().begin(); dose_it != it->data().end(); ++dose_it)
       collapsed_dose[dose_it.offset()] += *dose_it;
