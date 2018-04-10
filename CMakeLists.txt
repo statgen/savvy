@@ -26,13 +26,26 @@ find_package(Threads)
 
 add_definitions(-DSAVVY_VERSION="${PROJECT_VERSION}-beta")
 
-set(HEADER_FILES
-    include/savvy/savvy.hpp include/savvy/reader.hpp include/savvy/m3vcf_reader.hpp include/savvy/sav_reader.hpp include/savvy/allele_status.hpp include/savvy/vcf_reader.hpp include/savvy/varint.hpp include/savvy/s1r.hpp include/savvy/site_info.hpp include/savvy/variant_iterator.hpp include/savvy/portable_endian.hpp include/savvy/region.hpp include/savvy/compressed_vector.hpp include/savvy/eigen3_vector.hpp include/savvy/ublas_vector.hpp include/savvy/armadillo_vector.hpp include/savvy/utility.hpp include/savvy/data_format.hpp)
+add_library(savvy
+        include/savvy/allele_status.hpp
+        include/savvy/armadillo_vector.hpp
+        include/savvy/compressed_vector.hpp
+        include/savvy/data_format.hpp
+        include/savvy/eigen3_vector.hpp
+        include/savvy/portable_endian.hpp
+        src/savvy/reader.cpp include/savvy/reader.hpp
+        src/savvy/region.cpp include/savvy/region.hpp
+        include/savvy/s1r.hpp
+        src/savvy/sav_reader.cpp include/savvy/sav_reader.hpp
+        src/savvy/savvy.cpp include/savvy/savvy.hpp
+        src/savvy/site_info.cpp include/savvy/site_info.hpp
+        include/savvy/ublas_vector.hpp
+        src/savvy/utility.cpp include/savvy/utility.hpp
+        include/savvy/variant_group_iterator.hpp
+        include/savvy/variant_iterator.hpp
+        src/savvy/varint.cpp include/savvy/varint.hpp
+        src/savvy/vcf_reader.cpp include/savvy/vcf_reader.hpp)
 
-set(SOURCE_FILES
-    src/savvy/savvy.cpp src/savvy/reader.cpp src/savvy/m3vcf_reader.cpp include/savvy/sav_reader.hpp src/savvy/sav_reader.cpp include/test/test_class.hpp src/savvy/vcf_reader.cpp src/savvy/varint.cpp src/savvy/utility.cpp src/savvy/site_info.cpp src/savvy/region.cpp)
-
-add_library(savvy ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 

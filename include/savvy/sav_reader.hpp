@@ -15,7 +15,7 @@
 #include "variant_iterator.hpp"
 #include "utility.hpp"
 #include "data_format.hpp"
-#include "utility.hpp"
+#include "compressed_vector.hpp"
 
 #include <shrinkwrap/istream.hpp>
 
