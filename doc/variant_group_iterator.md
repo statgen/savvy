@@ -12,8 +12,8 @@ std::vector<float> collapsed_dose(marker_file.samples().size());
 
 while (std::getline(marker_group_file, marker_group_line))
 {
-  variant_group_iterator<savvy::compressed_vector<float>> it(marker_file, marker_group_line);
-  variant_group_iterator<savvy::compressed_vector<float>> end{};
+  savvy::variant_group_iterator<savvy::compressed_vector<float>> it(marker_file, marker_group_line);
+  savvy::variant_group_iterator<savvy::compressed_vector<float>> end{};
 
   std::fill(collapsed_dose.begin(), collapsed_dose.end(), 0.f);
 
@@ -43,8 +43,8 @@ std::vector<float> group_matrix;
 
 while (std::getline(marker_group_file, marker_group_line))
 {
-  variant_group_iterator<savvy::compressed_vector<float>> it(marker_file, marker_group_line);
-  variant_group_iterator<savvy::compressed_vector<float>> end{};
+  savvy::variant_group_iterator<savvy::compressed_vector<float>> it(marker_file, marker_group_line);
+  savvy::variant_group_iterator<savvy::compressed_vector<float>> end{};
 
   group_matrix.resize(0);
   if (it != end)
