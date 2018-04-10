@@ -59,7 +59,7 @@ while (std::getline(marker_group_file, marker_group_line))
     std::string marker_id = it->chromosome() + ":" + std::to_string(it->position()) + "_" + it->ref() + "/" + it->alt();
     
     for (auto dose_it = it->data().begin(); dose_it != it->data().end(); ++dose_it)
-      group_matrix[cnt * sample_size + dose_it.offset()] += *dose_it;
+      group_matrix[cnt * sample_size + dose_it.offset()] = *dose_it;
   }
   
   group_matrix.resize(sample_size * cnt);
