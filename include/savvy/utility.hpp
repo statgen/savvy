@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <array>
 #include <sstream>
+#include <cstring>
 
 namespace savvy
 {
