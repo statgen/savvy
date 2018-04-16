@@ -30,6 +30,7 @@ namespace savvy
     template<typename Rng>
     static std::array<std::uint8_t, 16> gen_uuid(Rng& rng)
     {
+      static_assert(sizeof(typename Rng::result_type) == 8, "gen_uuid requires a 64 bit PRNG");
       // xxxxxxxx-xxxx-4xxx-{8,9,A,B}xxx-xxxxxxxxxxxx
       // https://www.cryptosys.net/pki/uuid-rfc4122.html
 
