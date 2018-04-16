@@ -7,6 +7,7 @@
 #include <tuple>
 #include <iterator>
 #include <cstddef>
+#include <list>
 
 
 namespace savvy
