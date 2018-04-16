@@ -626,9 +626,10 @@ namespace savvy
     class writer
     {
     public:
-      writer(const std::string& file_path, std::uint8_t block_size_in_kib = 4 - 1) :
+      writer(const std::string& file_path, const std::array<std::uint8_t, 16>& uuid, std::uint8_t block_size_in_kib = 4 - 1) :
         file_path_(file_path),
-        ofs_(file_path, std::ios::binary)
+        ofs_(file_path, std::ios::binary),
+        uuid_(uuid)
       {
         this->block_size_ = 1024u * (std::uint32_t(block_size_in_kib) + 1);
 
@@ -925,6 +926,7 @@ namespace savvy
     private:
       std::string file_path_;
       std::ofstream ofs_;
+      const std::array<std::uint8_t, 16> uuid_;
       std::uint32_t block_size_;
       std::vector<entry> current_leaf_node_;
       std::vector<std::pair<std::string, std::uint64_t>> chromosomes_;

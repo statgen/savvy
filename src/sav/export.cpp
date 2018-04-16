@@ -310,7 +310,7 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
 
   for (auto it = headers.begin(); it != headers.end(); )
   {
-    std::string header_id = savvy::parse_header_id(it->second);
+    std::string header_id = savvy::parse_header_sub_field(it->second, "ID");
     if ((it->first == "INFO" && (header_id == "ID" || header_id == "QUAL" || header_id == "FILTER")) || it->first == "FORMAT")
       it = headers.erase(it);
     else

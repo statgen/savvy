@@ -69,12 +69,12 @@ public:
     {
       if (it->first == "INFO")
       {
-        std::string info_field = savvy::parse_header_id(it->second);
+        std::string info_field = savvy::parse_header_sub_field(it->second, "ID");
         metadata_fields_.push_back(std::move(info_field));
       }
       else if (it->first == "FORMAT")
       {
-        std::string format_field = savvy::parse_header_id(it->second);
+        std::string format_field = savvy::parse_header_sub_field(it->second, "ID");
         if (format_field == "GT")
           file_data_format_ = savvy::fmt::allele;
 //                    else if (format_field == "GP")

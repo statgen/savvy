@@ -31,6 +31,7 @@
 #include <type_traits>
 #include <memory>
 #include <set>
+#include <random>
 
 namespace savvy
 {
@@ -109,6 +110,8 @@ namespace savvy
       const std::vector<std::string>& info_fields() const { return metadata_fields_; }
       const std::vector<std::pair<std::string,std::string>>& headers() const { return headers_; }
       savvy::fmt data_format() const { return file_data_format_; }
+      std::uint32_t ploidy() const { return ploidy_; }
+      const std::array<std::uint8_t, 16>& uuid() const { return uuid_; }
 
       /**
        *
@@ -221,15 +224,24 @@ namespace savvy
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t ploidy_level;
-          if (varint_decode(in_it, end_it, ploidy_level) == end_it)
+          if (ploidy_ == 0)
+          {
+            if (varint_decode(in_it, end_it, ploidy_level) != end_it)
+              ++in_it;
+          }
+          else
+          {
+            ploidy_level = ploidy_;
+          }
+
+          if (in_it == end_it)
           {
             this->input_stream_->setstate(std::ios::badbit);
           }
           else
           {
-
             std::uint64_t sz;
-            varint_decode(++in_it, end_it, sz);
+            varint_decode(in_it, end_it, sz);
             for (std::size_t i = 0; i < sz && in_it != end_it; ++i)
             {
               std::uint8_t allele;
@@ -264,14 +276,24 @@ namespace savvy
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t ploidy_level;
-          if (varint_decode(in_it, end_it, ploidy_level) == end_it)
+          if (ploidy_ == 0)
+          {
+            if (varint_decode(in_it, end_it, ploidy_level) != end_it)
+              ++in_it;
+          }
+          else
+          {
+            ploidy_level = ploidy_;
+          }
+
+          if (in_it == end_it)
           {
             this->input_stream_->setstate(std::ios::badbit);
           }
           else
           {
             std::uint64_t sz;
-            varint_decode(++in_it, end_it, sz);
+            varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
             if (subset_size_ != samples().size())
@@ -354,14 +376,24 @@ namespace savvy
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t ploidy_level;
-          if (varint_decode(in_it, end_it, ploidy_level) == end_it)
+          if (ploidy_ == 0)
+          {
+            if (varint_decode(in_it, end_it, ploidy_level) != end_it)
+              ++in_it;
+          }
+          else
+          {
+            ploidy_level = ploidy_;
+          }
+
+          if (in_it == end_it)
           {
             this->input_stream_->setstate(std::ios::badbit);
           }
           else
           {
             std::uint64_t sz;
-            varint_decode(++in_it, end_it, sz);
+            varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
             if (subset_size_ != samples().size())
@@ -443,7 +475,17 @@ namespace savvy
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t ploidy_level;
-          if (varint_decode(in_it, end_it, ploidy_level) == end_it)
+          if (ploidy_ == 0)
+          {
+            if (varint_decode(in_it, end_it, ploidy_level) != end_it)
+              ++in_it;
+          }
+          else
+          {
+            ploidy_level = ploidy_;
+          }
+
+          if (in_it == end_it)
           {
             this->input_stream_->setstate(std::ios::badbit);
           }
@@ -452,7 +494,7 @@ namespace savvy
             const std::size_t stride = ploidy_level + 1;
 
             std::uint64_t sz;
-            varint_decode(++in_it, end_it, sz);
+            varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
             {
@@ -554,14 +596,24 @@ namespace savvy
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t ploidy_level;
-          if (varint_decode(in_it, end_it, ploidy_level) == end_it)
+          if (ploidy_ == 0)
+          {
+            if (varint_decode(in_it, end_it, ploidy_level) != end_it)
+              ++in_it;
+          }
+          else
+          {
+            ploidy_level = ploidy_;
+          }
+
+          if (in_it == end_it)
           {
             this->input_stream_->setstate(std::ios::badbit);
           }
           else
           {
             std::uint64_t sz;
-            varint_decode(++in_it, end_it, sz);
+            varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
             if (subset_size_ != samples().size())
@@ -618,14 +670,24 @@ namespace savvy
           std::istreambuf_iterator<char> end_it;
 
           std::uint64_t ploidy_level;
-          if (varint_decode(in_it, end_it, ploidy_level) == end_it)
+          if (ploidy_ == 0)
+          {
+            if (varint_decode(in_it, end_it, ploidy_level) != end_it)
+              ++in_it;
+          }
+          else
+          {
+            ploidy_level = ploidy_;
+          }
+
+          if (in_it == end_it)
           {
             this->input_stream_->setstate(std::ios::badbit);
           }
           else
           {
             std::uint64_t sz;
-            varint_decode(++in_it, end_it, sz);
+            varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
             if (subset_size_ != samples().size())
@@ -733,6 +795,8 @@ namespace savvy
       std::unique_ptr<shrinkwrap::zstd::istream> input_stream_;
       fmt file_data_format_;
       fmt requested_data_format_;
+      std::uint32_t ploidy_ = 0;
+      std::array<std::uint8_t, 16> uuid_;
     };
     //################################################################//
 
@@ -935,70 +999,24 @@ namespace savvy
 
       template <typename RandAccessStringIterator, typename RandAccessKVPIterator>
       writer(const std::string& file_path, const options& opts, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, fmt data_format) :
+        rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t)this),
         output_buf_(opts.compression_level > 0 ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, opts.compression_level)) : std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out))), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         output_stream_(output_buf_.get()),
+        samples_(samples_beg, samples_end),
         file_path_(file_path),
-        index_file_(opts.index_path.size() ? ::savvy::detail::make_unique<s1r::writer>(opts.index_path) : nullptr),
+        uuid_(::savvy::detail::gen_uuid(rng_)),
+        index_file_(opts.index_path.size() ? ::savvy::detail::make_unique<s1r::writer>(opts.index_path, uuid_) : nullptr),
         current_block_min_(std::numeric_limits<std::uint32_t>::max()),
         current_block_max_(0),
-        sample_size_(samples_end - samples_beg),
         allele_count_(0),
         record_count_(0),
         record_count_in_block_(0),
         block_size_(opts.block_size),
         data_format_(data_format)
       {
-        std::string version_string("sav\x00\x01\x00\x00", 7);
-        output_stream_.write(version_string.data(), version_string.size());
-
-        std::string uuid(16, '\0'); // TODO
-        output_stream_.write(uuid.data(), uuid.size());
-
-        std::ostreambuf_iterator<char> out_it(output_stream_);
-
         headers_.resize(std::distance(headers_beg, headers_end));
         auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string,std::string>& kvp) { return kvp.first != "FORMAT" && kvp.first != "fileformat"; });
         headers_.resize(std::distance(headers_.begin(), copy_res));
-
-        // TODO: Handle unsupported formats.
-        const char* fmt_str;
-        if (data_format_ == fmt::haplotype_dosage)
-          fmt_str = "<ID=HDS,Description=\"Haplotype dosages\">";
-//        else if (data_format_ == fmt::genotype_probability)
-//          fmt_str = "<ID=GP,Description=\"Genotype posterior probabilities\">";
-        else
-          fmt_str = "<ID=GT,Description=\"Genotype\">";
-        headers_.push_back(std::make_pair("FORMAT", fmt_str));
-
-        varint_encode(headers_.size(), out_it);
-        for (auto it = headers_.begin(); it != headers_.end(); ++it)
-        {
-          std::size_t str_sz = get_string_size(it->first);
-          varint_encode(str_sz, out_it);
-          if (str_sz)
-          {
-            output_stream_.write(it->first.data(), str_sz);
-
-            str_sz = get_string_size(it->second);
-            varint_encode(str_sz, out_it);
-            if (str_sz)
-              output_stream_.write(it->second.data(), str_sz);
-          }
-
-          if (it->first == "INFO")
-          {
-            this->property_fields_.push_back(parse_header_id(it->second));
-          }
-        }
-
-        varint_encode(sample_size_, out_it);
-        for (auto it = samples_beg; it != samples_end; ++it)
-        {
-          std::size_t str_sz = get_string_size(*it);
-          varint_encode(str_sz, out_it);
-          if (str_sz)
-            output_stream_.write(&(*it)[0], str_sz);
-        }
       }
 
 
@@ -1029,6 +1047,60 @@ namespace savvy
 
             s1r::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
             index_file_->write(current_chromosome_, e);
+          }
+        }
+      }
+
+      void write_header(std::int32_t ploidy)
+      {
+        if (ploidy_ == 0 && ploidy > 0 && good())
+        {
+          ploidy_ = ploidy;
+
+          std::string version_string("sav\x00\x01\x00\x00", 7);
+          output_stream_.write(version_string.data(), version_string.size());
+
+          output_stream_.write((char*)uuid_.data(), uuid_.size());
+
+          std::ostreambuf_iterator<char> out_it(output_stream_);
+
+
+          // TODO: Handle unsupported formats.
+          std::string fmt_str;
+          if (data_format_ == fmt::haplotype_dosage)
+            fmt_str = "<ID=HDS,Type=Float,Number=" + std::to_string(ploidy_) + ",Description=\"Haplotype dosages\">";
+          else
+            fmt_str = "<ID=GT,Type=Integer,Number=" + std::to_string(ploidy_) + ",Description=\"Genotype\">";
+          headers_.push_back(std::make_pair(std::string("FORMAT"), fmt_str));
+
+          varint_encode(headers_.size(), out_it);
+          for (auto it = headers_.begin(); it != headers_.end(); ++it)
+          {
+            std::size_t str_sz = get_string_size(it->first);
+            varint_encode(str_sz, out_it);
+            if (str_sz)
+            {
+              output_stream_.write(it->first.data(), str_sz);
+
+              str_sz = get_string_size(it->second);
+              varint_encode(str_sz, out_it);
+              if (str_sz)
+                output_stream_.write(it->second.data(), str_sz);
+            }
+
+            if (it->first == "INFO")
+            {
+              this->property_fields_.push_back(parse_header_sub_field(it->second, "ID"));
+            }
+          }
+
+          varint_encode(samples_.size(), out_it);
+          for (auto it = samples_.begin(); it != samples_.end(); ++it)
+          {
+            std::size_t str_sz = it->size();
+            varint_encode(str_sz, out_it);
+            if (str_sz)
+              output_stream_.write(&(*it)[0], str_sz);
           }
         }
       }
@@ -1106,84 +1178,96 @@ namespace savvy
       {
         if (this->good())
         {
-          if (data.size() % sample_size_ != 0)
+          if (data.size() % samples_.size() != 0)
           {
             output_stream_.setstate(std::ios::failbit);
           }
           else
           {
-            // 1024*1024 non-ref GTs or 64*1024 records
-            //if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
-            if (block_size_ != 0 && ((record_count_ % block_size_) == 0 || annotations.chromosome() != current_chromosome_))
+            if (ploidy_ == 0)
             {
-              if (index_file_ && record_count_in_block_)
+              write_header(std::uint32_t((data.size() / samples_.size()) & 0xFFFFFFFF));
+            }
+
+            if (data.size() / samples_.size() != ploidy_)
+            {
+              output_stream_.setstate(std::ios::failbit);
+            }
+            else
+            {
+              // 1024*1024 non-ref GTs or 64*1024 records
+              //if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
+              if (block_size_ != 0 && ((record_count_ % block_size_) == 0 || annotations.chromosome() != current_chromosome_))
               {
-                auto file_pos = std::uint64_t(output_stream_.tellp());
-                if (record_count_in_block_ > 0x10000) // Max records per block: 64*1024
+                if (index_file_ && record_count_in_block_)
                 {
-                  assert(!"Too many records in zstd frame to be indexed!");
-                  output_stream_.setstate(std::ios::badbit);
-                }
+                  auto file_pos = std::uint64_t(output_stream_.tellp());
+                  if (record_count_in_block_ > 0x10000) // Max records per block: 64*1024
+                  {
+                    assert(!"Too many records in zstd frame to be indexed!");
+                    output_stream_.setstate(std::ios::badbit);
+                  }
 
-                if (file_pos > 0x0000FFFFFFFFFFFF) // Max file size: 256 TiB
-                {
-                  assert(!"File size to large to be indexed!");
-                  output_stream_.setstate(std::ios::badbit);
-                }
+                  if (file_pos > 0x0000FFFFFFFFFFFF) // Max file size: 256 TiB
+                  {
+                    assert(!"File size to large to be indexed!");
+                    output_stream_.setstate(std::ios::badbit);
+                  }
 
-                s1r::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
-                index_file_->write(current_chromosome_, e);
+                  s1r::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
+                  index_file_->write(current_chromosome_, e);
+                }
+                output_stream_.flush();
+                allele_count_ = 0;
+                current_chromosome_ = annotations.chromosome();
+                record_count_in_block_ = 0;
+                current_block_min_ = std::numeric_limits<std::uint32_t>::max();
+                current_block_max_ = 0;
               }
-              output_stream_.flush();
-              allele_count_ = 0;
-              current_chromosome_ = annotations.chromosome();
-              record_count_in_block_ = 0;
-              current_block_min_ = std::numeric_limits<std::uint32_t>::max();
-              current_block_max_ = 0;
-            }
 
-            std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
+              std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
-            varint_encode(annotations.chromosome().size(), os_it);
-            std::copy(annotations.chromosome().begin(), annotations.chromosome().end(), os_it);
+              varint_encode(annotations.chromosome().size(), os_it);
+              std::copy(annotations.chromosome().begin(), annotations.chromosome().end(), os_it);
 
-            varint_encode(annotations.position(), os_it);
+              varint_encode(annotations.position(), os_it);
 
-            varint_encode(annotations.ref().size(), os_it);
-            if (annotations.ref().size())
-              std::copy(annotations.ref().begin(), annotations.ref().end(), os_it);
-            //os.write(&source.ref_[0], source.ref_.size());
+              varint_encode(annotations.ref().size(), os_it);
+              if (annotations.ref().size())
+                std::copy(annotations.ref().begin(), annotations.ref().end(), os_it);
+              //os.write(&source.ref_[0], source.ref_.size());
 
-            varint_encode(annotations.alt().size(), os_it);
-            if (annotations.alt().size())
-              std::copy(annotations.alt().begin(), annotations.alt().end(), os_it);
-            //os.write(&source.alt_[0], source.alt_.size());
+              varint_encode(annotations.alt().size(), os_it);
+              if (annotations.alt().size())
+                std::copy(annotations.alt().begin(), annotations.alt().end(), os_it);
+              //os.write(&source.alt_[0], source.alt_.size());
 
-            for (const std::string& key : property_fields_)
-            {
-              std::string value(annotations.prop(key));
-              varint_encode(value.size(), os_it);
-              if (value.size())
-                std::copy(value.begin(), value.end(), os_it);
-            }
+              for (const std::string& key : property_fields_)
+              {
+                std::string value(annotations.prop(key));
+                varint_encode(value.size(), os_it);
+                if (value.size())
+                  std::copy(value.begin(), value.end(), os_it);
+              }
 
-            if (data_format_ == fmt::haplotype_dosage)
-            {
-              write_hap_dosages(data);
-            }
+              if (data_format_ == fmt::haplotype_dosage)
+              {
+                write_hap_dosages(data);
+              }
 //            else if (data_format_ == fmt::genotype_probability)
 //            {
 //              write_probs(data);
 //            }
-            else
-            {
-              write_alleles(data);
-            }
+              else
+              {
+                write_alleles(data);
+              }
 
-            current_block_min_ = std::min(current_block_min_, std::uint32_t(annotations.position()));
-            current_block_max_ = std::max(current_block_max_, std::uint32_t(annotations.position() + std::max(annotations.ref().size(), annotations.alt().size())) - 1);
-            ++record_count_in_block_;
-            ++record_count_;
+              current_block_min_ = std::min(current_block_min_, std::uint32_t(annotations.position()));
+              current_block_max_ = std::max(current_block_max_, std::uint32_t(annotations.position() + std::max(annotations.ref().size(), annotations.alt().size())) - 1);
+              ++record_count_in_block_;
+              ++record_count_;
+            }
           }
         }
       }
@@ -1251,11 +1335,6 @@ namespace savvy
 
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
-        std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF);
-
-        // TODO: check modulus and set error if needed.
-        varint_encode(ploidy, os_it);
-
         std::uint64_t non_zero_count =  m.size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), ref_value));
         allele_count_ += non_zero_count;
         varint_encode(non_zero_count, os_it);
@@ -1268,11 +1347,6 @@ namespace savvy
       {
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
-        std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF);
-
-        // TODO: check modulus and set error if needed.
-        varint_encode(ploidy, os_it);
-
         allele_count_ += m.non_zero_size();
         varint_encode(m.non_zero_size(), os_it);
 
@@ -1283,11 +1357,6 @@ namespace savvy
       void write_hap_dosages(const std::vector<T>& m)
       {
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
-
-        std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF);
-
-        // TODO: check modulus and set error if needed.
-        varint_encode(ploidy, os_it);
 
         std::uint64_t non_zero_count = 0;
         for (auto it = m.begin(); it != m.end(); ++it)
@@ -1306,11 +1375,6 @@ namespace savvy
       void write_hap_dosages(const savvy::compressed_vector<T>& m)
       {
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
-
-        std::uint32_t ploidy = std::uint32_t((m.size() / sample_size_) & 0xFFFFFFFF);
-
-        // TODO: check modulus and set error if needed.
-        varint_encode(ploidy, os_it);
 
         std::uint64_t non_zero_count = 0;
         for (auto it = m.begin(); it != m.end(); ++it)
@@ -1375,22 +1439,25 @@ namespace savvy
       static const std::array<std::string, 0> empty_string_array;
       static const std::array<std::pair<std::string, std::string>, 0> empty_string_pair_array;
     protected:
+      std::mt19937_64 rng_;
       std::unique_ptr<std::streambuf> output_buf_;
       std::ostream output_stream_;
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> property_fields_;
+      std::vector<std::string> samples_;
       std::string file_path_;
+      std::array<std::uint8_t, 16> uuid_;
       std::unique_ptr<s1r::writer> index_file_;
       std::string current_chromosome_;
       std::uint32_t current_block_min_;
       std::uint32_t current_block_max_;
-      std::uint64_t sample_size_;
       std::uint32_t metadata_fields_cnt_;
       std::size_t allele_count_;
       std::size_t record_count_;
       std::size_t record_count_in_block_;
       std::uint16_t block_size_;
       fmt data_format_;
+      std::int32_t ploidy_ = 0;
     };
 
 

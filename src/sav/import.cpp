@@ -282,7 +282,7 @@ int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::r
 {
   savvy::site_info variant;
   std::vector<float> genotypes;
-  while (in.read(variant, genotypes))
+  while (out && in.read(variant, genotypes))
     out.write(variant, genotypes);
 
   if (regions.size())
@@ -290,10 +290,13 @@ int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::r
     for (auto it = regions.begin() + 1; it != regions.end(); ++it)
     {
       in.reset_region(*it);
-      while (in.read(variant, genotypes))
+      while (out && in.read(variant, genotypes))
         out.write(variant, genotypes);
     }
   }
+
+  if (out.fail())
+    std::cerr << "Write Failure: Does input file have mixed ploidy?" << std::endl;
 
   return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
@@ -303,8 +306,11 @@ int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& 
   // TODO: support regions without index.
   savvy::site_info variant;
   std::vector<float> genotypes;
-  while (in.read(variant, genotypes))
+  while (out && in.read(variant, genotypes))
     out.write(variant, genotypes);
+
+  if (out.fail())
+    std::cerr << "Write Failure: Does input file have mixed ploidy?" << std::endl;
   return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

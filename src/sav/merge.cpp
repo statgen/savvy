@@ -246,7 +246,7 @@ int merge_main(int argc, char** argv)
       merged_headers.reserve(merged_headers.size() + (f.headers().end() - f.headers().begin()));
       for (auto it = f.headers().begin(); it != f.headers().end(); ++it)
       {
-        if (it->first != "INFO" || info_fields.insert(savvy::parse_header_id(it->second)).second)
+        if (it->first != "INFO" || info_fields.insert(savvy::parse_header_sub_field(it->second, "ID")).second)
         {
           merged_headers.push_back(*it);
         }

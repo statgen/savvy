@@ -11,6 +11,10 @@
 #include <functional>
 #include <memory>
 #include <vector>
+#include <iomanip>
+#include <cstdint>
+#include <array>
+#include <sstream>
 
 namespace savvy
 {
@@ -21,11 +25,57 @@ namespace savvy
     {
       return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
     }
+
+    template<typename Rng>
+    static std::array<std::uint8_t, 16> gen_uuid(Rng& rng)
+    {
+      // xxxxxxxx-xxxx-4xxx-{8,9,A,B}xxx-xxxxxxxxxxxx
+      // https://www.cryptosys.net/pki/uuid-rfc4122.html
+
+      std::array<std::uint8_t, 16> ret;
+
+      std::uint64_t r1 = rng();
+      std::uint64_t r2 = rng();
+
+      std::memcpy(ret.data(), &r1, 8);
+      std::memcpy(ret.data() + 8, &r2, 8);
+
+      ret[6] = static_cast<std::uint8_t>(ret[6] & 0x0F) | static_cast<std::uint8_t>(0x40);
+      ret[8] = static_cast<std::uint8_t>(ret[8] & 0x3F) | static_cast<std::uint8_t>(0x80);
+
+      return ret;
+    }
+
+    template<typename Rng>
+    std::string gen_uuid_str(Rng& rng)
+    {
+      std::array<std::uint8_t, 16> tmp = gen_uuid(rng);
+      std::stringstream ret;
+      ret << std::hex << std::setfill('0');
+
+      std::size_t i = 0;
+      for ( ; i < 16; ++i)
+      {
+        if (i == 4 || i == 6 || i == 8 || i == 10)
+          ret << "-";
+        ret << std::setw(2) << (unsigned)tmp[i];
+      }
+
+      return ret.str();
+    }
   }
 
   std::string savvy_version();
 
-  std::string parse_header_id(std::string header_value);
+  struct header_value_details
+  {
+    std::string id;
+    std::string type;
+    std::string number;
+    std::string description;
+  };
+  header_value_details parse_header_value(std::string header_value);
+  std::string parse_header_sub_field(std::string header_value, std::string field_to_parse);
 
   template <typename T>
   class hds_to_gp

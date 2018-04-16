@@ -696,6 +696,8 @@ void subset_test(const std::string& path)
   assert(cnt == (F == savvy::fmt::haplotype_dosage ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
 }
 
+
+
 int main(int argc, char** argv)
 {
   std::string cmd = (argc < 2) ? "" : argv[1];

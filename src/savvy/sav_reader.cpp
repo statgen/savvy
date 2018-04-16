@@ -85,8 +85,14 @@ namespace savvy
       std::string version_string(7, '\0');
       input_stream_->read(&version_string[0], version_string.size());
 
-      std::string uuid(16, '\0');
-      input_stream_->read(&uuid[0], uuid.size());
+      input_stream_->read((char*)uuid_.data(), uuid_.size());
+
+      bool parse_ploidy = false;
+      for (auto it = uuid_.begin(); it != uuid_.end(); ++it)
+      {
+        if (*it)
+          parse_ploidy = true;
+      }
 
 
       std::istreambuf_iterator<char> in_it(*input_stream_);
@@ -122,18 +128,24 @@ namespace savvy
 
                   if (key == "INFO")
                   {
-                    std::string info_field = parse_header_id(val);
+                    std::string info_field = parse_header_sub_field(val, "ID");
                     metadata_fields_.push_back(std::move(info_field));
                   }
                   else if (key == "FORMAT")
                   {
-                    std::string format_field = parse_header_id(val);
-                    if (format_field == "GT")
+                    header_value_details format_header = parse_header_value(val);
+                    if (format_header.id == "GT")
+                    {
                       file_data_format_ = fmt::allele;
-//                    else if (format_field == "GP")
-//                      file_data_format_ = fmt::genotype_probability;
-                    else if (format_field == "HDS")
+                      if (parse_ploidy)
+                        ploidy_ = atoi(format_header.number.c_str());
+                    }
+                    else if (format_header.id == "HDS")
+                    {
                       file_data_format_ = fmt::haplotype_dosage;
+                      if (parse_ploidy)
+                        ploidy_ = atoi(format_header.number.c_str());
+                    }
                   }
                   headers_.emplace_back(std::move(key), std::move(val));
                 }
@@ -142,6 +154,12 @@ namespace savvy
             }
           }
           --headers_size;
+        }
+
+        if (parse_ploidy && !ploidy_)
+        {
+          this->input_stream_->setstate(std::ios::badbit);
+          return;
         }
 
         if (!headers_size)
@@ -220,7 +238,7 @@ namespace savvy
       reader r(input_file_path, fmt::allele); // TODO: make zero if possible.
       std::int64_t start_pos = r.tellg();
 
-      s1r::writer idx(output_file_path);
+      s1r::writer idx(output_file_path, r.uuid());
 
       std::uint32_t min = std::numeric_limits<std::uint32_t>::max();
       std::uint32_t max = 0;
