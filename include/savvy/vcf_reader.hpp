@@ -1380,7 +1380,7 @@ namespace savvy
         else if (f == savvy::fmt::dosage)
           (*output_stream_) << "##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage\">" << std::endl;
         else if (f == savvy::fmt::genotype_probability)
-          (*output_stream_) << "##FORMAT=<ID=GP,Number=.,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes\">" << std::endl;
+          (*output_stream_) << "##FORMAT=<ID=GP,Number=G,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes\">" << std::endl;
       }
 
       (*output_stream_) << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";

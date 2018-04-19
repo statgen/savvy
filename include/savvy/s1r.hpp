@@ -22,6 +22,7 @@
 #include <cassert>
 #include <array>
 #include <cstring>
+#include <tuple>
 
 namespace savvy
 {
@@ -383,6 +384,40 @@ namespace savvy
       }
 
       bool good() const { return ifs_.good(); }
+
+      std::tuple<std::uint32_t, std::uint32_t> range()
+      {
+        std::tuple<std::uint32_t, std::uint32_t> ret{std::numeric_limits<std::uint32_t>::max(), 0};
+
+        auto fn = [&ret](const internal_entry& e)
+        {
+          std::get<0>(ret) = std::min(std::get<0>(ret), e.region_start());
+          std::get<1>(ret) = std::max(std::get<1>(ret), e.region_end());
+        };
+
+        node_position position{0, 0};
+
+        const std::uint64_t leaf_level = this->tree_height() - 1;
+        ifs_.seekg(this->calculate_file_position(position));
+
+        if (position.level == leaf_level)
+        {
+          std::vector<entry> leaf_node(this->entries_per_leaf_node());
+          ifs_.read((char*) leaf_node.data(), this->bucket_size());
+
+          const auto entry_end_it = leaf_node.begin() + this->calculate_node_size(position);
+          std::for_each(leaf_node.begin(), entry_end_it, fn);
+        }
+        else
+        {
+          std::vector<internal_entry> internal_node(this->entries_per_internal_node());
+          ifs_.read((char*) internal_node.data(), this->bucket_size());
+          const auto entry_end_it = internal_node.begin() + this->calculate_node_size(position);
+          std::for_each(internal_node.begin(), entry_end_it, fn);
+        }
+
+        return ret;
+      }
 
       const tree_position end_tree_position()
       {
