@@ -58,7 +58,7 @@ This wrapper class can then be used as seen below.
 int main()
 {
   const std::size_t window_size = 100;
-  savvy::reader input_file("file.sav", savvy::fmt::allele);
+  savvy::reader input_file("file.sav", savvy::fmt::gt);
   std::vector<savvy::site_info> annotations(window_size);
   arma::SpMat<float> genotype_matrix(window_size, input_file.samples().size() * 2);
   
@@ -97,7 +97,7 @@ If your matrix of choice is a vector of vectors, then this can be done without a
 ```c++
 int main()
 {
-  savvy::reader input_file("/Users/lefaivej/Developer/projects/savvy/test_file.vcf", savvy::fmt::allele);
+  savvy::reader input_file("/Users/lefaivej/Developer/projects/savvy/test_file.vcf", savvy::fmt::gt);
   const std::size_t window_size = 100;
   const std::size_t num_columns = input_file.samples().size() * 2;
   std::vector<savvy::site_info> annotations(window_size);

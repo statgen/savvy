@@ -481,39 +481,39 @@ namespace savvy
         int fmt_id = hts_rec()->d.fmt[i].id;
         std::string fmt_key = hts_hdr()->id[BCF_DT_ID][fmt_id].key;
 
-        std::int64_t gt_idx     = std::distance(requested_data_formats_.begin(), std::find(requested_data_formats_.begin(), requested_data_formats_.end(), fmt::genotype));
-        std::int64_t allele_idx = std::distance(requested_data_formats_.begin(), std::find(requested_data_formats_.begin(), requested_data_formats_.end(), fmt::allele));
+        std::int64_t gt_idx     = std::distance(requested_data_formats_.begin(), std::find(requested_data_formats_.begin(), requested_data_formats_.end(), fmt::ac));
+        std::int64_t allele_idx = std::distance(requested_data_formats_.begin(), std::find(requested_data_formats_.begin(), requested_data_formats_.end(), fmt::gt));
 
         if (fmt_key == "GT" && (gt_idx < VecCnt || allele_idx < VecCnt))
         {
           if (gt_idx < VecCnt)
           {
-            cnt += read_genos_to<0>(fmt::genotype, destinations...);
+            cnt += read_genos_to<0>(fmt::ac, destinations...);
           }
           else // allele_idx < VecCnt
           {
-            cnt += read_genos_to<0>(fmt::allele, destinations...);
+            cnt += read_genos_to<0>(fmt::gt, destinations...);
           }
         }
         else if (fmt_key == "DS")
         {
-          cnt += read_genos_to<0>(fmt::dosage, destinations...);
+          cnt += read_genos_to<0>(fmt::ds, destinations...);
         }
         else if (fmt_key == "HDS")
         {
-          cnt += read_genos_to<0>(fmt::haplotype_dosage, destinations...);
+          cnt += read_genos_to<0>(fmt::hds, destinations...);
         }
         else if (fmt_key == "GP")
         {
-          cnt += read_genos_to<0>(fmt::genotype_probability, destinations...);
+          cnt += read_genos_to<0>(fmt::gp, destinations...);
         }
         else if (fmt_key == "GL")
         {
-          cnt += read_genos_to<0>(fmt::genotype_likelihood, destinations...);
+          cnt += read_genos_to<0>(fmt::gl, destinations...);
         }
         else if (fmt_key == "PL")
         {
-          cnt += read_genos_to<0>(fmt::phred_scaled_genotype_likelihood, destinations...);
+          cnt += read_genos_to<0>(fmt::pl, destinations...);
         }
         else
         {
@@ -532,25 +532,25 @@ namespace savvy
       {
         switch (data_format)
         {
-          case fmt::allele:
+          case fmt::gt:
             read_genotypes_al(destination);
             break;
-          case fmt::genotype:
+          case fmt::ac:
             read_genotypes_gt(destination);
             break;
-          case fmt::genotype_probability:
+          case fmt::gp:
             read_genotypes_gp(destination);
             break;
-          case fmt::dosage:
+          case fmt::ds:
             read_genotypes_ds(destination);
             break;
-          case fmt::haplotype_dosage:
+          case fmt::hds:
             read_genotypes_hds(destination);
             break;
-          case fmt::genotype_likelihood:
+          case fmt::gl:
             read_genotypes_gl(destination);
             break;
-          case fmt::phred_scaled_genotype_likelihood:
+          case fmt::pl:
             read_genotypes_pl(destination);
             break;
         }
@@ -1373,13 +1373,13 @@ namespace savvy
 
       for (auto f : this->format_fields_)
       {
-        if (f == savvy::fmt::allele)
+        if (f == savvy::fmt::gt)
           (*output_stream_) << "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">" << std::endl;
-        else if (f == savvy::fmt::haplotype_dosage)
+        else if (f == savvy::fmt::hds)
           (*output_stream_) << "##FORMAT=<ID=HDS,Number=.,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage\">" << std::endl;
-        else if (f == savvy::fmt::dosage)
+        else if (f == savvy::fmt::ds)
           (*output_stream_) << "##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage\">" << std::endl;
-        else if (f == savvy::fmt::genotype_probability)
+        else if (f == savvy::fmt::gp)
           (*output_stream_) << "##FORMAT=<ID=GP,Number=G,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes\">" << std::endl;
       }
 
@@ -1427,7 +1427,7 @@ namespace savvy
         for (std::size_t i = 0; i < format_fields_.size(); ++i)
         {
           fmt f = format_fields_[i];
-          if (f == fmt::allele || f == fmt::haplotype_dosage)
+          if (f == fmt::gt || f == fmt::hds)
           {
             if (ploidy)
             {
@@ -1441,7 +1441,7 @@ namespace savvy
                 this->output_stream_->setstate(std::ios::failbit);
             }
           }
-          else if (f == fmt::genotype_probability)
+          else if (f == fmt::gp)
           {
             if (ploidy)
             {
@@ -1455,7 +1455,7 @@ namespace savvy
                 this->output_stream_->setstate(std::ios::failbit);
             }
           }
-          else if (f == fmt::dosage)
+          else if (f == fmt::ds)
           {
             if (sample_size_ != get_vec(i, data...).size())
               this->output_stream_->setstate(std::ios::failbit);
@@ -1495,11 +1495,11 @@ namespace savvy
           {
             if (std::distance(format_fields_.begin(), it) > 0)
               output_stream_->put(':');
-            if (*it == fmt::dosage)
+            if (*it == fmt::ds)
               (*output_stream_) << "\tDS";
-            else if (*it == fmt::haplotype_dosage)
+            else if (*it == fmt::hds)
               (*output_stream_) << "\tHDS";
-            else if (*it == fmt::genotype_probability)
+            else if (*it == fmt::gp)
               (*output_stream_) << "\tGP";
             else
               (*output_stream_) << "\tGT";
@@ -1533,7 +1533,7 @@ namespace savvy
           {
             const auto& v = get_vec(format_index, data...);
             fmt f = format_fields_[format_index];
-            if (f == fmt::allele)
+            if (f == fmt::gt)
             {
               out_it = '\t';
 
@@ -1559,7 +1559,7 @@ namespace savvy
                   out_it = '1';
               }
             }
-            else if (f == fmt::genotype_probability)
+            else if (f == fmt::gp)
             {
               out_it = '\t';
 
@@ -1595,7 +1595,7 @@ namespace savvy
                 }
               }
             }
-            else if (f == fmt::haplotype_dosage)
+            else if (f == fmt::hds)
             {
               out_it = '\t';
 

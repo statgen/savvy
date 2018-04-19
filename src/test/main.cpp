@@ -533,7 +533,7 @@ public:
       file_info.insert(file_info.begin(), {"INFO", "<ID=FILTER,Description=\"Variant filter\">"});
       file_info.insert(file_info.begin(), {"INFO", "<ID=QUAL,Description=\"Variant quality\">"});
       file_info.insert(file_info.begin(), {"INFO", "<ID=ID,Description=\"Variant ID\">"});
-      savvy::sav::writer output(Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD, input.samples().begin(), input.samples().end(), file_info.begin(), file_info.end(), Fmt);
+      savvy::sav::writer output(Fmt == savvy::fmt::hds ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD, input.samples().begin(), input.samples().end(), file_info.begin(), file_info.end(), Fmt);
 
       std::size_t cnt = 0;
       while (input.read(anno, data))
@@ -543,15 +543,15 @@ public:
       }
 
       assert(output.good());
-      assert(cnt == (Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
+      assert(cnt == (Fmt == savvy::fmt::hds ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
     }
 
-    if (Fmt == savvy::fmt::haplotype_dosage)
-      run_file_checksum_test(SAVVYT_VCF_FILE, SAVVYT_SAV_FILE_DOSE, savvy::fmt::haplotype_dosage);
+    if (Fmt == savvy::fmt::hds)
+      run_file_checksum_test(SAVVYT_VCF_FILE, SAVVYT_SAV_FILE_DOSE, savvy::fmt::hds);
     else
-      run_file_checksum_test(SAVVYT_VCF_FILE, SAVVYT_SAV_FILE_HARD, savvy::fmt::allele);
+      run_file_checksum_test(SAVVYT_VCF_FILE, SAVVYT_SAV_FILE_HARD, savvy::fmt::gt);
 
-    savvy::sav::writer::create_index(Fmt == savvy::fmt::haplotype_dosage ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD);
+    savvy::sav::writer::create_index(Fmt == savvy::fmt::hds ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD);
   }
 };
 
@@ -598,7 +598,7 @@ public:
 
 void sav_random_access_test(savvy::fmt format)
 {
-  savvy::sav::indexed_reader rdr(format == savvy::fmt::allele ? SAVVYT_SAV_FILE_HARD : SAVVYT_SAV_FILE_DOSE, {"20", 1234600, 2230300}, format);
+  savvy::sav::indexed_reader rdr(format == savvy::fmt::gt ? SAVVYT_SAV_FILE_HARD : SAVVYT_SAV_FILE_DOSE, {"20", 1234600, 2230300}, format);
   savvy::site_info anno;
   std::vector<float> buf;
 
@@ -693,7 +693,7 @@ void subset_test(const std::string& path)
     assert(d.size() == intersect.size() * savvy::sample_stride(F, 2));
     ++cnt;
   }
-  assert(cnt == (F == savvy::fmt::haplotype_dosage ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
+  assert(cnt == (F == savvy::fmt::hds ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
 }
 
 
@@ -716,39 +716,39 @@ int main(int argc, char** argv)
 
   if (cmd == "convert-file")
   {
-    convert_file_test<savvy::fmt::allele>()();
-    convert_file_test<savvy::fmt::haplotype_dosage>()();
+    convert_file_test<savvy::fmt::gt>()();
+    convert_file_test<savvy::fmt::hds>()();
   }
   else if (cmd == "generic-reader")
   {
-    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::allele>()();
-    if (!file_exists(SAVVYT_SAV_FILE_DOSE)) convert_file_test<savvy::fmt::haplotype_dosage>()();
+    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::gt>()();
+    if (!file_exists(SAVVYT_SAV_FILE_DOSE)) convert_file_test<savvy::fmt::hds>()();
 
-    generic_reader_test(SAVVYT_VCF_FILE, savvy::fmt::allele, SAVVYT_MARKER_COUNT_HARD);
-    generic_reader_test(SAVVYT_VCF_FILE, savvy::fmt::haplotype_dosage, SAVVYT_MARKER_COUNT_DOSE);
+    generic_reader_test(SAVVYT_VCF_FILE, savvy::fmt::gt, SAVVYT_MARKER_COUNT_HARD);
+    generic_reader_test(SAVVYT_VCF_FILE, savvy::fmt::hds, SAVVYT_MARKER_COUNT_DOSE);
 
-    generic_reader_test(SAVVYT_SAV_FILE_HARD, savvy::fmt::allele, SAVVYT_MARKER_COUNT_HARD);
-    generic_reader_test(SAVVYT_SAV_FILE_HARD, savvy::fmt::haplotype_dosage, SAVVYT_MARKER_COUNT_HARD);
+    generic_reader_test(SAVVYT_SAV_FILE_HARD, savvy::fmt::gt, SAVVYT_MARKER_COUNT_HARD);
+    generic_reader_test(SAVVYT_SAV_FILE_HARD, savvy::fmt::hds, SAVVYT_MARKER_COUNT_HARD);
 
-    generic_reader_test(SAVVYT_SAV_FILE_DOSE, savvy::fmt::allele, SAVVYT_MARKER_COUNT_DOSE);
-    generic_reader_test(SAVVYT_SAV_FILE_DOSE, savvy::fmt::haplotype_dosage, SAVVYT_MARKER_COUNT_DOSE);
+    generic_reader_test(SAVVYT_SAV_FILE_DOSE, savvy::fmt::gt, SAVVYT_MARKER_COUNT_DOSE);
+    generic_reader_test(SAVVYT_SAV_FILE_DOSE, savvy::fmt::hds, SAVVYT_MARKER_COUNT_DOSE);
   }
   else if (cmd == "random-access")
   {
-    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::allele>()();
-    if (!file_exists(SAVVYT_SAV_FILE_DOSE)) convert_file_test<savvy::fmt::haplotype_dosage>()();
+    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::gt>()();
+    if (!file_exists(SAVVYT_SAV_FILE_DOSE)) convert_file_test<savvy::fmt::hds>()();
 
-    sav_random_access_test(savvy::fmt::allele);
-    sav_random_access_test(savvy::fmt::haplotype_dosage);
+    sav_random_access_test(savvy::fmt::gt);
+    sav_random_access_test(savvy::fmt::hds);
   }
   else if (cmd == "subset")
   {
-    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::allele>()();
+    if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test<savvy::fmt::gt>()();
 
-    subset_test<savvy::reader, savvy::fmt::genotype>(SAVVYT_VCF_FILE);
-    subset_test<savvy::reader, savvy::fmt::genotype>(SAVVYT_SAV_FILE_HARD);
-    subset_test<savvy::vcf::reader<1>, savvy::fmt::genotype>(SAVVYT_VCF_FILE);
-    subset_test<savvy::sav::reader, savvy::fmt::genotype>(SAVVYT_SAV_FILE_HARD);
+    subset_test<savvy::reader, savvy::fmt::ac>(SAVVYT_VCF_FILE);
+    subset_test<savvy::reader, savvy::fmt::ac>(SAVVYT_SAV_FILE_HARD);
+    subset_test<savvy::vcf::reader<1>, savvy::fmt::ac>(SAVVYT_VCF_FILE);
+    subset_test<savvy::sav::reader, savvy::fmt::ac>(SAVVYT_SAV_FILE_HARD);
   }
   else if (cmd == "varint")
   {

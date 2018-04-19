@@ -14,7 +14,7 @@ target_link_libraries(prog savvy hts z zstd)
 
 ## Read Variants from File 
 ```c++
-savvy::reader f("chr1.sav", savvy::fmt::allele);
+savvy::reader f("chr1.sav", savvy::fmt::gt);
 savvy::variant<std::vector<float>> var;
 
 while (f >> var)
@@ -32,7 +32,7 @@ while (f >> var)
 
 ## Indexed Files
 ```c++
-savvy::indexed_reader f("chr1.sav", {"X", 100000, 199999}, savvy::fmt::allele);
+savvy::indexed_reader f("chr1.sav", {"X", 100000, 199999}, savvy::fmt::gt);
 savvy::variant<std::vector<float>> var;
 
 while (f >> v)
@@ -49,7 +49,7 @@ while (f >> v)
 
 ## Read annotations and genotypes separately.
 ```c++
-savvy::reader f("chr1.sav", savvy::fmt::allele);
+savvy::reader f("chr1.sav", savvy::fmt::gt);
 savvy::site_info anno;
 std::vector<float> alleles;
 
@@ -68,7 +68,7 @@ while (f.read(anno, alleles))
 
 ## Subsetting Samples
 ```c++
-savvy::reader f("chr1.sav", savvy::fmt::allele);
+savvy::reader f("chr1.sav", savvy::fmt::gt);
 std::vector<std::string> requested = {"ID001","ID002","ID003"};
 std::vector<std::string> intersect = f.subset_samples({requested.begin(), requested.end()});
 
@@ -88,7 +88,7 @@ std::vector<float> std_vector;
 savvy::compressed_vector<double> savvy_sparse_vector;
 boost::numeric::ublas::compressed_vector<float> ublas_sparse_vector;
 
-savvy::reader f("chr1.sav", savvy::fmt::dosage);
+savvy::reader f("chr1.sav", savvy::fmt::ds);
 f.read(anno, std_vector);
 f.read(anno, savvy_sparse_vector);
 f.read(anno, ublas_sparse_vector);
@@ -97,7 +97,7 @@ f.read(anno, ublas_sparse_vector);
 ## Read Predicates
 Reading genotypes can be bypassed when using a read predicate.
 ```c++
-savvy::indexed_reader< f("chr1.sav", savvy::fmt::allele);
+savvy::indexed_reader< f("chr1.sav", savvy::fmt::gt);
 savvy::site_info anno;
 savvy::compressed_vector<float> gt;
 
@@ -108,7 +108,7 @@ while (f.read_if([](const site_info& v) { return std::stof(v.prop("AF")) < 0.1; 
 }
 ```
 ```c++
-savvy::indexed_reader f("chr1.sav", savvy::fmt::allele);
+savvy::indexed_reader f("chr1.sav", savvy::fmt::gt);
 savvy::anno;
 std::vector<float> buf;
 
@@ -155,7 +155,7 @@ auto lin_reg = [](const std::vector<float>& x, const std::vector<float>& y)
   return std::make_tuple(m, b, r2); // slope, y-intercept, r-squared
 };
 
-savvy::reader f("chr1.sav", savvy::fmt::genotype);
+savvy::reader f("chr1.sav", savvy::fmt::ac);
 savvy::site_info anno;
 std::vector<float> geno;
 std::vector<float> pheno(f.sample_size());
@@ -178,7 +178,7 @@ auto arma_lin_reg = [](const arma::Col<float>& x, const arma::Col<float>& y)
   return std::make_tuple(m, b, r2); // slope, y-intercept, r-squared
 };
 
-savvy::reader f("chr1.sav", savvy::fmt::allele);
+savvy::reader f("chr1.sav", savvy::fmt::gt);
 savvy::site_info anno;
 savvy::armadillo::dense_vector<float> geno;
 arma::Col<float> pheno(f.sample_size() * 2);
@@ -192,7 +192,7 @@ while (f.read(anno, geno))
 
 ## Multiple Data Vectors
 ```c++
-savvy::vcf::reader<2> f("chr1.bcf", savvy::fmt::genotype, savvy::fmt::dosage);
+savvy::vcf::reader<2> f("chr1.bcf", savvy::fmt::ac, savvy::fmt::ds);
 savvy::site_info anno;
 std::vector<float> genotypes;
 std::vector<float> dosages;
@@ -219,12 +219,12 @@ while (f.read(anno, genotypes, dosages))
 C++ 17 supports class template argument deduction, which means that template arguments can be deduced by constructor arguments. Compilers that do not support this must specify the number of data vectors to read as a template argument to the reader.
 ```c++
 // With C++ 17
-savvy::vcf::reader f("chr1.bcf", savvy::fmt::allele);
-savvy::vcf::reader f("chr1.bcf", savvy::fmt::allele, savvy::fmt::genotype_likelilhoods);
+savvy::vcf::reader f("chr1.bcf", savvy::fmt::gt);
+savvy::vcf::reader f("chr1.bcf", savvy::fmt::gt, savvy::fmt::gl);
 
 // Without C++ 17
-savvy::vcf::reader<1> f("chr1.bcf", savvy::fmt::allele);
-savvy::vcf::reader<2> f("chr1.bcf", savvy::fmt::allele, savvy::fmt::genotype_likelilhoods);
+savvy::vcf::reader<1> f("chr1.bcf", savvy::fmt::gt);
+savvy::vcf::reader<2> f("chr1.bcf", savvy::fmt::gt, savvy::fmt::gl);
 ``` 
 
 # SAV Command Line Interface

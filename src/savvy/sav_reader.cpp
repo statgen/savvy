@@ -30,7 +30,7 @@ namespace savvy
       file_path_(file_path),
       subset_size_(0),
       input_stream_(savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path)),
-      file_data_format_(fmt::allele)
+      file_data_format_(fmt::gt)
     {
       parse_header();
       requested_data_format_ = file_data_format_;
@@ -41,7 +41,7 @@ namespace savvy
       file_path_(file_path),
       subset_size_(0),
       input_stream_(savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path)),
-      file_data_format_(fmt::allele),
+      file_data_format_(fmt::gt),
       requested_data_format_(data_format)
     {
       parse_header();
@@ -136,13 +136,13 @@ namespace savvy
                     header_value_details format_header = parse_header_value(val);
                     if (format_header.id == "GT")
                     {
-                      file_data_format_ = fmt::allele;
+                      file_data_format_ = fmt::gt;
                       if (parse_ploidy)
                         ploidy_ = atoi(format_header.number.c_str());
                     }
                     else if (format_header.id == "HDS")
                     {
-                      file_data_format_ = fmt::haplotype_dosage;
+                      file_data_format_ = fmt::hds;
                       if (parse_ploidy)
                         ploidy_ = atoi(format_header.number.c_str());
                     }
@@ -235,7 +235,7 @@ namespace savvy
       if (output_file_path.empty())
         output_file_path = input_file_path + ".s1r";
 
-      reader r(input_file_path, fmt::allele); // TODO: make zero if possible.
+      reader r(input_file_path, fmt::gt); // TODO: make zero if possible.
       std::int64_t start_pos = r.tellg();
 
       s1r::writer idx(output_file_path, r.uuid());

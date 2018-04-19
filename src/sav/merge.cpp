@@ -28,7 +28,7 @@ private:
   std::string output_path_;
   int compression_level_ = -1;
   std::uint16_t block_size_ = default_block_size;
-  savvy::fmt format_ = savvy::fmt::allele;
+  savvy::fmt format_ = savvy::fmt::gt;
   bool help_ = false;
   std::uint32_t ploidy_ = 2;
 public:
@@ -98,7 +98,7 @@ public:
         case 'f':
           if (str_opt_arg == "HDS")
           {
-            format_ = savvy::fmt::haplotype_dosage;
+            format_ = savvy::fmt::hds;
           }
           else if (str_opt_arg != "GT")
           {

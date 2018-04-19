@@ -6,7 +6,7 @@
 #include <savvy/variant_group_iterator.hpp>
 
 std::ifstream marker_group_file("file_groups.txt", std::ios::binary);
-savvy::indexed_reader marker_file("marker_file.sav", {""}, savvy::fmt::dosage);
+savvy::indexed_reader marker_file("marker_file.sav", {""}, savvy::fmt::ds);
 std::string marker_group_line;
 std::vector<float> collapsed_dose(marker_file.samples().size());
 
@@ -36,7 +36,7 @@ while (std::getline(marker_group_file, marker_group_line))
 #include <savvy/variant_group_iterator.hpp>
 
 std::ifstream marker_group_file("file_groups.txt", std::ios::binary);
-savvy::indexed_reader marker_file("marker_file.sav", {""}, savvy::fmt::dosage);
+savvy::indexed_reader marker_file("marker_file.sav", {""}, savvy::fmt::ds);
 std::string marker_group_line;
 std::size_t sample_size = marker_file.samples().size();
 std::vector<float> group_matrix;

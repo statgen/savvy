@@ -261,7 +261,7 @@ namespace savvy
 
       void discard_genotypes()
       {
-        if (this->file_data_format_ == fmt::allele)
+        if (this->file_data_format_ == fmt::gt)
           this->discard_genotypes_impl<1>();
         else
           this->discard_genotypes_impl<7>();
@@ -765,16 +765,16 @@ namespace savvy
         destination.resize(0);
         if (true) //requested_data_formats_[idx] == file_data_format_)
         {
-          if (requested_data_format_ == fmt::allele)
-            file_data_format_ == fmt::allele ? read_genotypes_al<1>(destination) : read_genotypes_al<7>(destination);
-          else if (requested_data_format_== fmt::genotype)
-            file_data_format_ == fmt::allele ? read_genotypes_gt<1>(destination) : read_genotypes_gt<7>(destination);
-          else if (requested_data_format_ == fmt::genotype_probability)
-            file_data_format_ == fmt::allele ? read_genotypes_gp<1>(destination) : read_genotypes_gp<7>(destination);
-          else if (requested_data_format_ == fmt::dosage)
-            file_data_format_ == fmt::allele ? read_genotypes_ds<1>(destination) : read_genotypes_ds<7>(destination);
-          else if (requested_data_format_ == fmt::haplotype_dosage)
-            file_data_format_ == fmt::allele ? read_genotypes_hds<1>(destination) : read_genotypes_hds<7>(destination);
+          if (requested_data_format_ == fmt::gt)
+            file_data_format_ == fmt::gt ? read_genotypes_al<1>(destination) : read_genotypes_al<7>(destination);
+          else if (requested_data_format_== fmt::ac)
+            file_data_format_ == fmt::gt ? read_genotypes_gt<1>(destination) : read_genotypes_gt<7>(destination);
+          else if (requested_data_format_ == fmt::gp)
+            file_data_format_ == fmt::gt ? read_genotypes_gp<1>(destination) : read_genotypes_gp<7>(destination);
+          else if (requested_data_format_ == fmt::ds)
+            file_data_format_ == fmt::gt ? read_genotypes_ds<1>(destination) : read_genotypes_ds<7>(destination);
+          else if (requested_data_format_ == fmt::hds)
+            file_data_format_ == fmt::gt ? read_genotypes_hds<1>(destination) : read_genotypes_hds<7>(destination);
           else
             input_stream_->setstate(std::ios::failbit);
         }
@@ -1068,7 +1068,7 @@ namespace savvy
 
           // TODO: Handle unsupported formats.
           std::string fmt_str;
-          if (data_format_ == fmt::haplotype_dosage)
+          if (data_format_ == fmt::hds)
             fmt_str = "<ID=HDS,Type=Float,Number=" + std::to_string(ploidy_) + ",Description=\"Haplotype dosages\">";
           else
             fmt_str = "<ID=GT,Type=Integer,Number=" + std::to_string(ploidy_) + ",Description=\"Genotype\">";
@@ -1251,7 +1251,7 @@ namespace savvy
                   std::copy(value.begin(), value.end(), os_it);
               }
 
-              if (data_format_ == fmt::haplotype_dosage)
+              if (data_format_ == fmt::hds)
               {
                 write_hap_dosages(data);
               }

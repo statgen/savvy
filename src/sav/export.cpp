@@ -32,7 +32,7 @@ private:
   std::string file_format_;
   std::unique_ptr<savvy::s1r::sort_point> sort_type_;
   bool help_ = false;
-  savvy::fmt format_ = savvy::fmt::allele;
+  savvy::fmt format_ = savvy::fmt::gt;
   savvy::bounding_point bounding_point_ = savvy::bounding_point::beg;
 public:
   export_prog_args() :
@@ -98,15 +98,15 @@ public:
           std::string str_opt_arg(optarg ? optarg : "");
           if (str_opt_arg == "HDS")
           {
-            format_ = savvy::fmt::haplotype_dosage;
+            format_ = savvy::fmt::hds;
           }
           else if (str_opt_arg == "DS")
           {
-            format_ = savvy::fmt::dosage;
+            format_ = savvy::fmt::ds;
           }
           else if (str_opt_arg == "GP")
           {
-            format_ = savvy::fmt::genotype_probability;
+            format_ = savvy::fmt::gp;
           }
           else if (str_opt_arg != "GT")
           {

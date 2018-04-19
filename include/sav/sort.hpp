@@ -76,11 +76,11 @@ public:
       {
         std::string format_field = savvy::parse_header_sub_field(it->second, "ID");
         if (format_field == "GT")
-          file_data_format_ = savvy::fmt::allele;
+          file_data_format_ = savvy::fmt::gt;
 //                    else if (format_field == "GP")
 //                      file_data_format_ = fmt::genotype_probability;
         else if (format_field == "HDS")
-          file_data_format_ = savvy::fmt::haplotype_dosage;
+          file_data_format_ = savvy::fmt::hds;
       }
       headers_.emplace_back(it->first, it->second);
     }
