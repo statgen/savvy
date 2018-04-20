@@ -222,7 +222,14 @@ int merge_main(int argc, char** argv)
 
   std::deque<sav_reader> input_files;
   for (auto it = args.input_paths().begin(); it != args.input_paths().end(); ++it)
+  {
     input_files.emplace_back(*it, args.format());
+    if (!input_files.back().good())
+    {
+      std::cerr << "Could not open file (" << input_files.back().file_path() << ")\n";
+      return EXIT_FAILURE;
+    }
+  }
   std::vector<savvy::site_info> sites(args.input_paths().size());
   //std::vector<savvy::compressed_vector<float>> genos(args.input_paths().size()); //std::vector<savvy::compressed_vector<float>> genos(args.input_paths().size());
   savvy::compressed_vector<float> output_genos;

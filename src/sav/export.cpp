@@ -299,6 +299,12 @@ int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::stri
 template <typename T>
 int prep_reader_for_export(T& input, const export_prog_args& args)
 {
+  if (!input)
+  {
+    std::cerr << "Could not open file (" << args.input_path() << ")\n";
+    return EXIT_FAILURE;
+  }
+
   std::vector<std::string> sample_ids(input.samples().size());
   std::copy(input.samples().begin(), input.samples().end(), sample_ids.begin());
   if (args.subset_ids().size())

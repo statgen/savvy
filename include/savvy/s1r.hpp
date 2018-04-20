@@ -455,71 +455,84 @@ namespace savvy
       {
         std::array<char, 26> footer;
 
-        input_file_.seekg(-(footer.size()), std::ios::end);
-        input_file_.read(footer.data(), footer.size());
-        assert(input_file_.good());
-
-        std::size_t bytes_parsed = 0;
-        std::string version(footer.begin() + (footer.size() - 7), footer.begin() + footer.size());
-        bytes_parsed += version.size();
-
-        std::string uuid(footer.begin() + (footer.size() - bytes_parsed - 16), footer.begin() + (footer.size() - bytes_parsed));
-        bytes_parsed += uuid.size();
-
-        std::uint16_t tree_details_size_be;
-        std::memcpy((char*)(&tree_details_size_be), footer.data() + (footer.size() - bytes_parsed - sizeof(tree_details_size_be)), sizeof(tree_details_size_be));
-        bytes_parsed += sizeof(tree_details_size_be);
-
-        std::uint16_t tree_details_size = be16toh(tree_details_size_be);
-
-        std::uint8_t block_size_byte;
-        std::memcpy((char*)(&block_size_byte), footer.data() + (footer.size() - bytes_parsed - sizeof(block_size_byte)), sizeof(block_size_byte));
-        bytes_parsed += sizeof(block_size_byte);
-
-        const std::uint32_t block_size = 1024u * (std::uint32_t(block_size_byte) + 1);
-
-        struct tree_details
-        {
-          std::string name;
-          std::uint64_t entry_count = 0;
-        };
-
-        input_file_.seekg(-(std::int64_t(footer.size()) + tree_details_size), std::ios::end);
-        std::vector<tree_details> tree_details_array;
-
-        int tree_details_bytes_left = tree_details_size;
-        while (tree_details_bytes_left > 0 && input_file_.good())
-        {
-          tree_details details;
-          std::getline(input_file_, details.name, '\0');
-
-          std::uint64_t entry_count_be = 0;
-          input_file_.read((char*)(&entry_count_be), 8);
-          details.entry_count = be64toh(entry_count_be);
-
-          tree_details_bytes_left -= (details.name.size() + 1 + 8);
-
-
-          tree_details_array.emplace_back(std::move(details));
-        }
-
-        assert(tree_details_bytes_left == 0);
-
+        std::uint8_t block_size_byte = 0;
         std::uint64_t block_count = 0;
 
-        trees_.reserve(tree_details_array.size());
-        for (auto it = tree_details_array.begin(); it != tree_details_array.end(); ++it)
+        input_file_.seekg(-(footer.size()), std::ios::end);
+        input_file_.read(footer.data(), footer.size());
+        if (!input_file_.good())
         {
-          trees_.emplace_back(input_file_, block_size_byte, block_count, it->name, it->entry_count);
+          input_file_.setstate(std::ios::badbit);
+        }
+        else
+        {
+          std::size_t bytes_parsed = 0;
+          std::string version(footer.begin() + (footer.size() - 7), footer.begin() + footer.size());
+          bytes_parsed += version.size();
 
-          for (std::uint64_t nodes_at_current_level = detail::ceil_divide(it->entry_count, (std::uint64_t) detail::entries_per_leaf_node(block_size));
-            nodes_at_current_level > 1;
-            nodes_at_current_level = detail::ceil_divide(nodes_at_current_level, (std::uint64_t) detail::entries_per_internal_node(block_size)))
+          if (version.substr(0, 3) != "s1r")
           {
-            block_count += nodes_at_current_level;
+            input_file_.setstate(std::ios::badbit);
           }
+          else
+          {
+            std::string uuid(footer.begin() + (footer.size() - bytes_parsed - 16), footer.begin() + (footer.size() - bytes_parsed));
+            bytes_parsed += uuid.size();
 
-          block_count += 1;
+            std::uint16_t tree_details_size_be;
+            std::memcpy((char*)(&tree_details_size_be), footer.data() + (footer.size() - bytes_parsed - sizeof(tree_details_size_be)), sizeof(tree_details_size_be));
+            bytes_parsed += sizeof(tree_details_size_be);
+
+            std::uint16_t tree_details_size = be16toh(tree_details_size_be);
+
+
+            std::memcpy((char*)(&block_size_byte), footer.data() + (footer.size() - bytes_parsed - sizeof(block_size_byte)), sizeof(block_size_byte));
+            bytes_parsed += sizeof(block_size_byte);
+
+            const std::uint32_t block_size = 1024u * (std::uint32_t(block_size_byte) + 1);
+
+            struct tree_details
+            {
+              std::string name;
+              std::uint64_t entry_count = 0;
+            };
+
+            input_file_.seekg(-(std::int64_t(footer.size()) + tree_details_size), std::ios::end);
+            std::vector<tree_details> tree_details_array;
+
+            int tree_details_bytes_left = tree_details_size;
+            while (tree_details_bytes_left > 0 && input_file_.good())
+            {
+              tree_details details;
+              std::getline(input_file_, details.name, '\0');
+
+              std::uint64_t entry_count_be = 0;
+              input_file_.read((char*)(&entry_count_be), 8);
+              details.entry_count = be64toh(entry_count_be);
+
+              tree_details_bytes_left -= (details.name.size() + 1 + 8);
+
+
+              tree_details_array.emplace_back(std::move(details));
+            }
+
+            assert(tree_details_bytes_left == 0);
+
+            trees_.reserve(tree_details_array.size());
+            for (auto it = tree_details_array.begin(); it != tree_details_array.end(); ++it)
+            {
+              trees_.emplace_back(input_file_, block_size_byte, block_count, it->name, it->entry_count);
+
+              for (std::uint64_t nodes_at_current_level = detail::ceil_divide(it->entry_count, (std::uint64_t) detail::entries_per_leaf_node(block_size));
+                nodes_at_current_level > 1;
+                nodes_at_current_level = detail::ceil_divide(nodes_at_current_level, (std::uint64_t) detail::entries_per_internal_node(block_size)))
+              {
+                block_count += nodes_at_current_level;
+              }
+
+              block_count += 1;
+            }
+          }
         }
 
         trees_.emplace_back(input_file_, block_size_byte, block_count, "", 0); // empty tree (end marker).

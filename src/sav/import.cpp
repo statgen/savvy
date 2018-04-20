@@ -317,6 +317,12 @@ int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& 
 template <typename T>
 int prep_reader_for_import(T& input, const import_prog_args& args)
 {
+  if (!input)
+  {
+    std::cerr << "Could not open file (" << args.input_path() << ")\n";
+    return EXIT_FAILURE;
+  }
+
   std::vector<std::string> sample_ids(input.samples().size());
   std::copy(input.samples().begin(), input.samples().end(), sample_ids.begin());
   if (args.subset_ids().size())
