@@ -94,102 +94,108 @@ namespace savvy
           parse_ploidy = true;
       }
 
-
-      std::istreambuf_iterator<char> in_it(*input_stream_);
-      std::istreambuf_iterator<char> end;
-
-      std::uint64_t headers_size;
-      if (varint_decode(in_it, end, headers_size) != end)
+      if (!input_stream_->good() || version_string.substr(0, 3) != "sav")
       {
-        ++in_it;
-        headers_.reserve(headers_size);
+        input_stream_->setstate(std::ios::badbit);
+      }
+      else
+      {
+        std::istreambuf_iterator<char> in_it(*input_stream_);
+        std::istreambuf_iterator<char> end;
 
-        while (headers_size && in_it != end)
+        std::uint64_t headers_size;
+        if (good() && varint_decode(in_it, end, headers_size) != end)
         {
-          std::uint64_t key_size;
-          if (varint_decode(in_it, end, key_size) != end)
+          ++in_it;
+          headers_.reserve(headers_size);
+
+          while (headers_size && in_it != end)
           {
-            ++in_it;
-            if (key_size)
-            {
-              std::string key;
-              key.resize(key_size);
-              input_stream_->read(&key[0], key_size);
-
-              std::uint64_t val_size;
-              if (varint_decode(in_it, end, val_size) != end)
-              {
-                ++in_it;
-                if (key_size)
-                {
-                  std::string val;
-                  val.resize(val_size);
-                  input_stream_->read(&val[0], val_size);
-
-                  if (key == "INFO")
-                  {
-                    std::string info_field = parse_header_sub_field(val, "ID");
-                    metadata_fields_.push_back(std::move(info_field));
-                  }
-                  else if (key == "FORMAT")
-                  {
-                    header_value_details format_header = parse_header_value(val);
-                    if (format_header.id == "GT")
-                    {
-                      file_data_format_ = fmt::gt;
-                      if (parse_ploidy)
-                        ploidy_ = atoi(format_header.number.c_str());
-                    }
-                    else if (format_header.id == "HDS")
-                    {
-                      file_data_format_ = fmt::hds;
-                      if (parse_ploidy)
-                        ploidy_ = atoi(format_header.number.c_str());
-                    }
-                  }
-                  headers_.emplace_back(std::move(key), std::move(val));
-                }
-              }
-
-            }
-          }
-          --headers_size;
-        }
-
-        if (parse_ploidy && !ploidy_)
-        {
-          this->input_stream_->setstate(std::ios::badbit);
-          return;
-        }
-
-        if (!headers_size)
-        {
-          std::uint64_t sample_size;
-          if (varint_decode(in_it, end, sample_size) != end)
-          {
-            ++in_it;
-            sample_ids_.reserve(sample_size);
-
-            std::uint64_t id_sz;
-            while (sample_size && varint_decode(in_it, end, id_sz) != end)
+            std::uint64_t key_size;
+            if (varint_decode(in_it, end, key_size) != end)
             {
               ++in_it;
-              sample_ids_.emplace_back();
-              if (id_sz)
+              if (key_size)
               {
-                sample_ids_.back().resize(id_sz);
-                input_stream_->read(&sample_ids_.back()[0], id_sz);
-              }
-              --sample_size;
-            }
+                std::string key;
+                key.resize(key_size);
+                input_stream_->read(&key[0], key_size);
 
-            if (!sample_size)
-              return;
+                std::uint64_t val_size;
+                if (varint_decode(in_it, end, val_size) != end)
+                {
+                  ++in_it;
+                  if (key_size)
+                  {
+                    std::string val;
+                    val.resize(val_size);
+                    input_stream_->read(&val[0], val_size);
+
+                    if (key == "INFO")
+                    {
+                      std::string info_field = parse_header_sub_field(val, "ID");
+                      metadata_fields_.push_back(std::move(info_field));
+                    }
+                    else if (key == "FORMAT")
+                    {
+                      header_value_details format_header = parse_header_value(val);
+                      if (format_header.id == "GT")
+                      {
+                        file_data_format_ = fmt::gt;
+                        if (parse_ploidy)
+                          ploidy_ = atoi(format_header.number.c_str());
+                      }
+                      else if (format_header.id == "HDS")
+                      {
+                        file_data_format_ = fmt::hds;
+                        if (parse_ploidy)
+                          ploidy_ = atoi(format_header.number.c_str());
+                      }
+                    }
+                    headers_.emplace_back(std::move(key), std::move(val));
+                  }
+                }
+
+              }
+            }
+            --headers_size;
+          }
+
+          if (parse_ploidy && !ploidy_)
+          {
+            this->input_stream_->setstate(std::ios::badbit);
+            return;
+          }
+
+          if (!headers_size)
+          {
+            std::uint64_t sample_size;
+            if (varint_decode(in_it, end, sample_size) != end)
+            {
+              ++in_it;
+              sample_ids_.reserve(sample_size);
+
+              std::uint64_t id_sz;
+              while (sample_size && varint_decode(in_it, end, id_sz) != end)
+              {
+                ++in_it;
+                sample_ids_.emplace_back();
+                if (id_sz)
+                {
+                  sample_ids_.back().resize(id_sz);
+                  input_stream_->read(&sample_ids_.back()[0], id_sz);
+                }
+                --sample_size;
+              }
+
+              if (!sample_size)
+                return;
+            }
           }
         }
-      }
 
-      input_stream_->peek();
+        input_stream_->peek();
+      }
     }
 
     void reader_base::init_subset_map()
