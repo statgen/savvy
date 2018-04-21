@@ -24,7 +24,7 @@ find_package(Threads)
 
 #get_target_property(SHRINKWRAP_LIBS shrinkwrap INTERFACE_LINK_LIBRARIES)
 
-add_definitions(-DSAVVY_VERSION="${PROJECT_VERSION}-beta")
+add_definitions(-DSAVVY_VERSION="${PROJECT_VERSION}")
 
 add_library(savvy
         include/savvy/allele_status.hpp
