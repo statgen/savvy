@@ -1,2 +1,2 @@
-jonathonl/shrinkwrap@develop
+jonathonl/shrinkwrap@v1.0.0-beta
 htslib,https://github.com/samtools/htslib/releases/download/1.6/htslib-1.6.tar.bz2 --hash md5:d6fd14e208aca7e08cbe9072233d0af9 --cmake dep/htslib.cmake
