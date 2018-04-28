@@ -1308,7 +1308,7 @@ namespace savvy
       this->format_fields_.reserve(sizeof...(Fmt));
       this->init_format_fields(data_formats...);
 
-      (*output_stream_) << "##fileformat=VCFv4.2" << std::endl;
+      (*output_stream_) << "##fileformat=VCFv4.2\n";
 
 
       for (auto it = headers_beg; it != headers_end; ++it)
@@ -1321,12 +1321,12 @@ namespace savvy
             char datestr[11];
             if (std::strftime(datestr, sizeof(datestr), "%Y%m%d", std::localtime(&t)))
             {
-              (*output_stream_) << (std::string("##") + it->first + "=" + std::string(datestr)) << std::endl;
+              (*output_stream_) << (std::string("##") + it->first + "=" + std::string(datestr)) << "\n";
             }
           }
           else
           {
-            (*output_stream_) << (std::string("##") + it->first + "=" + it->second) << std::endl;
+            (*output_stream_) << (std::string("##") + it->first + "=" + it->second) << "\n";
 
             if (it->first == "INFO")
             {
@@ -1374,13 +1374,13 @@ namespace savvy
       for (auto f : this->format_fields_)
       {
         if (f == savvy::fmt::gt)
-          (*output_stream_) << "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">" << std::endl;
+          (*output_stream_) << "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
         else if (f == savvy::fmt::hds)
-          (*output_stream_) << "##FORMAT=<ID=HDS,Number=.,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage\">" << std::endl;
+          (*output_stream_) << "##FORMAT=<ID=HDS,Number=.,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage\">\n";
         else if (f == savvy::fmt::ds)
-          (*output_stream_) << "##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage\">" << std::endl;
+          (*output_stream_) << "##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage\">\n";
         else if (f == savvy::fmt::gp)
-          (*output_stream_) << "##FORMAT=<ID=GP,Number=G,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes\">" << std::endl;
+          (*output_stream_) << "##FORMAT=<ID=GP,Number=G,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes\">\n";
       }
 
       (*output_stream_) << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
@@ -1390,7 +1390,7 @@ namespace savvy
         ++sample_size_;
       }
 
-      (*output_stream_) << std::endl;
+      (*output_stream_) << "\n";
     }
 
     template <std::size_t VecCnt>
@@ -1644,7 +1644,7 @@ namespace savvy
           }
         }
 
-        (*output_stream_) << std::endl;
+        (*output_stream_) << "\n";
       }
     }
 
