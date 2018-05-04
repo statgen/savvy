@@ -304,6 +304,7 @@ namespace savvy
       void write_multi_sample_level_data(const std::size_t ploidy, const T&... data);
     private:
       std::vector<std::string> info_fields_;
+      std::vector<int> info_field_types_;
       std::vector<fmt> format_fields_;
       std::unique_ptr<std::ostream> output_stream_;
       std::size_t sample_size_;
@@ -1336,38 +1337,14 @@ namespace savvy
             {
               if (it->second.size() && it->second.front() == '<' && it->second.back() == '>')
               {
-                std::string header_value = it->second;
-                header_value.resize(header_value.size() - 1);
-
-                auto curr_pos = header_value.begin() + 1;
-                auto comma_pos = std::find(curr_pos, header_value.end(), ',');
-
-                while (comma_pos != header_value.end())
+                auto header_info = parse_header_value(it->second);
+                if (unique_info_fields.emplace(header_info.id).second)
                 {
-                  auto equals_pos = std::find(curr_pos, comma_pos, '=');
-                  if (equals_pos != comma_pos)
-                  {
-                    std::string key(curr_pos, equals_pos);
-                    std::string val(equals_pos + 1, comma_pos);
-
-                    if (key == "ID" && unique_info_fields.emplace(val).second)
-                      info_fields_.emplace_back(std::move(val));
-                  }
-
-                  curr_pos = comma_pos + 1;
-                  comma_pos = std::find(curr_pos, header_value.end(), ',');
-                }
-
-                auto equals_pos = std::find(curr_pos, comma_pos, '=');
-                if (equals_pos != comma_pos)
-                {
-                  std::string key(curr_pos, equals_pos);
-                  std::string val(equals_pos + 1, comma_pos);
-
-                  if (key == "ID" && unique_info_fields.emplace(val).second)
-                    info_fields_.emplace_back(std::move(val));
-
-                  curr_pos = comma_pos + 1;
+                  info_fields_.emplace_back(header_info.id);
+                  int field_int_type = -1;
+                  if (header_info.type == "Flag")
+                    field_int_type = BCF_BT_NULL;
+                  info_field_types_.emplace_back(field_int_type);
                 }
               }
             }
@@ -1486,7 +1463,10 @@ namespace savvy
               else
                 (*output_stream_) << ";";
 
-              (*output_stream_) << (*it + "=" + anno.prop(*it));
+              if (info_field_types_[std::distance(info_fields_.begin(), it)] == BCF_BT_NULL)
+                (*output_stream_) << (*it); // Flag
+              else
+                (*output_stream_) << (*it + "=" + anno.prop(*it));
 
               ++i;
             }
