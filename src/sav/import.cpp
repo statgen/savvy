@@ -38,6 +38,7 @@ private:
   savvy::fmt format_ = savvy::fmt::gt;
   savvy::bounding_point bounding_point_ = savvy::bounding_point::beg;
   std::unique_ptr<savvy::s1r::sort_point> sort_type_ = nullptr;
+  savvy::vcf::empty_vector_policy empty_vector_policy_ = savvy::vcf::empty_vector_policy::fail;
 public:
   import_prog_args() :
     long_options_(
@@ -52,6 +53,7 @@ public:
         {"regions-file", required_argument, 0, 'R'},
         {"sample-ids", required_argument, 0, 'i'},
         {"sample-ids-file", required_argument, 0, 'I'},
+        {"skip-empty-vectors", no_argument, 0, '\x01'},
         {"sort", no_argument, 0, 's'},
         {"sort-point", required_argument, 0, 'S'},
         {0, 0, 0, 0}
@@ -69,6 +71,7 @@ public:
   savvy::fmt format() const { return format_; }
   savvy::bounding_point bounding_point() const { return bounding_point_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
+  savvy::vcf::empty_vector_policy empty_vector_policy() const { return empty_vector_policy_; }
   bool index_is_set() const { return index_; }
   bool help_is_set() const { return help_; }
 
@@ -90,6 +93,8 @@ public:
     os << " -S, --sort-point      : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
     os << " -x, --index           : Enables indexing\n";
     os << " -X, --index-file      : Enables indexing and specifies index output file\n";
+    os << "\n";
+    os << " --skip-empty-vectors  : Skips variants that don't contain the request data format (By default, the import fails)\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -98,11 +103,21 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:f:hi:I:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:d:f:hi:I:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
       {
+        case '\x01':
+        {
+          if (std::string(long_options_[long_index].name) == "skip-empty-vectors")
+          {
+            empty_vector_policy_ = savvy::vcf::empty_vector_policy::skip;
+            break;
+          }
+          std::cerr << "Invalid long only index (" << long_index << ")\n";
+          return false;
+        }
         case '0':
         case '1':
         case '2':
@@ -298,7 +313,7 @@ int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::r
   if (out.fail())
     std::cerr << "Write Failure: Does input file have mixed ploidy?" << std::endl;
 
-  return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
+  return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& regions, savvy::sav::writer& out)
@@ -311,7 +326,7 @@ int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& 
 
   if (out.fail())
     std::cerr << "Write Failure: Does input file have mixed ploidy?" << std::endl;
-  return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
+  return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 template <typename T>
@@ -322,6 +337,8 @@ int prep_reader_for_import(T& input, const import_prog_args& args)
     std::cerr << "Could not open file (" << args.input_path() << ")\n";
     return EXIT_FAILURE;
   }
+
+  input.set_policy(args.empty_vector_policy());
 
   std::vector<std::string> sample_ids(input.samples().size());
   std::copy(input.samples().begin(), input.samples().end(), sample_ids.begin());
@@ -348,7 +365,7 @@ int prep_reader_for_import(T& input, const import_prog_args& args)
     {
       if (args.sort_type())
       {
-        return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, args.format(), args.regions(), output, args.format()) ? EXIT_SUCCESS : EXIT_FAILURE);
+        return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, args.format(), args.regions(), output, args.format()) && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE);
       }
       else
       {

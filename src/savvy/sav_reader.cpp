@@ -307,7 +307,7 @@ namespace savvy
       }
       else
       {
-        ret = idx.good();
+        ret = idx.good() && !r.bad();
       }
 
       return ret;

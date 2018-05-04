@@ -49,6 +49,13 @@ namespace savvy
       none = 0,
       bgzip
     };
+
+    enum class empty_vector_policy : std::uint8_t
+    {
+      fail = 0,
+      skip,
+      skip_with_warning
+    };
     //################################################################//
 
     std::vector<std::string> query_chromosomes(const std::string& file_path);
@@ -71,6 +78,7 @@ namespace savvy
         subset_map_(std::move(source.subset_map_)),
         subset_size_(source.subset_size_),
         state_(source.state_),
+        empty_vector_policy_(source.empty_vector_policy_),
         gt_(source.gt_),
         gt_sz_(source.gt_sz_),
         allele_index_(source.allele_index_),
@@ -99,6 +107,7 @@ namespace savvy
       const std::vector<std::string>& samples() const;
       const std::vector<std::string>& info_fields() const;
       const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
+      void set_policy(enum empty_vector_policy policy) { empty_vector_policy_ = policy; }
     protected:
       virtual bcf_hdr_t* hts_hdr() const = 0;
       virtual bcf1_t* hts_rec() const = 0;
@@ -146,6 +155,7 @@ namespace savvy
       std::array<fmt, VecCnt> requested_data_formats_;
       std::vector<std::uint64_t> subset_map_;
       std::uint64_t subset_size_;
+      empty_vector_policy empty_vector_policy_ = empty_vector_policy::fail;
       std::ios::iostate state_;
       int* gt_;
       int gt_sz_;
@@ -523,6 +533,14 @@ namespace savvy
           // Discard
         }
       }
+
+      if (cnt != VecCnt && empty_vector_policy_ != empty_vector_policy::skip)
+      {
+        std::cerr << "Variant is missing requested data format type." << std::endl;
+        if (empty_vector_policy_ == empty_vector_policy::fail)
+          state_ = std::ios::badbit | state_;
+      }
+
       return cnt;
     }
 

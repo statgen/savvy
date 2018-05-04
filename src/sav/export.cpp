@@ -258,7 +258,7 @@ int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& reg
   while (in.read(variant, genotypes))
     out.write(variant, genotypes);
 
-  return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
+  return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 template <typename Writer>
@@ -280,7 +280,7 @@ int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::regi
     }
   }
 
-  return out.good() ? EXIT_SUCCESS : EXIT_FAILURE;
+  return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 template <typename Rdr, typename Wrtr>
@@ -288,7 +288,7 @@ int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::stri
 {
   if (args.sort_type())
   {
-    return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, input.data_format(), args.regions(), output, args.format()) ? EXIT_SUCCESS : EXIT_FAILURE);
+    return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, input.data_format(), args.regions(), output, args.format()) && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE);
   }
   else
   {

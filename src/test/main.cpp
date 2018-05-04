@@ -508,8 +508,9 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b)
 
 void run_file_checksum_test(const std::string f1, const std::string f2, savvy::fmt format)
 {
-  savvy::reader input_file_reader1(f1, format);
-  savvy::reader input_file_reader2(f2, format);
+  savvy::vcf::reader<1> input_file_reader1(f1, format);
+  input_file_reader1.set_policy(savvy::vcf::empty_vector_policy::skip);
+  savvy::sav::reader input_file_reader2(f2, format);
   auto t = make_file_checksum_test(input_file_reader1, input_file_reader2);
   std::cout << "Starting checksum test ..." << std::endl;
   auto timed_call = time_procedure(t);
@@ -525,6 +526,8 @@ public:
   {
     {
       savvy::vcf::reader<1> input(SAVVYT_VCF_FILE, Fmt);
+      input.set_policy(savvy::vcf::empty_vector_policy::skip);
+
       savvy::site_info anno;
       savvy::compressed_vector<float> data;
 
