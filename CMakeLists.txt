@@ -49,7 +49,7 @@ add_library(savvy
 target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
-add_executable(sav
+add_executable(sav EXCLUDE_FROM_ALL
                src/sav/main.cpp
                src/sav/export.cpp include/sav/export.hpp
                src/sav/import.cpp include/sav/import.hpp
@@ -102,7 +102,9 @@ install(TARGETS savvy EXPORT ${PROJECT_NAME}-config
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
 
-install(TARGETS sav RUNTIME DESTINATION bin COMPONENT cli)
+install(TARGETS sav COMPONENT cli
+        RUNTIME DESTINATION bin
+        OPTIONAL)
 
 install(EXPORT ${PROJECT_NAME}-config DESTINATION share/${PROJECT_NAME})
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPATIBILITY SameMajorVersion)
