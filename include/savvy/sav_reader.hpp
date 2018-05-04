@@ -1080,15 +1080,6 @@ namespace savvy
           varint_encode(headers_.size(), out_it);
           for (auto it = headers_.begin(); it != headers_.end(); ++it)
           {
-            if (it->first == "INFO")
-            {
-              std::string info_id = parse_header_sub_field(it->second, "ID");
-              if (unique_info_fields.emplace(info_id).second)
-                this->property_fields_.emplace_back(info_id);
-              else
-                continue;
-            }
-
             std::size_t str_sz = get_string_size(it->first);
             varint_encode(str_sz, out_it);
             if (str_sz)
@@ -1099,6 +1090,13 @@ namespace savvy
               varint_encode(str_sz, out_it);
               if (str_sz)
                 output_stream_.write(it->second.data(), str_sz);
+            }
+
+            if (it->first == "INFO")
+            {
+              std::string info_id = parse_header_sub_field(it->second, "ID");
+              if (unique_info_fields.emplace(info_id).second)
+                this->property_fields_.emplace_back(info_id);
             }
           }
 
