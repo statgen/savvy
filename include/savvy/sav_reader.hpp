@@ -31,6 +31,7 @@
 #include <type_traits>
 #include <memory>
 #include <set>
+#include <unordered_set>
 #include <random>
 #include <chrono>
 
@@ -108,7 +109,7 @@ namespace savvy
 //      std::vector<std::string>::const_iterator prop_fields_begin() const { return metadata_fields_.begin(); }
 //      std::vector<std::string>::const_iterator prop_fields_end() const { return metadata_fields_.end(); }
 
-      const std::set<std::string>& info_fields() const { return metadata_fields_; }
+      const std::vector<std::string>& info_fields() const { return metadata_fields_; }
       const std::vector<std::pair<std::string,std::string>>& headers() const { return headers_; }
       savvy::fmt data_format() const { return file_data_format_; }
       std::uint32_t ploidy() const { return ploidy_; }
@@ -790,7 +791,7 @@ namespace savvy
       std::vector<std::string> sample_ids_;
       std::vector<std::uint64_t> subset_map_;
       std::vector<std::pair<std::string, std::string>> headers_;
-      std::set<std::string> metadata_fields_;
+      std::vector<std::string> metadata_fields_;
       std::string file_path_;
       std::uint64_t subset_size_;
       std::unique_ptr<shrinkwrap::zstd::istream> input_stream_;
@@ -1074,9 +1075,20 @@ namespace savvy
             fmt_str = "<ID=GT,Type=Integer,Number=" + std::to_string(ploidy_) + ",Description=\"Genotype\">";
           headers_.push_back(std::make_pair(std::string("FORMAT"), fmt_str));
 
+          std::unordered_set<std::string> unique_info_fields;
+
           varint_encode(headers_.size(), out_it);
           for (auto it = headers_.begin(); it != headers_.end(); ++it)
           {
+            if (it->first == "INFO")
+            {
+              std::string info_id = parse_header_sub_field(it->second, "ID");
+              if (unique_info_fields.emplace(info_id).second)
+                this->property_fields_.emplace_back(info_id);
+              else
+                continue;
+            }
+
             std::size_t str_sz = get_string_size(it->first);
             varint_encode(str_sz, out_it);
             if (str_sz)
@@ -1087,11 +1099,6 @@ namespace savvy
               varint_encode(str_sz, out_it);
               if (str_sz)
                 output_stream_.write(it->second.data(), str_sz);
-            }
-
-            if (it->first == "INFO")
-            {
-              this->property_fields_.push_back(parse_header_sub_field(it->second, "ID"));
             }
           }
 

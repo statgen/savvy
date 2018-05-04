@@ -62,6 +62,8 @@ public:
   headless_sav_reader(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, savvy::fmt format) :
       savvy::sav::reader("", format)
   {
+    std::unordered_set<std::string> unique_info_fields;
+
     file_data_format_ = format;
     file_path_ = file_path;
     input_stream_ = savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path);
@@ -70,7 +72,8 @@ public:
       if (it->first == "INFO")
       {
         std::string info_field = savvy::parse_header_sub_field(it->second, "ID");
-        metadata_fields_.emplace(std::move(info_field));
+        if (unique_info_fields.emplace(info_field).second)
+          metadata_fields_.emplace_back(std::move(info_field));
       }
       else if (it->first == "FORMAT")
       {

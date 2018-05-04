@@ -109,6 +109,8 @@ namespace savvy
           ++in_it;
           headers_.reserve(headers_size);
 
+          std::unordered_set<std::string> unique_info_fields;
+
           while (headers_size && in_it != end)
           {
             std::uint64_t key_size;
@@ -134,7 +136,8 @@ namespace savvy
                     if (key == "INFO")
                     {
                       std::string info_field = parse_header_sub_field(val, "ID");
-                      metadata_fields_.emplace(std::move(info_field));
+                      if (unique_info_fields.emplace(info_field).second)
+                        metadata_fields_.emplace_back(std::move(info_field));
                     }
                     else if (key == "FORMAT")
                     {

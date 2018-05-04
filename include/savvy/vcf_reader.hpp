@@ -35,6 +35,7 @@
 #include <cmath>
 #include <algorithm>
 #include <set>
+#include <unordered_set>
 #include <ctime>
 #include <htslib/hts.h>
 
@@ -96,7 +97,7 @@ namespace savvy
       std::vector<std::string> subset_samples(const std::set<std::string>& subset);
 
       const std::vector<std::string>& samples() const;
-      const std::set<std::string>& info_fields() const;
+      const std::vector<std::string>& info_fields() const;
       const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
     protected:
       virtual bcf_hdr_t* hts_hdr() const = 0;
@@ -141,7 +142,7 @@ namespace savvy
     protected:
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> sample_ids_;
-      std::set<std::string> property_fields_;
+      std::vector<std::string> property_fields_;
       std::array<fmt, VecCnt> requested_data_formats_;
       std::vector<std::uint64_t> subset_map_;
       std::uint64_t subset_size_;
@@ -302,7 +303,7 @@ namespace savvy
       template <typename... T>
       void write_multi_sample_level_data(const std::size_t ploidy, const T&... data);
     private:
-      std::set<std::string> info_fields_;
+      std::vector<std::string> info_fields_;
       std::vector<fmt> format_fields_;
       std::unique_ptr<std::ostream> output_stream_;
       std::size_t sample_size_;
@@ -391,7 +392,7 @@ namespace savvy
     }
 
     template <std::size_t VecCnt>
-    const std::set<std::string>& reader_base<VecCnt>::info_fields() const
+    const std::vector<std::string>& reader_base<VecCnt>::info_fields() const
     {
       return property_fields_;
     }
@@ -421,6 +422,7 @@ namespace savvy
       {
 
         this->property_fields_ = {"ID", "QUAL", "FILTER"};
+        std::unordered_set<std::string> unique_info_fields{property_fields_.begin(), property_fields_.end()};
         for (int i = 0; i < hdr->nhrec; ++i)
         {
           if (hdr->hrec[i]->type == BCF_HL_INFO)
@@ -431,8 +433,8 @@ namespace savvy
               if (strcmp(r->keys[j], "ID") == 0)
               {
                 const char* inf = r->vals[j];
-                if (inf)
-                  this->property_fields_.emplace(inf);
+                if (inf && unique_info_fields.emplace(inf).second)
+                  this->property_fields_.emplace_back(inf);
               }
             }
           }
@@ -1307,9 +1309,9 @@ namespace savvy
 
       this->format_fields_.reserve(sizeof...(Fmt));
       this->init_format_fields(data_formats...);
+      std::unordered_set<std::string> unique_info_fields;
 
       (*output_stream_) << "##fileformat=VCFv4.2\n";
-
 
       for (auto it = headers_beg; it != headers_end; ++it)
       {
@@ -1346,8 +1348,8 @@ namespace savvy
                     std::string key(curr_pos, equals_pos);
                     std::string val(equals_pos + 1, comma_pos);
 
-                    if (key == "ID")
-                      info_fields_.emplace(std::move(val));
+                    if (key == "ID" && unique_info_fields.emplace(key).second)
+                      info_fields_.emplace_back(std::move(val));
                   }
 
                   curr_pos = comma_pos + 1;
@@ -1360,8 +1362,8 @@ namespace savvy
                   std::string key(curr_pos, equals_pos);
                   std::string val(equals_pos + 1, comma_pos);
 
-                  if (key == "ID")
-                    info_fields_.emplace(std::move(val));
+                  if (key == "ID" && unique_info_fields.emplace(key).second)
+                    info_fields_.emplace_back(std::move(val));
 
                   curr_pos = comma_pos + 1;
                 }
