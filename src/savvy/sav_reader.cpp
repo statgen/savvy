@@ -134,7 +134,7 @@ namespace savvy
                     if (key == "INFO")
                     {
                       std::string info_field = parse_header_sub_field(val, "ID");
-                      metadata_fields_.push_back(std::move(info_field));
+                      metadata_fields_.emplace(std::move(info_field));
                     }
                     else if (key == "FORMAT")
                     {

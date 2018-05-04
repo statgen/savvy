@@ -9,16 +9,17 @@
 namespace savvy
 {
   //################################################################//
+  const std::set<std::string> reader_base::empty_string_set;
   const std::vector<std::string> reader_base::empty_string_vector;
   const std::vector<std::pair<std::string, std::string>> reader_base::empty_string_pair_vector;
 
-  const std::vector<std::string>& reader_base::info_fields() const
+  const std::set<std::string>& reader_base::info_fields() const
   {
     if (sav_impl())
       return sav_impl()->info_fields();
     else if (vcf_impl())
       return vcf_impl()->info_fields();
-    return empty_string_vector;
+    return empty_string_set;
   }
 
   const std::vector<std::string>& reader_base::samples() const

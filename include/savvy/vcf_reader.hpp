@@ -96,7 +96,7 @@ namespace savvy
       std::vector<std::string> subset_samples(const std::set<std::string>& subset);
 
       const std::vector<std::string>& samples() const;
-      const std::vector<std::string>& info_fields() const;
+      const std::set<std::string>& info_fields() const;
       const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
     protected:
       virtual bcf_hdr_t* hts_hdr() const = 0;
@@ -141,7 +141,7 @@ namespace savvy
     protected:
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> sample_ids_;
-      std::vector<std::string> property_fields_;
+      std::set<std::string> property_fields_;
       std::array<fmt, VecCnt> requested_data_formats_;
       std::vector<std::uint64_t> subset_map_;
       std::uint64_t subset_size_;
@@ -302,7 +302,7 @@ namespace savvy
       template <typename... T>
       void write_multi_sample_level_data(const std::size_t ploidy, const T&... data);
     private:
-      std::vector<std::string> info_fields_;
+      std::set<std::string> info_fields_;
       std::vector<fmt> format_fields_;
       std::unique_ptr<std::ostream> output_stream_;
       std::size_t sample_size_;
@@ -391,7 +391,7 @@ namespace savvy
     }
 
     template <std::size_t VecCnt>
-    const std::vector<std::string>& reader_base<VecCnt>::info_fields() const
+    const std::set<std::string>& reader_base<VecCnt>::info_fields() const
     {
       return property_fields_;
     }
@@ -432,7 +432,7 @@ namespace savvy
               {
                 const char* inf = r->vals[j];
                 if (inf)
-                  this->property_fields_.emplace_back(inf);
+                  this->property_fields_.emplace(inf);
               }
             }
           }
@@ -1347,7 +1347,7 @@ namespace savvy
                     std::string val(equals_pos + 1, comma_pos);
 
                     if (key == "ID")
-                      info_fields_.emplace_back(std::move(val));
+                      info_fields_.emplace(std::move(val));
                   }
 
                   curr_pos = comma_pos + 1;
@@ -1361,7 +1361,7 @@ namespace savvy
                   std::string val(equals_pos + 1, comma_pos);
 
                   if (key == "ID")
-                    info_fields_.emplace_back(std::move(val));
+                    info_fields_.emplace(std::move(val));
 
                   curr_pos = comma_pos + 1;
                 }

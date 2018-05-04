@@ -108,7 +108,7 @@ namespace savvy
 //      std::vector<std::string>::const_iterator prop_fields_begin() const { return metadata_fields_.begin(); }
 //      std::vector<std::string>::const_iterator prop_fields_end() const { return metadata_fields_.end(); }
 
-      const std::vector<std::string>& info_fields() const { return metadata_fields_; }
+      const std::set<std::string>& info_fields() const { return metadata_fields_; }
       const std::vector<std::pair<std::string,std::string>>& headers() const { return headers_; }
       savvy::fmt data_format() const { return file_data_format_; }
       std::uint32_t ploidy() const { return ploidy_; }
@@ -790,7 +790,7 @@ namespace savvy
       std::vector<std::string> sample_ids_;
       std::vector<std::uint64_t> subset_map_;
       std::vector<std::pair<std::string, std::string>> headers_;
-      std::vector<std::string> metadata_fields_;
+      std::set<std::string> metadata_fields_;
       std::string file_path_;
       std::uint64_t subset_size_;
       std::unique_ptr<shrinkwrap::zstd::istream> input_stream_;
