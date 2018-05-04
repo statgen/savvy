@@ -610,7 +610,8 @@ namespace savvy
           else
           {
             std::string qual(std::to_string(hts_rec()->qual));
-            qual.erase(qual.find_last_not_of(".0") + 1); // rtrim zeros.
+            qual.erase(qual.find_last_not_of('0') + 1); // rtrim zeros.
+            qual.erase(qual.find_last_not_of('.') + 1);
             props["QUAL"] = std::move(qual);
           }
 
@@ -646,7 +647,8 @@ namespace savvy
                   break;
                 case BCF_BT_FLOAT:
                   props[key] = std::to_string(info[i].v1.f);
-                  props[key].erase(props[key].find_last_not_of(".0") + 1); // rtrim zeros.
+                  props[key].erase(props[key].find_last_not_of('0') + 1); // rtrim zeros.
+                  props[key].erase(props[key].find_last_not_of('.') + 1);
                   break;
                 case BCF_BT_CHAR:
                   props[key] = std::string((char*)info[i].vptr, info[i].vptr_len);
