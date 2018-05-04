@@ -1348,7 +1348,7 @@ namespace savvy
                     std::string key(curr_pos, equals_pos);
                     std::string val(equals_pos + 1, comma_pos);
 
-                    if (key == "ID" && unique_info_fields.emplace(key).second)
+                    if (key == "ID" && unique_info_fields.emplace(val).second)
                       info_fields_.emplace_back(std::move(val));
                   }
 
@@ -1362,7 +1362,7 @@ namespace savvy
                   std::string key(curr_pos, equals_pos);
                   std::string val(equals_pos + 1, comma_pos);
 
-                  if (key == "ID" && unique_info_fields.emplace(key).second)
+                  if (key == "ID" && unique_info_fields.emplace(val).second)
                     info_fields_.emplace_back(std::move(val));
 
                   curr_pos = comma_pos + 1;
