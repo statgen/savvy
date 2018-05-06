@@ -17,8 +17,6 @@
 #include "data_format.hpp"
 #include "compressed_vector.hpp"
 
-#include <shrinkwrap/istream.hpp>
-
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -794,7 +792,7 @@ namespace savvy
       std::vector<std::string> metadata_fields_;
       std::string file_path_;
       std::uint64_t subset_size_;
-      std::unique_ptr<shrinkwrap::zstd::istream> input_stream_;
+      std::unique_ptr<std::istream> input_stream_;
       fmt file_data_format_;
       fmt requested_data_format_;
       std::uint32_t ploidy_ = 0;
@@ -1002,7 +1000,7 @@ namespace savvy
       template <typename RandAccessStringIterator, typename RandAccessKVPIterator>
       writer(const std::string& file_path, const options& opts, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, fmt data_format) :
         rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t)this),
-        output_buf_(opts.compression_level > 0 ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, opts.compression_level)) : std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out))), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
+        output_buf_(create_out_streambuf(file_path, opts.compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         output_stream_(output_buf_.get()),
         samples_(samples_beg, samples_end),
         file_path_(file_path),
@@ -1295,6 +1293,8 @@ namespace savvy
         ret->open(file_path.c_str(), mode);
         return ret;
       }
+
+      static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, std::int8_t compression_level);
 
       template <std::size_t BitWidth, typename T, typename OutIt>
       static void serialize_alleles(const std::vector<T>& m, OutIt os_it)

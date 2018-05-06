@@ -15,8 +15,6 @@
 #include "data_format.hpp"
 #include "savvy.hpp"
 
-#include <shrinkwrap/gz.hpp>
-
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -29,7 +27,6 @@
 #include <set>
 #include <unordered_set>
 #include <ctime>
-#include <htslib/hts.h>
 
 namespace savvy
 {
@@ -83,6 +80,8 @@ namespace savvy
         virtual bool get_cur_format_values_int32(const char* tag, int**buf, int*sz) const = 0;
         virtual bool get_cur_format_values_float(const char* tag, int**buf, int*sz) const = 0;
       };
+
+      std::unique_ptr<std::ostream> create_out_stream(const std::string& file_path, compression_type type);
     }
 
     //################################################################//
@@ -1150,7 +1149,7 @@ namespace savvy
     template <std::size_t VecCnt>
     template <typename RandAccessStringIterator, typename RandAccessKVPIterator, typename... Fmt>
     writer<VecCnt>::writer(const std::string& file_path, const options& opts, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, Fmt... data_formats) :
-      output_stream_(opts.compression == compression_type::none ? std::unique_ptr<std::ostream>(new std::ofstream(file_path)) : std::unique_ptr<std::ostream>(new shrinkwrap::bgzf::ostream(file_path))),
+      output_stream_(detail::create_out_stream(file_path, opts.compression)),
       sample_size_(0)
     {
       static_assert(VecCnt == sizeof...(Fmt), "Number of requested format fields do not match VecCnt template parameter");

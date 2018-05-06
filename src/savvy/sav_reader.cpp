@@ -8,6 +8,8 @@
 #include "savvy/variant_iterator.hpp"
 #include "savvy/utility.hpp"
 
+#include <shrinkwrap/istream.hpp>
+
 #include <assert.h>
 #include <algorithm>
 #include <map>
@@ -236,6 +238,14 @@ namespace savvy
     //================================================================//
     const std::array<std::string, 0> writer::empty_string_array = {};
     const std::array<std::pair<std::string, std::string>, 0> writer::empty_string_pair_array = {};
+
+    std::unique_ptr<std::streambuf> writer::create_out_streambuf(const std::string& file_path, std::int8_t compression_level)
+    {
+      if (compression_level > 0)
+        return std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, compression_level));
+      else
+        return std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out));
+    }
 
     bool writer::create_index(const std::string& input_file_path, std::string output_file_path)
     {

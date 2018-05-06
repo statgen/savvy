@@ -9,6 +9,8 @@
 #include <htslib/synced_bcf_reader.h>
 #include <htslib/vcf.h>
 
+#include <shrinkwrap/gz.hpp>
+
 #include <sstream>
 #include <assert.h>
 #include <limits>
@@ -371,6 +373,14 @@ namespace savvy
         bcf_destroy1(rec);
 
       return nullptr;
+    }
+
+    std::unique_ptr<std::ostream> create_out_stream(const std::string& file_path, compression_type type)
+    {
+      if (type == compression_type::none)
+        return std::unique_ptr<std::ostream>(new std::ofstream(file_path));
+      else
+        return std::unique_ptr<std::ostream>(new shrinkwrap::bgzf::ostream(file_path));
     }
   }
 }
