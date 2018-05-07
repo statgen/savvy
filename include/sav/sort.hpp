@@ -9,6 +9,8 @@
 
 #include "savvy/sav_reader.hpp"
 
+#include <shrinkwrap/zstd.hpp>
+
 #include <string>
 #include <random>
 

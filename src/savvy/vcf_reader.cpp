@@ -5,14 +5,13 @@
  */
 
 #include "savvy/vcf_reader.hpp"
-
+extern "C" {
 #include <htslib/synced_bcf_reader.h>
 #include <htslib/vcf.h>
-
+}
 #include <shrinkwrap/gz.hpp>
 
 #include <sstream>
-#include <assert.h>
 #include <limits>
 
 namespace savvy
@@ -375,7 +374,7 @@ namespace savvy
       return nullptr;
     }
 
-    std::unique_ptr<std::ostream> create_out_stream(const std::string& file_path, compression_type type)
+    std::unique_ptr<std::ostream> detail::create_out_stream(const std::string& file_path, compression_type type)
     {
       if (type == compression_type::none)
         return std::unique_ptr<std::ostream>(new std::ofstream(file_path));
