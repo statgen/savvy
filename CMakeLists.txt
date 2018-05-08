@@ -8,6 +8,9 @@ set(CMAKE_CXX_STANDARD 11)
 #set_property(TARGET hts PROPERTY IMPORTED_LOCATION ${CMAKE_INSTALL_PREFIX}/lib/libhts.a)
 #set_property(TARGET hts APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_INSTALL_PREFIX}/include)
 
+if (USE_CXX3_ABI)
+    add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
+endif()
 
 if(CGET_PREFIX)
     link_directories(${CGET_PREFIX}/lib)
@@ -98,8 +101,8 @@ if(BUILD_SLR_EXAMPLES)
     target_link_libraries(linreg-ttest savvy ${OPENCL_LIB})
 endif()
 
-install(DIRECTORY include/savvy DESTINATION include)
-install(TARGETS savvy EXPORT ${PROJECT_NAME}-config
+install(DIRECTORY include/savvy COMPONENT api DESTINATION include)
+install(TARGETS savvy COMPONENT api EXPORT ${PROJECT_NAME}-config
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
 
@@ -107,23 +110,26 @@ install(TARGETS sav COMPONENT cli
         RUNTIME DESTINATION bin
         OPTIONAL)
 
-install(EXPORT ${PROJECT_NAME}-config DESTINATION share/${PROJECT_NAME})
+install(EXPORT ${PROJECT_NAME}-config COMPONENT api DESTINATION share/${PROJECT_NAME})
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPATIBILITY SameMajorVersion)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake DESTINATION share/${PROJECT_NAME})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPONENT api DESTINATION share/${PROJECT_NAME})
 
 export(EXPORT ${PROJECT_NAME}-config)
 
 #set(CPACK_PACKAGE_NAME "${PROJECT_NAME")
-#set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
-#set(CPACK_DEB_COMPONENT_INSTALL ON)
-#set(CPACK_RPM_COMPONENT_INSTALL ON)
-#set(CPACK_COMPONENTS_ALL cli)
-execute_process(COMMAND bash "-c" "finger $(whoami) | egrep -o 'Name: [a-zA-Z0-9 ]{1,}' | cut -d ':' -f 2 | xargs echo -n" OUTPUT_VARIABLE FULL_NAME)
-set(CPACK_PACKAGE_CONTACT ${FULL_NAME})
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+set(CPACK_DEB_COMPONENT_INSTALL ON)
+set(CPACK_RPM_COMPONENT_INSTALL ON)
+#set(CPACK_COMPONENTS_ALL "")
 
-if (UNIX AND NOT APPLE)
-    set(CPACK_GENERATOR "DEB;RPM;STGZ")
-endif()
+#set(CPACK_SYSTEM_NAME Linux-cxx3-abi)
+#execute_process(COMMAND bash "-c" "finger $(whoami) | egrep -o 'Name: [a-zA-Z0-9 ]{1,}' | cut -d ':' -f 2 | xargs echo -n" OUTPUT_VARIABLE FULL_NAME)
+#set(CPACK_PACKAGE_CONTACT ${FULL_NAME})
+set(CPACK_PACKAGE_CONTACT "University of Michigan Center for Statistical Genetics")
+
+#if (UNIX AND NOT APPLE)
+#    set(CPACK_GENERATOR "DEB;RPM;STGZ")
+#endif()
 
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})

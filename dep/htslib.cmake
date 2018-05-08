@@ -1,13 +1,26 @@
 cmake_minimum_required(VERSION 3.2)
 project(htslib VERSION 1.3.1)
 
+get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+foreach(dir ${dirs})
+    set(CMAKE_C_FLAGS "-I${dir}" ${CMAKE_C_FLAGS})
+    set(CMAKE_CXX_FLAGS "-I${dir}" ${CMAKE_CXX_FLAGS})
+endforeach()
+message("dirs: ${dirs}")
+message("cxxflags: ${CMAKE_CXX_FLAGS}")
+
 #execute_process(COMMAND ./configure --disable-libcurl --disable-lzma --disable-bz2 --prefix=${CMAKE_INSTALL_PREFIX} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+#set(ENV{CFLAGS} "${CMAKE_C_FLAGS} $ENV{CFLAGS}")
+#set(ENV{CXXFLAGS} "${CMAKE_CXX_FLAGS} $ENV{CXXFLAGS}")
+#set(ENV{AM_CFLAGS} -I${CGET_PREFIX}/include)
+#set(ENV{CPPFLAGS} -I${CGET_PREFIX}/include)
 
 execute_process(COMMAND ./configure --disable-libcurl --disable-lzma --disable-bz2 --prefix=${CMAKE_INSTALL_PREFIX} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_custom_command(OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}hts${CMAKE_SHARED_LIBRARY_SUFFIX}" "${CMAKE_CURRENT_SOURCE_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}hts${CMAKE_STATIC_LIBRARY_SUFFIX}"
-                COMMAND $(MAKE)
-                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-                COMMENT "Building htslib ...")
+                   COMMAND $(MAKE) CFLAGS="${CMAKE_C_FLAGS}" CXXFLAGS="${CMAKE_CXX_FLAGS}"
+                   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                   COMMENT "Building htslib ...")
 add_custom_target(hts ALL DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}hts${CMAKE_SHARED_LIBRARY_SUFFIX}" "${CMAKE_CURRENT_SOURCE_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}hts${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
 #add_custom_target(hts ALL
@@ -15,7 +28,7 @@ add_custom_target(hts ALL DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${CMAKE_SHARED_LI
                   #WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" 
                   #COMMENT "Building htslib ...")
 
-#install(DIRECTORY htslib DESTINATION include)
+install(DIRECTORY htslib DESTINATION include)
 
 if (BUILD_SHARED_LIBS)
     install(FILES
