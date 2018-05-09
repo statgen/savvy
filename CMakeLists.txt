@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.2)
 project(savvy VERSION 1.0.0)
 include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 11)
 
@@ -103,8 +104,8 @@ endif()
 
 install(DIRECTORY include/savvy COMPONENT api DESTINATION include)
 install(TARGETS savvy COMPONENT api EXPORT ${PROJECT_NAME}-config
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 install(TARGETS sav COMPONENT cli
         RUNTIME DESTINATION bin
@@ -117,15 +118,14 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake C
 export(EXPORT ${PROJECT_NAME}-config)
 
 #set(CPACK_PACKAGE_NAME "${PROJECT_NAME")
-set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
-set(CPACK_DEB_COMPONENT_INSTALL ON)
-set(CPACK_RPM_COMPONENT_INSTALL ON)
+#set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+#set(CPACK_DEB_COMPONENT_INSTALL ON)
+#set(CPACK_RPM_COMPONENT_INSTALL ON)
 #set(CPACK_COMPONENTS_ALL "")
 
 #set(CPACK_SYSTEM_NAME Linux-cxx3-abi)
 #execute_process(COMMAND bash "-c" "finger $(whoami) | egrep -o 'Name: [a-zA-Z0-9 ]{1,}' | cut -d ':' -f 2 | xargs echo -n" OUTPUT_VARIABLE FULL_NAME)
 #set(CPACK_PACKAGE_CONTACT ${FULL_NAME})
-set(CPACK_PACKAGE_CONTACT "University of Michigan Center for Statistical Genetics")
 
 #if (UNIX AND NOT APPLE)
 #    set(CPACK_GENERATOR "DEB;RPM;STGZ")
