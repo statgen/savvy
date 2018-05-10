@@ -248,7 +248,7 @@ public:
 
     if (remaining_arg_count < 2 && index_ && index_path_.empty())
     {
-      std::cerr << "--index-file must be specified in output path is not." << std::endl;
+      std::cerr << "--index-file must be specified when output path is not." << std::endl;
       return false;
     }
 
