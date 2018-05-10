@@ -69,6 +69,7 @@ cd build-cli
 cmake \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_TOOLCHAIN_FILE=/cget/cget/cget.cmake \
+  -DCMAKE_CXX_FLAGS="-static-libstdc++" \
   -DCPACK_GENERATOR="STGZ;DEB;RPM" \
   -DCPACK_PACKAGE_CONTACT="csg-devel@umich.edu" \
   -DCPACK_ARCHIVE_COMPONENT_INSTALL=ON \
