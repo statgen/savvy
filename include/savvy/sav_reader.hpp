@@ -267,7 +267,7 @@ namespace savvy
       }
 
       template <std::size_t BitWidth, typename T>
-      void read_genotypes_al(T& destination)
+      void read_genotypes_al(site_info& annotations, T& destination)
       {
         if (good())
         {
@@ -296,9 +296,13 @@ namespace savvy
             varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
+            std::size_t an = samples().size() * ploidy_level;
+            std::size_t ac = 0;
+
             if (subset_size_ != samples().size())
             {
-              destination.resize(subset_size_ * ploidy_level);
+              an = subset_size_ * ploidy_level;
+              destination.resize(an);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -309,12 +313,22 @@ namespace savvy
 
                 const std::uint64_t sample_index = total_offset / ploidy_level;
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
-                  destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = (BitWidth == 1 ? allele : std::round(allele)); //(allele ? missing_value : alt_value);
+                {
+                  if (BitWidth != 1)
+                    allele = std::round(allele);
+
+                  if (std::isnan(allele))
+                    --an;
+                  else
+                    ++ac;
+
+                  destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele; //(allele ? missing_value : alt_value);
+                }
               }
             }
             else
             {
-              destination.resize(samples().size() * ploidy_level);
+              destination.resize(an);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -322,9 +336,23 @@ namespace savvy
                 std::uint64_t offset;
                 std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
                 total_offset += offset;
-                destination[total_offset] = (BitWidth == 1 ? allele : std::round(allele)); //(allele ? missing_value : alt_value);
+
+                if (BitWidth != 1)
+                  allele = std::round(allele);
+
+                if (std::isnan(allele))
+                  --an;
+                else
+                  ++ac;
+
+                destination[total_offset] = allele; //(allele ? missing_value : alt_value);
               }
             }
+
+            annotations.prop("AC", std::to_string(ac));
+            annotations.prop("AN", std::to_string(an));
+            if (an)
+              annotations.prop("AF", std::to_string(static_cast<float>(ac) / static_cast<float>(an)));
 
             if (input_stream_->get() == std::char_traits<char>::eof())
             {
@@ -336,7 +364,7 @@ namespace savvy
       }
 
       template <std::size_t BitWidth, typename T>
-      void read_genotypes_gt(T& destination)
+      void read_genotypes_gt(site_info& annotations, T& destination)
       {
         if (good())
         {
@@ -365,9 +393,14 @@ namespace savvy
             varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
+            std::size_t an = samples().size() * ploidy_level;
+            std::size_t ac = 0;
+
             if (subset_size_ != samples().size())
             {
               destination.resize(subset_size_);
+
+              an = subset_size_;
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -378,7 +411,17 @@ namespace savvy
 
                 const std::uint64_t sample_index = total_offset / ploidy_level;
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
-                  destination[subset_map_[sample_index]] += (BitWidth == 1 ? allele : std::round(allele)); //(allele ? missing_value : alt_value);
+                {
+                  if (BitWidth != 1)
+                    allele = std::round(allele);
+
+                  if (std::isnan(allele))
+                    --an;
+                  else
+                    ++ac;
+
+                  destination[subset_map_[sample_index]] += allele; //(allele ? missing_value : alt_value);
+                }
               }
             }
             else
@@ -391,9 +434,23 @@ namespace savvy
                 std::uint64_t offset;
                 std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
                 total_offset += offset;
-                destination[total_offset / ploidy_level] += (BitWidth == 1 ? allele : std::round(allele)); //(allele ? missing_value : alt_value);
+
+                if (BitWidth != 1)
+                  allele = std::round(allele);
+
+                if (std::isnan(allele))
+                  --an;
+                else
+                  ++ac;
+
+                destination[total_offset / ploidy_level] += allele; //(allele ? missing_value : alt_value);
               }
             }
+
+            annotations.prop("AC", std::to_string(ac));
+            annotations.prop("AN", std::to_string(an));
+            if (an)
+              annotations.prop("AF", std::to_string(static_cast<float>(ac) / static_cast<float>(an)));
 
             if (input_stream_->get() == std::char_traits<char>::eof())
             {
@@ -405,7 +462,7 @@ namespace savvy
       }
 
       template <std::size_t BitWidth, typename T>
-      void read_genotypes_gp(T& destination)
+      void read_genotypes_gp(site_info& annotations, T& destination)
       {
         if (good())
         {
@@ -526,7 +583,7 @@ namespace savvy
       }
 
       template <std::size_t BitWidth, typename T>
-      void read_genotypes_hds(T& destination)
+      void read_genotypes_hds(site_info& annotations, T& destination)
       {
         if (good())
         {
@@ -599,7 +656,7 @@ namespace savvy
       }
 
       template <std::size_t BitWidth, typename T>
-      void read_genotypes_ds(T& destination)
+      void read_genotypes_ds(site_info& annotations, T& destination)
       {
         if (good())
         {
@@ -697,21 +754,21 @@ namespace savvy
       }
 
       template <typename T>
-      void read_genotypes(T& destination)
+      void read_genotypes(site_info& annotations, T& destination)
       {
         destination.resize(0);
         if (true) //requested_data_formats_[idx] == file_data_format_)
         {
           if (requested_data_format_ == fmt::gt)
-            file_data_format_ == fmt::gt ? read_genotypes_al<1>(destination) : read_genotypes_al<7>(destination);
+            file_data_format_ == fmt::gt ? read_genotypes_al<1>(annotations, destination) : read_genotypes_al<7>(annotations, destination);
           else if (requested_data_format_== fmt::ac)
-            file_data_format_ == fmt::gt ? read_genotypes_gt<1>(destination) : read_genotypes_gt<7>(destination);
+            file_data_format_ == fmt::gt ? read_genotypes_gt<1>(annotations, destination) : read_genotypes_gt<7>(annotations, destination);
           else if (requested_data_format_ == fmt::gp)
-            file_data_format_ == fmt::gt ? read_genotypes_gp<1>(destination) : read_genotypes_gp<7>(destination);
+            file_data_format_ == fmt::gt ? read_genotypes_gp<1>(annotations, destination) : read_genotypes_gp<7>(annotations, destination);
           else if (requested_data_format_ == fmt::ds)
-            file_data_format_ == fmt::gt ? read_genotypes_ds<1>(destination) : read_genotypes_ds<7>(destination);
+            file_data_format_ == fmt::gt ? read_genotypes_ds<1>(annotations, destination) : read_genotypes_ds<7>(annotations, destination);
           else if (requested_data_format_ == fmt::hds)
-            file_data_format_ == fmt::gt ? read_genotypes_hds<1>(destination) : read_genotypes_hds<7>(destination);
+            file_data_format_ == fmt::gt ? read_genotypes_hds<1>(annotations, destination) : read_genotypes_hds<7>(annotations, destination);
           else
             input_stream_->setstate(std::ios::failbit);
         }
@@ -754,7 +811,20 @@ namespace savvy
       reader& read(site_info& annotations, T& destination)
       {
         this->read_variant_details(annotations);
-        this->read_genotypes(destination);
+        this->read_genotypes(annotations, destination);
+        return *this;
+      }
+
+      template <typename Pred, typename T>
+      reader& read_if(Pred fn, site_info& annotations, T& destination)
+      {
+        while (good())
+        {
+          this->read_variant_details(annotations);
+          this->read_genotypes(annotations, destination);
+          if (fn(annotations))
+            break;
+        }
         return *this;
       }
     };
@@ -802,6 +872,7 @@ namespace savvy
       {
         return this->read(destination, destination.data());
       }
+
       template <typename T>
       indexed_reader& read(site_info& annotations, T& destination)
       {
@@ -834,7 +905,7 @@ namespace savvy
             ++current_offset_in_block_;
             if (region_compare(bounding_type_, annotations, reg_))
             {
-              this->read_genotypes(destination);
+              this->read_genotypes(annotations, destination);
               break;
             }
             else
@@ -851,42 +922,9 @@ namespace savvy
       {
         while (this->good())
         {
-          if (current_offset_in_block_ >= total_in_block_)
-          {
-            if (i_ == query_.end())
-              this->input_stream_->setstate(std::ios::eofbit);
-            else
-            {
-              total_in_block_ = std::uint32_t(0x000000000000FFFF & i_->value()) + 1;
-              current_offset_in_block_ = 0;
-              this->input_stream_->seekg(std::streampos((i_->value() >> 16) & 0x0000FFFFFFFFFFFF));
-              ++i_;
-            }
-          }
-
-          this->read_variant_details(annotations);
-          if (!this->good())
-          {
-            if (current_offset_in_block_ < total_in_block_)
-            {
-              assert(!"Truncated block");
-              this->input_stream_->setstate(std::ios::badbit);
-            }
-          }
-          else
-          {
-            ++current_offset_in_block_;
-            bool predicate_passed = fn(annotations);
-            if (region_compare(bounding_type_, annotations, reg_) && predicate_passed)
-            {
-              this->read_genotypes(destination);
-              break;
-            }
-            else
-            {
-              this->discard_genotypes();
-            }
-          }
+          read(annotations, destination);
+          if (fn(annotations))
+            break;
         }
 
         return *this;

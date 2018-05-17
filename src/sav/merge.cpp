@@ -321,7 +321,8 @@ int merge_main(int argc, char** argv)
         }
         else
         {
-          input_files[i].read_genotypes(vec_wrapper);
+          savvy::site_info tmp;
+          input_files[i].read_genotypes(tmp, vec_wrapper);
           if (!input_files[i].good())
           {
             // TODO: Corrupt File
