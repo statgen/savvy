@@ -243,7 +243,7 @@ namespace savvy
           ss << bcf_hdr_int2id(hdr_, BCF_DT_ID, rec_->d.flt[i]);
         }
         std::string fltr(ss.str());
-        if (fltr == "." || fltr == "PASS")
+        if (fltr == ".")
           fltr.clear();
         props["FILTER"] = std::move(fltr);
         props["ID"] = rec_->d.id;
