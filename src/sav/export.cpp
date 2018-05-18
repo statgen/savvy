@@ -8,6 +8,8 @@
 #include "sav/export.hpp"
 #include "sav/sort.hpp"
 #include "sav/utility.hpp"
+#include "sav/filter.hpp"
+
 #include "savvy/vcf_reader.hpp"
 #include "savvy/sav_reader.hpp"
 #include "savvy/savvy.hpp"
@@ -27,6 +29,7 @@ private:
   std::vector<option> long_options_;
   std::set<std::string> subset_ids_;
   std::vector<savvy::region> regions_;
+  filter filter_;
   std::string input_path_;
   std::string output_path_;
   std::string file_format_;
@@ -43,6 +46,7 @@ public:
         {"data-format", required_argument, 0, 'd'},
         {"exclude-monomorphic", no_argument, 0, '\x01'},
         {"file-format", required_argument, 0, 'f'},
+        {"filter", required_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
         {"regions", required_argument, 0, 'r'},
         {"regions-file", required_argument, 0, 'R'},
@@ -59,6 +63,8 @@ public:
   const std::string& input_path() const { return input_path_; }
   const std::string& output_path() const { return output_path_; }
   const std::string& file_format() const { return file_format_; }
+  filter& filter_functor() { return filter_; }
+  const filter& filter_functor() const { return filter_; }
   const std::set<std::string>& subset_ids() const { return subset_ids_; }
   const std::vector<savvy::region>& regions() const { return regions_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
@@ -73,7 +79,7 @@ public:
     os << "Usage: sav export [opts ...] [in.sav] [out.{vcf,sav}]\n";
     os << "\n";
     os << " -d, --data-format     : Format field to export (GT, DS, HDS or GP, default: GT)\n";
-    //os << " -e, --filter-expression : File format (vcf or sav, default: vcf)\n";
+    os << " -e, --filter          : Expression for filtering based on info fields\n";
     os << " -f, --file-format     : File format (vcf, vcf.gz or sav, default: vcf)\n";
     os << " -h, --help            : Print usage\n";
     os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
@@ -91,7 +97,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "d:f:hi:I:p:r:R:sS:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "d:e:f:hi:I:p:r:R:sS:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -124,6 +130,17 @@ public:
           else if (str_opt_arg != "GT")
           {
             std::cerr << "Invalid format field value (" << str_opt_arg << ")\n";
+            return false;
+          }
+          break;
+        }
+        case 'e':
+        {
+          std::string str_opt_arg(optarg ? optarg : "");
+          filter_ = str_opt_arg;
+          if (!filter_)
+          {
+            std::cerr << "Invalid filter expression (" << str_opt_arg << ")\n";
             return false;
           }
           break;
@@ -262,53 +279,53 @@ public:
   }
 };
 
-template <typename Rdr>
-std::function<bool(const savvy::site_info& var)> gen_filter_predicate(const Rdr& in, const export_prog_args& args)
-{
-  std::size_t hap_cnt = in.samples().size() * in.ploidy();
-  if (args.exclude_monomorphic())
-  {
-    return [hap_cnt](const savvy::site_info& var)
-    {
-      if (var.prop("AC").size())
-      {
-        std::size_t ac = (std::size_t) std::atol(var.prop("AC").c_str());
-        if (!ac || ac == hap_cnt)
-          return false;
-      }
-      return true;
-    };
-  }
-  else
-  {
-    return [](const savvy::site_info& var) { return true; };
-  }
-}
+//template <typename Rdr>
+//std::function<bool(const savvy::site_info& var)> gen_filter_predicate(const Rdr& in, const export_prog_args& args)
+//{
+//  std::size_t hap_cnt = in.samples().size() * in.ploidy();
+//  if (args.exclude_monomorphic())
+//  {
+//    return [hap_cnt](const savvy::site_info& var)
+//    {
+//      if (var.prop("AC").size())
+//      {
+//        std::size_t ac = (std::size_t) std::atol(var.prop("AC").c_str());
+//        if (!ac || ac == hap_cnt)
+//          return false;
+//      }
+//      return true;
+//    };
+//  }
+//  else
+//  {
+//    return [](const savvy::site_info& var) { return true; };
+//  }
+//}
 
 template <typename Writer>
-int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, const export_prog_args& args, Writer& out)
+int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, const filter& fn, Writer& out)
 {
   savvy::site_info variant;
   std::vector<float> genotypes;
 
 
-  auto fn = gen_filter_predicate(in, args);
+  //auto fn = gen_filter_predicate(in, args);
 
-  while (in.read_if(fn, variant, genotypes))
+  while (in.read_if(std::ref(fn), variant, genotypes))
     out.write(variant, genotypes);
 
   return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 template <typename Writer>
-int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, const export_prog_args& args, Writer& out)
+int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, const filter& fn, Writer& out)
 {
   savvy::site_info variant;
   std::vector<float> genotypes;
 
-  auto fn = gen_filter_predicate(in, args);
+  //auto fn = gen_filter_predicate(in, args);
 
-  while (in.read_if(fn, variant, genotypes))
+  while (in.read_if(std::ref(fn), variant, genotypes))
     out.write(variant, genotypes);
 
   if (regions.size())
@@ -316,7 +333,7 @@ int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::regi
     for (auto it = regions.begin() + 1; it != regions.end(); ++it)
     {
       in.reset_region(*it);
-      while (in.read_if(fn, variant, genotypes))
+      while (in.read_if(std::ref(fn), variant, genotypes))
         out.write(variant, genotypes);
     }
   }
@@ -333,12 +350,12 @@ int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::stri
   }
   else
   {
-    return export_records(input, args.regions(), args, output);
+    return export_records(input, args.regions(), args.filter_functor(), output);
   }
 }
 
 template <typename T>
-int prep_reader_for_export(T& input, const export_prog_args& args)
+int prep_reader_for_export(T& input, export_prog_args& args)
 {
   if (!input)
   {
@@ -385,6 +402,12 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
 ////  else if (args.format() == savvy::fmt::genotype_probability)
 ////    headers.emplace_back("FORMAT", "<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1\">"); // TODO: Handle other ploidy levels.
 
+
+  if (args.exclude_monomorphic())
+  {
+    std::size_t hap_cnt = sample_ids.size() * input.ploidy();
+    args.filter_functor() += filter("AC!=0;AC!=" + std::to_string(hap_cnt)); // "&(AC!=0;AC!=" + std::to_string(hap_cnt) + ")"
+  }
 
   if (args.file_format() == "sav")
   {
