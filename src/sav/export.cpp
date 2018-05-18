@@ -89,6 +89,8 @@ public:
     os << " -R, --regions-file    : Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
     os << " -s, --sort            : Enables sorting by first position of allele\n";
     os << " -S, --sort-point      : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
+    os << "\n";
+    os << " --exclude-monomorphic : Filters out monomorphic variants\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
