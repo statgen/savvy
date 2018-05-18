@@ -79,7 +79,7 @@ public:
     os << "Usage: sav export [opts ...] [in.sav] [out.{vcf,sav}]\n";
     os << "\n";
     os << " -d, --data-format     : Format field to export (GT, DS, HDS or GP, default: GT)\n";
-    os << " -e, --filter          : Expression for filtering based on info fields\n";
+    os << " -e, --filter          : Expression for filtering based on info fields (eg, -e 'AC>=10;AF>0.01') # (IN DEVELOPMENT) More complex expressions in the works\n";
     os << " -f, --file-format     : File format (vcf, vcf.gz or sav, default: vcf)\n";
     os << " -h, --help            : Print usage\n";
     os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
