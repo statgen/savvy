@@ -31,15 +31,17 @@ private:
   std::string output_path_;
   std::string file_format_;
   std::unique_ptr<savvy::s1r::sort_point> sort_type_;
-  bool help_ = false;
   savvy::fmt format_ = savvy::fmt::gt;
   savvy::bounding_point bounding_point_ = savvy::bounding_point::beg;
+  bool help_ = false;
+  bool exclude_monomorphic_ = false;
 public:
   export_prog_args() :
     long_options_(
       {
         {"bounding-point", required_argument, 0, 'p'},
         {"data-format", required_argument, 0, 'd'},
+        {"exclude-monomorphic", no_argument, 0, '\x01'},
         {"file-format", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {"regions", required_argument, 0, 'r'},
@@ -63,6 +65,7 @@ public:
   savvy::fmt format() const { return format_; }
   savvy::bounding_point bounding_point() const { return bounding_point_; }
   bool help_is_set() const { return help_; }
+  bool exclude_monomorphic() const { return exclude_monomorphic_; }
 
   void print_usage(std::ostream& os)
   {
@@ -93,6 +96,16 @@ public:
       char copt = char(opt & 0xFF);
       switch (copt)
       {
+        case '\x01':
+        {
+          if (std::string(long_options_[long_index].name) == "exclude-monomorphic")
+          {
+            exclude_monomorphic_ = true;
+            break;
+          }
+          std::cerr << "Invalid long only index (" << long_index << ")\n";
+          return false;
+        }
         case 'd':
         {
           std::string str_opt_arg(optarg ? optarg : "");
@@ -249,25 +262,53 @@ public:
   }
 };
 
+template <typename Rdr>
+std::function<bool(const savvy::site_info& var)> gen_filter_predicate(const Rdr& in, const export_prog_args& args)
+{
+  std::size_t hap_cnt = in.samples().size() * in.ploidy();
+  if (args.exclude_monomorphic())
+  {
+    return [hap_cnt](const savvy::site_info& var)
+    {
+      if (var.prop("AC").size())
+      {
+        std::size_t ac = (std::size_t) std::atol(var.prop("AC").c_str());
+        if (!ac || ac == hap_cnt)
+          return false;
+      }
+      return true;
+    };
+  }
+  else
+  {
+    return [](const savvy::site_info& var) { return true; };
+  }
+}
+
 template <typename Writer>
-int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, Writer& out)
+int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, const export_prog_args& args, Writer& out)
 {
   savvy::site_info variant;
   std::vector<float> genotypes;
 
-  while (in.read(variant, genotypes))
+
+  auto fn = gen_filter_predicate(in, args);
+
+  while (in.read_if(fn, variant, genotypes))
     out.write(variant, genotypes);
 
   return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 template <typename Writer>
-int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, Writer& out)
+int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, const export_prog_args& args, Writer& out)
 {
   savvy::site_info variant;
   std::vector<float> genotypes;
 
-  while (in.read(variant, genotypes))
+  auto fn = gen_filter_predicate(in, args);
+
+  while (in.read_if(fn, variant, genotypes))
     out.write(variant, genotypes);
 
   if (regions.size())
@@ -275,7 +316,7 @@ int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::regi
     for (auto it = regions.begin() + 1; it != regions.end(); ++it)
     {
       in.reset_region(*it);
-      while (in.read(variant, genotypes))
+      while (in.read_if(fn, variant, genotypes))
         out.write(variant, genotypes);
     }
   }
@@ -292,7 +333,7 @@ int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::stri
   }
   else
   {
-    return export_records(input, args.regions(), output);
+    return export_records(input, args.regions(), args, output);
   }
 }
 
