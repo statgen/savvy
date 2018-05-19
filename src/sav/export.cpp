@@ -75,7 +75,7 @@ public:
   void print_usage(std::ostream& os)
   {
     os << "----------------------------------------------\n";
-    os << "Usage: sav export [opts ...] [in.sav] [out.{vcf,sav}]\n";
+    os << "Usage: sav export [opts ...] [in.sav] [out.{vcf,vcf.gz,sav}]\n";
     os << "\n";
     os << " -d, --data-format     : Format field to export (GT, DS, HDS or GP, default: GT)\n";
     os << " -e, --filter          : Expression for filtering based on info fields (eg, -e 'AC>=10;AF>0.01') # (IN DEVELOPMENT) More complex expressions in the works\n";
@@ -401,6 +401,11 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
 
   if (args.file_format() == "sav")
   {
+    headers.reserve(headers.size() + 3);
+    headers.insert(headers.end(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
+    headers.insert(headers.end(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
+    headers.insert(headers.end(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
+
     savvy::sav::writer output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
     return prep_writer_for_export(input, output, sample_ids, headers, args);
   }
