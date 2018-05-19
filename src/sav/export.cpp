@@ -29,6 +29,7 @@ private:
   std::vector<option> long_options_;
   std::set<std::string> subset_ids_;
   std::vector<savvy::region> regions_;
+  std::vector<std::string> info_fields_;
   filter filter_;
   std::string input_path_;
   std::string output_path_;
@@ -46,6 +47,7 @@ public:
         {"file-format", required_argument, 0, 'f'},
         {"filter", required_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
+        {"info-fields", required_argument, 0, 'm'},
         {"regions", required_argument, 0, 'r'},
         {"regions-file", required_argument, 0, 'R'},
         {"sample-ids", required_argument, 0, 'i'},
@@ -64,6 +66,7 @@ public:
   const filter& filter_functor() const { return filter_; }
   const std::set<std::string>& subset_ids() const { return subset_ids_; }
   const std::vector<savvy::region>& regions() const { return regions_; }
+  const std::vector<std::string>& info_fields() const { return info_fields_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
   savvy::fmt format() const { return format_; }
   savvy::bounding_point bounding_point() const { return bounding_point_; }
@@ -80,6 +83,7 @@ public:
     os << " -h, --help            : Print usage\n";
     os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
+    os << " -m, --info-fields     : Comma separated list of INFO (metadata) fields to include with each variant (default: exports all info fields)\n";
     os << " -p, --bounding-point  : Determines the inclusion policy of indels during region queries (any, all, beg or end, default: beg)\n";
     os << " -r, --regions         : Comma separated list of regions formatted as chr[:start-end]\n";
     os << " -R, --regions-file    : Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
@@ -93,7 +97,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "d:e:f:hi:I:p:r:R:sS:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "d:e:f:hi:I:m:p:r:R:sS:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -149,10 +153,13 @@ public:
           help_ = true;
           break;
         case 'i':
-          subset_ids_ = split_string_to_set(optarg, ',');
+          subset_ids_ = split_string_to_set(optarg ? optarg : "", ',');
           break;
         case 'I':
-          subset_ids_ = split_file_to_set(optarg);
+          subset_ids_ = split_file_to_set(optarg ? optarg : "");
+          break;
+        case 'm':
+          info_fields_ = split_string_to_vector(optarg ? optarg : "", ',');
           break;
         case 'p':
         {
@@ -361,8 +368,12 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
   for (auto it = headers.begin(); it != headers.end(); )
   {
     std::string header_id = savvy::parse_header_sub_field(it->second, "ID");
-    if ((it->first == "INFO" && (header_id == "ID" || header_id == "QUAL" || header_id == "FILTER")) || it->first == "FORMAT")
+    if ((it->first == "FORMAT") ||
+      (it->first == "INFO" && (header_id == "ID" || header_id == "QUAL" || header_id == "FILTER")) ||
+      (it->first == "INFO" && args.info_fields().size() && std::find(args.info_fields().begin(), args.info_fields().end(), header_id) == args.info_fields().end()))
+    {
       it = headers.erase(it);
+    }
     else
     {
       if (it->first == "fileDate")
