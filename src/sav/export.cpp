@@ -37,14 +37,12 @@ private:
   savvy::fmt format_ = savvy::fmt::gt;
   savvy::bounding_point bounding_point_ = savvy::bounding_point::beg;
   bool help_ = false;
-  bool exclude_monomorphic_ = false;
 public:
   export_prog_args() :
     long_options_(
       {
         {"bounding-point", required_argument, 0, 'p'},
         {"data-format", required_argument, 0, 'd'},
-        {"exclude-monomorphic", no_argument, 0, '\x01'},
         {"file-format", required_argument, 0, 'f'},
         {"filter", required_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
@@ -63,7 +61,6 @@ public:
   const std::string& input_path() const { return input_path_; }
   const std::string& output_path() const { return output_path_; }
   const std::string& file_format() const { return file_format_; }
-  filter& filter_functor() { return filter_; }
   const filter& filter_functor() const { return filter_; }
   const std::set<std::string>& subset_ids() const { return subset_ids_; }
   const std::vector<savvy::region>& regions() const { return regions_; }
@@ -71,7 +68,6 @@ public:
   savvy::fmt format() const { return format_; }
   savvy::bounding_point bounding_point() const { return bounding_point_; }
   bool help_is_set() const { return help_; }
-  bool exclude_monomorphic() const { return exclude_monomorphic_; }
 
   void print_usage(std::ostream& os)
   {
@@ -89,8 +85,6 @@ public:
     os << " -R, --regions-file    : Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
     os << " -s, --sort            : Enables sorting by first position of allele\n";
     os << " -S, --sort-point      : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
-    os << "\n";
-    os << " --exclude-monomorphic : Filters out monomorphic variants\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -104,16 +98,6 @@ public:
       char copt = char(opt & 0xFF);
       switch (copt)
       {
-        case '\x01':
-        {
-          if (std::string(long_options_[long_index].name) == "exclude-monomorphic")
-          {
-            exclude_monomorphic_ = true;
-            break;
-          }
-          std::cerr << "Invalid long only index (" << long_index << ")\n";
-          return false;
-        }
         case 'd':
         {
           std::string str_opt_arg(optarg ? optarg : "");
@@ -357,7 +341,7 @@ int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::stri
 }
 
 template <typename T>
-int prep_reader_for_export(T& input, export_prog_args& args)
+int prep_reader_for_export(T& input, const export_prog_args& args)
 {
   if (!input)
   {
@@ -403,13 +387,6 @@ int prep_reader_for_export(T& input, export_prog_args& args)
 //    headers.emplace_back("FORMAT", "<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage\">");
 ////  else if (args.format() == savvy::fmt::genotype_probability)
 ////    headers.emplace_back("FORMAT", "<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1\">"); // TODO: Handle other ploidy levels.
-
-
-  if (args.exclude_monomorphic())
-  {
-    std::size_t hap_cnt = sample_ids.size() * input.ploidy();
-    args.filter_functor() += filter("AC!=0;AC!=" + std::to_string(hap_cnt)); // "&(AC!=0;AC!=" + std::to_string(hap_cnt) + ")"
-  }
 
   if (args.file_format() == "sav")
   {
