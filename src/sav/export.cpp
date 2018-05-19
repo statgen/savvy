@@ -268,6 +268,14 @@ public:
       return false;
     }
 
+    if (info_fields_.size() && file_format_ == "sav")
+    {
+      info_fields_.reserve(info_fields_.size() + 3);
+      info_fields_.emplace_back("ID");
+      info_fields_.emplace_back("QUAL");
+      info_fields_.emplace_back("FILTER");
+    }
+
     return true;
   }
 };
@@ -369,7 +377,7 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
   {
     std::string header_id = savvy::parse_header_sub_field(it->second, "ID");
     if ((it->first == "FORMAT") ||
-      (it->first == "INFO" && (header_id == "ID" || header_id == "QUAL" || header_id == "FILTER")) ||
+      (it->first == "INFO"  && args.file_format() != "sav" && (header_id == "ID" || header_id == "QUAL" || header_id == "FILTER")) ||
       (it->first == "INFO" && args.info_fields().size() && std::find(args.info_fields().begin(), args.info_fields().end(), header_id) == args.info_fields().end()))
     {
       it = headers.erase(it);
@@ -401,11 +409,6 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
 
   if (args.file_format() == "sav")
   {
-    headers.reserve(headers.size() + 3);
-    headers.insert(headers.end(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
-    headers.insert(headers.end(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
-    headers.insert(headers.end(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
-
     savvy::sav::writer output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
     return prep_writer_for_export(input, output, sample_ids, headers, args);
   }
