@@ -470,7 +470,7 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
     if (args.index_path().size())
       opts.index_path = args.index_path();
 
-    savvy::sav::writer output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
+    savvy::sav::writer output(args.output_path(), opts, sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
     return prep_writer_for_export(input, output, sample_ids, headers, args);
   }
   else
