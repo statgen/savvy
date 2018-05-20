@@ -323,6 +323,11 @@ public:
       return false;
     }
 
+    if (compression_level_ < 0)
+      compression_level_ = default_compression_level;
+    else if (compression_level_ > 19)
+      compression_level_ = 19;
+
     if (info_fields_.size() && file_format_ == "sav")
     {
       info_fields_.reserve(info_fields_.size() + 3);
@@ -358,11 +363,11 @@ public:
 //  }
 //}
 
-template <typename Writer>
+template <typename Vec, typename Writer>
 int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, const filter& fn, Writer& out)
 {
   savvy::site_info variant;
-  std::vector<float> genotypes;
+  Vec genotypes;
 
 
   //auto fn = gen_filter_predicate(in, args);
@@ -373,11 +378,11 @@ int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& reg
   return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-template <typename Writer>
+template <typename Vec, typename Writer>
 int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, const filter& fn, Writer& out)
 {
   savvy::site_info variant;
-  std::vector<float> genotypes;
+  Vec genotypes;
 
   //auto fn = gen_filter_predicate(in, args);
 
@@ -397,7 +402,7 @@ int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::regi
   return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-template <typename Rdr, typename Wrtr>
+template <typename Vec, typename Rdr, typename Wrtr>
 int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::string>& sample_ids, const std::vector<std::pair<std::string, std::string>>& headers, const export_prog_args& args)
 {
   if (args.sort_type())
@@ -406,7 +411,7 @@ int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::stri
   }
   else
   {
-    return export_records(input, args.regions(), args.filter_functor(), output);
+    return export_records<Vec>(input, args.regions(), args.filter_functor(), output);
   }
 }
 
@@ -471,7 +476,7 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
       opts.index_path = args.index_path();
 
     savvy::sav::writer output(args.output_path(), opts, sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
-    return prep_writer_for_export(input, output, sample_ids, headers, args);
+    return prep_writer_for_export<savvy::compressed_vector<float>>(input, output, sample_ids, headers, args);
   }
   else
   {
@@ -479,7 +484,7 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
     if (args.file_format() == "vcf.gz")
       opts.compression = savvy::vcf::compression_type::bgzip;
     savvy::vcf::writer<1> output(args.output_path(), opts, sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
-    return prep_writer_for_export(input, output, sample_ids, headers, args);
+    return prep_writer_for_export<std::vector<float>>(input, output, sample_ids, headers, args);
   }
 }
 

@@ -296,7 +296,7 @@ public:
 int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::region>& regions, savvy::sav::writer& out)
 {
   savvy::site_info variant;
-  std::vector<float> genotypes;
+  savvy::compressed_vector<float> genotypes;
   while (out && in.read(variant, genotypes))
     out.write(variant, genotypes);
 
@@ -320,7 +320,7 @@ int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& 
 {
   // TODO: support regions without index.
   savvy::site_info variant;
-  std::vector<float> genotypes;
+  savvy::compressed_vector<float> genotypes;
   while (out && in.read(variant, genotypes))
     out.write(variant, genotypes);
 
