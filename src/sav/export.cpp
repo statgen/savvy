@@ -29,25 +29,32 @@ private:
   std::vector<option> long_options_;
   std::set<std::string> subset_ids_;
   std::vector<savvy::region> regions_;
+  std::vector<std::string> info_fields_;
   filter filter_;
   std::string input_path_;
   std::string output_path_;
+  std::string index_path_;
   std::string file_format_;
   std::unique_ptr<savvy::s1r::sort_point> sort_type_;
   savvy::fmt format_ = savvy::fmt::gt;
   savvy::bounding_point bounding_point_ = savvy::bounding_point::beg;
+  int compression_level_ = -1;
+  std::uint16_t block_size_ = default_block_size;
   bool help_ = false;
-  bool exclude_monomorphic_ = false;
+  bool index_ = false;
 public:
   export_prog_args() :
     long_options_(
       {
+        {"block-size", required_argument, 0, 'b'},
         {"bounding-point", required_argument, 0, 'p'},
         {"data-format", required_argument, 0, 'd'},
-        {"exclude-monomorphic", no_argument, 0, '\x01'},
         {"file-format", required_argument, 0, 'f'},
         {"filter", required_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
+        {"index", no_argument, 0, 'x'},
+        {"index-file", required_argument, 0, 'X'},
+        {"info-fields", required_argument, 0, 'm'},
         {"regions", required_argument, 0, 'r'},
         {"regions-file", required_argument, 0, 'R'},
         {"sample-ids", required_argument, 0, 'i'},
@@ -63,34 +70,40 @@ public:
   const std::string& input_path() const { return input_path_; }
   const std::string& output_path() const { return output_path_; }
   const std::string& file_format() const { return file_format_; }
-  filter& filter_functor() { return filter_; }
+  const std::string& index_path() const { return index_path_; }
   const filter& filter_functor() const { return filter_; }
   const std::set<std::string>& subset_ids() const { return subset_ids_; }
   const std::vector<savvy::region>& regions() const { return regions_; }
+  const std::vector<std::string>& info_fields() const { return info_fields_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
   savvy::fmt format() const { return format_; }
   savvy::bounding_point bounding_point() const { return bounding_point_; }
+  std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
+  std::uint16_t block_size() const { return block_size_; }
+  bool index_is_set() const { return index_; }
   bool help_is_set() const { return help_; }
-  bool exclude_monomorphic() const { return exclude_monomorphic_; }
 
   void print_usage(std::ostream& os)
   {
     os << "----------------------------------------------\n";
-    os << "Usage: sav export [opts ...] [in.sav] [out.{vcf,sav}]\n";
+    os << "Usage: sav export [opts ...] [in.sav] [out.{vcf,vcf.gz,sav}]\n";
     os << "\n";
+    os << " -#                    : # compression level (1-19, default: " << default_compression_level << ")\n";
+    os << " -b, --block-size      : Number of markers in SAV compression block (0-65535, default: " << default_block_size << ")\n";
     os << " -d, --data-format     : Format field to export (GT, DS, HDS or GP, default: GT)\n";
     os << " -e, --filter          : Expression for filtering based on info fields (eg, -e 'AC>=10;AF>0.01') # (IN DEVELOPMENT) More complex expressions in the works\n";
     os << " -f, --file-format     : File format (vcf, vcf.gz or sav, default: vcf)\n";
     os << " -h, --help            : Print usage\n";
     os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
+    os << " -m, --info-fields     : Comma separated list of INFO (metadata) fields to include with each variant (default: exports all info fields)\n";
     os << " -p, --bounding-point  : Determines the inclusion policy of indels during region queries (any, all, beg or end, default: beg)\n";
     os << " -r, --regions         : Comma separated list of regions formatted as chr[:start-end]\n";
     os << " -R, --regions-file    : Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
     os << " -s, --sort            : Enables sorting by first position of allele\n";
     os << " -S, --sort-point      : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
-    os << "\n";
-    os << " --exclude-monomorphic : Filters out monomorphic variants\n";
+    os << " -x, --index           : Enables indexing (SAV output only)\n";
+    os << " -X, --index-file      : Enables indexing and specifies index output file (SAV output only)\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
@@ -99,21 +112,29 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "d:e:f:hi:I:p:r:R:sS:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:d:e:f:hi:I:m:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
       {
-        case '\x01':
-        {
-          if (std::string(long_options_[long_index].name) == "exclude-monomorphic")
-          {
-            exclude_monomorphic_ = true;
-            break;
-          }
-          std::cerr << "Invalid long only index (" << long_index << ")\n";
-          return false;
-        }
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+          if (compression_level_ < 0)
+            compression_level_ = 0;
+          compression_level_ *= 10;
+          compression_level_ += copt - '0';
+          break;
+        case 'b':
+          block_size_ = std::uint16_t(std::atoi(optarg) > 0xFFFF ? 0xFFFF : std::atoi(optarg));
+          break;
         case 'd':
         {
           std::string str_opt_arg(optarg ? optarg : "");
@@ -165,10 +186,13 @@ public:
           help_ = true;
           break;
         case 'i':
-          subset_ids_ = split_string_to_set(optarg, ',');
+          subset_ids_ = split_string_to_set(optarg ? optarg : "", ',');
           break;
         case 'I':
-          subset_ids_ = split_file_to_set(optarg);
+          subset_ids_ = split_file_to_set(optarg ? optarg : "");
+          break;
+        case 'm':
+          info_fields_ = split_string_to_vector(optarg ? optarg : "", ',');
           break;
         case 'p':
         {
@@ -243,12 +267,24 @@ public:
           }
           break;
         }
+        case 'x':
+          index_ = true;
+          break;
+        case 'X':
+          index_ = true;
+          index_path_ = optarg;
         default:
           return false;
       }
     }
 
     int remaining_arg_count = argc - optind;
+
+    if (remaining_arg_count < 2 && index_ && index_path_.empty())
+    {
+      std::cerr << "--index-file must be specified when output path is not." << std::endl;
+      return false;
+    }
 
     if (remaining_arg_count == 0)
     {
@@ -270,11 +306,34 @@ public:
     {
       input_path_ = argv[optind];
       output_path_ = argv[optind + 1];
+
+      if (index_ && index_path_.empty())
+        index_path_ = output_path_ + ".s1r";
+
+      if (::savvy::detail::has_extension(output_path_, ".sav"))
+        file_format_ = "sav";
+      else if (::savvy::detail::has_extension(output_path_, ".vcf"))
+        file_format_ = "vcf";
+      else if (::savvy::detail::has_extension(output_path_, ".vcf.gz"))
+        file_format_ = "vcf.gz";
     }
     else
     {
       std::cerr << "Too many arguments\n";
       return false;
+    }
+
+    if (compression_level_ < 0)
+      compression_level_ = default_compression_level;
+    else if (compression_level_ > 19)
+      compression_level_ = 19;
+
+    if (info_fields_.size() && file_format_ == "sav")
+    {
+      info_fields_.reserve(info_fields_.size() + 3);
+      info_fields_.emplace_back("ID");
+      info_fields_.emplace_back("QUAL");
+      info_fields_.emplace_back("FILTER");
     }
 
     return true;
@@ -304,11 +363,11 @@ public:
 //  }
 //}
 
-template <typename Writer>
+template <typename Vec, typename Writer>
 int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, const filter& fn, Writer& out)
 {
   savvy::site_info variant;
-  std::vector<float> genotypes;
+  Vec genotypes;
 
 
   //auto fn = gen_filter_predicate(in, args);
@@ -319,11 +378,11 @@ int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& reg
   return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-template <typename Writer>
+template <typename Vec, typename Writer>
 int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, const filter& fn, Writer& out)
 {
   savvy::site_info variant;
-  std::vector<float> genotypes;
+  Vec genotypes;
 
   //auto fn = gen_filter_predicate(in, args);
 
@@ -343,7 +402,7 @@ int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::regi
   return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-template <typename Rdr, typename Wrtr>
+template <typename Vec, typename Rdr, typename Wrtr>
 int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::string>& sample_ids, const std::vector<std::pair<std::string, std::string>>& headers, const export_prog_args& args)
 {
   if (args.sort_type())
@@ -352,12 +411,12 @@ int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::stri
   }
   else
   {
-    return export_records(input, args.regions(), args.filter_functor(), output);
+    return export_records<Vec>(input, args.regions(), args.filter_functor(), output);
   }
 }
 
 template <typename T>
-int prep_reader_for_export(T& input, export_prog_args& args)
+int prep_reader_for_export(T& input, const export_prog_args& args)
 {
   if (!input)
   {
@@ -377,8 +436,12 @@ int prep_reader_for_export(T& input, export_prog_args& args)
   for (auto it = headers.begin(); it != headers.end(); )
   {
     std::string header_id = savvy::parse_header_sub_field(it->second, "ID");
-    if ((it->first == "INFO" && (header_id == "ID" || header_id == "QUAL" || header_id == "FILTER")) || it->first == "FORMAT")
+    if ((it->first == "FORMAT") ||
+      (it->first == "INFO"  && args.file_format() != "sav" && (header_id == "ID" || header_id == "QUAL" || header_id == "FILTER")) ||
+      (it->first == "INFO" && args.info_fields().size() && std::find(args.info_fields().begin(), args.info_fields().end(), header_id) == args.info_fields().end()))
+    {
       it = headers.erase(it);
+    }
     else
     {
       if (it->first == "fileDate")
@@ -404,17 +467,16 @@ int prep_reader_for_export(T& input, export_prog_args& args)
 ////  else if (args.format() == savvy::fmt::genotype_probability)
 ////    headers.emplace_back("FORMAT", "<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1\">"); // TODO: Handle other ploidy levels.
 
-
-  if (args.exclude_monomorphic())
-  {
-    std::size_t hap_cnt = sample_ids.size() * input.ploidy();
-    args.filter_functor() += filter("AC!=0;AC!=" + std::to_string(hap_cnt)); // "&(AC!=0;AC!=" + std::to_string(hap_cnt) + ")"
-  }
-
   if (args.file_format() == "sav")
   {
-    savvy::sav::writer output(args.output_path(), sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
-    return prep_writer_for_export(input, output, sample_ids, headers, args);
+    savvy::sav::writer::options opts;
+    opts.compression_level = args.compression_level();
+    opts.block_size = args.block_size();
+    if (args.index_path().size())
+      opts.index_path = args.index_path();
+
+    savvy::sav::writer output(args.output_path(), opts, sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
+    return prep_writer_for_export<savvy::compressed_vector<float>>(input, output, sample_ids, headers, args);
   }
   else
   {
@@ -422,7 +484,7 @@ int prep_reader_for_export(T& input, export_prog_args& args)
     if (args.file_format() == "vcf.gz")
       opts.compression = savvy::vcf::compression_type::bgzip;
     savvy::vcf::writer<1> output(args.output_path(), opts, sample_ids.begin(), sample_ids.end(), headers.begin(), headers.end(), args.format());
-    return prep_writer_for_export(input, output, sample_ids, headers, args);
+    return prep_writer_for_export<std::vector<float>>(input, output, sample_ids, headers, args);
   }
 }
 
