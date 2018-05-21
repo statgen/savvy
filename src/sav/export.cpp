@@ -182,7 +182,7 @@ public:
         }
         case 'h':
           help_ = true;
-          break;
+          return true;
         case 'i':
           subset_ids_ = split_string_to_set(optarg ? optarg : "", ',');
           break;

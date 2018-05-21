@@ -31,11 +31,9 @@ public:
 
   void print_usage(std::ostream& os)
   {
-    os << "----------------------------------------------\n";
     os << "Usage: sav stat-index [opts ...] <in.sav.s1r> \n";
     os << "\n";
     os << " -h, --help  Print usage\n";
-    os << "----------------------------------------------\n";
     os << std::flush;
   }
 
@@ -50,7 +48,7 @@ public:
       {
       case 'h':
         help_ = true;
-        break;
+        return true;
       default:
         return false;
       }

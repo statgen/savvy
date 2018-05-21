@@ -150,7 +150,7 @@ public:
         }
         case 'h':
           help_ = true;
-          break;
+          return true;
         case 'r':
           for (const auto& r : split_string_to_vector(optarg, ','))
             regions_.emplace_back(string_to_region(r));
