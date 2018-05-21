@@ -76,9 +76,12 @@ target_link_libraries(sav savvy)
 #target_link_libraries(savvy-speed-test savvy)
 
 add_custom_target(manuals
-        COMMAND help2man --output "${CMAKE_BINARY_DIR}/sav.1" "${CMAKE_BINARY_DIR}/sav"
-        COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_import.1" "${CMAKE_BINARY_DIR}/sav import"
-        COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_export.1" "${CMAKE_BINARY_DIR}/sav export")
+                  COMMAND help2man --output "${CMAKE_BINARY_DIR}/sav.1" "${CMAKE_BINARY_DIR}/sav"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_import.1" "${CMAKE_BINARY_DIR}/sav import"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_export.1" "${CMAKE_BINARY_DIR}/sav export"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_index.1" "${CMAKE_BINARY_DIR}/sav index"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_stat-index.1" "${CMAKE_BINARY_DIR}/sav stat-index"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_merge.1" "${CMAKE_BINARY_DIR}/sav merge")
 
 if(BUILD_TESTS)
     enable_testing()

@@ -58,11 +58,11 @@ public:
     os << "----------------------------------------------\n";
     os << "Usage: sav merge [opts ...] <input.{sav,vcf,vcf.gz,bcf}> <input2.{sav,vcf,vcf.gz,bcf}> [additional_input.{sav,vcf,vcf.gz,bcf} ...] \n";
     os << "\n";
-    os << " -#               : # compression level (1-19, default: " << default_compression_level << ")\n";
-    os << " -b, --block-size : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
-    os << " -f, --format     : Format field to copy (GT or HDS, default: GT)\n";
-    os << " -h, --help       : Print usage\n";
-    os << " -o, --output     : Output file (default: stdout)\n";
+    os << " -#                # compression level (1-19, default: " << default_compression_level << ")\n";
+    os << " -b, --block-size  Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
+    os << " -f, --format      Format field to copy (GT or HDS, default: GT)\n";
+    os << " -h, --help        Print usage\n";
+    os << " -o, --output      Output file (default: stdout)\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }

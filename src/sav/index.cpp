@@ -39,7 +39,7 @@ public:
     os << "----------------------------------------------\n";
     os << "Usage: sav index [opts ...] <in.sav> \n";
     os << "\n";
-    os << " -h, --help         : Print usage\n";
+    os << " -h, --help  Print usage\n";
     os << "----------------------------------------------\n";
     os << std::flush;
   }
