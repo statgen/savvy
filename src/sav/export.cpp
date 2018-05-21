@@ -85,26 +85,24 @@ public:
 
   void print_usage(std::ostream& os)
   {
-    os << "----------------------------------------------\n";
     os << "Usage: sav export [opts ...] [in.sav] [out.{vcf,vcf.gz,sav}]\n";
     os << "\n";
-    os << " -#                    : # compression level (1-19, default: " << default_compression_level << ")\n";
-    os << " -b, --block-size      : Number of markers in SAV compression block (0-65535, default: " << default_block_size << ")\n";
-    os << " -d, --data-format     : Format field to export (GT, DS, HDS or GP, default: GT)\n";
-    os << " -e, --filter          : Expression for filtering based on info fields (eg, -e 'AC>=10;AF>0.01') # (IN DEVELOPMENT) More complex expressions in the works\n";
-    os << " -f, --file-format     : File format (vcf, vcf.gz or sav, default: vcf)\n";
-    os << " -h, --help            : Print usage\n";
-    os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
-    os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
-    os << " -m, --info-fields     : Comma separated list of INFO (metadata) fields to include with each variant (default: exports all info fields)\n";
-    os << " -p, --bounding-point  : Determines the inclusion policy of indels during region queries (any, all, beg or end, default: beg)\n";
-    os << " -r, --regions         : Comma separated list of regions formatted as chr[:start-end]\n";
-    os << " -R, --regions-file    : Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
-    os << " -s, --sort            : Enables sorting by first position of allele\n";
-    os << " -S, --sort-point      : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
-    os << " -x, --index           : Enables indexing (SAV output only)\n";
-    os << " -X, --index-file      : Enables indexing and specifies index output file (SAV output only)\n";
-    os << "----------------------------------------------\n";
+    os << " -#                     Number (#) of compression level (1-19, default: " << default_compression_level << ")\n";
+    os << " -b, --block-size       Number of markers in SAV compression block (0-65535, default: " << default_block_size << ")\n";
+    os << " -d, --data-format      Format field to export (GT, DS, HDS or GP, default: GT)\n";
+    os << " -e, --filter           Expression for filtering based on info fields (eg, -e 'AC>=10;AF>0.01') # (IN DEVELOPMENT) More complex expressions in the works\n";
+    os << " -f, --file-format      File format (vcf, vcf.gz or sav, default: vcf)\n";
+    os << " -h, --help             Print usage\n";
+    os << " -i, --sample-ids       Comma separated list of sample IDs to subset\n";
+    os << " -I, --sample-ids-file  Path to file containing list of sample IDs to subset\n";
+    os << " -m, --info-fields      Comma separated list of INFO (metadata) fields to include with each variant (default: exports all info fields)\n";
+    os << " -p, --bounding-point   Determines the inclusion policy of indels during region queries (any, all, beg or end, default: beg)\n";
+    os << " -r, --regions          Comma separated list of regions formatted as chr[:start-end]\n";
+    os << " -R, --regions-file     Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
+    os << " -s, --sort             Enables sorting by first position of allele\n";
+    os << " -S, --sort-point       Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
+    os << " -x, --index            Enables indexing (SAV output only)\n";
+    os << " -X, --index-file       Enables indexing and specifies index output file (SAV output only)\n";
     os << std::flush;
   }
 

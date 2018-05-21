@@ -78,7 +78,7 @@ cmake \
   -DCPACK_COMPONENTS_ALL=cli \
   ${src_dir}
 
-make sav
+make sav manuals
 make package
 cp savvy-*.{sh,deb,rpm} ${out_dir}/
 cd ..

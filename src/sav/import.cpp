@@ -77,25 +77,23 @@ public:
 
   void print_usage(std::ostream& os) const
   {
-    os << "----------------------------------------------\n";
     os << "Usage: sav import [opts ...] [in.{vcf,vcf.gz,bcf}] [out.sav]\n";
     os << "\n";
-    os << " -#                    : # compression level (1-19, default: " << default_compression_level << ")\n";
-    os << " -b, --block-size      : Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
-    os << " -d, --data-format     : Format field to copy (GT or HDS, default: GT)\n";
-    os << " -h, --help            : Print usage\n";
-    os << " -i, --sample-ids      : Comma separated list of sample IDs to subset\n";
-    os << " -I, --sample-ids-file : Path to file containing list of sample IDs to subset\n";
-    os << " -p, --bounding-point  : Determines the inclusion policy of indels during region queries (any, all, beg or end, default: beg)\n";
-    os << " -r, --regions         : Comma separated list of regions formated as chr[:start-end]\n";
-    os << " -R, --regions-file    : Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
-    os << " -s, --sort            : Enables sorting by first position of allele\n";
-    os << " -S, --sort-point      : Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
-    os << " -x, --index           : Enables indexing\n";
-    os << " -X, --index-file      : Enables indexing and specifies index output file\n";
+    os << " -#                        Number (#) of compression level (1-19, default: " << default_compression_level << ")\n";
+    os << " -b, --block-size          Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
+    os << " -d, --data-format         Format field to copy (GT or HDS, default: GT)\n";
+    os << " -h, --help                Print usage\n";
+    os << " -i, --sample-ids          Comma separated list of sample IDs to subset\n";
+    os << " -I, --sample-ids-file     Path to file containing list of sample IDs to subset\n";
+    os << " -p, --bounding-point      Determines the inclusion policy of indels during region queries (any, all, beg or end, default is beg)\n";
+    os << " -r, --regions             Comma separated list of regions formated as chr[:start-end]\n";
+    os << " -R, --regions-file        Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
+    os << " -s, --sort                Enables sorting by first position of allele\n";
+    os << " -S, --sort-point          Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
+    os << " -x, --index               Enables indexing\n";
+    os << " -X, --index-file          Enables indexing and specifies index output file\n";
     os << "\n";
-    os << " --skip-empty-vectors  : Skips variants that don't contain the request data format (By default, the import fails)\n";
-    os << "----------------------------------------------\n";
+    os << "     --skip-empty-vectors  Skips variants that don't contain the request data format (By default, the import fails)\n";
     os << std::flush;
   }
 

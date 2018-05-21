@@ -75,6 +75,10 @@ target_link_libraries(sav savvy)
 #add_executable(savvy-speed-test src/test/savvy_speed_test.cpp)
 #target_link_libraries(savvy-speed-test savvy)
 
+add_custom_target(manuals
+        COMMAND help2man --output "${CMAKE_BINARY_DIR}/sav.1" "${CMAKE_BINARY_DIR}/sav"
+        COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_import.1" "${CMAKE_BINARY_DIR}/sav import"
+        COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_export.1" "${CMAKE_BINARY_DIR}/sav export")
 
 if(BUILD_TESTS)
     enable_testing()
@@ -115,6 +119,10 @@ install(TARGETS sav COMPONENT cli
 install(EXPORT ${PROJECT_NAME}-config COMPONENT api DESTINATION share/${PROJECT_NAME})
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPATIBILITY SameMajorVersion)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPONENT api DESTINATION share/${PROJECT_NAME})
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sav.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_import.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_export.1
+        DESTINATION share/man/man1
+        OPTIONAL)
 
 export(EXPORT ${PROJECT_NAME}-config)
 

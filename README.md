@@ -244,3 +244,10 @@ sav merge file1.sav file2.sav > merged.sav
 ```shell
 sav export --regions chr1,chr2:10000-20000 --sample-ids ID1,ID2,ID3 file.sav > file.vcf
 ```
+
+#Packaging
+```shell
+docker build -t savvy-packaging - < packaging-dockerfile-ubuntu16
+mkdir -p packages
+docker run -v $(pwd):/savvy-src -v $(pwd)/packages:/out savvy-packaging /savvy-src/package-linux.sh /savvy-src /out
+```

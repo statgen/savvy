@@ -34,22 +34,21 @@ public:
 
   void print_usage(std::ostream& os)
   {
-    os << "----------------------------------------------\n";
-    os << "Usage:\n";
-    os << "sav <sub-command> [args ...]\n";
-    os << "sav [opts ...]\n";
+    //os << "----------------------------------------------\n";
+    os << "Usage: sav <sub-command> [args ...]\n";
+    os << "or: sav [opts ...]\n";
     os << "\n";
     os << "Sub-commands:\n";
-    os << "export     : Exports SAV to VCF or SAV\n";
-    os << "import     : Imports VCF or BCF into SAV\n";
-    os << "index      : Indexes SAV file\n";
-    os << "merge      : Merges multiple files into one\n";
-    os << "stat-index : Gathers statistics on s1r index\n";
+    os << " export:      Exports SAV to VCF or SAV\n";
+    os << " import:      Imports VCF or BCF into SAV\n";
+    os << " index:       Indexes SAV file\n";
+    os << " merge:       Merges multiple files into one\n";
+    os << " stat-index:  Gathers statistics on s1r index\n";
     os << "\n";
     os << "Options:\n";
-    os << " -h, --help    : Print usage\n";
-    os << " -v, --version : Print version\n";
-    os << "----------------------------------------------\n";
+    os << " -h, --help     Print usage\n";
+    os << " -v, --version  Print version\n";
+    //os << "----------------------------------------------\n";
     os << std::flush;
   }
 

@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     cmake \
     git \
+    help2man \
     lsb-release \
     python \
     python-pip \
