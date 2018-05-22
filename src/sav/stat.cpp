@@ -7,6 +7,7 @@
 #include "sav/stat.hpp"
 #include "sav/utility.hpp"
 #include "savvy/s1r.hpp"
+#include "savvy/savvy.hpp"
 
 #include <getopt.h>
 
@@ -59,6 +60,8 @@ public:
     if (remaining_arg_count == 1)
     {
       input_path_ = argv[optind];
+      if (savvy::detail::has_extension(input_path_, ".sav"))
+        input_path_ += ".s1r";
     }
     else if (remaining_arg_count < 1)
     {
