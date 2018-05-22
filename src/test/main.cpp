@@ -467,6 +467,18 @@ private:
     return seed;
   }
 
+  template <typename T>
+  static void print_variant(const T&prop_fields, const savvy::site_info& anno, const std::vector<float>& data)
+  {
+    std::cout << anno.position();
+    for (const auto& prop_key : prop_fields)
+      std::cout << "\t" << anno.prop(prop_key);
+
+    for (auto gt = data.begin(); gt != data.end(); ++gt)
+      std::cout << (unsigned short)savvy::sav::detail::allele_encoder<7>::encode(*gt);
+    std::cout << std::endl;
+  }
+
   template <typename ReaderType>
   static std::size_t get_checksum(ReaderType& reader)
   {
@@ -476,6 +488,8 @@ private:
     std::vector<float> data;
 
     auto prop_fields = reader.info_fields();
+
+    prop_fields.erase(std::find(prop_fields.begin(), prop_fields.end(), "AF")); // TODO: Add back when auto-generated AF is added to vcf_reader.
 
     std::size_t num_markers = 0;
     while (reader.read(anno, data))
@@ -489,6 +503,8 @@ private:
 
       for (auto gt = data.begin(); gt != data.end(); ++gt)
         ret = hash_combine(ret, savvy::sav::detail::allele_encoder<7>::encode(*gt));
+
+      //print_variant(prop_fields, anno, data);
 
       ++num_markers;
     }
@@ -516,6 +532,7 @@ void run_file_checksum_test(const std::string f1, const std::string f2, savvy::f
   auto timed_call = time_procedure(t);
   std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
   std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
+  assert(timed_call.return_value());
 }
 
 template <savvy::fmt Fmt>
@@ -545,7 +562,7 @@ public:
         ++cnt;
       }
 
-      assert(output.good());
+      assert(output.good() && !input.bad());
       assert(cnt == (Fmt == savvy::fmt::hds ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
     }
 

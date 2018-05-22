@@ -591,7 +591,8 @@ namespace savvy
         {
           if (gt_sz_ % samples().size() != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
@@ -644,7 +645,8 @@ namespace savvy
         {
           if (gt_sz_ % samples().size() != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
@@ -695,7 +697,8 @@ namespace savvy
       {
         if (hts_file_->cur_num_alleles() > 2)
         {
-          state_ = std::ios::failbit; // multi allelic GP not supported.
+          std::cerr << "multi-allelic GP not supported" << std::endl;
+          state_ = std::ios::badbit;
           return;
         }
 
@@ -706,7 +709,8 @@ namespace savvy
           const std::size_t num_samples = sample_ids_.size();
           if (gt_sz_ % num_samples != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
@@ -753,7 +757,8 @@ namespace savvy
       {
         if (hts_file_->cur_num_alleles() > 2)
         {
-          state_ = std::ios::failbit; // multi allelic HDS not supported.
+          std::cerr << "multi allelic HDS not supported" << std::endl;
+          state_ = std::ios::badbit;
           return;
         }
 
@@ -764,7 +769,8 @@ namespace savvy
           const std::size_t num_samples = sample_ids_.size();
           if (gt_sz_ % num_samples != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
@@ -811,7 +817,8 @@ namespace savvy
       {
         if (hts_file_->cur_num_alleles() > 2)
         {
-          state_ = std::ios::failbit; // multi allelic GP not supported.
+          std::cerr << "multi allelic GP not supported" << std::endl;
+          state_ = std::ios::badbit;
           return;
         }
 
@@ -822,7 +829,8 @@ namespace savvy
           const std::size_t num_samples = sample_ids_.size();
           if (gt_sz_ % num_samples != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
@@ -865,7 +873,8 @@ namespace savvy
       {
         if (hts_file_->cur_num_alleles() > 2)
         {
-          state_ = std::ios::failbit; // multi allelic GP not supported.
+          std::cerr << "multi allelic GL not supported" << std::endl;
+          state_ = std::ios::badbit;
           return;
         }
 
@@ -876,7 +885,8 @@ namespace savvy
           const std::size_t num_samples = sample_ids_.size();
           if (gt_sz_ % num_samples != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
@@ -919,7 +929,8 @@ namespace savvy
       {
         if (hts_file_->cur_num_alleles() > 2)
         {
-          state_ = std::ios::failbit; // multi allelic GP not supported.
+          std::cerr << "multi allelic PL not supported" << std::endl;
+          state_ = std::ios::badbit;
           return;
         }
 
@@ -928,7 +939,8 @@ namespace savvy
           const std::size_t num_samples = sample_ids_.size();
           if (gt_sz_ % num_samples != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
