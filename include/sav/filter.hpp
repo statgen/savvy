@@ -8,6 +8,7 @@
 #define SAVVY_SAV_FILTER_HPP
 
 #include "savvy/site_info.hpp"
+#include "savvy/utility.hpp"
 
 #include <string>
 #include <list>
@@ -19,48 +20,35 @@ class filter
 public:
   filter(std::string filter_expression = "")
   {
-    auto tmp = parse(filter_expression.begin(), filter_expression.end());
-    good_ = tmp.second;
-    expression_list_ = std::move(tmp.first);
+    std::tie(expression_tree_, good_) = parse(filter_expression.begin(), filter_expression.end());
   }
 
   bool operator()(const savvy::site_info& site) const
   {
-    bool ret = true;
-    for (auto it = expression_list_.cbegin(); it != expression_list_.cend(); ++it)
-    {
-      ret = (*it)(site);
-      if (std::next(it) == expression_list_.cend())
-        break;
-
-      if (!ret)
-        break;
-    }
-
-    return ret;
+    return (*expression_tree_)(site);
   }
 
-  filter& operator+=(const filter& other)
-  {
-    if (&other != this)
-    {
-      if (!other.good_)
-        good_ = false;
-      expression_list_.insert(expression_list_.end(), other.expression_list_.begin(), other.expression_list_.end());
-    }
-    return *this;
-  }
-
-  filter& operator+=(filter&& other)
-  {
-    if (&other != this)
-    {
-      if (!other.good_)
-        good_ = false;
-      expression_list_.insert(expression_list_.end(), std::make_move_iterator(other.expression_list_.begin()), std::make_move_iterator(other.expression_list_.end()));
-    }
-    return *this;
-  }
+//  filter& operator+=(const filter& other)
+//  {
+//    if (&other != this)
+//    {
+//      if (!other.good_)
+//        good_ = false;
+//      expression_list_.insert(expression_list_.end(), other.expression_list_.begin(), other.expression_list_.end());
+//    }
+//    return *this;
+//  }
+//
+//  filter& operator+=(filter&& other)
+//  {
+//    if (&other != this)
+//    {
+//      if (!other.good_)
+//        good_ = false;
+//      expression_list_.insert(expression_list_.end(), std::make_move_iterator(other.expression_list_.begin()), std::make_move_iterator(other.expression_list_.end()));
+//    }
+//    return *this;
+//  }
 
   operator bool() const { return good_; }
 private:
@@ -75,13 +63,37 @@ private:
     less_than_equals
   };
 
-  struct expression
+  class expression
   {
+  public:
+    virtual bool operator()(const savvy::site_info& site) const = 0;
+    virtual ~expression(){}
+  };
+
+  class boolean_expression : public expression
+  {
+  public:
+    boolean_expression(bool val) :
+      val_(val)
+    {
+    }
+
+    bool operator()(const savvy::site_info& site) const
+    {
+      return val_;
+    }
+  private:
+    bool val_;
+  };
+
+  class comparison_expression : public expression
+  {
+  public:
     std::string left;
     cmpr comparison;
     std::string right;
 
-    expression(std::string l, cmpr c, std::string r) :
+    comparison_expression(std::string l, cmpr c, std::string r) :
       left(std::move(l)),
       comparison(c),
       right(std::move(r))
@@ -129,6 +141,34 @@ private:
       if (comparison ==  cmpr::greater_than_equals ) return numeric_left >= numeric_right;
 
       return false;
+    }
+  };
+
+  enum class logical
+  {
+    op_and,
+    op_or
+  };
+
+  class logical_expression : public expression
+  {
+  public:
+    std::unique_ptr<expression> left;
+    logical op;
+    std::unique_ptr<expression> right;
+    logical_expression(std::unique_ptr<expression>&& l, logical o, std::unique_ptr<expression>&& r) :
+      left(std::move(l)),
+      op(o),
+      right(std::move(r))
+    {
+    }
+
+    bool operator()(const savvy::site_info& site) const
+    {
+      if (op == logical::op_or)
+        return (*left)(site) || (*right)(site);
+      else
+        return (*left)(site) && (*right)(site);
     }
   };
 
@@ -200,8 +240,10 @@ private:
     return true;
   }
 
-  static std::pair<std::list<expression>, bool> parse(std::string::iterator cur, std::string::iterator end)
+  static std::tuple<std::unique_ptr<expression>, bool> parse(std::string::iterator cur, std::string::iterator end)
   {
+    using namespace savvy::detail;
+
     static const std::string selector_delims = "=<>!";
     static const std::string comparison_characters = "=<>!~";
     static const std::string argument_delims = ";,&|";
@@ -210,7 +252,7 @@ private:
       ++cur;
 
     if (cur == end)
-      return {{}, true};
+      return {make_unique<boolean_expression>(false), false};
 
     std::string::iterator delim;
 
@@ -224,24 +266,22 @@ private:
 
 
     if (delim == end || !is_valid_operand(left_operand))
-      return {{}, false};
+      return {make_unique<boolean_expression>(false), false};
 
     cur = delim;
-    while (cur != end && std::isspace(*cur))
-      ++cur;
 
     delim = find_first_not_of(cur + 1, end, comparison_characters.begin(), comparison_characters.end());
 
     cmpr comparison = parse_comparison(std::string(cur, delim));
     if (comparison == cmpr::invalid || delim == end)
-      return {{}, false};
+      return {make_unique<boolean_expression>(false), false};
 
     cur = delim;
     while (cur != end && std::isspace(*cur))
       ++cur;
 
     if (cur == end)
-      return {{}, true};
+      return {make_unique<boolean_expression>(false), true};
 
     if (*cur == '\'' || *cur == '"')
       delim = parse_string(cur, end);
@@ -251,23 +291,28 @@ private:
     std::string right_operand(cur, delim);
     right_operand.erase(right_operand.find_last_not_of(' ') + 1);
 
-    while (delim != end && std::isspace(*delim))
-      ++delim;
-
     if (!is_valid_operand(right_operand))
-      return {{}, false};
+      return {make_unique<boolean_expression>(false), false};
 
-    if (delim == end)
+    auto cmpr_expr = make_unique<comparison_expression>(left_operand, comparison, right_operand);
+
+    if (delim == end) // or *delim == ')'
     {
-      return {{{left_operand, comparison, right_operand}}, true};
+      return {std::move(cmpr_expr), true};
     }
 
+    logical log_op;
+    if (*delim == '&' || *delim == ';')
+      log_op = logical::op_and;
+    else if (*delim == '|' || *delim == ',')
+      log_op = logical::op_or;
+
     auto tmp = parse(delim + 1, end);
-    tmp.first.emplace_front(left_operand, comparison, right_operand);
-    return tmp;
+    return {make_unique<logical_expression>(std::move(cmpr_expr), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp)};
   }
 private:
-  std::list<expression> expression_list_;
+  //std::list<comparison_expression> expression_list_;
+  std::unique_ptr<expression> expression_tree_;
   bool good_;
 };
 
