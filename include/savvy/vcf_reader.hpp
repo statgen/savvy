@@ -691,9 +691,15 @@ namespace savvy
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   if (gt_[i] == bcf_gt_missing)
+                  {
                     destination[subset_map_[sample_index]] += std::numeric_limits<typename T::value_type>::quiet_NaN();
+                    --an;
+                  }
                   else if ((gt_[i] >> 1) == allele_index_plus_one)
+                  {
                     destination[subset_map_[sample_index]] += alt_value;
+                    ++ac;
+                  }
                 }
               }
             }
@@ -1147,7 +1153,7 @@ namespace savvy
         this->read_variant_details(annotations);
         if (this->good() && region_compare(bounding_type_, annotations, region_))
         {
-          if (this->read_requested_genos(destinations...) > 0)
+          if (this->read_requested_genos(annotations, destinations...) > 0)
             break;
         }
       }
@@ -1166,7 +1172,7 @@ namespace savvy
         {
           if (fn(annotations) && region_compare(bounding_type_, annotations, region_))
           {
-            if (this->read_requested_genos(destinations...) > 0)
+            if (this->read_requested_genos(annotations, destinations...) > 0)
               break;
           }
         }

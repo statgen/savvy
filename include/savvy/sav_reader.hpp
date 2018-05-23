@@ -315,15 +315,20 @@ namespace savvy
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   if (BitWidth != 1)
+                  {
                     allele = std::round(allele);
+                    if (allele != typename T::value_type())
+                      destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele;
+                  }
+                  else
+                  {
+                    destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele;
+                  }
 
                   if (std::isnan(allele))
                     --an;
                   else if (allele)
-                  {
-                    destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele; //(allele ? missing_value : alt_value);
                     ++ac;
-                  }
                 }
               }
             }
@@ -339,14 +344,20 @@ namespace savvy
                 total_offset += offset;
 
                 if (BitWidth != 1)
+                {
                   allele = std::round(allele);
+                  if (allele != typename T::value_type())
+                    destination[total_offset] = allele;
+                }
+                else
+                {
+                  destination[total_offset] = allele;
+                }
 
                 if (std::isnan(allele))
                   --an;
-                else
+                else if (allele)
                   ++ac;
-
-                destination[total_offset] = allele; //(allele ? missing_value : alt_value);
               }
             }
 
@@ -414,15 +425,20 @@ namespace savvy
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   if (BitWidth != 1)
+                  {
                     allele = std::round(allele);
+                    if (allele != typename T::value_type())
+                      destination[subset_map_[sample_index]] += allele;
+                  }
+                  else
+                  {
+                    destination[subset_map_[sample_index]] += allele;
+                  }
 
                   if (std::isnan(allele))
                     --an;
                   else if (allele)
-                  {
                     ++ac;
-                    destination[subset_map_[sample_index]] += allele; //(allele ? missing_value : alt_value);
-                  }
                 }
               }
             }
@@ -438,14 +454,20 @@ namespace savvy
                 total_offset += offset;
 
                 if (BitWidth != 1)
+                {
                   allele = std::round(allele);
+                  if (allele != typename T::value_type())
+                    destination[total_offset / ploidy_level] += allele;
+                }
+                else
+                {
+                  destination[total_offset / ploidy_level] += allele;
+                }
 
                 if (std::isnan(allele))
                   --an;
-                else
+                else if (allele)
                   ++ac;
-
-                destination[total_offset / ploidy_level] += allele; //(allele ? missing_value : alt_value);
               }
             }
 
