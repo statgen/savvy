@@ -495,7 +495,7 @@ private:
 
     auto prop_fields = reader.info_fields();
 
-    //prop_fields.erase(std::find(prop_fields.begin(), prop_fields.end(), "AF")); // TODO: Add back when auto-generated AF is added to vcf_reader.
+    //prop_fields.erase(std::find(prop_fields.begin(), prop_fields.end(), "AF"));
 
     std::size_t num_markers = 0;
     while (reader.read(anno, data))
@@ -544,7 +544,7 @@ void run_file_checksum_test(const std::string f1, const std::string f2, savvy::f
   auto timed_call = time_procedure(t);
   std::cout << "Returned: " << (timed_call.return_value() ? "True" : "FALSE") << std::endl;
   std::cout << "Elapsed Time: " << timed_call.template elapsed_time<std::chrono::milliseconds>() << "ms" << std::endl;
-  //assert(timed_call.return_value());
+  assert(timed_call.return_value());
 }
 
 template <savvy::fmt Fmt>
