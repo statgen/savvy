@@ -656,7 +656,11 @@ namespace savvy
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele;
-                  dose_sum += allele;
+
+                  if (std::isnan(allele))
+                    --an;
+                  else
+                    dose_sum += allele;
                 }
               }
             }
@@ -674,7 +678,11 @@ namespace savvy
 
                 assert(total_offset < (samples().size() * ploidy_level));
                 destination[total_offset] = allele;
-                dose_sum += allele;
+
+                if (std::isnan(allele))
+                  --an;
+                else
+                  dose_sum += allele;
               }
             }
 
@@ -740,7 +748,11 @@ namespace savvy
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   destination[subset_map_[sample_index]] += allele;
-                  dose_sum += allele;
+
+                  if (std::isnan(allele))
+                    --an;
+                  else
+                    dose_sum += allele;
                 }
               }
             }
@@ -755,7 +767,11 @@ namespace savvy
                 std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
                 total_offset += offset;
                 destination[total_offset / ploidy_level] += allele;
-                dose_sum += allele;
+
+                if (std::isnan(allele))
+                  --an;
+                else
+                  dose_sum += allele;
               }
             }
 
