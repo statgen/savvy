@@ -516,7 +516,7 @@ private:
       for (auto gt = data.begin(); gt != data.end(); ++gt)
         ret = hash_combine(ret, savvy::sav::detail::allele_encoder<7>::encode(*gt));
 
-      print_variant(prop_fields, anno, data);
+      //print_variant(prop_fields, anno, data);
 
       ++num_markers;
     }
