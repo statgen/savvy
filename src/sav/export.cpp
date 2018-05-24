@@ -35,6 +35,7 @@ private:
   std::string output_path_;
   std::string index_path_;
   std::string file_format_;
+  std::string headers_path_;
   std::unique_ptr<savvy::s1r::sort_point> sort_type_;
   savvy::fmt format_ = savvy::fmt::gt;
   savvy::bounding_point bounding_point_ = savvy::bounding_point::beg;
@@ -51,6 +52,7 @@ public:
         {"data-format", required_argument, 0, 'd'},
         {"file-format", required_argument, 0, 'f'},
         {"filter", required_argument, 0, 'e'},
+        {"headers", required_argument, 0, '\x01'},
         {"help", no_argument, 0, 'h'},
         {"index", no_argument, 0, 'x'},
         {"index-file", required_argument, 0, 'X'},
@@ -71,6 +73,7 @@ public:
   const std::string& output_path() const { return output_path_; }
   const std::string& file_format() const { return file_format_; }
   const std::string& index_path() const { return index_path_; }
+  const std::string& headers_path() const { return headers_path_; }
   const filter& filter_functor() const { return filter_; }
   const std::set<std::string>& subset_ids() const { return subset_ids_; }
   const std::vector<savvy::region>& regions() const { return regions_; }
@@ -103,6 +106,8 @@ public:
     os << " -S, --sort-point       Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
     os << " -x, --index            Enables indexing (SAV output only)\n";
     os << " -X, --index-file       Enables indexing and specifies index output file (SAV output only)\n";
+    os << "\n";
+    os << "     --headers          Path to headers file that is either formated as VCF headers or tab-delimited key value pairs\n";
     os << std::flush;
   }
 
@@ -115,6 +120,16 @@ public:
       char copt = char(opt & 0xFF);
       switch (copt)
       {
+        case '\x01':
+        {
+          if (std::string(long_options_[long_index].name) == "headers")
+          {
+            headers_path_ = std::string(optarg ? optarg : "");
+            break;
+          }
+          std::cerr << "Invalid long only index (" << long_index << ")\n";
+          return false;
+        }
         case '0':
         case '1':
         case '2':
@@ -429,7 +444,40 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
 
   auto variant_metadata = input.info_fields();
 
-  auto headers = input.headers();
+  std::vector<std::pair<std::string, std::string>> headers;
+  if (args.headers_path().empty())
+    headers = input.headers();
+  else
+  {
+    std::ifstream headers_ifs(args.headers_path(), std::ios::binary);
+    if (!headers_ifs)
+    {
+      std::cerr << "Could not open headers file (" << args.headers_path() << ")\n";
+      return EXIT_FAILURE;
+    }
+
+    std::string line;
+    while (std::getline(headers_ifs, line))
+    {
+      if (line.size())
+      {
+        line.erase(0, line.find_first_not_of('#'));
+        auto delim = line.find_first_of("=\t");
+        std::string key = line.substr(0, delim);
+        std::string value;
+        if (delim != std::string::npos)
+          value = line.substr(delim + 1);
+        if (std::min(key.size(), value.size()) == 0)
+        {
+          std::cerr << "Invalid header in " << args.headers_path() << "\n";
+          return EXIT_FAILURE;
+        }
+        headers.emplace_back(std::move(key), std::move(value));
+        headers.reserve((std::size_t) headers.size() * 1.5f);
+      }
+    }
+  }
+
 
   for (auto it = headers.begin(); it != headers.end(); )
   {

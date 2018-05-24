@@ -340,6 +340,7 @@ namespace savvy
       std::vector<fmt> format_fields_;
       std::unique_ptr<std::ostream> output_stream_;
       std::size_t sample_size_;
+      char phase_character_ = '|';
     };
     //################################################################//
 
@@ -1267,6 +1268,9 @@ namespace savvy
 
       for (auto it = headers_beg; it != headers_end; ++it)
       {
+        if (it->first == "phasing" && (it->second == "partial" || it->second == "none"))
+          phase_character_ = '/';
+
         if (it->first != "FORMAT" && it->first != "fileformat")
         {
           if (it->first == "fileDate")
@@ -1482,7 +1486,7 @@ namespace savvy
               ++i;
               for ( ; i < end; ++i)
               {
-                out_it = '|';
+                out_it = phase_character_;
 
                 if (std::isnan(v[i]))
                   out_it = '.';
