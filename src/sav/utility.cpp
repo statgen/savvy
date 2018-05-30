@@ -92,9 +92,10 @@ std::set<std::string> split_file_to_set(const char* in)
   return ret;
 }
 
-std::vector<std::string> split_file_to_vector(const char* in)
+std::vector<std::string> split_file_to_vector(const char* in, std::size_t size_hint)
 {
   std::vector<std::string> ret;
+  ret.reserve(size_hint);
 
   std::string s;
   std::ifstream ifs(in);

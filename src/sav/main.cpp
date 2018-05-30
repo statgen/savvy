@@ -8,6 +8,7 @@
 #include "sav/import.hpp"
 #include "sav/index.hpp"
 #include "sav/merge.hpp"
+#include "sav/reheader.hpp"
 #include "sav/sort.hpp"
 #include "sav/stat.hpp"
 #include "savvy/utility.hpp"
@@ -43,6 +44,7 @@ public:
     os << " import:      Imports VCF or BCF into SAV\n";
     os << " index:       Indexes SAV file\n";
     os << " merge:       Merges multiple files into one\n";
+    os << " reheader:    Replaces headers wihtout recompressing variant blocks.\n";
     os << " stat-index:  Gathers statistics on s1r index\n";
     os << "\n";
     os << "Options:\n";
@@ -106,6 +108,10 @@ int main(int argc, char** argv)
   else if (args.sub_command() == "merge")
   {
     return merge_main(argc, argv);
+  }
+  else if (args.sub_command() == "reheader")
+  {
+    return reheader_main(argc, argv);
   }
   else if (args.sub_command() == "stat-index")
   {

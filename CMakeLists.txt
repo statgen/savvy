@@ -61,6 +61,7 @@ add_executable(sav
                src/sav/index.cpp include/sav/index.hpp
                include/sav/filter.hpp
                src/sav/merge.cpp include/sav/merge.hpp
+               src/sav/reheader.cpp include/sav/reheader.hpp
                src/sav/sort.cpp include/sav/sort.hpp
                src/sav/stat.cpp include/sav/stat.hpp
                src/sav/utility.cpp include/sav/utility.hpp)
