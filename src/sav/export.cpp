@@ -442,8 +442,6 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
   if (args.subset_ids().size())
     sample_ids = input.subset_samples(args.subset_ids());
 
-  auto variant_metadata = input.info_fields();
-
   std::vector<std::pair<std::string, std::string>> headers;
   if (args.headers_path().empty())
     headers = input.headers();
