@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include "sav/reheader.hpp"
+#include "sav/rehead.hpp"
 #include "sav/utility.hpp"
 #include "savvy/sav_reader.hpp"
 
@@ -12,8 +12,9 @@
 #include <fstream>
 #include <getopt.h>
 #include <vector>
+#include <savvy/reader.hpp>
 
-class reheader_prog_args
+class rehead_prog_args
 {
 private:
   std::vector<option> long_options_;
@@ -23,11 +24,11 @@ private:
   std::string sample_ids_path_;
   bool help_ = false;
 public:
-  reheader_prog_args() :
+  rehead_prog_args() :
     long_options_(
       {
         {"help", no_argument, 0, 'h'},
-        {"sample-ids-file", required_argument, 0, 'I'},
+        {"sample-ids", required_argument, 0, 'I'},
         {0, 0, 0, 0}
       })
   {
@@ -44,7 +45,7 @@ public:
   {
     os << "Usage: sav reheader [opts ...] <headers.txt> <in.sav> <out.sav> \n";
     os << "\n";
-    os << " -h, --help  Print usage\n";
+    os << " -h, --help             Print usage\n";
     os << " -I, --sample-ids-file  Path to file containing list of sample IDs that will replace existing IDs.\n";
     os << std::flush;
   }
@@ -98,9 +99,9 @@ public:
 
 
 
-int reheader_main(int argc, char** argv)
+int rehead_main(int argc, char **argv)
 {
-  reheader_prog_args args;
+  rehead_prog_args args;
   if (!args.parse(argc, argv))
   {
     args.print_usage(std::cerr);
@@ -145,6 +146,32 @@ int reheader_main(int argc, char** argv)
     }
 
     savvy::sav::reader sav_reader(args.input_path());
+
+
+    std::size_t info_i = 0;
+    for (auto it = headers.begin(); it != headers.end(); ++it)
+    {
+      if (it->first == "INFO")
+      {
+        auto inf = savvy::parse_header_value(it->second);
+        if (info_i == sav_reader.info_fields().size() || sav_reader.info_fields()[info_i++] != inf.id)
+        {
+          std::cerr << "New info fields must match old ones\n";
+          return EXIT_FAILURE;
+        }
+      }
+      else if (it->first == "FORMAT")
+      {
+        auto inf = savvy::parse_header_value(it->second);
+        if (((inf.id == "GT" && sav_reader.data_format() != savvy::fmt::gt) || (inf.id == "HDS" && sav_reader.data_format() != savvy::fmt::hds))
+          || atoi(inf.number.c_str()) != sav_reader.ploidy())
+        {
+          std::cerr << "Altering FORMAT header is not allowed\n";
+          return EXIT_FAILURE;
+        }
+      }
+    }
+
 
 
     if (!sav_reader)

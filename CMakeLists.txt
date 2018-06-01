@@ -55,16 +55,17 @@ target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMA
 target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 add_executable(sav
-               src/sav/main.cpp
-               src/sav/export.cpp include/sav/export.hpp
-               src/sav/import.cpp include/sav/import.hpp
-               src/sav/index.cpp include/sav/index.hpp
-               include/sav/filter.hpp
-               src/sav/merge.cpp include/sav/merge.hpp
-               src/sav/reheader.cpp include/sav/reheader.hpp
-               src/sav/sort.cpp include/sav/sort.hpp
-               src/sav/stat.cpp include/sav/stat.hpp
-               src/sav/utility.cpp include/sav/utility.hpp)
+        src/sav/main.cpp
+        src/sav/export.cpp include/sav/export.hpp
+        src/sav/head.cpp include/sav/head.hpp
+        src/sav/import.cpp include/sav/import.hpp
+        src/sav/index.cpp include/sav/index.hpp
+        include/sav/filter.hpp
+        src/sav/merge.cpp include/sav/merge.hpp
+        src/sav/rehead.cpp include/sav/rehead.hpp
+        src/sav/sort.cpp include/sav/sort.hpp
+        src/sav/stat.cpp include/sav/stat.hpp
+        src/sav/utility.cpp include/sav/utility.hpp)
 target_link_libraries(sav savvy)
 
 #add_executable(bcf2m3vcf src/sav/bcf2m3vcf.cpp)

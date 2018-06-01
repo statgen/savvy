@@ -5,10 +5,11 @@
  */
 
 #include "sav/export.hpp"
+#include "sav/head.hpp"
 #include "sav/import.hpp"
 #include "sav/index.hpp"
 #include "sav/merge.hpp"
-#include "sav/reheader.hpp"
+#include "sav/rehead.hpp"
 #include "sav/sort.hpp"
 #include "sav/stat.hpp"
 #include "savvy/utility.hpp"
@@ -41,10 +42,11 @@ public:
     os << "\n";
     os << "Sub-commands:\n";
     os << " export:      Exports SAV to VCF or SAV\n";
+    os << " head:        Prints SAV headers or samples IDs\n";
     os << " import:      Imports VCF or BCF into SAV\n";
     os << " index:       Indexes SAV file\n";
     os << " merge:       Merges multiple files into one\n";
-    os << " reheader:    Replaces headers wihtout recompressing variant blocks.\n";
+    os << " reheader:    Replaces headers without recompressing variant blocks.\n";
     os << " stat-index:  Gathers statistics on s1r index\n";
     os << "\n";
     os << "Options:\n";
@@ -97,6 +99,10 @@ int main(int argc, char** argv)
   {
     return export_main(argc, argv);
   }
+  else if (args.sub_command() == "head")
+  {
+    return head_main(argc, argv);
+  }
   else if (args.sub_command() == "import")
   {
     return import_main(argc, argv);
@@ -109,9 +115,9 @@ int main(int argc, char** argv)
   {
     return merge_main(argc, argv);
   }
-  else if (args.sub_command() == "reheader")
+  else if (args.sub_command() == "rehead")
   {
-    return reheader_main(argc, argv);
+    return rehead_main(argc, argv);
   }
   else if (args.sub_command() == "stat-index")
   {

@@ -4,9 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#ifndef SAVVY_SAV_REHEADER_HPP
-#define SAVVY_SAV_REHEADER_HPP
+#ifndef SAVVY_SAV_HEAD_HPP
+#define SAVVY_SAV_HEAD_HPP
 
-int reheader_main(int argc, char** argv);
+int head_main(int argc, char** argv);
 
-#endif //SAVVY_SAV_REHEADER_HPP
+#endif //SAVVY_SAV_HEAD_HPP
