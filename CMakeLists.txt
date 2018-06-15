@@ -56,6 +56,7 @@ target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE
 
 add_executable(sav
         src/sav/main.cpp
+        src/sav/concat.cpp include/sav/concat.hpp
         src/sav/export.cpp include/sav/export.hpp
         src/sav/head.cpp include/sav/head.hpp
         src/sav/import.cpp include/sav/import.hpp

@@ -43,7 +43,7 @@ public:
 
   void print_usage(std::ostream& os)
   {
-    os << "Usage: sav reheader [opts ...] <headers.txt> <in.sav> <out.sav> \n";
+    os << "Usage: sav rehead [opts ...] <headers.txt> <in.sav> <out.sav> \n";
     os << "\n";
     os << " -h, --help             Print usage\n";
     os << " -I, --sample-ids-file  Path to file containing list of sample IDs that will replace existing IDs.\n";
