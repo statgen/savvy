@@ -80,11 +80,13 @@ target_link_libraries(sav savvy)
 
 add_custom_target(manuals
                   COMMAND help2man --output "${CMAKE_BINARY_DIR}/sav.1" "${CMAKE_BINARY_DIR}/sav"
-                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_import.1" "${CMAKE_BINARY_DIR}/sav import"
                   COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_export.1" "${CMAKE_BINARY_DIR}/sav export"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_head.1" "${CMAKE_BINARY_DIR}/sav head"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_import.1" "${CMAKE_BINARY_DIR}/sav import"
                   COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_index.1" "${CMAKE_BINARY_DIR}/sav index"
-                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_stat-index.1" "${CMAKE_BINARY_DIR}/sav stat-index"
-                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_merge.1" "${CMAKE_BINARY_DIR}/sav merge")
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_merge.1" "${CMAKE_BINARY_DIR}/sav merge"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_rehead.1" "${CMAKE_BINARY_DIR}/sav rehead"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_stat-index.1" "${CMAKE_BINARY_DIR}/sav stat-index")
 
 if(BUILD_TESTS)
     enable_testing()
@@ -126,7 +128,8 @@ install(EXPORT ${PROJECT_NAME}-config COMPONENT api DESTINATION share/${PROJECT_
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPATIBILITY SameMajorVersion)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPONENT api DESTINATION share/${PROJECT_NAME})
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sav.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_import.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_export.1
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sav.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_export.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_head.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_import.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_index.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_merge.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_rehead.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_stat-index.1
+        COMPONENT cli
         DESTINATION share/man/man1
         OPTIONAL)
 
