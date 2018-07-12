@@ -18,9 +18,14 @@
 class filter
 {
 public:
-  filter(std::string filter_expression = "")
+  filter(std::string filter_expression = "") :
+    expression_tree_(savvy::detail::make_unique<boolean_expression>(true))
   {
-    std::tie(expression_tree_, good_) = parse(filter_expression.begin(), filter_expression.end());
+    if (!filter_expression.empty())
+    {
+      auto beg = filter_expression.begin();
+      std::tie(expression_tree_, good_) = parse(beg, filter_expression.end());
+    }
   }
 
   bool operator()(const savvy::site_info& site) const
@@ -221,6 +226,9 @@ private:
       ++cur;
     }
 
+    while (cur != end && std::isspace(*cur))
+      ++cur;
+
     return cur;
   }
 
@@ -240,13 +248,13 @@ private:
     return true;
   }
 
-  static std::tuple<std::unique_ptr<expression>, bool> parse(std::string::iterator cur, std::string::iterator end)
+  static std::tuple<std::unique_ptr<expression>, bool> parse(std::string::iterator& cur, const std::string::iterator& end)
   {
     using namespace savvy::detail;
 
     static const std::string selector_delims = "=<>!";
     static const std::string comparison_characters = "=<>!~";
-    static const std::string argument_delims = ";,&|";
+    static const std::string argument_delims = ");,&|";
 
     while (cur != end && std::isspace(*cur))
       ++cur;
@@ -255,65 +263,100 @@ private:
       return {make_unique<boolean_expression>(false), false};
 
     std::string::iterator delim;
-
-    if (*cur == '\'' || *cur == '"')
-      delim = parse_string(cur, end);
-    else
-      delim = std::find_first_of(cur, end, selector_delims.begin(), selector_delims.end());
-
-    std::string left_operand(cur, delim);
-    left_operand.erase(left_operand.find_last_not_of(' ') + 1); // rtrim
-
-
-    if (delim == end || !is_valid_operand(left_operand))
-      return {make_unique<boolean_expression>(false), false};
-
-    cur = delim;
-
-    delim = find_first_not_of(cur + 1, end, comparison_characters.begin(), comparison_characters.end());
-
-    cmpr comparison = parse_comparison(std::string(cur, delim));
-    if (comparison == cmpr::invalid || delim == end)
-      return {make_unique<boolean_expression>(false), false};
-
-    cur = delim;
-    while (cur != end && std::isspace(*cur))
-      ++cur;
-
-    if (cur == end)
-      return {make_unique<boolean_expression>(false), true};
-
-    if (*cur == '\'' || *cur == '"')
-      delim = parse_string(cur, end);
-    else
-      delim = std::find_first_of(cur, end, argument_delims.begin(), argument_delims.end());
-
-    std::string right_operand(cur, delim);
-    right_operand.erase(right_operand.find_last_not_of(' ') + 1);
-
-    if (!is_valid_operand(right_operand))
-      return {make_unique<boolean_expression>(false), false};
-
-    auto cmpr_expr = make_unique<comparison_expression>(left_operand, comparison, right_operand);
-
-    if (delim == end) // or *delim == ')'
+    if (*cur == '(')
     {
-      return {std::move(cmpr_expr), true};
+      ++cur;
+      auto sub_expr = parse(cur, end);
+      if (!std::get<1>(sub_expr))
+        return sub_expr;
+
+      while (cur != end && std::isspace(*cur))
+        ++cur;
+
+      if (cur == end)
+        return sub_expr;
+
+      logical log_op;
+      if (*cur == '&' || *cur == ';')
+        log_op = logical::op_and;
+      else if (*cur == '|' || *cur == ',')
+        log_op = logical::op_or;
+      else
+        return {make_unique<boolean_expression>(false), false};
+
+      ++cur;
+      auto tmp = parse(cur, end);
+      return {make_unique<logical_expression>(std::move(std::get<0>(sub_expr)), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp)};
     }
+    else
+    {
+      if (*cur == '\'' || *cur == '"')
+        delim = parse_string(cur, end);
+      else
+        delim = std::find_first_of(cur, end, selector_delims.begin(), selector_delims.end());
 
-    logical log_op;
-    if (*delim == '&' || *delim == ';')
-      log_op = logical::op_and;
-    else if (*delim == '|' || *delim == ',')
-      log_op = logical::op_or;
+      std::string left_operand(cur, delim);
+      left_operand.erase(left_operand.find_last_not_of(' ') + 1); // rtrim
 
-    auto tmp = parse(delim + 1, end);
-    return {make_unique<logical_expression>(std::move(cmpr_expr), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp)};
+
+      if (delim == end || !is_valid_operand(left_operand))
+        return {make_unique<boolean_expression>(false), false};
+
+      cur = delim;
+
+      delim = find_first_not_of(cur + 1, end, comparison_characters.begin(), comparison_characters.end());
+
+      cmpr comparison = parse_comparison(std::string(cur, delim));
+      if (comparison == cmpr::invalid || delim == end)
+        return {make_unique<boolean_expression>(false), false};
+
+      cur = delim;
+      while (cur != end && std::isspace(*cur))
+        ++cur;
+
+      if (cur == end)
+        return {make_unique<boolean_expression>(false), false};
+
+      if (*cur == '\'' || *cur == '"')
+        delim = parse_string(cur, end);
+      else
+        delim = std::find_first_of(cur, end, argument_delims.begin(), argument_delims.end());
+
+      std::string right_operand(cur, delim);
+      right_operand.erase(right_operand.find_last_not_of(' ') + 1);
+
+      if (!is_valid_operand(right_operand))
+        return {make_unique<boolean_expression>(false), false};
+
+      auto cmpr_expr = make_unique<comparison_expression>(left_operand, comparison, right_operand);
+
+      if (delim == end)
+      {
+        cur = delim;
+        return {std::move(cmpr_expr), true};
+      }
+
+      if (*delim == ')')
+      {
+        cur = delim + 1;
+        return {std::move(cmpr_expr), true};
+      }
+
+      logical log_op;
+      if (*delim == '&' || *delim == ';')
+        log_op = logical::op_and;
+      else if (*delim == '|' || *delim == ',')
+        log_op = logical::op_or;
+
+      cur = delim + 1;
+      auto tmp = parse(cur, end);
+      return {make_unique<logical_expression>(std::move(cmpr_expr), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp)};
+    }
   }
 private:
   //std::list<comparison_expression> expression_list_;
   std::unique_ptr<expression> expression_tree_;
-  bool good_;
+  bool good_ = true;
 };
 
 #endif //SAVVY_SAV_FILTER_HPP
