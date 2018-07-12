@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(savvy VERSION 1.1.0)
+project(savvy VERSION 1.2.0)
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
@@ -55,15 +55,18 @@ target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMA
 target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 add_executable(sav
-               src/sav/main.cpp
-               src/sav/export.cpp include/sav/export.hpp
-               src/sav/import.cpp include/sav/import.hpp
-               src/sav/index.cpp include/sav/index.hpp
-               include/sav/filter.hpp
-               src/sav/merge.cpp include/sav/merge.hpp
-               src/sav/sort.cpp include/sav/sort.hpp
-               src/sav/stat.cpp include/sav/stat.hpp
-               src/sav/utility.cpp include/sav/utility.hpp)
+        src/sav/main.cpp
+        src/sav/concat.cpp include/sav/concat.hpp
+        src/sav/export.cpp include/sav/export.hpp
+        src/sav/head.cpp include/sav/head.hpp
+        src/sav/import.cpp include/sav/import.hpp
+        src/sav/index.cpp include/sav/index.hpp
+        include/sav/filter.hpp
+        src/sav/merge.cpp include/sav/merge.hpp
+        src/sav/rehead.cpp include/sav/rehead.hpp
+        src/sav/sort.cpp include/sav/sort.hpp
+        src/sav/stat.cpp include/sav/stat.hpp
+        src/sav/utility.cpp include/sav/utility.hpp)
 target_link_libraries(sav savvy)
 
 #add_executable(bcf2m3vcf src/sav/bcf2m3vcf.cpp)
@@ -77,11 +80,13 @@ target_link_libraries(sav savvy)
 
 add_custom_target(manuals
                   COMMAND help2man --output "${CMAKE_BINARY_DIR}/sav.1" "${CMAKE_BINARY_DIR}/sav"
-                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_import.1" "${CMAKE_BINARY_DIR}/sav import"
                   COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_export.1" "${CMAKE_BINARY_DIR}/sav export"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_head.1" "${CMAKE_BINARY_DIR}/sav head"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_import.1" "${CMAKE_BINARY_DIR}/sav import"
                   COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_index.1" "${CMAKE_BINARY_DIR}/sav index"
-                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_stat-index.1" "${CMAKE_BINARY_DIR}/sav stat-index"
-                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_merge.1" "${CMAKE_BINARY_DIR}/sav merge")
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_merge.1" "${CMAKE_BINARY_DIR}/sav merge"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_rehead.1" "${CMAKE_BINARY_DIR}/sav rehead"
+                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_stat-index.1" "${CMAKE_BINARY_DIR}/sav stat-index")
 
 if(BUILD_TESTS)
     enable_testing()
@@ -123,7 +128,8 @@ install(EXPORT ${PROJECT_NAME}-config COMPONENT api DESTINATION share/${PROJECT_
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPATIBILITY SameMajorVersion)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPONENT api DESTINATION share/${PROJECT_NAME})
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sav.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_import.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_export.1
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sav.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_export.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_head.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_import.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_index.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_merge.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_rehead.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_stat-index.1
+        COMPONENT cli
         DESTINATION share/man/man1
         OPTIONAL)
 

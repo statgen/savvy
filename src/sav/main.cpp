@@ -4,10 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#include "sav/concat.hpp"
 #include "sav/export.hpp"
+#include "sav/head.hpp"
 #include "sav/import.hpp"
 #include "sav/index.hpp"
 #include "sav/merge.hpp"
+#include "sav/rehead.hpp"
 #include "sav/sort.hpp"
 #include "sav/stat.hpp"
 #include "savvy/utility.hpp"
@@ -40,9 +43,11 @@ public:
     os << "\n";
     os << "Sub-commands:\n";
     os << " export:      Exports SAV to VCF or SAV\n";
+    os << " head:        Prints SAV headers or samples IDs\n";
     os << " import:      Imports VCF or BCF into SAV\n";
     os << " index:       Indexes SAV file\n";
     os << " merge:       Merges multiple files into one\n";
+    os << " rehead:      Replaces headers without recompressing variant blocks.\n";
     os << " stat-index:  Gathers statistics on s1r index\n";
     os << "\n";
     os << "Options:\n";
@@ -91,9 +96,17 @@ int main(int argc, char** argv)
     return EXIT_FAILURE;
   }
 
-  if (args.sub_command() == "export")
+  if (args.sub_command() == "concat")
+  {
+    return concat_main(argc, argv);
+  }
+  else if (args.sub_command() == "export")
   {
     return export_main(argc, argv);
+  }
+  else if (args.sub_command() == "head")
+  {
+    return head_main(argc, argv);
   }
   else if (args.sub_command() == "import")
   {
@@ -106,6 +119,10 @@ int main(int argc, char** argv)
   else if (args.sub_command() == "merge")
   {
     return merge_main(argc, argv);
+  }
+  else if (args.sub_command() == "rehead")
+  {
+    return rehead_main(argc, argv);
   }
   else if (args.sub_command() == "stat-index")
   {

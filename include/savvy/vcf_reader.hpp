@@ -148,26 +148,26 @@ namespace savvy
       void read_variant_details(site_info& destination);
 
       template <typename... T>
-      std::size_t read_requested_genos(T&... vec);
+      std::size_t read_requested_genos(site_info& annotations, T&... vec);
       template <std::size_t Idx, typename T1>
-      bool read_genos_to(fmt data_format, T1& vec);
+      bool read_genos_to(fmt data_format, site_info& annotations, T1& vec);
       template <std::size_t Idx, typename T1, typename... T2>
-      bool read_genos_to(fmt data_format, T1& vec, T2&... others);
+      bool read_genos_to(fmt data_format, site_info& annotations, T1& vec, T2&... others);
 
       template <typename T>
-      void read_genotypes_al(T& destination);
+      void read_genotypes_al(site_info& annotations, T& destination);
       template <typename T>
-      void read_genotypes_gt(T& destination);
+      void read_genotypes_gt(site_info& annotations, T& destination);
       template <typename T>
-      void read_genotypes_gp(T& destination);
+      void read_genotypes_gp(site_info& annotations, T& destination);
       template <typename T>
-      void read_genotypes_ds(T& destination);
+      void read_genotypes_ds(site_info& annotations, T& destination);
       template <typename T>
-      void read_genotypes_hds(T& destination);
+      void read_genotypes_hds(site_info& annotations, T& destination);
       template <typename T>
-      void read_genotypes_gl(T& destination);
+      void read_genotypes_gl(site_info& annotations, T& destination);
       template <typename T>
-      void read_genotypes_pl(T& destination);
+      void read_genotypes_pl(site_info& annotations, T& destination);
 
       void init_requested_formats(fmt f);
       template <typename... T2>
@@ -340,6 +340,7 @@ namespace savvy
       std::vector<fmt> format_fields_;
       std::unique_ptr<std::ostream> output_stream_;
       std::size_t sample_size_;
+      char phase_character_ = '|';
     };
     //################################################################//
 
@@ -441,7 +442,7 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <typename... T>
-    std::size_t reader_base<VecCnt>::read_requested_genos(T&... destinations)
+    std::size_t reader_base<VecCnt>::read_requested_genos(savvy::site_info& annotations, T&... destinations)
     {
       std::size_t cnt = 0;
       clear_destinations(destinations...);
@@ -457,32 +458,32 @@ namespace savvy
         {
           if (gt_idx < VecCnt)
           {
-            cnt += read_genos_to<0>(fmt::ac, destinations...);
+            cnt += read_genos_to<0>(fmt::ac, annotations, destinations...);
           }
           else // allele_idx < VecCnt
           {
-            cnt += read_genos_to<0>(fmt::gt, destinations...);
+            cnt += read_genos_to<0>(fmt::gt, annotations, destinations...);
           }
         }
         else if (fmt_key == "DS")
         {
-          cnt += read_genos_to<0>(fmt::ds, destinations...);
+          cnt += read_genos_to<0>(fmt::ds, annotations, destinations...);
         }
         else if (fmt_key == "HDS")
         {
-          cnt += read_genos_to<0>(fmt::hds, destinations...);
+          cnt += read_genos_to<0>(fmt::hds, annotations, destinations...);
         }
         else if (fmt_key == "GP")
         {
-          cnt += read_genos_to<0>(fmt::gp, destinations...);
+          cnt += read_genos_to<0>(fmt::gp, annotations, destinations...);
         }
         else if (fmt_key == "GL")
         {
-          cnt += read_genos_to<0>(fmt::gl, destinations...);
+          cnt += read_genos_to<0>(fmt::gl, annotations, destinations...);
         }
         else if (fmt_key == "PL")
         {
-          cnt += read_genos_to<0>(fmt::pl, destinations...);
+          cnt += read_genos_to<0>(fmt::pl, annotations, destinations...);
         }
         else
         {
@@ -502,7 +503,7 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <std::size_t Idx, typename T1>
-    bool reader_base<VecCnt>::read_genos_to(fmt data_format, T1& destination)
+    bool reader_base<VecCnt>::read_genos_to(fmt data_format, site_info& annotations, T1& destination)
     {
       bool ret = true;
       if (requested_data_formats_[Idx] == data_format)
@@ -510,25 +511,25 @@ namespace savvy
         switch (data_format)
         {
           case fmt::gt:
-            read_genotypes_al(destination);
+            read_genotypes_al(annotations, destination);
             break;
           case fmt::ac:
-            read_genotypes_gt(destination);
+            read_genotypes_gt(annotations, destination);
             break;
           case fmt::gp:
-            read_genotypes_gp(destination);
+            read_genotypes_gp(annotations, destination);
             break;
           case fmt::ds:
-            read_genotypes_ds(destination);
+            read_genotypes_ds(annotations, destination);
             break;
           case fmt::hds:
-            read_genotypes_hds(destination);
+            read_genotypes_hds(annotations, destination);
             break;
           case fmt::gl:
-            read_genotypes_gl(destination);
+            read_genotypes_gl(annotations, destination);
             break;
           case fmt::pl:
-            read_genotypes_pl(destination);
+            read_genotypes_pl(annotations, destination);
             break;
         }
       }
@@ -542,15 +543,15 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <std::size_t Idx, typename T1, typename... T2>
-    bool reader_base<VecCnt>::read_genos_to(fmt data_format, T1& vec, T2&... others)
+    bool reader_base<VecCnt>::read_genos_to(fmt data_format, site_info& annotations, T1& vec, T2&... others)
     {
       if (requested_data_formats_[Idx] == data_format)
       {
-        return read_genos_to<Idx>(data_format, vec);
+        return read_genos_to<Idx>(data_format, annotations, vec);
       }
       else
       {
-        return read_genos_to<Idx + 1>(data_format, others...);
+        return read_genos_to<Idx + 1>(data_format, annotations, others...);
       }
     }
 
@@ -582,7 +583,7 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <typename T>
-    void reader_base<VecCnt>::read_genotypes_al(T& destination)
+    void reader_base<VecCnt>::read_genotypes_al(site_info& annotations, T& destination)
     {
       if (good())
       {
@@ -591,15 +592,21 @@ namespace savvy
         {
           if (gt_sz_ % samples().size() != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
             const int allele_index_plus_one = allele_index_ + 1;
             const std::uint64_t ploidy(gt_sz_ / samples().size());
+
+            std::size_t an = samples().size() * ploidy;
+            std::size_t ac = 0;
+
             if (subset_map_.size())
             {
-              destination.resize(subset_size_ * ploidy);
+              an = subset_size_ * ploidy;
+              destination.resize(an);
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
@@ -607,24 +614,42 @@ namespace savvy
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   if (gt_[i] == bcf_gt_missing)
+                  {
                     destination[subset_map_[sample_index] * ploidy + (i % ploidy)] = std::numeric_limits<typename T::value_type>::quiet_NaN();
+                    --an;
+                  }
                   else if ((gt_[i] >> 1) == allele_index_plus_one)
+                  {
                     destination[subset_map_[sample_index] * ploidy + (i % ploidy)] = alt_value;
+                    ++ac;
+                  }
                 }
               }
             }
             else
             {
-              destination.resize(gt_sz_);
+              destination.resize(an);
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
                 if (gt_[i] == bcf_gt_missing)
+                {
                   destination[i] = std::numeric_limits<typename T::value_type>::quiet_NaN();
+                  --an;
+                }
                 else if ((gt_[i] >> 1) == allele_index_plus_one)
+                {
                   destination[i] = alt_value;
+                  ++ac;
+                }
               }
             }
+
+            annotations.prop("AC", std::to_string(ac));
+            annotations.prop("AN", std::to_string(an));
+            if (an)
+              annotations.prop("AF", std::to_string(static_cast<float>(ac) / static_cast<float>(an)));
+
             return;
           }
         }
@@ -635,7 +660,7 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <typename T>
-    void reader_base<VecCnt>::read_genotypes_gt(T& destination)
+    void reader_base<VecCnt>::read_genotypes_gt(site_info& annotations, T& destination)
     {
       if (good())
       {
@@ -644,16 +669,22 @@ namespace savvy
         {
           if (gt_sz_ % samples().size() != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
             const std::uint64_t ploidy(gt_sz_ / samples().size());
             const int allele_index_plus_one = allele_index_ + 1;
 
+            std::size_t an = samples().size() * ploidy;
+            std::size_t ac = 0;
+
             if (subset_map_.size())
             {
               destination.resize(subset_size_);
+
+              an = subset_size_ * ploidy;
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
@@ -661,9 +692,15 @@ namespace savvy
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   if (gt_[i] == bcf_gt_missing)
+                  {
                     destination[subset_map_[sample_index]] += std::numeric_limits<typename T::value_type>::quiet_NaN();
+                    --an;
+                  }
                   else if ((gt_[i] >> 1) == allele_index_plus_one)
+                  {
                     destination[subset_map_[sample_index]] += alt_value;
+                    ++ac;
+                  }
                 }
               }
             }
@@ -674,11 +711,23 @@ namespace savvy
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
                 if (gt_[i] == bcf_gt_missing)
+                {
                   destination[i / ploidy] += std::numeric_limits<typename T::value_type>::quiet_NaN();
+                  --an;
+                }
                 else if ((gt_[i] >> 1) == allele_index_plus_one)
+                {
                   destination[i / ploidy] += alt_value;
+                  ++ac;
+                }
               }
             }
+
+            annotations.prop("AC", std::to_string(ac));
+            annotations.prop("AN", std::to_string(an));
+            if (an)
+              annotations.prop("AF", std::to_string(static_cast<float>(ac) / static_cast<float>(an)));
+
             return;
           }
         }
@@ -689,13 +738,14 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <typename T>
-    void reader_base<VecCnt>::read_genotypes_ds(T& destination)
+    void reader_base<VecCnt>::read_genotypes_ds(site_info& annotations, T& destination)
     {
       if (good())
       {
         if (hts_file_->cur_num_alleles() > 2)
         {
-          state_ = std::ios::failbit; // multi allelic GP not supported.
+          std::cerr << "multi-allelic GP not supported" << std::endl;
+          state_ = std::ios::badbit;
           return;
         }
 
@@ -706,24 +756,36 @@ namespace savvy
           const std::size_t num_samples = sample_ids_.size();
           if (gt_sz_ % num_samples != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
             const std::uint64_t ploidy(gt_sz_ / num_samples);
             const typename T::value_type zero_value{0};
 
+            std::size_t an = samples().size() * ploidy;
+            float dose_sum = 0.f;
+
             if (subset_map_.size())
             {
               destination.resize(subset_size_);
+              an = subset_size_ * ploidy;
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
                 const std::uint64_t sample_index = i / ploidy;
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
-                  if (ds[i] != zero_value)
-                    destination[subset_map_[sample_index]] = ds[i];
+                  float cur_ds = ds[i];
+                  if (cur_ds != zero_value)
+                  {
+                    destination[subset_map_[sample_index]] = cur_ds;
+                    if (std::isnan(cur_ds))
+                      an -= ploidy;
+                    else
+                      dose_sum += cur_ds;
+                  }
                 }
               }
             }
@@ -733,10 +795,22 @@ namespace savvy
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
-                if (ds[i] != zero_value)
-                  destination[i] = ds[i];
+                float cur_ds = ds[i];
+                if (cur_ds != zero_value)
+                {
+                  destination[i] = cur_ds;
+                  if (std::isnan(cur_ds))
+                    an -= ploidy;
+                  else
+                    dose_sum += cur_ds;
+                }
               }
             }
+
+            annotations.prop("AN", std::to_string(an));
+            if (an)
+              annotations.prop("AF", std::to_string(dose_sum / static_cast<float>(an)));
+
             return;
           }
         }
@@ -747,41 +821,54 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <typename T>
-    void reader_base<VecCnt>::read_genotypes_hds(T& destination)
+    void reader_base<VecCnt>::read_genotypes_hds(site_info& annotations, T& destination)
     {
       if (good())
       {
         if (hts_file_->cur_num_alleles() > 2)
         {
-          state_ = std::ios::failbit; // multi allelic HDS not supported.
+          std::cerr << "multi allelic HDS not supported" << std::endl;
+          state_ = std::ios::badbit;
           return;
         }
 
 
         if (hts_file_->get_cur_format_values_float("HDS", &(gt_), &(gt_sz_)))
         {
-          float* hds = (float*) (void*) (gt_);
+          float *hds = (float *) (void *) (gt_);
           const std::size_t num_samples = sample_ids_.size();
           if (gt_sz_ % num_samples != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
             const std::uint64_t ploidy(gt_sz_ / num_samples);
             const typename T::value_type zero_value{0};
 
+            std::size_t an = samples().size() * ploidy;
+            float dose_sum = 0.f;
+
             if (subset_map_.size())
             {
-              destination.resize(subset_size_ * ploidy);
+              an = subset_size_ * ploidy;
+              destination.resize(an);
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
                 const std::uint64_t sample_index = i / ploidy;
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
-                  if (hds[i] != zero_value)
-                    destination[subset_map_[sample_index] * ploidy + (i % ploidy)] = hds[i];
+                  float cur_hds = hds[i];
+                  if (cur_hds != zero_value)
+                  {
+                    destination[subset_map_[sample_index] * ploidy + (i % ploidy)] = cur_hds;
+                    if (std::isnan(cur_hds))
+                      --an;
+                    else
+                      dose_sum += cur_hds;
+                  }
                 }
               }
             }
@@ -791,10 +878,22 @@ namespace savvy
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
-                if (hds[i] != zero_value)
-                  destination[i] = hds[i];
+                float cur_hds = hds[i];
+                if (cur_hds != zero_value)
+                {
+                  destination[i] = cur_hds;
+                  if (std::isnan(cur_hds))
+                    --an;
+                  else
+                    dose_sum += cur_hds;
+                }
               }
             }
+
+            annotations.prop("AN", std::to_string(an));
+            if (an)
+              annotations.prop("AF", std::to_string(dose_sum / static_cast<float>(an)));
+
             return;
           }
         }
@@ -805,13 +904,14 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <typename T>
-    void reader_base<VecCnt>::read_genotypes_gp(T& destination)
+    void reader_base<VecCnt>::read_genotypes_gp(site_info& annotations, T& destination)
     {
       if (good())
       {
         if (hts_file_->cur_num_alleles() > 2)
         {
-          state_ = std::ios::failbit; // multi allelic GP not supported.
+          std::cerr << "multi allelic GP not supported" << std::endl;
+          state_ = std::ios::badbit;
           return;
         }
 
@@ -822,7 +922,8 @@ namespace savvy
           const std::size_t num_samples = sample_ids_.size();
           if (gt_sz_ % num_samples != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
@@ -859,13 +960,14 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <typename T>
-    void reader_base<VecCnt>::read_genotypes_gl(T& destination)
+    void reader_base<VecCnt>::read_genotypes_gl(site_info& annotations, T& destination)
     {
       if (good())
       {
         if (hts_file_->cur_num_alleles() > 2)
         {
-          state_ = std::ios::failbit; // multi allelic GP not supported.
+          std::cerr << "multi allelic GL not supported" << std::endl;
+          state_ = std::ios::badbit;
           return;
         }
 
@@ -876,7 +978,8 @@ namespace savvy
           const std::size_t num_samples = sample_ids_.size();
           if (gt_sz_ % num_samples != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
@@ -913,13 +1016,14 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <typename T>
-    void reader_base<VecCnt>::read_genotypes_pl(T& destination)
+    void reader_base<VecCnt>::read_genotypes_pl(site_info& annotations, T& destination)
     {
       if (good())
       {
         if (hts_file_->cur_num_alleles() > 2)
         {
-          state_ = std::ios::failbit; // multi allelic GP not supported.
+          std::cerr << "multi allelic PL not supported" << std::endl;
+          state_ = std::ios::badbit;
           return;
         }
 
@@ -928,7 +1032,8 @@ namespace savvy
           const std::size_t num_samples = sample_ids_.size();
           if (gt_sz_ % num_samples != 0)
           {
-            // TODO: mixed ploidy at site error.
+            std::cerr << "ERROR: mixed ploidy at site" << std::endl;
+            state_ = std::ios::badbit;
           }
           else
           {
@@ -1021,7 +1126,7 @@ namespace savvy
       while (vecs_read == 0 && this->good())
       {
         this->read_variant_details(annotations);
-        vecs_read = this->read_requested_genos(destinations...);
+        vecs_read = this->read_requested_genos(annotations, destinations...);
       }
 
       return *this;
@@ -1049,7 +1154,7 @@ namespace savvy
         this->read_variant_details(annotations);
         if (this->good() && region_compare(bounding_type_, annotations, region_))
         {
-          if (this->read_requested_genos(destinations...) > 0)
+          if (this->read_requested_genos(annotations, destinations...) > 0)
             break;
         }
       }
@@ -1068,7 +1173,7 @@ namespace savvy
         {
           if (fn(annotations) && region_compare(bounding_type_, annotations, region_))
           {
-            if (this->read_requested_genos(destinations...) > 0)
+            if (this->read_requested_genos(annotations, destinations...) > 0)
               break;
           }
         }
@@ -1163,6 +1268,9 @@ namespace savvy
 
       for (auto it = headers_beg; it != headers_end; ++it)
       {
+        if (it->first == "phasing" && (it->second == "partial" || it->second == "none"))
+          phase_character_ = '/';
+
         if (it->first != "FORMAT" && it->first != "fileformat")
         {
           if (it->first == "fileDate")
@@ -1378,7 +1486,7 @@ namespace savvy
               ++i;
               for ( ; i < end; ++i)
               {
-                out_it = '|';
+                out_it = phase_character_;
 
                 if (std::isnan(v[i]))
                   out_it = '.';
