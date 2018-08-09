@@ -70,10 +70,11 @@ namespace savvy
     class hts_file : public detail::hts_file_base
     {
     public:
-      hts_file(htsFile* fp, bcf_hdr_t* hdr, bcf1_t* rec) :
+      hts_file(htsFile* fp, bcf_hdr_t* hdr, bcf1_t* rec, bool destroy_hdr = true) :
         file_(fp),
         hdr_(hdr),
-        rec_(rec)
+        rec_(rec),
+        destroy_hdr_(destroy_hdr)
       {
       }
 
@@ -81,7 +82,7 @@ namespace savvy
       {
         try
         {
-          if (hdr_)
+          if (hdr_ && destroy_hdr_)
             bcf_hdr_destroy(hdr_);
           if (file_)
             bcf_close(file_);
@@ -289,13 +290,14 @@ namespace savvy
       bcf1_t* rec_ = nullptr;
     private:
       htsFile* file_ = nullptr;
+      bool destroy_hdr_ = false;
     };
 
     class hts_indexed_file : public hts_file
     {
     public:
       hts_indexed_file(bcf_srs_t* sr, bcf_hdr_t* hdr, bcf1_t* rec) :
-        hts_file(nullptr, hdr, rec),
+        hts_file(nullptr, hdr, rec, false),
         synced_readers_(sr)
       {
       }
