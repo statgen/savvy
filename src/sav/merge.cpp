@@ -13,6 +13,7 @@
 #include <getopt.h>
 
 #include <fstream>
+#include <list>
 #include <deque>
 #include <vector>
 #include <set>
@@ -218,6 +219,182 @@ int merge_main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
+  std::deque<savvy::sav::reader> input_files;
+  for (auto it = args.input_paths().begin(); it != args.input_paths().end(); ++it)
+  {
+    input_files.emplace_back(*it, args.format());
+    if (!input_files.back().good())
+    {
+      std::cerr << "Could not open file (" << input_files.back().file_path() << ")\n";
+      return EXIT_FAILURE;
+    }
+  }
+
+  std::size_t num_samples = 0;
+  std::vector<std::size_t> sample_offsets(input_files.size());
+  {
+    auto ft = input_files.begin();
+    for (auto it = sample_offsets.begin(); it != sample_offsets.end(); ++it, ++ft)
+    {
+      (*it) = num_samples;
+      num_samples += ft->samples().size();
+    }
+  }
+
+
+  //std::vector<savvy::compressed_vector<float>> genos(args.input_paths().size()); //std::vector<savvy::compressed_vector<float>> genos(args.input_paths().size());
+  std::vector<float> output_genos(num_samples * args.ploidy());
+
+  std::vector<std::string> sample_ids;
+  sample_ids.reserve(num_samples);
+
+  std::vector<std::pair<std::string,std::string>> merged_headers;
+
+  std::set<std::string> info_fields;
+  std::set<std::string> unique_headers;
+
+  for (auto& f : input_files)
+  {
+    for (auto it = f.samples().begin(); it != f.samples().end(); ++it)
+      sample_ids.emplace_back(*it);
+
+    //merged_headers.reserve(merged_headers.size() + (f.headers().end() - f.headers().begin()));
+    for (auto it = f.headers().begin(); it != f.headers().end(); ++it)
+    {
+      if ((it->first != "INFO" || info_fields.insert(savvy::parse_header_sub_field(it->second, "ID")).second) && unique_headers.insert(it->first + "=" + it->second).second)
+      {
+        merged_headers.push_back(*it);
+      }
+    }
+  }
+
+
+  if (info_fields.insert("FILTER").second)
+    merged_headers.insert(merged_headers.begin(), {"INFO","<ID=FILTER,Description=\"Variant filter\">"});
+  if (info_fields.insert("QUAL").second)
+    merged_headers.insert(merged_headers.begin(), {"INFO","<ID=QUAL,Description=\"Variant quality\">"});
+  if (info_fields.insert("ID").second)
+    merged_headers.insert(merged_headers.begin(), {"INFO","<ID=ID,Description=\"Variant ID\">"});
+
+  savvy::sav::writer::options opts;
+  opts.compression_level = args.compression_level();
+  opts.block_size = args.block_size();
+
+  savvy::sav::writer output(args.output_path(), opts, sample_ids.begin(), sample_ids.end(), merged_headers.begin(), merged_headers.end(), args.format());
+
+  std::vector<std::list<savvy::variant<std::vector<float>>>> variants(args.input_paths().size());
+
+
+  for (std::size_t i = 0; i < input_files.size(); ++i)
+  {
+    variants[i].emplace_back();
+    input_files[i] >> variants[i].back();
+    if (!input_files[i])
+      variants[i].pop_back();
+  }
+
+  std::size_t min_pos_index = 0;
+  while (min_pos_index < input_files.size())
+  {
+    min_pos_index = (std::size_t)-1;
+    savvy::site_info min_site;
+    for (std::size_t i = 0; i < input_files.size(); ++i)
+    {
+      if (variants[i].size())
+      {
+        if (min_site.chromosome().empty())
+        {
+          min_site = variants[i].front();
+          min_pos_index = i;
+        }
+        else
+        {
+          if (input_files[i].good() && min_site.chromosome() == variants[i].front().chromosome() && variants[i].front().position() < min_site.position())
+          {
+            min_site = variants[i].front();
+            min_pos_index = i;
+          }
+        }
+      }
+    }
+
+    while (true)
+    {
+      std::size_t equal_cnt = 0;
+      for (std::size_t i = 0; i < input_files.size(); ++i)
+      {
+        if (input_files[i].good())
+        {
+          if (variants[i].back().chromosome() == min_site.chromosome() &&
+            variants[i].back().position() == min_site.position())
+          {
+            ++equal_cnt;
+            variants[i].emplace_back();
+            input_files[i] >> variants[i].back();
+            if (!input_files[i])
+              variants[i].pop_back();
+          }
+        }
+      }
+
+      if (equal_cnt == 0)
+        break;
+    }
+
+    output_genos.resize(0);
+    output_genos.resize(num_samples * args.ploidy());
+    for (std::size_t i = 0; i < input_files.size(); ++i)
+    {
+      for (auto v = variants[i].begin(); v != variants[i].end(); ++v)
+      {
+        if (v->chromosome() == min_site.chromosome() &&
+          v->position() == min_site.position() &&
+          v->ref() == min_site.ref() &&
+          v->alt() == min_site.alt())
+        {
+          for (std::size_t j = 0; j < v->data().size(); ++j)
+            output_genos[sample_offsets[i]* args.ploidy() + j] = v->data()[j];
+
+          if (i != min_pos_index)
+          {
+            // TODO: merge props.
+          }
+
+          variants[i].erase(v);
+          if (variants[i].empty() && input_files[i].good())
+          {
+            variants[i].emplace_back();
+            input_files[i] >> variants[i].back();
+            if (!input_files[i])
+              variants[i].pop_back();
+          }
+          break;
+        }
+      }
+    }
+
+    output.write(min_site, output_genos);
+  }
+
+  return output.good() ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+#ifdef MERGE_OLD
+int merge_main(int argc, char** argv)
+{
+  merge_prog_args args;
+  if (!args.parse(argc, argv))
+  {
+    args.print_usage(std::cerr);
+    return EXIT_FAILURE;
+  }
+
+  if (args.help_is_set())
+  {
+    args.print_usage(std::cout);
+    return EXIT_SUCCESS;
+  }
+
   std::deque<sav_reader> input_files;
   for (auto it = args.input_paths().begin(); it != args.input_paths().end(); ++it)
   {
@@ -368,3 +545,4 @@ int merge_main(int argc, char** argv)
 
   return EXIT_FAILURE;
 }
+#endif
