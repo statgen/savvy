@@ -8,7 +8,6 @@
 #define LIBSAVVY_SITE_INFO_HPP
 
 #include "compressed_vector.hpp"
-#include "data_format.hpp"
 
 #include <string>
 #include <vector>
@@ -178,6 +177,35 @@ namespace savvy
     }
 
     out_it = '\n';
+  }
+
+  template <typename T>
+  void update_info_fields(site_info& site, const T& data)
+  {
+    std::size_t ac = 0;
+    std::size_t an = data.size();
+    std::size_t af = 0.f;
+    std::size_t maf = 0.f;
+
+    for (auto it = data.begin(); it != data.end(); ++it)
+    {
+      if (std::isnan(*it))
+        --an;
+      else if (*it)
+      {
+        ++ac;
+        af += *it;
+        maf += (*it > 0.5 ? 1.f - *it : *it);
+      }
+    }
+
+    af /= an;
+    maf /= an;
+
+    site.prop("AC", std::to_string(ac));
+    site.prop("AN", std::to_string(an));
+    site.prop("AF", std::to_string(af));
+    site.prop("MAF", std::to_string(maf));
   }
 }
 #endif //LIBSAVVY_SITE_INFO_HPP

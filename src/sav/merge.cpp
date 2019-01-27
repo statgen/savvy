@@ -373,6 +373,7 @@ int merge_main(int argc, char** argv)
       }
     }
 
+    savvy::update_info_fields(min_site, output_genos);
     output.write(min_site, output_genos);
   }
 
