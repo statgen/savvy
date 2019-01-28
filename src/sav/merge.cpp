@@ -42,7 +42,7 @@ public:
         {"output", required_argument, 0, 'o'},
         {0, 0, 0, 0}
       }),
-    output_path_("/dev/stdout")
+    output_path_("tmp.sav")
   {
   }
 
@@ -357,7 +357,11 @@ int merge_main(int argc, char** argv)
 
           if (i != min_pos_index)
           {
-            // TODO: merge props.
+            auto end_it = input_files[i].info_fields().end();
+            for (auto it = input_files[i].info_fields().begin(); it != end_it; ++it)
+            {
+              min_site.prop(*it, v->prop(*it));
+            }
           }
 
           variants[i].erase(v);
