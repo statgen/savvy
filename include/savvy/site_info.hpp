@@ -8,6 +8,7 @@
 #define LIBSAVVY_SITE_INFO_HPP
 
 #include "compressed_vector.hpp"
+#include "data_format.hpp"
 
 #include <string>
 #include <vector>
@@ -180,7 +181,7 @@ namespace savvy
   }
 
   template <typename T>
-  void update_info_fields(site_info& site, const T& data)
+  void update_info_fields(site_info& site, const T& data, savvy::fmt data_format)
   {
     std::size_t ac = 0;
     std::size_t an = data.size();
@@ -202,10 +203,16 @@ namespace savvy
     af /= an;
     maf /= an;
 
-    site.prop("AC", std::to_string(ac));
-    site.prop("AN", std::to_string(an));
-    site.prop("AF", std::to_string(af));
-    site.prop("MAF", std::to_string(maf));
+    if (data_format == savvy::fmt::gt || data_format == savvy::fmt::hds || data_format == savvy::fmt::ds || data_format == savvy::fmt::ac)
+    {
+      if (data_format == savvy::fmt::gt || data_format == savvy::fmt::hds)
+      {
+        site.prop("AC", std::to_string(ac));
+        site.prop("AN", std::to_string(an));
+        site.prop("MAF", std::to_string(maf));
+      }
+      site.prop("AF", std::to_string(af));
+    }
   }
 }
 #endif //LIBSAVVY_SITE_INFO_HPP

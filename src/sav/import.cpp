@@ -31,6 +31,7 @@ private:
   std::string input_path_;
   std::string output_path_;
   std::string index_path_;
+  int update_info_ = -1;
   int compression_level_ = -1;
   std::uint16_t block_size_ = default_block_size;
   bool help_ = false;
@@ -56,6 +57,7 @@ public:
         {"skip-empty-vectors", no_argument, 0, '\x01'},
         {"sort", no_argument, 0, 's'},
         {"sort-point", required_argument, 0, 'S'},
+        {"update-info", required_argument, 0, '\x01'},
         {0, 0, 0, 0}
       })
   {
@@ -72,6 +74,7 @@ public:
   savvy::bounding_point bounding_point() const { return bounding_point_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
   savvy::vcf::empty_vector_policy empty_vector_policy() const { return empty_vector_policy_; }
+  bool update_info() const { return update_info_ != 0; }
   bool index_is_set() const { return index_; }
   bool help_is_set() const { return help_; }
 
@@ -94,6 +97,7 @@ public:
     os << " -X, --index-file          Enables indexing and specifies index output file\n";
     os << "\n";
     os << "     --skip-empty-vectors  Skips variants that don't contain the request data format (By default, the import fails)\n";
+    os << "     --update-info      Specifies whether AC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
     os << std::flush;
   }
 
@@ -280,6 +284,10 @@ public:
       return false;
     }
 
+    if (update_info_ < 0)
+    {
+      update_info_ = subset_ids_.size() ? 1 : 0; // Automatically update info fields if samples are subset.
+    }
 
     if (compression_level_ < 0)
       compression_level_ = default_compression_level;
@@ -291,12 +299,16 @@ public:
 };
 
 
-int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::region>& regions, savvy::sav::writer& out)
+int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::region>& regions, savvy::fmt data_format, bool update_info, savvy::sav::writer& out)
 {
   savvy::site_info variant;
   savvy::compressed_vector<float> genotypes;
   while (out && in.read(variant, genotypes))
+  {
+    if (update_info)
+      savvy::update_info_fields(variant, genotypes, data_format);
     out.write(variant, genotypes);
+  }
 
   if (regions.size())
   {
@@ -304,7 +316,11 @@ int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::r
     {
       in.reset_region(*it);
       while (out && in.read(variant, genotypes))
+      {
+        if (update_info)
+          savvy::update_info_fields(variant, genotypes, data_format);
         out.write(variant, genotypes);
+      }
     }
   }
 
@@ -314,13 +330,17 @@ int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::r
   return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& regions, savvy::sav::writer& out)
+int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::region>& regions, savvy::fmt data_format, bool update_info, savvy::sav::writer& out)
 {
   // TODO: support regions without index.
   savvy::site_info variant;
   savvy::compressed_vector<float> genotypes;
   while (out && in.read(variant, genotypes))
+  {
+    if (update_info)
+      savvy::update_info_fields(variant, genotypes, data_format);
     out.write(variant, genotypes);
+  }
 
   if (out.fail())
     std::cerr << "Write Failure: Does input file have mixed ploidy?" << std::endl;
@@ -363,11 +383,11 @@ int prep_reader_for_import(T& input, const import_prog_args& args)
     {
       if (args.sort_type())
       {
-        return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, args.format(), args.regions(), output, args.format()) && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE);
+        return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, args.format(), args.regions(), output, args.format(), args.update_info()) && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE);
       }
       else
       {
-        return import_records(input, args.regions(), output);
+        return import_records(input, args.regions(), args.format(), args.update_info(), output);
       }
     }
   }

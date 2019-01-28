@@ -296,13 +296,9 @@ namespace savvy
             varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
-            std::size_t an = samples().size() * ploidy_level;
-            std::size_t ac = 0;
-
             if (subset_size_ != samples().size())
             {
-              an = subset_size_ * ploidy_level;
-              destination.resize(an);
+              destination.resize(subset_size_ * ploidy_level);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -324,17 +320,12 @@ namespace savvy
                   {
                     destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele;
                   }
-
-                  if (std::isnan(allele))
-                    --an;
-                  else if (allele)
-                    ++ac;
                 }
               }
             }
             else
             {
-              destination.resize(an);
+              destination.resize(samples().size() * ploidy_level);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -353,18 +344,8 @@ namespace savvy
                 {
                   destination[total_offset] = allele;
                 }
-
-                if (std::isnan(allele))
-                  --an;
-                else if (allele)
-                  ++ac;
               }
             }
-
-            annotations.prop("AC", std::to_string(ac));
-            annotations.prop("AN", std::to_string(an));
-            if (an)
-              annotations.prop("AF", std::to_string(static_cast<float>(ac) / static_cast<float>(an)));
 
             if (input_stream_->get() == std::char_traits<char>::eof())
             {
@@ -405,14 +386,10 @@ namespace savvy
             varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
-            std::size_t an = samples().size() * ploidy_level;
-            std::size_t ac = 0;
 
             if (subset_size_ != samples().size())
             {
               destination.resize(subset_size_);
-
-              an = subset_size_ * ploidy_level;
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -434,11 +411,6 @@ namespace savvy
                   {
                     destination[subset_map_[sample_index]] += allele;
                   }
-
-                  if (std::isnan(allele))
-                    --an;
-                  else if (allele)
-                    ++ac;
                 }
               }
             }
@@ -463,18 +435,8 @@ namespace savvy
                 {
                   destination[total_offset / ploidy_level] += allele;
                 }
-
-                if (std::isnan(allele))
-                  --an;
-                else if (allele)
-                  ++ac;
               }
             }
-
-            annotations.prop("AC", std::to_string(ac));
-            annotations.prop("AN", std::to_string(an));
-            if (an)
-              annotations.prop("AF", std::to_string(static_cast<float>(ac) / static_cast<float>(an)));
 
             if (input_stream_->get() == std::char_traits<char>::eof())
             {
@@ -635,14 +597,9 @@ namespace savvy
             varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
-            std::size_t an = samples().size() * ploidy_level;
-            float dose_sum = 0.f;
-
             if (subset_size_ != samples().size())
             {
-              an = subset_size_ * ploidy_level;
-              destination.resize(an);
-
+              destination.resize(subset_size_ * ploidy_level);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -656,17 +613,12 @@ namespace savvy
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele;
-
-                  if (std::isnan(allele))
-                    --an;
-                  else
-                    dose_sum += allele;
                 }
               }
             }
             else
             {
-              destination.resize(an);
+              destination.resize(samples().size() * ploidy_level);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -678,17 +630,8 @@ namespace savvy
 
                 assert(total_offset < (samples().size() * ploidy_level));
                 destination[total_offset] = allele;
-
-                if (std::isnan(allele))
-                  --an;
-                else
-                  dose_sum += allele;
               }
             }
-
-            annotations.prop("AN", std::to_string(an));
-            if (an)
-              annotations.prop("AF", std::to_string(dose_sum / static_cast<float>(an)));
 
             if (input_stream_->get() == std::char_traits<char>::eof())
             {
@@ -729,13 +672,9 @@ namespace savvy
             varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
-            std::size_t an = samples().size() * ploidy_level;
-            float dose_sum = 0.f;
-
             if (subset_size_ != samples().size())
             {
               destination.resize(subset_size_);
-              an = subset_size_ * ploidy_level;
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -748,11 +687,6 @@ namespace savvy
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   destination[subset_map_[sample_index]] += allele;
-
-                  if (std::isnan(allele))
-                    --an;
-                  else
-                    dose_sum += allele;
                 }
               }
             }
@@ -767,17 +701,8 @@ namespace savvy
                 std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
                 total_offset += offset;
                 destination[total_offset / ploidy_level] += allele;
-
-                if (std::isnan(allele))
-                  --an;
-                else
-                  dose_sum += allele;
               }
             }
-
-            annotations.prop("AN", std::to_string(an));
-            if (an)
-              annotations.prop("AF", std::to_string(dose_sum / static_cast<float>(an)));
 
             if (input_stream_->get() == std::char_traits<char>::eof())
             {
