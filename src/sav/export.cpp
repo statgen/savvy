@@ -18,6 +18,7 @@
 #include <fstream>
 #include <ctime>
 #include <getopt.h>
+#include <sys/stat.h>
 
 class export_prog_args
 {
@@ -223,6 +224,12 @@ public:
           subset_ids_ = split_string_to_set(optarg ? optarg : "", ',');
           break;
         case 'I':
+          struct stat buf;
+          if (stat(optarg ? optarg : "", &buf) != 0)
+          {
+            std::cerr << "Cannot open --sample-ids-file (" << (optarg ? optarg : "") << ")\n";
+            return false;
+          }
           subset_ids_ = split_file_to_set(optarg ? optarg : "");
           break;
         case 'm':
