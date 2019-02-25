@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <iterator>
 #include <ostream>
+#include <cmath>
 
 namespace savvy
 {
