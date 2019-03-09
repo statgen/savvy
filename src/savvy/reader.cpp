@@ -49,6 +49,12 @@ namespace savvy
       return vcf_impl()->subset_samples(subset);
     return std::vector<std::string>();
   }
+
+  void reader_base::set_policy(enum vcf::empty_vector_policy p)
+  {
+    if (vcf_impl())
+      return vcf_impl()->set_policy(p);
+  }
   //################################################################//
 
   //################################################################//
