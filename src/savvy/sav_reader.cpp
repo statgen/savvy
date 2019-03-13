@@ -36,6 +36,7 @@ namespace savvy
     {
       parse_header();
       requested_data_format_ = file_data_format_;
+
       init_subset_map();
     }
 
@@ -209,6 +210,11 @@ namespace savvy
       for (std::size_t i = 0; i < subset_map_.size(); ++i)
         subset_map_[i] = i;
       subset_size_ = subset_map_.size();
+
+      sort_mapping_.resize(ploidy_ * samples().size());
+      for (std::size_t i = 0; i < sort_mapping_.size(); ++i)
+        sort_mapping_[i] = i;
+      prev_sort_mapping_.resize(sort_mapping_.size());
     }
 
     std::vector<std::string> reader_base::subset_samples(const std::set<std::string>& subset)

@@ -299,6 +299,11 @@ namespace savvy
             std::size_t an = samples().size() * ploidy_level;
             std::size_t ac = 0;
 
+            std::size_t sort_cnt = 0;
+            std::size_t prev_sort_mapping_idx = 0;
+            std::size_t zero_sort_count = sz;
+            std::swap(sort_mapping_, prev_sort_mapping_);
+
             if (subset_size_ != samples().size())
             {
               an = subset_size_ * ploidy_level;
@@ -311,18 +316,25 @@ namespace savvy
                 std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
                 total_offset += offset;
 
-                const std::uint64_t sample_index = total_offset / ploidy_level;
+                std::size_t unsorted_index = prev_sort_mapping_[total_offset];
+                while (prev_sort_mapping_idx < total_offset)
+                  sort_mapping_[zero_sort_count++] = prev_sort_mapping_[prev_sort_mapping_idx++];
+                sort_mapping_[sort_cnt++] = unsorted_index;
+                ++prev_sort_mapping_idx;
+
+
+                const std::uint64_t sample_index = unsorted_index / ploidy_level;
                 if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
                 {
                   if (BitWidth != 1)
                   {
                     allele = std::round(allele);
                     if (allele != typename T::value_type())
-                      destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele;
+                      destination[subset_map_[sample_index] * ploidy_level + (unsorted_index % ploidy_level)] = allele;
                   }
                   else
                   {
-                    destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele;
+                    destination[subset_map_[sample_index] * ploidy_level + (unsorted_index % ploidy_level)] = allele;
                   }
 
                   if (std::isnan(allele))
@@ -343,15 +355,21 @@ namespace savvy
                 std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
                 total_offset += offset;
 
+                std::size_t unsorted_index = prev_sort_mapping_[total_offset];
+                while (prev_sort_mapping_idx < total_offset)
+                  sort_mapping_[zero_sort_count++] = prev_sort_mapping_[prev_sort_mapping_idx++];
+                sort_mapping_[sort_cnt++] = unsorted_index;
+                ++prev_sort_mapping_idx;
+
                 if (BitWidth != 1)
                 {
                   allele = std::round(allele);
                   if (allele != typename T::value_type())
-                    destination[total_offset] = allele;
+                    destination[unsorted_index] = allele;
                 }
                 else
                 {
-                  destination[total_offset] = allele;
+                  destination[unsorted_index] = allele;
                 }
 
                 if (std::isnan(allele))
@@ -360,6 +378,12 @@ namespace savvy
                   ++ac;
               }
             }
+
+            assert(sort_cnt == sz);
+            assert(prev_sort_mapping_idx == zero_sort_count);
+            while (prev_sort_mapping_idx < an)
+              sort_mapping_[zero_sort_count++] = prev_sort_mapping_[prev_sort_mapping_idx++];
+
 
             annotations.prop("AC", std::to_string(ac));
             annotations.prop("AN", std::to_string(an));
@@ -820,6 +844,8 @@ namespace savvy
       std::vector<std::uint64_t> subset_map_;
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> metadata_fields_;
+      std::vector<std::size_t> sort_mapping_;
+      std::vector<std::size_t> prev_sort_mapping_;
       std::string file_path_;
       std::uint64_t subset_size_;
       std::unique_ptr<std::istream> input_stream_;
@@ -1068,6 +1094,11 @@ namespace savvy
         {
           ploidy_ = ploidy;
 
+          sort_mapping_.resize(ploidy_ * samples_.size());
+          for (std::size_t i = 0; i < sort_mapping_.size(); ++i)
+            sort_mapping_[i] = i;
+          prev_sort_mapping_.resize(sort_mapping_.size());
+
           std::string version_string("sav\x00\x01\x00\x00", 7);
           output_stream_.write(version_string.data(), version_string.size());
 
@@ -1233,6 +1264,9 @@ namespace savvy
                   index_file_->write(current_chromosome_, e);
                 }
                 output_stream_.flush();
+
+                for (std::size_t i = 0; i < sort_mapping_.size(); ++i)
+                  sort_mapping_[i] = i;
                 allele_count_ = 0;
                 current_chromosome_ = annotations.chromosome();
                 record_count_in_block_ = 0;
@@ -1307,6 +1341,44 @@ namespace savvy
 
       static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, std::int8_t compression_level);
 
+
+      template <std::size_t BitWidth, typename T, typename OutIt>
+      void serialize_alleles_sorted(const std::vector<T>& m, std::size_t non_zero_size, OutIt os_it)
+      {
+        std::swap(prev_sort_mapping_, sort_mapping_);
+
+        std::size_t sort_cnt = 0;
+        std::size_t zero_sort_cnt = non_zero_size;
+        for (std::size_t i = 0; i < prev_sort_mapping_.size(); ++i)
+        {
+          if (m[prev_sort_mapping_[i]] != 0.f)
+            sort_mapping_[sort_cnt++] = prev_sort_mapping_[i];
+          else
+            sort_mapping_[zero_sort_cnt++] = prev_sort_mapping_[i];
+        }
+
+//        for (std::size_t i = 0; i < prev_sort_mapping_.size(); ++i)
+//        {
+//          if (m[prev_sort_mapping_[i]] == 0.f)
+//            sort_mapping_[sort_cnt++] = prev_sort_mapping_[i];
+//        }
+
+
+        std::uint64_t last_pos = 0;
+
+        for (std::size_t i = 0; i < prev_sort_mapping_.size(); ++i)
+        {
+          std::int8_t signed_allele = detail::allele_encoder<BitWidth>::encode(m[prev_sort_mapping_[i]]);
+          if (signed_allele >= 0)
+          {
+            std::uint64_t dist = static_cast<std::uint64_t>(i);
+            std::uint64_t offset = dist - last_pos;
+            last_pos = dist + 1;
+            prefixed_varint<BitWidth>::encode((std::uint8_t)(signed_allele), offset, os_it);
+          }
+        }
+      }
+
       template <std::size_t BitWidth, typename T, typename OutIt>
       static void serialize_alleles(const std::vector<T>& m, OutIt os_it)
       {
@@ -1323,7 +1395,6 @@ namespace savvy
             prefixed_varint<BitWidth>::encode((std::uint8_t)(signed_allele), offset, os_it);
           }
         }
-
       }
 
       template <std::size_t BitWidth, typename T, typename OutIt>
@@ -1342,7 +1413,6 @@ namespace savvy
             prefixed_varint<BitWidth>::encode((std::uint8_t)(signed_allele), offset, os_it);
           }
         }
-
       }
 
       template <typename T>
@@ -1356,15 +1426,18 @@ namespace savvy
         allele_count_ += non_zero_count;
         varint_encode(non_zero_count, os_it);
 
-        serialize_alleles<1>(m, os_it);
+        serialize_alleles_sorted<1>(m, non_zero_count, os_it);  //serialize_alleles<1>(m, os_it);
       }
 
       template <typename T>
       void write_alleles(const savvy::compressed_vector<T>& m)
       {
+        const T ref_value = T();
+
         std::ostreambuf_iterator<char> os_it(output_stream_.rdbuf());
 
-        allele_count_ += m.non_zero_size();
+        std::uint64_t non_zero_count =  m.non_zero_size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), ref_value));
+        allele_count_ += non_zero_count;
         varint_encode(m.non_zero_size(), os_it);
 
         serialize_alleles<1>(m, os_it);
@@ -1475,6 +1548,8 @@ namespace savvy
       std::uint16_t block_size_;
       fmt data_format_;
       std::int32_t ploidy_ = 0;
+      std::vector<std::size_t> sort_mapping_;
+      std::vector<std::size_t> prev_sort_mapping_;
     };
 
 
