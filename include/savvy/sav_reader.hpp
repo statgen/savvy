@@ -199,6 +199,12 @@ namespace savvy
                           prop_val.resize(sz);
                           input_stream_->read(&prop_val[0], sz);
                           props[key] = prop_val;
+
+                          if (key == "BWT_RESET")
+                          {
+                            for (std::size_t i = 0; i < sort_mapping_.size(); ++i)
+                              sort_mapping_[i] = i;
+                          }
                         }
                       }
                     }
@@ -1052,7 +1058,9 @@ namespace savvy
         data_format_(data_format)
       {
         headers_.resize(std::distance(headers_beg, headers_end));
-        auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string,std::string>& kvp) { return kvp.first != "FORMAT" && kvp.first != "fileformat"; });
+        auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string,std::string>& kvp) { return kvp.first != "FORMAT" && kvp.first != "fileformat" && (kvp.first != "INFO" || parse_header_sub_field(kvp.second, "ID") != "BWT_RESET"); });
+        headers_.insert(copy_res, {"INFO","<ID=BWT_RESET,Description=\"Indicates when BWT sorting has been reset\">"});
+        ++copy_res;
         headers_.resize(std::distance(headers_.begin(), copy_res));
       }
 
@@ -1243,8 +1251,10 @@ namespace savvy
             {
               // 1024*1024 non-ref GTs or 64*1024 records
               //if (allele_count_ >= 0x100000 || (record_count_ % 0x10000) == 0 || annotations.chromosome() != current_chromosome_)
+              bool flushed = false;
               if (block_size_ != 0 && ((record_count_ % block_size_) == 0 || annotations.chromosome() != current_chromosome_))
               {
+                flushed = true;
                 if (index_file_ && record_count_in_block_)
                 {
                   auto file_pos = std::uint64_t(output_stream_.tellp());
@@ -1267,6 +1277,7 @@ namespace savvy
 
                 for (std::size_t i = 0; i < sort_mapping_.size(); ++i)
                   sort_mapping_[i] = i;
+
                 allele_count_ = 0;
                 current_chromosome_ = annotations.chromosome();
                 record_count_in_block_ = 0;
@@ -1294,6 +1305,8 @@ namespace savvy
               for (const std::string& key : property_fields_)
               {
                 std::string value(annotations.prop(key));
+                if (flushed && key == "BWT_RESET")
+                  value = "1";
                 varint_encode(value.size(), os_it);
                 if (value.size())
                   std::copy(value.begin(), value.end(), os_it);
