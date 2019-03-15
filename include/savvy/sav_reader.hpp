@@ -1057,11 +1057,11 @@ namespace savvy
         block_size_(opts.block_size),
         data_format_(data_format)
       {
-        headers_.resize(std::distance(headers_beg, headers_end));
-        auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string,std::string>& kvp) { return kvp.first != "FORMAT" && kvp.first != "fileformat" && (kvp.first != "INFO" || parse_header_sub_field(kvp.second, "ID") != "BWT_RESET"); });
-        headers_.insert(copy_res, {"INFO","<ID=BWT_RESET,Description=\"Indicates when BWT sorting has been reset\">"});
-        ++copy_res;
-        headers_.resize(std::distance(headers_.begin(), copy_res));
+          headers_.resize(std::distance(headers_beg, headers_end) + 1);
+          auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string, std::string>& kvp) { return kvp.first != "FORMAT" && kvp.first != "fileformat" && (kvp.first != "INFO" || parse_header_sub_field(kvp.second, "ID") != "BWT_RESET"); });
+          (*copy_res) = {"INFO", "<ID=BWT_RESET,Description=\"Indicates when BWT sorting has been reset\">"};
+          ++copy_res;
+          headers_.erase(copy_res, headers_.end());
       }
 
 
