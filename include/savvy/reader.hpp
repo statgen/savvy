@@ -136,6 +136,15 @@ namespace savvy
       return true;
     }
 
+    bool eof() const
+    {
+      if (sav_impl())
+        return sav_impl()->eof();
+      else if (vcf_impl())
+        return vcf_impl()->eof();
+      return true;
+    }
+
 //    template <typename T>
 //    bool read_variant(T& destination, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN())
 //    {
