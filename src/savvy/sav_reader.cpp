@@ -270,7 +270,7 @@ namespace savvy
       std::map<std::string, std::vector<s1r::entry>> index_data;
 
       site_info variant;
-      savvy::compressed_vector<float> variant_data;
+      std::vector<float> variant_data;
 
       std::size_t records_in_block = 0;
       std::string current_chromosome;

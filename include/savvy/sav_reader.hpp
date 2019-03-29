@@ -273,7 +273,7 @@ namespace savvy
       }
 
       template <std::size_t BitWidth, typename T>
-      void read_genotypes_al(site_info& annotations, T& destination)
+      void read_genotypes_al_sorted(site_info& annotations, T& destination)
       {
         if (good())
         {
@@ -389,6 +389,117 @@ namespace savvy
             assert(prev_sort_mapping_idx == zero_sort_count);
             while (prev_sort_mapping_idx < an)
               sort_mapping_[zero_sort_count++] = prev_sort_mapping_[prev_sort_mapping_idx++];
+
+
+            annotations.prop("AC", std::to_string(ac));
+            annotations.prop("AN", std::to_string(an));
+            if (an)
+              annotations.prop("AF", std::to_string(static_cast<float>(ac) / static_cast<float>(an)));
+
+            if (input_stream_->get() == std::char_traits<char>::eof())
+            {
+              assert(!"Truncated file");
+              this->input_stream_->setstate(std::ios::badbit);
+            }
+          }
+        }
+      }
+
+      template <std::size_t BitWidth, typename T>
+      void read_genotypes_al(site_info& annotations, T& destination)
+      {
+        if (good())
+        {
+          const auto missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN();
+          std::istreambuf_iterator<char> in_it(*input_stream_);
+          std::istreambuf_iterator<char> end_it;
+
+          std::uint64_t ploidy_level;
+          if (ploidy_ == 0)
+          {
+            if (varint_decode(in_it, end_it, ploidy_level) != end_it)
+              ++in_it;
+          }
+          else
+          {
+            ploidy_level = ploidy_;
+          }
+
+          if (in_it == end_it)
+          {
+            this->input_stream_->setstate(std::ios::badbit);
+          }
+          else
+          {
+            std::uint64_t sz;
+            varint_decode(in_it, end_it, sz);
+            std::uint64_t total_offset = 0;
+
+            std::size_t an = samples().size() * ploidy_level;
+            std::size_t ac = 0;
+
+            if (subset_size_ != samples().size())
+            {
+              an = subset_size_ * ploidy_level;
+              destination.resize(an);
+
+              for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+              {
+                typename T::value_type allele;
+                std::uint64_t offset;
+                std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
+                total_offset += offset;
+
+
+                const std::uint64_t sample_index = total_offset / ploidy_level;
+                if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
+                {
+                  if (BitWidth != 1)
+                  {
+                    allele = std::round(allele);
+                    if (allele != typename T::value_type())
+                      destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele;
+                  }
+                  else
+                  {
+                    destination[subset_map_[sample_index] * ploidy_level + (total_offset % ploidy_level)] = allele;
+                  }
+
+                  if (std::isnan(allele))
+                    --an;
+                  else if (allele)
+                    ++ac;
+                }
+              }
+            }
+            else
+            {
+              destination.resize(an);
+
+              for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+              {
+                typename T::value_type allele;
+                std::uint64_t offset;
+                std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
+                total_offset += offset;
+
+                if (BitWidth != 1)
+                {
+                  allele = std::round(allele);
+                  if (allele != typename T::value_type())
+                    destination[total_offset] = allele;
+                }
+                else
+                {
+                  destination[total_offset] = allele;
+                }
+
+                if (std::isnan(allele))
+                  --an;
+                else if (allele)
+                  ++ac;
+              }
+            }
 
 
             annotations.prop("AC", std::to_string(ac));
@@ -825,7 +936,7 @@ namespace savvy
         if (true) //requested_data_formats_[idx] == file_data_format_)
         {
           if (requested_data_format_ == fmt::gt)
-            file_data_format_ == fmt::gt ? read_genotypes_al<1>(annotations, destination) : read_genotypes_al<7>(annotations, destination);
+            file_data_format_ == fmt::gt ? (annotations.prop("BWT_SORT").empty() ? read_genotypes_al<1>(annotations, destination) : read_genotypes_al_sorted<1>(annotations, destination)) : read_genotypes_al<7>(annotations, destination);
           else if (requested_data_format_== fmt::ac)
             file_data_format_ == fmt::gt ? read_genotypes_gt<1>(annotations, destination) : read_genotypes_gt<7>(annotations, destination);
           else if (requested_data_format_ == fmt::gp)
@@ -1057,9 +1168,11 @@ namespace savvy
         block_size_(opts.block_size),
         data_format_(data_format)
       {
-          headers_.resize(std::distance(headers_beg, headers_end) + 1);
-          auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string, std::string>& kvp) { return kvp.first != "FORMAT" && kvp.first != "fileformat" && (kvp.first != "INFO" || parse_header_sub_field(kvp.second, "ID") != "BWT_RESET"); });
+          headers_.resize(std::distance(headers_beg, headers_end) + 2);
+          auto copy_res = std::copy_if(headers_beg, headers_end, headers_.begin(), [](const std::pair<std::string, std::string>& kvp) { return kvp.first != "FORMAT" && kvp.first != "fileformat" && (kvp.first != "INFO" || (parse_header_sub_field(kvp.second, "ID") != "BWT_RESET" && parse_header_sub_field(kvp.second, "ID") != "BWT_SORT")); });
           (*copy_res) = {"INFO", "<ID=BWT_RESET,Description=\"Indicates when BWT sorting has been reset\">"};
+          ++copy_res;
+          (*copy_res) = {"INFO", "<ID=BWT_SORT,Description=\"Indicates when BWT sorting has been applied to a variant\">"};
           ++copy_res;
           headers_.erase(copy_res, headers_.end());
       }
@@ -1302,27 +1415,35 @@ namespace savvy
                 std::copy(annotations.alt().begin(), annotations.alt().end(), os_it);
               //os.write(&source.alt_[0], source.alt_.size());
 
+              std::uint64_t non_zero_count = (data_format_ == fmt::hds ? get_non_zero_hds_count(data) : get_non_zero_count(data));
+
+              bool apply_sort = data_format_ != fmt::hds && non_zero_count > (samples_.size() * ploidy_ * sort_af_threshold_);
+
               for (const std::string& key : property_fields_)
               {
                 std::string value(annotations.prop(key));
                 if (flushed && key == "BWT_RESET")
+                  value = "1";
+                if (apply_sort && key == "BWT_SORT")
                   value = "1";
                 varint_encode(value.size(), os_it);
                 if (value.size())
                   std::copy(value.begin(), value.end(), os_it);
               }
 
+              allele_count_ += non_zero_count;
+              varint_encode(non_zero_count, os_it);
+
               if (data_format_ == fmt::hds)
               {
-                write_hap_dosages(data);
+                serialize_alleles<7>(data, os_it); //write_hap_dosages(data);
               }
-//            else if (data_format_ == fmt::genotype_probability)
-//            {
-//              write_probs(data);
-//            }
               else
               {
-                write_alleles(data);
+                if (apply_sort)
+                  serialize_alleles_sorted<1>(data, non_zero_count, os_it);
+                else
+                  serialize_alleles<1>(data, os_it); //write_alleles(data);
               }
 
               current_block_min_ = std::min(current_block_min_, std::uint32_t(annotations.position()));
@@ -1393,6 +1514,14 @@ namespace savvy
       }
 
       template <std::size_t BitWidth, typename T, typename OutIt>
+      void serialize_alleles_sorted(const savvy::compressed_vector<T>& m, std::size_t non_zero_size, OutIt os_it)
+      {
+        // TODO: use temp dense vector.
+        std::cerr << "Cannot use compressed vector when writing bwt sorted sav file." << std::endl;
+        output_stream_.setstate(std::ios::failbit);
+      }
+
+      template <std::size_t BitWidth, typename T, typename OutIt>
       static void serialize_alleles(const std::vector<T>& m, OutIt os_it)
       {
         std::uint64_t last_pos = 0;
@@ -1429,7 +1558,26 @@ namespace savvy
       }
 
       template <typename T>
-      void write_alleles(const std::vector<T>& m)
+      std::uint64_t get_non_zero_count(const T& m)
+      {
+        const typename T::value_type ref_value = typename T::value_type();
+        return m.size() - static_cast<std::size_t>(std::count(m.begin(), m.end(), ref_value));
+      }
+
+      template <typename T>
+      std::uint64_t get_non_zero_hds_count(const T& m)
+      {
+        std::uint64_t ret = 0;
+        for (auto it = m.begin(); it != m.end(); ++it)
+        {
+          if (detail::allele_encoder<7>::encode(*it) >= 0)
+            ++ret;
+        }
+        return ret;
+      }
+
+      template <typename T>
+      void write_alleles(const std::vector<T>& m, std::size_t sort_ac_threshold)
       {
         const T ref_value = T();
 
@@ -1439,11 +1587,14 @@ namespace savvy
         allele_count_ += non_zero_count;
         varint_encode(non_zero_count, os_it);
 
-        serialize_alleles_sorted<1>(m, non_zero_count, os_it);  //serialize_alleles<1>(m, os_it);
+        if (non_zero_count > sort_ac_threshold)
+          serialize_alleles_sorted<1>(m, non_zero_count, os_it);
+        else
+          serialize_alleles<1>(m, os_it);
       }
 
       template <typename T>
-      void write_alleles(const savvy::compressed_vector<T>& m)
+      void write_alleles(const savvy::compressed_vector<T>& m, std::size_t sort_ac_threshold) // TODO: see what is using this method
       {
         const T ref_value = T();
 
@@ -1563,6 +1714,7 @@ namespace savvy
       std::int32_t ploidy_ = 0;
       std::vector<std::size_t> sort_mapping_;
       std::vector<std::size_t> prev_sort_mapping_;
+      float sort_af_threshold_ = 0.0001;
     };
 
 
