@@ -930,13 +930,55 @@ namespace savvy
       }
 
       template <typename T>
+      bool is_sparse(const T&)
+      {
+        return false;
+      }
+
+      template <typename T>
+      bool is_sparse(const savvy::compressed_vector<T>&)
+      {
+        return true;
+      }
+
+      template <typename T>
       void read_genotypes(site_info& annotations, T& destination)
       {
         destination.resize(0);
         if (true) //requested_data_formats_[idx] == file_data_format_)
         {
           if (requested_data_format_ == fmt::gt)
-            file_data_format_ == fmt::gt ? (annotations.prop("BWT_SORT").empty() ? read_genotypes_al<1>(annotations, destination) : read_genotypes_al_sorted<1>(annotations, destination)) : read_genotypes_al<7>(annotations, destination);
+          {
+            if (file_data_format_ == fmt::gt)
+            {
+              if (annotations.prop("BWT_SORT").empty())
+              {
+                read_genotypes_al<1>(annotations, destination);
+              }
+              else
+              {
+                if (is_sparse(destination))
+                {
+                  read_genotypes_al_sorted<1>(annotations, temp_gt_vector_);
+                  destination.resize(0);
+                  destination.resize(temp_gt_vector_.size());
+                  for (std::size_t i = 0; i < temp_gt_vector_.size(); ++i)
+                  {
+                    if (temp_gt_vector_[i] != 0.f)
+                      destination[i] = temp_gt_vector_[i];
+                  }
+                }
+                else
+                {
+                  read_genotypes_al_sorted<1>(annotations, destination);
+                }
+              }
+            }
+            else
+            {
+              read_genotypes_al<7>(annotations, destination);
+            }
+          }
           else if (requested_data_format_== fmt::ac)
             file_data_format_ == fmt::gt ? read_genotypes_gt<1>(annotations, destination) : read_genotypes_gt<7>(annotations, destination);
           else if (requested_data_format_ == fmt::gp)
@@ -963,6 +1005,7 @@ namespace savvy
       std::vector<std::string> metadata_fields_;
       std::vector<std::size_t> sort_mapping_;
       std::vector<std::size_t> prev_sort_mapping_;
+      std::vector<float> temp_gt_vector_;
       std::string file_path_;
       std::uint64_t subset_size_;
       std::unique_ptr<std::istream> input_stream_;
