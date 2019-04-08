@@ -302,9 +302,6 @@ namespace savvy
             varint_decode(in_it, end_it, sz);
             std::uint64_t total_offset = 0;
 
-            std::size_t an = samples().size() * ploidy_level;
-            std::size_t ac = 0;
-
             std::size_t sort_cnt = 0;
             std::size_t prev_sort_mapping_idx = 0;
             std::size_t zero_sort_count = sz;
@@ -312,8 +309,7 @@ namespace savvy
 
             if (subset_size_ != samples().size())
             {
-              an = subset_size_ * ploidy_level;
-              destination.resize(an);
+              destination.resize(subset_size_ * ploidy_level);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -342,17 +338,12 @@ namespace savvy
                   {
                     destination[subset_map_[sample_index] * ploidy_level + (unsorted_index % ploidy_level)] = allele;
                   }
-
-                  if (std::isnan(allele))
-                    --an;
-                  else if (allele)
-                    ++ac;
                 }
               }
             }
             else
             {
-              destination.resize(an);
+              destination.resize(samples().size() * ploidy_level);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -377,24 +368,13 @@ namespace savvy
                 {
                   destination[unsorted_index] = allele;
                 }
-
-                if (std::isnan(allele))
-                  --an;
-                else if (allele)
-                  ++ac;
               }
             }
 
             assert(sort_cnt == sz);
             assert(prev_sort_mapping_idx == zero_sort_count);
-            while (prev_sort_mapping_idx < an)
+            while (prev_sort_mapping_idx < samples().size() * ploidy_level)
               sort_mapping_[zero_sort_count++] = prev_sort_mapping_[prev_sort_mapping_idx++];
-
-
-            annotations.prop("AC", std::to_string(ac));
-            annotations.prop("AN", std::to_string(an));
-            if (an)
-              annotations.prop("AF", std::to_string(static_cast<float>(ac) / static_cast<float>(an)));
 
             if (input_stream_->get() == std::char_traits<char>::eof())
             {
