@@ -136,6 +136,15 @@ namespace savvy
       return true;
     }
 
+    bool eof() const
+    {
+      if (sav_impl())
+        return sav_impl()->eof();
+      else if (vcf_impl())
+        return vcf_impl()->eof();
+      return true;
+    }
+
 //    template <typename T>
 //    bool read_variant(T& destination, const typename T::vector_type::value_type missing_value = std::numeric_limits<typename T::vector_type::value_type>::quiet_NaN())
 //    {
@@ -150,8 +159,8 @@ namespace savvy
     const std::vector<std::string>& info_fields() const;
     const std::vector<std::string>& samples() const;
     const std::vector<std::pair<std::string, std::string>>& headers() const;
-
     std::vector<std::string> subset_samples(const std::set<std::string>& subset);
+    void set_policy(enum vcf::empty_vector_policy p);
   private:
     static const std::vector<std::string> empty_string_vector;
     static const std::vector<std::pair<std::string, std::string>> empty_string_pair_vector;

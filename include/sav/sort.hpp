@@ -96,7 +96,7 @@ public:
 };
 
 template <typename VecType, typename Reader, typename Writer>
-bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt in_format, const std::vector<savvy::region>& regions, Writer& out, savvy::fmt out_format)
+bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt in_format, const std::vector<savvy::region>& regions, Writer& out, savvy::fmt out_format, bool update_info)
 {
   less_than_comparator less_than(sort);
 
@@ -171,6 +171,7 @@ bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt 
 
     if (min_index < write_variants.size())
     {
+      savvy::update_info_fields(write_variants[min_index], write_variants[min_index].data(), out_format);
       out << write_variants[min_index];
       temp_readers[min_index] >> write_variants[min_index];
     }

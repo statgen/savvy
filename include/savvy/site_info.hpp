@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <iterator>
 #include <ostream>
+#include <cmath>
 
 namespace savvy
 {
@@ -178,6 +179,39 @@ namespace savvy
     }
 
     out_it = '\n';
+  }
+
+  template <typename T>
+  void update_info_fields(site_info& site, const T& data, savvy::fmt data_format)
+  {
+    std::size_t ac = 0;
+    std::size_t an = data.size();
+    float af = 0.f;
+
+    for (auto it = data.begin(); it != data.end(); ++it)
+    {
+      if (std::isnan(*it))
+        --an;
+      else if (*it)
+      {
+        ++ac;
+        af += *it;
+      }
+    }
+
+    af /= an;
+    float maf = af > 0.5 ? 1.f - af : af;
+
+    if (data_format == savvy::fmt::gt || data_format == savvy::fmt::hds || data_format == savvy::fmt::ds || data_format == savvy::fmt::ac)
+    {
+      if (data_format == savvy::fmt::gt || data_format == savvy::fmt::hds)
+      {
+        site.prop("AC", std::to_string(ac));
+        site.prop("AN", std::to_string(an));
+        site.prop("MAF", std::to_string(maf));
+      }
+      site.prop("AF", std::to_string(af));
+    }
   }
 }
 #endif //LIBSAVVY_SITE_INFO_HPP

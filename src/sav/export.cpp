@@ -18,6 +18,7 @@
 #include <fstream>
 #include <ctime>
 #include <getopt.h>
+#include <sys/stat.h>
 
 class export_prog_args
 {
@@ -39,6 +40,7 @@ private:
   std::unique_ptr<savvy::s1r::sort_point> sort_type_;
   savvy::fmt format_ = savvy::fmt::gt;
   savvy::bounding_point bounding_point_ = savvy::bounding_point::beg;
+  int update_info_ = -1;
   int compression_level_ = -1;
   std::uint16_t block_size_ = default_block_size;
   bool help_ = false;
@@ -63,6 +65,7 @@ public:
         {"sample-ids-file", required_argument, 0, 'I'},
         {"sort", no_argument, 0, 's'},
         {"sort-point", required_argument, 0, 'S'},
+        {"update-info", required_argument, 0, '\x01'},
         {0, 0, 0, 0}
       }),
     file_format_("vcf")
@@ -83,6 +86,7 @@ public:
   savvy::bounding_point bounding_point() const { return bounding_point_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
+  bool update_info() const { return update_info_ != 0; }
   bool index_is_set() const { return index_; }
   bool help_is_set() const { return help_; }
 
@@ -108,6 +112,7 @@ public:
     os << " -X, --index-file       Enables indexing and specifies index output file (SAV output only)\n";
     os << "\n";
     os << "     --headers          Path to headers file that is either formated as VCF headers or tab-delimited key value pairs\n";
+    os << "     --update-info      Specifies whether AC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
     os << std::flush;
   }
 
@@ -125,6 +130,23 @@ public:
           if (std::string(long_options_[long_index].name) == "headers")
           {
             headers_path_ = std::string(optarg ? optarg : "");
+            break;
+          }
+          else if (std::string(long_options_[long_index].name) == "update-info")
+          {
+            std::string update_info_string(optarg ? optarg : "");
+            if (update_info_string == "always")
+              update_info_ = 1;
+            else if (update_info_string == "never")
+              update_info_ = 0;
+            else if (update_info_string == "auto")
+              update_info_ = -1;
+            else
+            {
+              std::cerr << "Invalid --update-info value (" << update_info_string << ")\n";
+              return false;
+            }
+
             break;
           }
           std::cerr << "Invalid long only index (" << long_index << ")\n";
@@ -202,6 +224,12 @@ public:
           subset_ids_ = split_string_to_set(optarg ? optarg : "", ',');
           break;
         case 'I':
+          struct stat buf;
+          if (stat(optarg ? optarg : "", &buf) != 0)
+          {
+            std::cerr << "Cannot open --sample-ids-file (" << (optarg ? optarg : "") << ")\n";
+            return false;
+          }
           subset_ids_ = split_file_to_set(optarg ? optarg : "");
           break;
         case 'm':
@@ -336,6 +364,11 @@ public:
       return false;
     }
 
+    if (update_info_ < 0)
+    {
+      update_info_ = subset_ids_.size() ? 1 : 0; // Automatically update info fields if samples are subset.
+    }
+
     if (compression_level_ < 0)
       compression_level_ = default_compression_level;
     else if (compression_level_ > 19)
@@ -377,7 +410,7 @@ public:
 //}
 
 template <typename Vec, typename Writer>
-int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, const filter& fn, Writer& out)
+int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, const filter& fn, savvy::fmt data_format, bool update_info, Writer& out)
 {
   savvy::site_info variant;
   Vec genotypes;
@@ -386,13 +419,17 @@ int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& reg
   //auto fn = gen_filter_predicate(in, args);
 
   while (in.read_if(std::ref(fn), variant, genotypes))
+  {
+    if (update_info)
+      savvy::update_info_fields(variant, genotypes, data_format);
     out.write(variant, genotypes);
+  }
 
   return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 template <typename Vec, typename Writer>
-int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, const filter& fn, Writer& out)
+int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, const filter& fn, savvy::fmt data_format, bool update_info, Writer& out)
 {
   savvy::site_info variant;
   Vec genotypes;
@@ -400,7 +437,11 @@ int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::regi
   //auto fn = gen_filter_predicate(in, args);
 
   while (in.read_if(std::ref(fn), variant, genotypes))
+  {
+    if (update_info)
+      savvy::update_info_fields(variant, genotypes, data_format);
     out.write(variant, genotypes);
+  }
 
   if (regions.size())
   {
@@ -408,7 +449,11 @@ int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::regi
     {
       in.reset_region(*it);
       while (in.read_if(std::ref(fn), variant, genotypes))
+      {
+        if (update_info)
+          savvy::update_info_fields(variant, genotypes, data_format);
         out.write(variant, genotypes);
+      }
     }
   }
 
@@ -420,11 +465,11 @@ int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::stri
 {
   if (args.sort_type())
   {
-    return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, input.data_format(), args.regions(), output, args.format()) && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE);
+    return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, input.data_format(), args.regions(), output, args.format(), args.update_info()) && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE);
   }
   else
   {
-    return export_records<Vec>(input, args.regions(), args.filter_functor(), output);
+    return export_records<Vec>(input, args.regions(), args.filter_functor(), args.format(), args.update_info(), output);
   }
 }
 
@@ -470,8 +515,9 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
           std::cerr << "Invalid header in " << args.headers_path() << "\n";
           return EXIT_FAILURE;
         }
+        if (headers.capacity() == headers.size())
+          headers.reserve((std::size_t) headers.size() * 1.5f);
         headers.emplace_back(std::move(key), std::move(value));
-        headers.reserve((std::size_t) headers.size() * 1.5f);
       }
     }
   }

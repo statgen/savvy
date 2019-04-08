@@ -103,6 +103,14 @@ int concat_main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
 
+  std::size_t ploidy = 0;
+  std::vector<std::string> samples;
+  savvy::fmt data_format;
+
+  std::vector<std::pair<std::string,std::string>> merged_headers;
+  std::set<std::string> info_fields;
+  std::set<std::string> unique_headers;
+
   std::vector<std::size_t> variant_offsets;
   variant_offsets.reserve(args.input_paths().size());
 
@@ -117,13 +125,42 @@ int concat_main(int argc, char **argv)
     }
 
     if (it == args.input_paths().begin())
-      variant_offsets.push_back(0);
-    else
-      variant_offsets.push_back(sav_reader.tellg());
+    {
+      ploidy = sav_reader.ploidy();
+      samples = sav_reader.samples();
+      data_format = sav_reader.data_format();
+    }
+
+    if (ploidy != sav_reader.ploidy())
+    {
+      std::cerr << "Files do not have the same ploidy\n";
+      return EXIT_FAILURE;
+    }
+
+    if (samples.size() != sav_reader.samples().size())
+    {
+      std::cerr << "Files do not have the same sameple size\n";
+      return EXIT_FAILURE;
+    }
+
+    for (auto it = sav_reader.headers().begin(); it != sav_reader.headers().end(); ++it)
+    {
+      if ((it->first != "INFO" || info_fields.insert(savvy::parse_header_sub_field(it->second, "ID")).second) && unique_headers.insert(it->first + "=" + it->second).second)
+      {
+        merged_headers.push_back(*it);
+      }
+    }
+
+    variant_offsets.push_back(sav_reader.tellg());
+  }
+
+  {
+    savvy::sav::writer header_writer(args.output_path(), samples.begin(), samples.end(), merged_headers.begin(), merged_headers.end(), data_format);
+    header_writer.write_header(ploidy);
   }
 
 
-  std::ofstream ofs(args.output_path(), std::ios::binary);
+  std::ofstream ofs(args.output_path(), std::ios::binary | std::ios::ate);
   if (!ofs)
   {
     std::cerr << "Could not open output path (" << args.output_path() << ")\n";

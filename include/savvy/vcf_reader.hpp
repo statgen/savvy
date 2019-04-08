@@ -600,13 +600,9 @@ namespace savvy
             const int allele_index_plus_one = allele_index_ + 1;
             const std::uint64_t ploidy(gt_sz_ / samples().size());
 
-            std::size_t an = samples().size() * ploidy;
-            std::size_t ac = 0;
-
             if (subset_map_.size())
             {
-              an = subset_size_ * ploidy;
-              destination.resize(an);
+              destination.resize(subset_size_ * ploidy);
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
@@ -616,39 +612,30 @@ namespace savvy
                   if (gt_[i] == bcf_gt_missing)
                   {
                     destination[subset_map_[sample_index] * ploidy + (i % ploidy)] = std::numeric_limits<typename T::value_type>::quiet_NaN();
-                    --an;
                   }
                   else if ((gt_[i] >> 1) == allele_index_plus_one)
                   {
                     destination[subset_map_[sample_index] * ploidy + (i % ploidy)] = alt_value;
-                    ++ac;
                   }
                 }
               }
             }
             else
             {
-              destination.resize(an);
+              destination.resize(samples().size() * ploidy);
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
                 if (gt_[i] == bcf_gt_missing)
                 {
                   destination[i] = std::numeric_limits<typename T::value_type>::quiet_NaN();
-                  --an;
                 }
                 else if ((gt_[i] >> 1) == allele_index_plus_one)
                 {
                   destination[i] = alt_value;
-                  ++ac;
                 }
               }
             }
-
-            annotations.prop("AC", std::to_string(ac));
-            annotations.prop("AN", std::to_string(an));
-            if (an)
-              annotations.prop("AF", std::to_string(static_cast<float>(ac) / static_cast<float>(an)));
 
             return;
           }
@@ -677,14 +664,9 @@ namespace savvy
             const std::uint64_t ploidy(gt_sz_ / samples().size());
             const int allele_index_plus_one = allele_index_ + 1;
 
-            std::size_t an = samples().size() * ploidy;
-            std::size_t ac = 0;
-
             if (subset_map_.size())
             {
               destination.resize(subset_size_);
-
-              an = subset_size_ * ploidy;
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
@@ -694,12 +676,10 @@ namespace savvy
                   if (gt_[i] == bcf_gt_missing)
                   {
                     destination[subset_map_[sample_index]] += std::numeric_limits<typename T::value_type>::quiet_NaN();
-                    --an;
                   }
                   else if ((gt_[i] >> 1) == allele_index_plus_one)
                   {
                     destination[subset_map_[sample_index]] += alt_value;
-                    ++ac;
                   }
                 }
               }
@@ -713,20 +693,13 @@ namespace savvy
                 if (gt_[i] == bcf_gt_missing)
                 {
                   destination[i / ploidy] += std::numeric_limits<typename T::value_type>::quiet_NaN();
-                  --an;
                 }
                 else if ((gt_[i] >> 1) == allele_index_plus_one)
                 {
                   destination[i / ploidy] += alt_value;
-                  ++ac;
                 }
               }
             }
-
-            annotations.prop("AC", std::to_string(ac));
-            annotations.prop("AN", std::to_string(an));
-            if (an)
-              annotations.prop("AF", std::to_string(static_cast<float>(ac) / static_cast<float>(an)));
 
             return;
           }
@@ -764,13 +737,9 @@ namespace savvy
             const std::uint64_t ploidy(gt_sz_ / num_samples);
             const typename T::value_type zero_value{0};
 
-            std::size_t an = samples().size() * ploidy;
-            float dose_sum = 0.f;
-
             if (subset_map_.size())
             {
               destination.resize(subset_size_);
-              an = subset_size_ * ploidy;
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
@@ -781,10 +750,6 @@ namespace savvy
                   if (cur_ds != zero_value)
                   {
                     destination[subset_map_[sample_index]] = cur_ds;
-                    if (std::isnan(cur_ds))
-                      an -= ploidy;
-                    else
-                      dose_sum += cur_ds;
                   }
                 }
               }
@@ -799,17 +764,9 @@ namespace savvy
                 if (cur_ds != zero_value)
                 {
                   destination[i] = cur_ds;
-                  if (std::isnan(cur_ds))
-                    an -= ploidy;
-                  else
-                    dose_sum += cur_ds;
                 }
               }
             }
-
-            annotations.prop("AN", std::to_string(an));
-            if (an)
-              annotations.prop("AF", std::to_string(dose_sum / static_cast<float>(an)));
 
             return;
           }
@@ -847,13 +804,9 @@ namespace savvy
             const std::uint64_t ploidy(gt_sz_ / num_samples);
             const typename T::value_type zero_value{0};
 
-            std::size_t an = samples().size() * ploidy;
-            float dose_sum = 0.f;
-
             if (subset_map_.size())
             {
-              an = subset_size_ * ploidy;
-              destination.resize(an);
+              destination.resize(subset_size_ * ploidy);
 
               for (std::size_t i = 0; i < gt_sz_; ++i)
               {
@@ -864,10 +817,6 @@ namespace savvy
                   if (cur_hds != zero_value)
                   {
                     destination[subset_map_[sample_index] * ploidy + (i % ploidy)] = cur_hds;
-                    if (std::isnan(cur_hds))
-                      --an;
-                    else
-                      dose_sum += cur_hds;
                   }
                 }
               }
@@ -882,17 +831,9 @@ namespace savvy
                 if (cur_hds != zero_value)
                 {
                   destination[i] = cur_hds;
-                  if (std::isnan(cur_hds))
-                    --an;
-                  else
-                    dose_sum += cur_hds;
                 }
               }
             }
-
-            annotations.prop("AN", std::to_string(an));
-            if (an)
-              annotations.prop("AF", std::to_string(dose_sum / static_cast<float>(an)));
 
             return;
           }
