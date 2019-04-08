@@ -477,6 +477,119 @@ namespace savvy
       }
 
       template <std::size_t BitWidth, typename T>
+      void read_genotypes_gt_sorted(site_info& annotations, T& destination)
+      {
+        if (good())
+        {
+          const auto missing_value = std::numeric_limits<typename T::value_type>::quiet_NaN();
+          std::istreambuf_iterator<char> in_it(*input_stream_);
+          std::istreambuf_iterator<char> end_it;
+
+          std::uint64_t ploidy_level;
+          if (ploidy_ == 0)
+          {
+            if (varint_decode(in_it, end_it, ploidy_level) != end_it)
+              ++in_it;
+          }
+          else
+          {
+            ploidy_level = ploidy_;
+          }
+
+          if (in_it == end_it)
+          {
+            this->input_stream_->setstate(std::ios::badbit);
+          }
+          else
+          {
+            std::uint64_t sz;
+            varint_decode(in_it, end_it, sz);
+            std::uint64_t total_offset = 0;
+
+            std::size_t sort_cnt = 0;
+            std::size_t prev_sort_mapping_idx = 0;
+            std::size_t zero_sort_count = sz;
+            std::swap(sort_mapping_, prev_sort_mapping_);
+
+
+            if (subset_size_ != samples().size())
+            {
+              destination.resize(subset_size_);
+
+              for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+              {
+                typename T::value_type allele;
+                std::uint64_t offset;
+                std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
+                total_offset += offset;
+
+                std::size_t unsorted_index = prev_sort_mapping_[total_offset];
+                while (prev_sort_mapping_idx < total_offset)
+                  sort_mapping_[zero_sort_count++] = prev_sort_mapping_[prev_sort_mapping_idx++];
+                sort_mapping_[sort_cnt++] = unsorted_index;
+                ++prev_sort_mapping_idx;
+
+                const std::uint64_t sample_index = unsorted_index / ploidy_level;
+                if (subset_map_[sample_index] != std::numeric_limits<std::uint64_t>::max())
+                {
+                  if (BitWidth != 1)
+                  {
+                    allele = std::round(allele);
+                    if (allele != typename T::value_type())
+                      destination[subset_map_[sample_index]] += allele;
+                  }
+                  else
+                  {
+                    destination[subset_map_[sample_index]] += allele;
+                  }
+                }
+              }
+            }
+            else
+            {
+              destination.resize(samples().size());
+
+              for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
+              {
+                typename T::value_type allele;
+                std::uint64_t offset;
+                std::tie(allele, offset) = detail::allele_decoder<BitWidth>::decode(++in_it, end_it, missing_value);
+                total_offset += offset;
+
+                std::size_t unsorted_index = prev_sort_mapping_[total_offset];
+                while (prev_sort_mapping_idx < total_offset)
+                  sort_mapping_[zero_sort_count++] = prev_sort_mapping_[prev_sort_mapping_idx++];
+                sort_mapping_[sort_cnt++] = unsorted_index;
+                ++prev_sort_mapping_idx;
+
+                if (BitWidth != 1)
+                {
+                  allele = std::round(allele);
+                  if (allele != typename T::value_type())
+                    destination[unsorted_index / ploidy_level] += allele;
+                }
+                else
+                {
+                  destination[unsorted_index / ploidy_level] += allele;
+                }
+              }
+            }
+
+            assert(sort_cnt == sz);
+            assert(prev_sort_mapping_idx == zero_sort_count);
+            while (prev_sort_mapping_idx < samples().size() * ploidy_level)
+              sort_mapping_[zero_sort_count++] = prev_sort_mapping_[prev_sort_mapping_idx++];
+
+            if (input_stream_->get() == std::char_traits<char>::eof())
+            {
+              assert(!"Truncated file");
+              this->input_stream_->setstate(std::ios::badbit);
+            }
+          }
+        }
+      }
+
+      template <std::size_t BitWidth, typename T>
       void read_genotypes_gt(site_info& annotations, T& destination)
       {
         if (good())
@@ -851,19 +964,19 @@ namespace savvy
         destination.resize(0);
         if (true) //requested_data_formats_[idx] == file_data_format_)
         {
-          if (requested_data_format_ == fmt::gt)
+          if (requested_data_format_ == fmt::gt || requested_data_format_ == fmt::ac)
           {
             if (file_data_format_ == fmt::gt)
             {
               if (annotations.prop("BWT_SORT").empty())
               {
-                read_genotypes_al<1>(annotations, destination);
+                requested_data_format_ == fmt::gt ? read_genotypes_al<1>(annotations, destination) : read_genotypes_gt<1>(annotations, destination);
               }
               else
               {
                 if (is_sparse(destination))
                 {
-                  read_genotypes_al_sorted<1>(annotations, temp_gt_vector_);
+                  requested_data_format_ == fmt::gt ? read_genotypes_al_sorted<1>(annotations, temp_gt_vector_) : read_genotypes_gt_sorted<1>(annotations, temp_gt_vector_);
                   destination.resize(0);
                   destination.resize(temp_gt_vector_.size());
                   for (std::size_t i = 0; i < temp_gt_vector_.size(); ++i)
@@ -874,17 +987,15 @@ namespace savvy
                 }
                 else
                 {
-                  read_genotypes_al_sorted<1>(annotations, destination);
+                  requested_data_format_ == fmt::gt ? read_genotypes_al_sorted<1>(annotations, destination) : read_genotypes_gt_sorted<1>(annotations, destination);
                 }
               }
             }
             else
             {
-              read_genotypes_al<7>(annotations, destination);
+              requested_data_format_ == fmt::gt ? read_genotypes_al<7>(annotations, destination) : read_genotypes_gt<7>(annotations, destination);
             }
           }
-          else if (requested_data_format_== fmt::ac)
-            file_data_format_ == fmt::gt ? read_genotypes_gt<1>(annotations, destination) : read_genotypes_gt<7>(annotations, destination);
           else if (requested_data_format_ == fmt::gp)
             file_data_format_ == fmt::gt ? read_genotypes_gp<1>(annotations, destination) : read_genotypes_gp<7>(annotations, destination);
           else if (requested_data_format_ == fmt::ds)
