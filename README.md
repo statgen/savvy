@@ -19,7 +19,7 @@ savvy::variant<std::vector<float>> var;
 
 while (f >> var)
 {
-  var.locus();
+  var.position();
   var.chromosome();
   var.ref();
   var.alt();
@@ -55,7 +55,7 @@ std::vector<float> alleles;
 
 while (f.read(anno, alleles))
 {
-  anno.locus();
+  anno.position();
   anno.chromosome();
   anno.ref();
   anno.alt();
@@ -198,7 +198,7 @@ std::vector<float> genotypes;
 std::vector<float> dosages;
 while (f.read(anno, genotypes, dosages))
 {
-  anno.locus();
+  anno.position();
   anno.chromosome();
   anno.ref();
   anno.alt();
@@ -245,7 +245,7 @@ sav merge file1.sav file2.sav > merged.sav
 sav export --regions chr1,chr2:10000-20000 --sample-ids ID1,ID2,ID3 file.sav > file.vcf
 ```
 
-#Packaging
+# Packaging
 ```shell
 docker build -t savvy-packaging - < packaging-dockerfile-ubuntu16
 mkdir -p packages
