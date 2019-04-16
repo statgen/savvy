@@ -65,6 +65,8 @@ namespace savvy
 
       return ret.str();
     }
+
+    bool file_exists(const std::string& file_path);
   }
 
   std::string savvy_version();

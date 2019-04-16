@@ -16,6 +16,7 @@
 #include "utility.hpp"
 #include "data_format.hpp"
 #include "compressed_vector.hpp"
+#include "utility.hpp"
 
 #include <cstdint>
 #include <string>
@@ -795,7 +796,7 @@ namespace savvy
       template <typename T>
       indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, bounding_point bound_type, T data_format)  :
         reader_base(file_path, data_format),
-        index_(index_file_path.size() ? index_file_path : file_path + ".s1r"),
+        index_(index_file_path.size() ? index_file_path : (::savvy::detail::file_exists(file_path + ".s1r") ? file_path + ".s1r" : file_path)),
         query_(index_.create_query(reg)),
         i_(query_.begin()),
         reg_(reg),

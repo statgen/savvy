@@ -7,6 +7,7 @@
 #include "savvy/utility.hpp"
 
 #include <algorithm>
+#include <sys/stat.h>
 
 namespace savvy
 {
@@ -104,5 +105,14 @@ namespace savvy
     }
 
     return "";
+  }
+
+  namespace detail
+  {
+    bool file_exists(const std::string& file_path)
+    {
+      struct stat st;
+      return (stat(file_path.c_str(), &st) == 0);
+    }
   }
 }

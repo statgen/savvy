@@ -81,6 +81,35 @@ public:
 };
 
 
+bool append_index(const std::string& sav_file_path, const std::string& s1r_file_path, bool delete_s1r_file = true)
+{
+  std::ifstream index_file(s1r_file_path, std::ios::binary);
+  index_file.seekg(0, std::ios::end);
+  std::int64_t index_file_size_64 = index_file.tellg();
+  index_file.seekg(0, std::ios::beg);
+  if (index_file_size_64 > std::numeric_limits<std::uint32_t >::max() || index_file_size_64 < 0 || !index_file.good())
+    return false;
+
+  if (delete_s1r_file)
+    std::remove(s1r_file_path.c_str());
+
+  std::uint32_t index_file_size_le = htole32((std::uint32_t)index_file_size_64);
+
+  std::ofstream sav_file(sav_file_path, std::ios::binary | std::ios::app);
+  sav_file.write("\x50\x2A\x4D\x18", 4);
+  sav_file.write((char*)(&index_file_size_le), 4);
+
+  std::vector<char> buf(4096);
+  while (index_file && sav_file && index_file_size_64 > 0)
+  {
+    std::size_t sz = std::min((std::size_t)index_file_size_64, buf.size());
+    index_file.read(buf.data(), sz);
+    sav_file.write(buf.data(), sz);
+    index_file_size_64 -= sz;
+  }
+
+  return (index_file.good() && sav_file.good());
+}
 
 
 int index_main(int argc, char** argv)
@@ -98,5 +127,9 @@ int index_main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  return savvy::sav::writer::create_index(args.input_path()) ? EXIT_SUCCESS : EXIT_FAILURE;
+  std::string index_file_path = args.input_path() + ".s1r";
+
+  if (!savvy::sav::writer::create_index(args.input_path(), index_file_path))
+    return EXIT_FAILURE;
+  return append_index(args.input_path(), index_file_path) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
