@@ -46,6 +46,26 @@ namespace savvy
     std::uint64_t to_;
   };
 
+  typedef region query_bounds;
+
+  class genomic_bounds : public query_bounds
+  {
+  public:
+    genomic_bounds(const std::string& chromosome, std::uint64_t from = 0, std::uint64_t to = std::numeric_limits<std::uint64_t>::max()) :
+      query_bounds(chromosome, from, to)
+    {
+    }
+  };
+
+  class offset_bounds : public query_bounds
+  {
+  public:
+    offset_bounds(const std::string& chromosome, std::uint64_t from = 0, std::uint64_t to = std::numeric_limits<std::uint64_t>::max()) :
+      query_bounds(chromosome, from, to)
+    {
+    }
+  };
+
   template <typename Iter>
   std::vector<region> region::merge(Iter beg, Iter end)
   {

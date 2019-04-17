@@ -802,7 +802,9 @@ namespace savvy
         reg_(reg),
         bounding_type_(bound_type),
         current_offset_in_block_(0),
-        total_in_block_(0)
+        total_in_block_(0),
+        total_records_read_(0),
+        max_records_to_read_(std::numeric_limits<std::uint64_t>::max())
       {
         if (!index_.good())
           this->input_stream_->setstate(std::ios::badbit);
@@ -839,6 +841,12 @@ namespace savvy
       {
         while (this->good())
         {
+          if (total_records_read_ == max_records_to_read_)
+          {
+            this->input_stream_->setstate(std::ios::eofbit);
+            break;
+          }
+
           if (current_offset_in_block_ >= total_in_block_)
           {
             if (i_ == query_.end())
@@ -864,6 +872,7 @@ namespace savvy
           else
           {
             ++current_offset_in_block_;
+            ++total_records_read_;
             if (region_compare(bounding_type_, annotations, reg_))
             {
               this->read_genotypes(annotations, destination);
@@ -891,16 +900,71 @@ namespace savvy
         return *this;
       }
 
-      void reset_region(const region& reg)
+      void reset_bounds(genomic_bounds reg)
       {
+        total_records_read_ = 0;
         current_offset_in_block_ = 0;
         total_in_block_ = 0;
         reg_ = reg;
-        this->input_stream_->clear();
-        query_ = index_.create_query(reg);
+        input_stream_->clear();
+        query_ = index_.create_query(std::move(reg));
         i_ = query_.begin();
         if (!index_.good())
-          this->input_stream_->setstate(std::ios::badbit);
+          input_stream_->setstate(std::ios::badbit);
+      }
+
+      [[deprecated("Use reset_bounds() instead")]]
+      void reset_region(const region& reg) { reset_bounds(genomic_bounds(reg.chromosome(), reg.from(), reg.to())); }
+
+      void reset_bounds(offset_bounds reg)
+      {
+        reset_bounds(genomic_bounds(reg.chromosome()));
+
+        auto discard_skip = [this](std::uint32_t num)
+        {
+          savvy::site_info annotations;
+          while (num > 0 && current_offset_in_block_ < total_in_block_ && this->good())
+          {
+            this->read_variant_details(annotations);
+
+            ++(this->current_offset_in_block_);
+            if (this->good())
+              this->discard_genotypes();
+            --num;
+          }
+          return num;
+        };
+
+        std::size_t num_variants_to_skip = reg.from();
+        max_records_to_read_ = reg.to() - reg.from();
+
+//        if (num_variants_to_skip < total_in_block_ - current_offset_in_block_)
+//        {
+//          discard_skip(num_variants_to_skip);
+//        }
+//        else
+        {
+//          num_variants_to_skip -= (total_in_block_ - current_offset_in_block_);
+          while (i_ != query_.end())
+          {
+            total_in_block_ = std::uint32_t(0x000000000000FFFF & i_->value()) + 1;
+
+            if (num_variants_to_skip < total_in_block_)
+            {
+              current_offset_in_block_ = 0;
+              this->input_stream_->seekg(std::streampos((i_->value() >> 16) & 0x0000FFFFFFFFFFFF));
+              ++i_;
+              discard_skip(num_variants_to_skip);
+              return;
+            }
+
+            num_variants_to_skip -= total_in_block_;
+            ++i_;
+          }
+
+          // Skipped past end of index.
+          this->input_stream_->setstate(std::ios::failbit);
+        }
       }
     private:
       s1r::reader index_;
@@ -910,6 +974,8 @@ namespace savvy
       bounding_point bounding_type_;
       std::uint32_t current_offset_in_block_;
       std::uint32_t total_in_block_;
+      std::uint64_t total_records_read_;
+      std::uint64_t max_records_to_read_;
     };
     //################################################################//
 
