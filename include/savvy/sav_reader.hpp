@@ -76,6 +76,17 @@ namespace savvy
 
     std::vector<std::string> query_chromosomes(const std::string& file_path);
 
+    struct index_statistics
+    {
+      std::string contig;
+      std::size_t tree_height = 0;
+      std::size_t block_count = 0;
+      std::size_t record_count = 0;
+      std::size_t min_position = std::numeric_limits<std::size_t>::max();
+      std::size_t max_position = 0;
+    };
+    std::vector<index_statistics> stat_index(const std::string& file_path);
+
     //################################################################//
     class reader_base
     {

@@ -8,6 +8,7 @@
 #include "sav/utility.hpp"
 #include "savvy/s1r.hpp"
 #include "savvy/savvy.hpp"
+#include "savvy/sav_reader.hpp"
 
 #include <getopt.h>
 
@@ -32,7 +33,7 @@ public:
 
   void print_usage(std::ostream& os)
   {
-    os << "Usage: sav stat-index [opts ...] <in.sav.s1r> \n";
+    os << "Usage: sav stat-index [opts ...] <in.sav> \n";
     os << "\n";
     os << " -h, --help  Print usage\n";
     os << std::flush;
@@ -60,7 +61,7 @@ public:
     if (remaining_arg_count == 1)
     {
       input_path_ = argv[optind];
-      if (savvy::detail::has_extension(input_path_, ".sav"))
+      if (savvy::detail::file_exists(input_path_ + ".s1r"))
         input_path_ += ".s1r";
     }
     else if (remaining_arg_count < 1)
@@ -96,9 +97,9 @@ int stat_index_main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  savvy::s1r::reader index_file(args.input_path());
+  std::vector<savvy::sav::index_statistics> stats = savvy::sav::stat_index(args.input_path());
 
-  if (!index_file.good())
+  if (stats.empty())
   {
     std::cerr << "Could not open index file (" << args.input_path() << ")\n";
     return EXIT_FAILURE;
@@ -106,34 +107,42 @@ int stat_index_main(int argc, char** argv)
 
 
   std::cout << "chromosome";
-  for (auto it = index_file.trees_begin(); it != index_file.trees_end(); ++it)
-    std::cout << "\t" << it->name();
+  for (auto it = stats.begin(); it != stats.end(); ++it)
+    std::cout << "\t" << it->contig;
+  std::cout << std::endl;
+
+  std::cout << "tree height";
+  for (auto it = stats.begin(); it != stats.end(); ++it)
+  {
+    std::cout << "\t" << it->tree_height;
+  }
   std::cout << std::endl;
 
   std::cout << "block count";
-  for (auto it = index_file.trees_begin(); it != index_file.trees_end(); ++it)
+  for (auto it = stats.begin(); it != stats.end(); ++it)
   {
-    std::cout << "\t" << it->entry_count();
+    std::cout << "\t" << it->block_count;
   }
   std::cout << std::endl;
 
   std::cout << "marker count";
-  for (auto it = index_file.trees_begin(); it != index_file.trees_end(); ++it)
+  for (auto it = stats.begin(); it != stats.end(); ++it)
   {
-    std::uint64_t cnt = 0;
-    auto q = it->create_query(0, std::numeric_limits<std::uint64_t>::max());
-    for (auto e = q.begin(); e != q.end(); ++e)
-    {
-      cnt += std::uint32_t(0x000000000000FFFF & e->value()) + 1;
-    }
-    std::cout << "\t" << cnt;
+    std::cout << "\t" << it->record_count;
   }
   std::cout << std::endl;
 
-  std::cout << "tree height";
-  for (auto it = index_file.trees_begin(); it != index_file.trees_end(); ++it)
+  std::cout << "min position";
+  for (auto it = stats.begin(); it != stats.end(); ++it)
   {
-    std::cout << "\t" << it->tree_height();
+    std::cout << "\t" << it->min_position;
+  }
+  std::cout << std::endl;
+
+  std::cout << "max position";
+  for (auto it = stats.begin(); it != stats.end(); ++it)
+  {
+    std::cout << "\t" << it->max_position;
   }
   std::cout << std::endl;
 
