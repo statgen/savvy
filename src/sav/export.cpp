@@ -40,6 +40,8 @@ private:
   std::unique_ptr<savvy::s1r::sort_point> sort_type_;
   savvy::fmt format_ = savvy::fmt::gt;
   savvy::bounding_point bounding_point_ = savvy::bounding_point::beg;
+  std::int64_t skip_ = 0; // Signed because negative skip (ie, tail) may be implemented in the future.
+  std::uint64_t limit_ = std::numeric_limits<std::uint64_t>::max();
   int update_info_ = -1;
   int compression_level_ = -1;
   std::uint16_t block_size_ = default_block_size;
@@ -59,10 +61,12 @@ public:
         {"index", no_argument, 0, 'x'},
         {"index-file", required_argument, 0, 'X'},
         {"info-fields", required_argument, 0, 'm'},
+        {"limit", required_argument, 0, '\x01'},
         {"regions", required_argument, 0, 'r'},
         {"regions-file", required_argument, 0, 'R'},
         {"sample-ids", required_argument, 0, 'i'},
         {"sample-ids-file", required_argument, 0, 'I'},
+        {"skip", required_argument, 0, '\x01'},
         {"sort", no_argument, 0, 's'},
         {"sort-point", required_argument, 0, 'S'},
         {"update-info", required_argument, 0, '\x01'},
@@ -82,6 +86,8 @@ public:
   const std::vector<savvy::genomic_bounds>& regions() const { return regions_; }
   const std::vector<std::string>& info_fields() const { return info_fields_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
+  std::int64_t skip() const { return skip_; }
+  std::uint64_t limit() const { return limit_; }
   savvy::fmt format() const { return format_; }
   savvy::bounding_point bounding_point() const { return bounding_point_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
@@ -112,6 +118,8 @@ public:
     os << " -X, --index-file       Enables indexing and specifies index output file (SAV output only)\n";
     os << "\n";
     os << "     --headers          Path to headers file that is either formated as VCF headers or tab-delimited key value pairs\n";
+    os << "     --skip             Number of variants to skip using the index\n";
+    os << "     --limit            Number of variants to limit\n";
     os << "     --update-info      Specifies whether AC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
     os << std::flush;
   }
@@ -147,6 +155,16 @@ public:
               return false;
             }
 
+            break;
+          }
+          else if (std::string(long_options_[long_index].name) == "skip")
+          {
+            skip_ = std::atoll(optarg);
+            break;
+          }
+          else if (std::string(long_options_[long_index].name) == "limit")
+          {
+            limit_ = std::atoll(optarg);
             break;
           }
           std::cerr << "Invalid long only index (" << long_index << ")\n";
@@ -364,6 +382,12 @@ public:
       return false;
     }
 
+    if (regions_.size() && skip_)
+    {
+      std::cerr << "--regions cannot be combined with --skip\n";
+      return false;
+    }
+
     if (update_info_ < 0)
     {
       update_info_ = subset_ids_.size() ? 1 : 0; // Automatically update info fields if samples are subset.
@@ -410,7 +434,7 @@ public:
 //}
 
 template <typename Vec, typename Writer>
-int export_records(savvy::sav::reader& in, const std::vector<savvy::genomic_bounds>& regions, const filter& fn, savvy::fmt data_format, bool update_info, Writer& out)
+int export_records(savvy::sav::reader& in, const export_prog_args& args, Writer& out)
 {
   savvy::site_info variant;
   Vec genotypes;
@@ -418,10 +442,12 @@ int export_records(savvy::sav::reader& in, const std::vector<savvy::genomic_boun
 
   //auto fn = gen_filter_predicate(in, args);
 
-  while (in.read_if(std::ref(fn), variant, genotypes))
+  while (in.read_if(std::ref(args.filter_functor()), variant, genotypes))
   {
-    if (update_info)
-      savvy::update_info_fields(variant, genotypes, data_format);
+    if (in.read_count() > args.limit())
+      break;
+    if (args.update_info())
+      savvy::update_info_fields(variant, genotypes, args.format());
     out.write(variant, genotypes);
   }
 
@@ -429,31 +455,37 @@ int export_records(savvy::sav::reader& in, const std::vector<savvy::genomic_boun
 }
 
 template <typename Vec, typename Writer>
-int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::genomic_bounds>& regions, const filter& fn, savvy::fmt data_format, bool update_info, Writer& out)
+int export_records(savvy::sav::indexed_reader& in, const export_prog_args& args, Writer& out)
 {
   savvy::site_info variant;
   Vec genotypes;
 
   //auto fn = gen_filter_predicate(in, args);
 
-  while (in.read_if(std::ref(fn), variant, genotypes))
+  while (in.read_if(std::ref(args.filter_functor()), variant, genotypes))
   {
-    if (update_info)
-      savvy::update_info_fields(variant, genotypes, data_format);
+    if (in.read_count() > args.limit())
+      break;
+    if (args.update_info())
+      savvy::update_info_fields(variant, genotypes, args.format());
     out.write(variant, genotypes);
   }
 
-  if (regions.size())
+  if (args.regions().size())
   {
-    for (auto it = regions.begin() + 1; it != regions.end(); ++it)
+    std::uint64_t prev_read_count = in.read_count();
+    for (auto it = args.regions().begin() + 1; it != args.regions().end(); ++it)
     {
       in.reset_bounds(*it);
-      while (in.read_if(std::ref(fn), variant, genotypes))
+      while (in.read_if(std::ref(args.filter_functor()), variant, genotypes))
       {
-        if (update_info)
-          savvy::update_info_fields(variant, genotypes, data_format);
+        if ((prev_read_count + in.read_count()) > args.limit())
+          break;
+        if (args.update_info())
+          savvy::update_info_fields(variant, genotypes, args.format());
         out.write(variant, genotypes);
       }
+      prev_read_count = in.read_count();
     }
   }
 
@@ -469,7 +501,7 @@ int prep_writer_for_export(Rdr& input, Wrtr& output, const std::vector<std::stri
   }
   else
   {
-    return export_records<Vec>(input, args.regions(), args.filter_functor(), args.format(), args.update_info(), output);
+    return export_records<Vec>(input, args, output);
   }
 }
 
@@ -596,6 +628,12 @@ int export_main(int argc, char** argv)
   if (args.regions().size())
   {
     savvy::sav::indexed_reader input(args.input_path(), args.regions().front(), args.bounding_point(), args.format());
+    return prep_reader_for_export(input, args);
+  }
+  else if (args.skip())
+  {
+    savvy::sav::indexed_reader input(args.input_path(), {""}, args.bounding_point(), args.format());
+    input.reset_bounds({std::uint64_t(args.skip()), args.skip() + args.limit()});
     return prep_reader_for_export(input, args);
   }
   else
