@@ -96,7 +96,7 @@ public:
 };
 
 template <typename VecType, typename Reader, typename Writer>
-bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt in_format, const std::vector<savvy::region>& regions, Writer& out, savvy::fmt out_format, bool update_info)
+bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt in_format, const std::vector<savvy::genomic_bounds>& regions, Writer& out, savvy::fmt out_format, bool update_info)
 {
   less_than_comparator less_than(sort);
 

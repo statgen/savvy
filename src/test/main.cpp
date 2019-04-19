@@ -656,7 +656,7 @@ void sav_random_access_test(savvy::fmt format)
 
   assert(!rdr.read(anno, buf));
 
-  rdr.reset_region({"18", 2234600, 2234700});
+  rdr.reset_bounds({"18", 2234600, 2234700});
 
   assert(rdr.read(anno, buf));
   assert(anno.chromosome() == "18");

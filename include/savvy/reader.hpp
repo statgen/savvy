@@ -199,6 +199,9 @@ namespace savvy
     indexed_reader() {}
     indexed_reader(const std::string& file_path, const region& reg, savvy::fmt data_format);
     indexed_reader(const std::string& file_path, const region& reg, bounding_point bounding_type, savvy::fmt data_format);
+
+    void reset_bounds(const genomic_bounds& reg);
+    [[deprecated("Use reset_bounds() instead")]]
     void reset_region(const region& reg);
 
     std::vector<std::string> chromosomes() const;

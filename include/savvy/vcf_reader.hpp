@@ -268,6 +268,9 @@ namespace savvy
       //template <typename PathItr, typename RegionItr>
       //region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end);
       ~indexed_reader();
+
+      void reset_bounds(const genomic_bounds& reg);
+      [[deprecated("Use reset_bounds() instead")]]
       void reset_region(const region& reg);
 
       std::vector<std::string> chromosomes() const;
@@ -1172,7 +1175,7 @@ namespace savvy
     }
 
     template <std::size_t VecCnt>
-    void indexed_reader<VecCnt>::reset_region(const region& reg)
+    void indexed_reader<VecCnt>::reset_bounds(const genomic_bounds& reg)
     {
       region_ = reg;
       this->state_ = std::ios::goodbit;
@@ -1180,6 +1183,12 @@ namespace savvy
 
       if (!this->hts_file_)
         this->state_ = std::ios::failbit;
+    }
+
+    template <std::size_t VecCnt>
+    void indexed_reader<VecCnt>::reset_region(const region& reg)
+    {
+      reset_bounds(genomic_bounds(reg.chromosome(), reg.from(), reg.to()));
     }
     //################################################################//
 

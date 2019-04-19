@@ -51,6 +51,7 @@ namespace savvy
   class genomic_bounds : public query_bounds
   {
   public:
+    genomic_bounds(query_bounds&& src) : query_bounds(std::move(src)) {}
     genomic_bounds(const std::string& chromosome, std::uint64_t from = 0, std::uint64_t to = std::numeric_limits<std::uint64_t>::max()) :
       query_bounds(chromosome, from, to)
     {
@@ -60,7 +61,8 @@ namespace savvy
   class offset_bounds : public query_bounds
   {
   public:
-    offset_bounds(const std::string& chromosome, std::uint64_t from = 0, std::uint64_t to = std::numeric_limits<std::uint64_t>::max()) :
+    offset_bounds(query_bounds&& src) : query_bounds(std::move(src)) {}
+    offset_bounds(std::uint64_t from, std::uint64_t to = std::numeric_limits<std::uint64_t>::max(), const std::string& chromosome = "") :
       query_bounds(chromosome, from, to)
     {
     }

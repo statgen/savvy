@@ -29,7 +29,7 @@ private:
 
   std::vector<option> long_options_;
   std::set<std::string> subset_ids_;
-  std::vector<savvy::region> regions_;
+  std::vector<savvy::genomic_bounds> regions_;
   std::vector<std::string> info_fields_;
   filter filter_;
   std::string input_path_;
@@ -79,7 +79,7 @@ public:
   const std::string& headers_path() const { return headers_path_; }
   const filter& filter_functor() const { return filter_; }
   const std::set<std::string>& subset_ids() const { return subset_ids_; }
-  const std::vector<savvy::region>& regions() const { return regions_; }
+  const std::vector<savvy::genomic_bounds>& regions() const { return regions_; }
   const std::vector<std::string>& info_fields() const { return info_fields_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
   savvy::fmt format() const { return format_; }
@@ -410,7 +410,7 @@ public:
 //}
 
 template <typename Vec, typename Writer>
-int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& regions, const filter& fn, savvy::fmt data_format, bool update_info, Writer& out)
+int export_records(savvy::sav::reader& in, const std::vector<savvy::genomic_bounds>& regions, const filter& fn, savvy::fmt data_format, bool update_info, Writer& out)
 {
   savvy::site_info variant;
   Vec genotypes;
@@ -429,7 +429,7 @@ int export_records(savvy::sav::reader& in, const std::vector<savvy::region>& reg
 }
 
 template <typename Vec, typename Writer>
-int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::region>& regions, const filter& fn, savvy::fmt data_format, bool update_info, Writer& out)
+int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::genomic_bounds>& regions, const filter& fn, savvy::fmt data_format, bool update_info, Writer& out)
 {
   savvy::site_info variant;
   Vec genotypes;
@@ -447,7 +447,7 @@ int export_records(savvy::sav::indexed_reader& in, const std::vector<savvy::regi
   {
     for (auto it = regions.begin() + 1; it != regions.end(); ++it)
     {
-      in.reset_region(*it);
+      in.reset_bounds(*it);
       while (in.read_if(std::ref(fn), variant, genotypes))
       {
         if (update_info)

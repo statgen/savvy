@@ -93,12 +93,17 @@ namespace savvy
     return {};
   }
 
-  void indexed_reader::reset_region(const region& reg)
+  void indexed_reader::reset_bounds(const genomic_bounds& reg)
   {
     if (sav_reader_)
-      sav_reader_->reset_region(reg);
+      sav_reader_->reset_bounds(reg);
     else if (vcf_reader_)
-      vcf_reader_->reset_region(reg);
+      vcf_reader_->reset_bounds(reg);
+  }
+
+  void indexed_reader::reset_region(const region& reg)
+  {
+    reset_bounds(genomic_bounds(reg.chromosome(), reg.from(), reg.to()));
   }
   //################################################################//
 }
