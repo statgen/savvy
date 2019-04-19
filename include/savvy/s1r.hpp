@@ -617,7 +617,7 @@ namespace savvy
         {
           for (auto j = trees.begin(); j != std::prev(trees.end()); ++j)
           {
-            if (i->chromosome() == j->name())
+            if (i->chromosome() == j->name() || i->chromosome().empty())
             {
               auto tmp_query = j->create_query(i->from(), i->to());
               auto b = tmp_query.begin();
