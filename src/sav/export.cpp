@@ -30,6 +30,7 @@ private:
   std::vector<option> long_options_;
   std::set<std::string> subset_ids_;
   std::vector<savvy::genomic_bounds> regions_;
+  std::unique_ptr<savvy::offset_bounds> slice_;
   std::vector<std::string> info_fields_;
   filter filter_;
   std::string input_path_;
@@ -40,8 +41,6 @@ private:
   std::unique_ptr<savvy::s1r::sort_point> sort_type_;
   savvy::fmt format_ = savvy::fmt::gt;
   savvy::bounding_point bounding_point_ = savvy::bounding_point::beg;
-  std::int64_t skip_ = 0; // Signed because negative skip (ie, tail) may be implemented in the future.
-  std::uint64_t limit_ = std::numeric_limits<std::uint64_t>::max();
   int update_info_ = -1;
   int compression_level_ = -1;
   std::uint16_t block_size_ = default_block_size;
@@ -61,12 +60,11 @@ public:
         {"index", no_argument, 0, 'x'},
         {"index-file", required_argument, 0, 'X'},
         {"info-fields", required_argument, 0, 'm'},
-        {"limit", required_argument, 0, '\x01'},
         {"regions", required_argument, 0, 'r'},
         {"regions-file", required_argument, 0, 'R'},
         {"sample-ids", required_argument, 0, 'i'},
         {"sample-ids-file", required_argument, 0, 'I'},
-        {"skip", required_argument, 0, '\x01'},
+        {"slice", required_argument, 0, 'c'},
         {"sort", no_argument, 0, 's'},
         {"sort-point", required_argument, 0, 'S'},
         {"update-info", required_argument, 0, '\x01'},
@@ -86,8 +84,7 @@ public:
   const std::vector<savvy::genomic_bounds>& regions() const { return regions_; }
   const std::vector<std::string>& info_fields() const { return info_fields_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
-  std::int64_t skip() const { return skip_; }
-  std::uint64_t limit() const { return limit_; }
+  const std::unique_ptr<savvy::offset_bounds>& slice() const { return slice_; }
   savvy::fmt format() const { return format_; }
   savvy::bounding_point bounding_point() const { return bounding_point_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
@@ -102,6 +99,7 @@ public:
     os << "\n";
     os << " -#                     Number (#) of compression level (1-19, default: " << default_compression_level << ")\n";
     os << " -b, --block-size       Number of markers in SAV compression block (0-65535, default: " << default_block_size << ")\n";
+    os << " -c, --slice            Uses index to subset records within specified range (eg, 10000-20000) of offsets within file\n";
     os << " -d, --data-format      Format field to export (GT, DS, HDS or GP, default: GT)\n";
     os << " -e, --filter           Expression for filtering based on info fields (eg, -e 'AC>=10;AF>0.01') # (IN DEVELOPMENT) More complex expressions in the works\n";
     os << " -f, --file-format      File format (vcf, vcf.gz or sav, default: vcf)\n";
@@ -118,8 +116,6 @@ public:
     os << " -X, --index-file       Enables indexing and specifies index output file (SAV output only)\n";
     os << "\n";
     os << "     --headers          Path to headers file that is either formated as VCF headers or tab-delimited key value pairs\n";
-    os << "     --skip             Number of variants to skip using the index\n";
-    os << "     --limit            Number of variants to limit\n";
     os << "     --update-info      Specifies whether AC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
     os << std::flush;
   }
@@ -128,7 +124,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:d:e:f:hi:I:m:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:c:d:e:f:hi:I:m:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -157,16 +153,6 @@ public:
 
             break;
           }
-          else if (std::string(long_options_[long_index].name) == "skip")
-          {
-            skip_ = std::atoll(optarg);
-            break;
-          }
-          else if (std::string(long_options_[long_index].name) == "limit")
-          {
-            limit_ = std::atoll(optarg);
-            break;
-          }
           std::cerr << "Invalid long only index (" << long_index << ")\n";
           return false;
         }
@@ -188,6 +174,25 @@ public:
         case 'b':
           block_size_ = std::uint16_t(std::atoi(optarg) > 0xFFFF ? 0xFFFF : std::atoi(optarg));
           break;
+        case 'c':
+        {
+          std::string s(optarg ? optarg : "");
+          const std::size_t hyphen_pos = s.find('-');
+          if (hyphen_pos != std::string::npos)
+          {
+            std::string sstart = s.substr(0, hyphen_pos);
+            std::string send = s.substr(hyphen_pos + 1, s.size() - hyphen_pos - 1);
+            std::int64_t istart = std::atoll(sstart.c_str());
+            std::int64_t iend = std::atoll(send.c_str());
+            if (iend > istart)
+            {
+              slice_ = savvy::detail::make_unique<savvy::offset_bounds>(istart, iend);
+              break;
+            }
+          }
+          std::cerr << "Invalid --slice range.\n";
+          return false;
+        }
         case 'd':
         {
           std::string str_opt_arg(optarg ? optarg : "");
@@ -382,9 +387,9 @@ public:
       return false;
     }
 
-    if (regions_.size() && skip_)
+    if (regions_.size() && slice_)
     {
-      std::cerr << "--regions cannot be combined with --skip\n";
+      std::cerr << "--regions cannot be combined with --slice\n";
       return false;
     }
 
@@ -444,8 +449,6 @@ int export_records(savvy::sav::reader& in, const export_prog_args& args, Writer&
 
   while (in.read_if(std::ref(args.filter_functor()), variant, genotypes))
   {
-    if (in.read_count() > args.limit())
-      break;
     if (args.update_info())
       savvy::update_info_fields(variant, genotypes, args.format());
     out.write(variant, genotypes);
@@ -464,8 +467,6 @@ int export_records(savvy::sav::indexed_reader& in, const export_prog_args& args,
 
   while (in.read_if(std::ref(args.filter_functor()), variant, genotypes))
   {
-    if (in.read_count() > args.limit())
-      break;
     if (args.update_info())
       savvy::update_info_fields(variant, genotypes, args.format());
     out.write(variant, genotypes);
@@ -473,19 +474,15 @@ int export_records(savvy::sav::indexed_reader& in, const export_prog_args& args,
 
   if (args.regions().size())
   {
-    std::uint64_t prev_read_count = in.read_count();
     for (auto it = args.regions().begin() + 1; it != args.regions().end(); ++it)
     {
       in.reset_bounds(*it);
       while (in.read_if(std::ref(args.filter_functor()), variant, genotypes))
       {
-        if ((prev_read_count + in.read_count()) > args.limit())
-          break;
         if (args.update_info())
           savvy::update_info_fields(variant, genotypes, args.format());
         out.write(variant, genotypes);
       }
-      prev_read_count = in.read_count();
     }
   }
 
@@ -630,10 +627,10 @@ int export_main(int argc, char** argv)
     savvy::sav::indexed_reader input(args.input_path(), args.regions().front(), args.bounding_point(), args.format());
     return prep_reader_for_export(input, args);
   }
-  else if (args.skip())
+  else if (args.slice())
   {
     savvy::sav::indexed_reader input(args.input_path(), {""}, args.bounding_point(), args.format());
-    input.reset_bounds({std::uint64_t(args.skip()), args.skip() + args.limit()});
+    input.reset_bounds(*args.slice());
     return prep_reader_for_export(input, args);
   }
   else

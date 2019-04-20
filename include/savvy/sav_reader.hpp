@@ -124,7 +124,6 @@ namespace savvy
       savvy::fmt data_format() const { return file_data_format_; }
       std::uint32_t ploidy() const { return ploidy_; }
       const std::array<std::uint8_t, 16>& uuid() const { return uuid_; }
-      std::uint64_t read_count() const { return total_records_read_; }
 
       /**
        *
@@ -749,7 +748,6 @@ namespace savvy
         {
           discard_genotypes();
         }
-        ++total_records_read_;
       }
     private:
       void parse_header();
@@ -764,7 +762,6 @@ namespace savvy
       std::unique_ptr<std::istream> input_stream_;
       fmt file_data_format_;
       fmt requested_data_format_;
-      std::uint64_t total_records_read_ = 0;
       std::uint32_t ploidy_ = 0;
       std::array<std::uint8_t, 16> uuid_;
     };
@@ -817,6 +814,7 @@ namespace savvy
         bounding_type_(bound_type),
         current_offset_in_block_(0),
         total_in_block_(0),
+        total_records_read_(0),
         max_records_to_read_(std::numeric_limits<std::uint64_t>::max())
       {
         if (!index_.good())
@@ -885,6 +883,7 @@ namespace savvy
           else
           {
             ++current_offset_in_block_;
+            ++total_records_read_;
             if (region_compare(bounding_type_, annotations, reg_))
             {
               this->read_genotypes(annotations, destination);
@@ -948,7 +947,7 @@ namespace savvy
         };
 
         std::size_t num_variants_to_skip = reg.from();
-        max_records_to_read_ = reg.to() - reg.from();
+        max_records_to_read_ = reg.to() > reg.from() ? reg.to() - reg.from() : 0;
 
 //        if (num_variants_to_skip < total_in_block_ - current_offset_in_block_)
 //        {
@@ -986,6 +985,7 @@ namespace savvy
       bounding_point bounding_type_;
       std::uint32_t current_offset_in_block_;
       std::uint32_t total_in_block_;
+      std::uint64_t total_records_read_;
       std::uint64_t max_records_to_read_;
     };
     //################################################################//

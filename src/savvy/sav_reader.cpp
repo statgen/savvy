@@ -91,8 +91,7 @@ namespace savvy
       subset_size_(source.subset_size_),
       input_stream_(std::move(source.input_stream_)),
       file_data_format_(source.file_data_format_),
-      requested_data_format_(source.requested_data_format_),
-      total_records_read_(source.total_records_read_)
+      requested_data_format_(source.requested_data_format_)
     {
     }
 
@@ -110,7 +109,6 @@ namespace savvy
         metadata_fields_ = std::move(source.metadata_fields_);
         file_data_format_ = source.file_data_format_;
         requested_data_format_ = source.requested_data_format_;
-        total_records_read_ = source.total_records_read_;
       }
       return *this;
     }

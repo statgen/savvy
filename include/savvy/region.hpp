@@ -25,13 +25,13 @@ namespace savvy
     end
   };
 
-  class region
+  class query_bounds
   {
   public:
     template <typename Iter>
-    static std::vector<region> merge(Iter beg, Iter end);
+    static std::vector<query_bounds> merge(Iter beg, Iter end);
 
-    region(const std::string& chromosome, std::uint64_t from = 1, std::uint64_t to = std::numeric_limits<std::uint64_t>::max()) :
+    query_bounds(const std::string& chromosome, std::uint64_t from = 1, std::uint64_t to = std::numeric_limits<std::uint64_t>::max()) :
       chromosome_(chromosome),
       from_(from),
       to_(to)
@@ -46,8 +46,6 @@ namespace savvy
     std::uint64_t to_;
   };
 
-  typedef region query_bounds;
-
   class genomic_bounds : public query_bounds
   {
   public:
@@ -57,6 +55,8 @@ namespace savvy
     {
     }
   };
+
+  typedef genomic_bounds region;
 
   class offset_bounds : public query_bounds
   {
@@ -69,10 +69,10 @@ namespace savvy
   };
 
   template <typename Iter>
-  std::vector<region> region::merge(Iter beg, Iter end)
+  std::vector<query_bounds> query_bounds::merge(Iter beg, Iter end)
   {
     std::unordered_map<std::string, std::size_t> ret_index;
-    std::vector<region> ret;
+    std::vector<query_bounds> ret;
 
     for (auto it = beg; it != end; ++it)
     {
