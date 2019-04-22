@@ -99,7 +99,7 @@ public:
     os << "\n";
     os << " -#                     Number (#) of compression level (1-19, default: " << default_compression_level << ")\n";
     os << " -b, --block-size       Number of markers in SAV compression block (0-65535, default: " << default_block_size << ")\n";
-    os << " -c, --slice            Uses index to subset records within specified range (eg, 10000-20000) of offsets within file\n";
+    os << " -c, --slice            Range formatted as begin:end (non-inclusive end) that specifies a subset of record offsets within file\n";
     os << " -d, --data-format      Format field to export (GT, DS, HDS or GP, default: GT)\n";
     os << " -e, --filter           Expression for filtering based on info fields (eg, -e 'AC>=10;AF>0.01') # (IN DEVELOPMENT) More complex expressions in the works\n";
     os << " -f, --file-format      File format (vcf, vcf.gz or sav, default: vcf)\n";
@@ -108,7 +108,7 @@ public:
     os << " -I, --sample-ids-file  Path to file containing list of sample IDs to subset\n";
     os << " -m, --info-fields      Comma separated list of INFO (metadata) fields to include with each variant (default: exports all info fields)\n";
     os << " -p, --bounding-point   Determines the inclusion policy of indels during region queries (any, all, beg or end, default: beg)\n";
-    os << " -r, --regions          Comma separated list of regions formatted as chr[:start-end]\n";
+    os << " -r, --regions          Comma separated list of genomic regions formatted as chr[:start-end]\n";
     os << " -R, --regions-file     Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
     os << " -s, --sort             Enables sorting by first position of allele\n";
     os << " -S, --sort-point       Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
@@ -177,11 +177,11 @@ public:
         case 'c':
         {
           std::string s(optarg ? optarg : "");
-          const std::size_t hyphen_pos = s.find('-');
-          if (hyphen_pos != std::string::npos)
+          const std::size_t colon_pos = s.find(':');
+          if (colon_pos != std::string::npos)
           {
-            std::string sstart = s.substr(0, hyphen_pos);
-            std::string send = s.substr(hyphen_pos + 1, s.size() - hyphen_pos - 1);
+            std::string sstart = s.substr(0, colon_pos);
+            std::string send = s.substr(colon_pos + 1, s.size() - colon_pos - 1);
             std::int64_t istart = std::atoll(sstart.c_str());
             std::int64_t iend = std::atoll(send.c_str());
             if (iend > istart)

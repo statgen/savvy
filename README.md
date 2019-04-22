@@ -40,7 +40,7 @@ while (f >> v)
   ...
 }
 
-f.reset_region({"X", 200000, 299999});
+f.reset_bounds({"X", 200000, 299999});
 while (f >> v)
 {
   ...
@@ -243,6 +243,16 @@ sav merge file1.sav file2.sav > merged.sav
 ## Export
 ```shell
 sav export --regions chr1,chr2:10000-20000 --sample-ids ID1,ID2,ID3 file.sav > file.vcf
+```
+
+## Slice Queries
+In addition to querying genomic regions, S1R indexes can be used to quickly subset records by their offset within a file.
+```shell
+# export first 1,000 records
+sav export --slice 0:1000 file.sav > file.vcf
+
+# export second 1,000 records (1,000-1,999)
+sav export --slice 1000:2000 file.sav > file.vcf
 ```
 
 # Packaging
