@@ -13,7 +13,7 @@
 #include <vector>
 #include <set>
 
-savvy::region string_to_region(const std::string& s);
+savvy::genomic_region string_to_region(const std::string& s);
 std::vector<std::string> split_string_to_vector(const char* in, char delim);
 std::set<std::string> split_string_to_set(const char* in, char delim);
 std::set<std::string> split_file_to_set(const char* in);

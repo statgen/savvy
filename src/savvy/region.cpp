@@ -8,7 +8,7 @@
 
 namespace savvy
 {
-  bool region_compare(bounding_point bounding_type, const site_info& var, const region& reg)
+  bool region_compare(bounding_point bounding_type, const site_info& var, const genomic_region& reg)
   {
     switch (bounding_type)
     {

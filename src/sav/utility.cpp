@@ -12,12 +12,12 @@
 #include <cstring>
 #include <algorithm>
 
-savvy::region string_to_region(const std::string& s)
+savvy::genomic_region string_to_region(const std::string& s)
 {
   const std::size_t colon_pos = s.find(':');
   if (colon_pos == std::string::npos)
   {
-    return savvy::region(s);
+    return savvy::genomic_region(s);
   }
   else
   {
@@ -27,7 +27,7 @@ savvy::region string_to_region(const std::string& s)
     {
       std::string slocus = s.substr(colon_pos + 1);
       std::uint64_t ilocus = std::uint64_t(std::atoll(slocus.c_str()));
-      return savvy::region(chr, ilocus, ilocus);
+      return savvy::genomic_region(chr, ilocus, ilocus);
     }
     else
     {
@@ -35,11 +35,11 @@ savvy::region string_to_region(const std::string& s)
       std::string send = s.substr(hyphen_pos + 1);
       if (send.empty())
       {
-        return savvy::region(chr, std::uint64_t(std::atoll(sbeg.c_str())));
+        return savvy::genomic_region(chr, std::uint64_t(std::atoll(sbeg.c_str())));
       }
       else
       {
-        return savvy::region(chr, std::uint64_t(std::atoll(sbeg.c_str())), std::uint64_t(std::atoll(send.c_str())));
+        return savvy::genomic_region(chr, std::uint64_t(std::atoll(sbeg.c_str())), std::uint64_t(std::atoll(send.c_str())));
       }
     }
   }

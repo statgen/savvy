@@ -21,9 +21,9 @@ namespace savvy
   class variant_group_iterator_util
   {
   public:
-    static std::vector<region> merge_regions(const std::vector<region>& un_merged_regions)
+    static std::vector<genomic_region> merge_regions(const std::vector<genomic_region>& un_merged_regions)
     {
-      std::vector<region> ret;
+      std::vector<genomic_region> ret;
 
       for (auto it = un_merged_regions.begin(); it != un_merged_regions.end(); ++it)
       {
@@ -35,7 +35,7 @@ namespace savvy
         {
           std::uint64_t from = std::min(ret.back().from(), it->from());
           std::uint64_t to = std::max(ret.back().to(), it->to());
-          ret.back() = region(ret.back().chromosome(), from, to);
+          ret.back() = genomic_region(ret.back().chromosome(), from, to);
         }
       }
 
@@ -67,15 +67,15 @@ namespace savvy
     }
 
     // [CHROM]:[POS]_[REF]/[ALT]
-    static savvy::region site_info_to_region(const savvy::site_info& site)
+    static savvy::genomic_region site_info_to_region(const savvy::site_info& site)
     {
       std::size_t length = std::max(site.ref().size(), site.alt().size());
       if (length > 0)
       {
-        return savvy::region{site.chromosome(), site.position(), site.position() + length - 1};
+        return savvy::genomic_region{site.chromosome(), site.position(), site.position() + length - 1};
       }
 
-      return savvy::region{""};
+      return savvy::genomic_region{""};
     }
 
     static std::tuple<std::string, std::list<savvy::site_info>> parse_marker_group_line(const std::string& input)
@@ -184,7 +184,7 @@ namespace savvy
   private:
     void init()
     {
-      std::vector<savvy::region> un_merged_regions(sites_.size(), {""});
+      std::vector<savvy::genomic_region> un_merged_regions(sites_.size(), {""});
       auto out_it = un_merged_regions.begin();
       for (auto in_it = sites_.begin(); in_it != sites_.end(); ++in_it, ++out_it)
         *out_it = site_info_to_region(*in_it);
@@ -240,7 +240,7 @@ namespace savvy
     RdrT* rdr_;
     std::string group_id_;
     std::list<site_info> sites_;
-    std::vector<region> merged_regions_;
+    std::vector<genomic_region> merged_regions_;
     std::size_t region_offset_;
     value_type variant_;
   };

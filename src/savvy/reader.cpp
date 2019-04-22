@@ -68,7 +68,7 @@ namespace savvy
   //################################################################//
 
   //################################################################//
-  indexed_reader::indexed_reader(const std::string& file_path, const region& reg, savvy::fmt data_format)
+  indexed_reader::indexed_reader(const std::string& file_path, const genomic_region& reg, savvy::fmt data_format)
   {
     if (::savvy::detail::has_extension(file_path, ".sav"))
       sav_reader_ = ::savvy::detail::make_unique<sav::indexed_reader>(file_path, reg, data_format);
@@ -76,7 +76,7 @@ namespace savvy
       vcf_reader_ = ::savvy::detail::make_unique<vcf::indexed_reader<1>>(file_path, reg, data_format);
   }
 
-  indexed_reader::indexed_reader(const std::string& file_path, const region& reg, bounding_point bounding_type, savvy::fmt data_format)
+  indexed_reader::indexed_reader(const std::string& file_path, const genomic_region& reg, bounding_point bounding_type, savvy::fmt data_format)
   {
     if (::savvy::detail::has_extension(file_path, ".sav"))
       sav_reader_ = ::savvy::detail::make_unique<sav::indexed_reader>(file_path, reg, bounding_type, data_format);
@@ -93,7 +93,7 @@ namespace savvy
     return {};
   }
 
-  void indexed_reader::reset_bounds(const genomic_bounds& reg)
+  void indexed_reader::reset_bounds(const genomic_region& reg)
   {
     if (sav_reader_)
       sav_reader_->reset_bounds(reg);
@@ -101,9 +101,9 @@ namespace savvy
       vcf_reader_->reset_bounds(reg);
   }
 
-  void indexed_reader::reset_region(const region& reg)
+  void indexed_reader::reset_region(const genomic_region& reg)
   {
-    reset_bounds(genomic_bounds(reg.chromosome(), reg.from(), reg.to()));
+    reset_bounds(genomic_region(reg.chromosome(), reg.from(), reg.to()));
   }
   //################################################################//
 }

@@ -29,8 +29,8 @@ private:
 
   std::vector<option> long_options_;
   std::set<std::string> subset_ids_;
-  std::vector<savvy::genomic_bounds> regions_;
-  std::unique_ptr<savvy::offset_bounds> slice_;
+  std::vector<savvy::genomic_region> regions_;
+  std::unique_ptr<savvy::slice_bounds> slice_;
   std::vector<std::string> info_fields_;
   filter filter_;
   std::string input_path_;
@@ -81,10 +81,10 @@ public:
   const std::string& headers_path() const { return headers_path_; }
   const filter& filter_functor() const { return filter_; }
   const std::set<std::string>& subset_ids() const { return subset_ids_; }
-  const std::vector<savvy::genomic_bounds>& regions() const { return regions_; }
+  const std::vector<savvy::genomic_region>& regions() const { return regions_; }
   const std::vector<std::string>& info_fields() const { return info_fields_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
-  const std::unique_ptr<savvy::offset_bounds>& slice() const { return slice_; }
+  const std::unique_ptr<savvy::slice_bounds>& slice() const { return slice_; }
   savvy::fmt format() const { return format_; }
   savvy::bounding_point bounding_point() const { return bounding_point_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
@@ -186,7 +186,7 @@ public:
             std::int64_t iend = std::atoll(send.c_str());
             if (iend > istart)
             {
-              slice_ = savvy::detail::make_unique<savvy::offset_bounds>(istart, iend);
+              slice_ = savvy::detail::make_unique<savvy::slice_bounds>(istart, iend);
               break;
             }
           }

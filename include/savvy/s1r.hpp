@@ -598,8 +598,8 @@ namespace savvy
       }
 
       class query;
-      query create_query(region reg);
-      query create_query(std::vector<region> regs);
+      query create_query(genomic_region reg);
+      query create_query(std::vector<genomic_region> regs);
     private:
       std::string file_path_;
       std::ifstream input_file_;
@@ -609,7 +609,7 @@ namespace savvy
     class reader::query
     {
     public:
-      query(std::ifstream& ifs, std::vector<tree_reader>& trees, std::vector<region> regs) :
+      query(std::ifstream& ifs, std::vector<tree_reader>& trees, std::vector<genomic_region> regs) :
         ifs_(&ifs),
         regions_{regs}
       {
@@ -630,7 +630,7 @@ namespace savvy
         tree_queries_.emplace_back(trees.back().create_query(0, 0)); // empty tree.
       }
 
-      query(std::ifstream& ifs, std::vector<tree_reader>& trees, region reg) : query(ifs, trees, std::vector<region>({reg})) {}
+      query(std::ifstream& ifs, std::vector<tree_reader>& trees, genomic_region reg) : query(ifs, trees, std::vector<genomic_region>({reg})) {}
 
       class iterator;
       iterator begin();
@@ -638,7 +638,7 @@ namespace savvy
     private:
       std::ifstream* ifs_;
       std::vector<tree_reader::query> tree_queries_;
-      std::vector<region> regions_;
+      std::vector<genomic_region> regions_;
     };
 
     class reader::query::iterator
@@ -1014,13 +1014,13 @@ namespace savvy
 //    }
 
 
-    inline reader::query reader::create_query(region reg)
+    inline reader::query reader::create_query(genomic_region reg)
     {
       query ret(input_file_, trees_, reg);
       return ret;
     }
 
-    inline reader::query reader::create_query(std::vector<region> regs)
+    inline reader::query reader::create_query(std::vector<genomic_region> regs)
     {
       query ret(input_file_, trees_, regs);
       return ret;

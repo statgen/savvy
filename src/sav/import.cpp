@@ -27,7 +27,7 @@ private:
 
   std::vector<option> long_options_;
   std::set<std::string> subset_ids_;
-  std::vector<savvy::genomic_bounds> regions_;
+  std::vector<savvy::genomic_region> regions_;
   std::string input_path_;
   std::string output_path_;
   std::string index_path_;
@@ -67,7 +67,7 @@ public:
   const std::string& output_path() const { return output_path_; }
   const std::string& index_path() const { return index_path_; }
   const std::set<std::string>& subset_ids() const { return subset_ids_; }
-  const std::vector<savvy::genomic_bounds>& regions() const { return regions_; }
+  const std::vector<savvy::genomic_region>& regions() const { return regions_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
   savvy::fmt format() const { return format_; }
@@ -299,7 +299,7 @@ public:
 };
 
 
-int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::genomic_bounds>& regions, savvy::fmt data_format, bool update_info, savvy::sav::writer& out)
+int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::genomic_region>& regions, savvy::fmt data_format, bool update_info, savvy::sav::writer& out)
 {
   savvy::site_info variant;
   savvy::compressed_vector<float> genotypes;
@@ -330,7 +330,7 @@ int import_records(savvy::vcf::indexed_reader<1>& in, const std::vector<savvy::g
   return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::genomic_bounds>& regions, savvy::fmt data_format, bool update_info, savvy::sav::writer& out)
+int import_records(savvy::vcf::reader<1>& in, const std::vector<savvy::genomic_region>& regions, savvy::fmt data_format, bool update_info, savvy::sav::writer& out)
 {
   // TODO: support regions without index.
   savvy::site_info variant;

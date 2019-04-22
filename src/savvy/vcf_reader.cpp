@@ -345,7 +345,7 @@ namespace savvy
       return nullptr;
     }
 
-    std::unique_ptr<detail::hts_file_base> detail::hts_file_base::create_indexed_file(const std::string& file_path, const region& reg)
+    std::unique_ptr<detail::hts_file_base> detail::hts_file_base::create_indexed_file(const std::string& file_path, const genomic_region& reg)
     {
       bcf_srs_t* sr = bcf_sr_init();
       //bcf1_t* rec = bcf_init1();

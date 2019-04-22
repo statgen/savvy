@@ -46,23 +46,23 @@ namespace savvy
     std::uint64_t to_;
   };
 
-  class genomic_bounds : public query_bounds
+  class genomic_region : public query_bounds
   {
   public:
-    genomic_bounds(query_bounds&& src) : query_bounds(std::move(src)) {}
-    genomic_bounds(const std::string& chromosome, std::uint64_t from = 0, std::uint64_t to = std::numeric_limits<std::uint64_t>::max()) :
+    genomic_region(query_bounds&& src) : query_bounds(std::move(src)) {}
+    genomic_region(const std::string& chromosome, std::uint64_t from = 0, std::uint64_t to = std::numeric_limits<std::uint64_t>::max()) :
       query_bounds(chromosome, from, to)
     {
     }
   };
 
-  typedef genomic_bounds region;
+  typedef genomic_region region;
 
-  class offset_bounds : public query_bounds
+  class slice_bounds : public query_bounds
   {
   public:
-    offset_bounds(query_bounds&& src) : query_bounds(std::move(src)) {}
-    offset_bounds(std::uint64_t from, std::uint64_t to = std::numeric_limits<std::uint64_t>::max(), const std::string& chromosome = "") :
+    slice_bounds(query_bounds&& src) : query_bounds(std::move(src)) {}
+    slice_bounds(std::uint64_t from, std::uint64_t to = std::numeric_limits<std::uint64_t>::max(), const std::string& chromosome = "") :
       query_bounds(chromosome, from, to)
     {
     }
@@ -85,7 +85,7 @@ namespace savvy
       {
         std::uint64_t from = std::min(ret[insert_res.first->second].from(), it->from());
         std::uint64_t to = std::max(ret[insert_res.first->second].to(), it->to());
-        ret[insert_res.first->second] = region(ret[insert_res.first->second].chromosome(), from, to);
+        ret[insert_res.first->second] = genomic_region(ret[insert_res.first->second].chromosome(), from, to);
       }
     }
 
@@ -96,7 +96,7 @@ namespace savvy
   {
     struct any_coordinate_within_region
     {
-      static bool compare(const site_info& var, const region& reg)
+      static bool compare(const site_info& var, const genomic_region& reg)
       {
         return (var.position() <= reg.to() && (var.position() + std::max(var.ref().size(), var.alt().size()) - 1) >= reg.from() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
       }
@@ -104,7 +104,7 @@ namespace savvy
 
     struct all_coordinates_within_region
     {
-      static bool compare(const site_info& var, const region& reg)
+      static bool compare(const site_info& var, const genomic_region& reg)
       {
         return (var.position() >= reg.from() && (var.position() + std::max(var.ref().size(), var.alt().size()) - 1) <= reg.to() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
       }
@@ -112,7 +112,7 @@ namespace savvy
 
     struct leftmost_coordinate_within_region
     {
-      static bool compare(const site_info& var, const region& reg)
+      static bool compare(const site_info& var, const genomic_region& reg)
       {
         return (var.position() >= reg.from() && var.position() <= reg.to() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
       }
@@ -120,7 +120,7 @@ namespace savvy
 
     struct rightmost_coordinate_within_region
     {
-      static bool compare(const site_info& var, const region& reg)
+      static bool compare(const site_info& var, const genomic_region& reg)
       {
         std::uint64_t right = (var.position() + std::max(var.ref().size(), var.alt().size()) - 1);
         return (right >= reg.from() && right <= reg.to() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
@@ -128,7 +128,7 @@ namespace savvy
     };
   }
 
-  bool region_compare(bounding_point bounding_type, const site_info& var, const region& reg);
+  bool region_compare(bounding_point bounding_type, const site_info& var, const genomic_region& reg);
 }
 
 #endif //LIBSAVVY_REGION_HPP

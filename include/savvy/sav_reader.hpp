@@ -805,7 +805,7 @@ namespace savvy
     {
     public:
       template <typename T>
-      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, bounding_point bound_type, T data_format)  :
+      indexed_reader(const std::string& file_path, const std::string& index_file_path, const genomic_region& reg, bounding_point bound_type, T data_format)  :
         reader_base(file_path, data_format),
         index_(index_file_path.size() ? index_file_path : (::savvy::detail::file_exists(file_path + ".s1r") ? file_path + ".s1r" : file_path)),
         query_(index_.create_query(reg)),
@@ -821,17 +821,17 @@ namespace savvy
           this->input_stream_->setstate(std::ios::badbit);
       }
 
-      indexed_reader(const std::string& file_path, const region& reg, savvy::fmt data_format)  :
+      indexed_reader(const std::string& file_path, const genomic_region& reg, savvy::fmt data_format)  :
         indexed_reader(file_path, std::string(""), reg, bounding_point::beg, data_format)
       {
       }
 
-      indexed_reader(const std::string& file_path, const std::string& index_file_path, const region& reg, savvy::fmt data_format)  :
+      indexed_reader(const std::string& file_path, const std::string& index_file_path, const genomic_region& reg, savvy::fmt data_format)  :
         indexed_reader(file_path, index_file_path, reg, bounding_point::beg, data_format)
       {
       }
 
-      indexed_reader(const std::string& file_path, const region& reg, bounding_point bounding_type, savvy::fmt data_format)  :
+      indexed_reader(const std::string& file_path, const genomic_region& reg, bounding_point bounding_type, savvy::fmt data_format)  :
         indexed_reader(file_path, std::string(""), reg, bounding_type, data_format)
       {
       }
@@ -911,7 +911,7 @@ namespace savvy
         return *this;
       }
 
-      void reset_bounds(genomic_bounds reg)
+      void reset_bounds(genomic_region reg)
       {
         total_records_read_ = 0;
         current_offset_in_block_ = 0;
@@ -925,11 +925,11 @@ namespace savvy
       }
 
       [[deprecated("Use reset_bounds() instead")]]
-      void reset_region(const region& reg) { reset_bounds(genomic_bounds(reg.chromosome(), reg.from(), reg.to())); }
+      void reset_region(const genomic_region& reg) { reset_bounds(genomic_region(reg.chromosome(), reg.from(), reg.to())); }
 
-      void reset_bounds(offset_bounds reg)
+      void reset_bounds(slice_bounds reg)
       {
-        reset_bounds(genomic_bounds(reg.chromosome()));
+        reset_bounds(genomic_region(reg.chromosome()));
 
         auto discard_skip = [this](std::uint32_t num)
         {
@@ -981,7 +981,7 @@ namespace savvy
       s1r::reader index_;
       s1r::reader::query query_;
       s1r::reader::query::iterator i_;
-      region reg_; //TODO: make this a default template argument when vector type is also a reader template.
+      genomic_region reg_; //TODO: make this a default template argument when vector type is also a reader template.
       bounding_point bounding_type_;
       std::uint32_t current_offset_in_block_;
       std::uint32_t total_in_block_;

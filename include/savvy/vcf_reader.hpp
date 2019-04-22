@@ -66,7 +66,7 @@ namespace savvy
       {
       public:
         static std::unique_ptr<hts_file_base> create_file(const std::string& file_path);
-        static std::unique_ptr<hts_file_base> create_indexed_file(const std::string& file_path, const region& reg);
+        static std::unique_ptr<hts_file_base> create_indexed_file(const std::string& file_path, const genomic_region& reg);
 
         virtual ~hts_file_base() {}
 
@@ -262,16 +262,16 @@ namespace savvy
     {
     public:
       template <typename... T>
-      indexed_reader(const std::string& file_path, const region& reg, T... data_formats);
+      indexed_reader(const std::string& file_path, const genomic_region& reg, T... data_formats);
       template <typename... T>
-      indexed_reader(const std::string& file_path, const region& reg, bounding_point bounding_type, T... data_formats);
+      indexed_reader(const std::string& file_path, const genomic_region& reg, bounding_point bounding_type, T... data_formats);
       //template <typename PathItr, typename RegionItr>
       //region_reader(PathItr file_paths_beg, PathItr file_paths_end, RegionItr regions_beg, RegionItr regions_end);
       ~indexed_reader();
 
-      void reset_bounds(const genomic_bounds& reg);
+      void reset_bounds(const genomic_region& reg);
       [[deprecated("Use reset_bounds() instead")]]
-      void reset_region(const region& reg);
+      void reset_region(const genomic_region& reg);
 
       std::vector<std::string> chromosomes() const;
 
@@ -289,7 +289,7 @@ namespace savvy
 //      bcf_hdr_t* hts_hdr() const { return bcf_sr_get_header(synced_readers_, 0); }
 //      bcf1_t* hts_rec() const { return hts_rec_; }
     private:
-      region region_;
+      genomic_region region_;
       std::string file_path_;
 //      bcf_srs_t* synced_readers_;
 //      bcf1_t* hts_rec_;
@@ -1128,14 +1128,14 @@ namespace savvy
 
     template <std::size_t VecCnt>
     template <typename... T>
-    indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const region& reg, T... data_formats) :
+    indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const genomic_region& reg, T... data_formats) :
       indexed_reader<VecCnt>(file_path, reg, bounding_point::beg, data_formats...)
     {
     }
 
     template <std::size_t VecCnt>
     template <typename... T>
-    indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const region& reg, bounding_point bounding_type, T... data_formats) :
+    indexed_reader<VecCnt>::indexed_reader(const std::string& file_path, const genomic_region& reg, bounding_point bounding_type, T... data_formats) :
       region_(reg),
       file_path_(file_path),
       bounding_type_(bounding_type)
@@ -1175,7 +1175,7 @@ namespace savvy
     }
 
     template <std::size_t VecCnt>
-    void indexed_reader<VecCnt>::reset_bounds(const genomic_bounds& reg)
+    void indexed_reader<VecCnt>::reset_bounds(const genomic_region& reg)
     {
       region_ = reg;
       this->state_ = std::ios::goodbit;
@@ -1186,9 +1186,9 @@ namespace savvy
     }
 
     template <std::size_t VecCnt>
-    void indexed_reader<VecCnt>::reset_region(const region& reg)
+    void indexed_reader<VecCnt>::reset_region(const genomic_region& reg)
     {
-      reset_bounds(genomic_bounds(reg.chromosome(), reg.from(), reg.to()));
+      reset_bounds(genomic_region(reg.chromosome(), reg.from(), reg.to()));
     }
     //################################################################//
 
