@@ -6,6 +6,7 @@
 
 #include "sav/sort.hpp"
 
+#include <chrono>
 
   less_than_comparator::less_than_comparator(savvy::s1r::sort_point type) :
     sort_type_(type)
@@ -50,7 +51,7 @@
   }
 
   random_string_generator::random_string_generator() :
-    rg_(std::random_device{}()),
+    rg_(std::random_device{}()^std::chrono::high_resolution_clock().now().time_since_epoch().count()),
     dist_(0, char_array_.size() - 1)
   {
   }
