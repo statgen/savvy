@@ -8,6 +8,7 @@
 #define SAVVY_SAV_SORT_HPP
 
 #include "savvy/sav_reader.hpp"
+#include "savvy/vcf_reader.hpp"
 
 #include <shrinkwrap/zstd.hpp>
 
@@ -41,69 +42,103 @@ private:
   std::uniform_int_distribution<std::size_t> dist_;
 };
 
-class headless_sav_writer : public savvy::sav::writer
+//class headless_sav_writer : public savvy::sav::writer
+//{
+//public:
+//  template<typename RandAccessStringIterator, typename RandAccessKVPIterator>
+//  headless_sav_writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, savvy::fmt data_format, std::uint32_t ploidy)
+//      :
+//      savvy::sav::writer("", samples_beg, samples_end, headers_beg, headers_end, data_format)
+//  {
+//    output_buf_ = std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path));
+//    output_stream_.rdbuf(output_buf_.get());
+//    file_path_ = file_path;
+//    ploidy_ = ploidy;
+//  }
+//
+//  const std::string& file_path() const { return this->file_path_; }
+//};
+//
+//class headless_sav_reader : public savvy::sav::reader
+//{
+//public:
+//  template<typename RandAccessStringIterator, typename RandAccessKVPIterator>
+//  headless_sav_reader(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, savvy::fmt format) :
+//      savvy::sav::reader("", format)
+//  {
+//    std::unordered_set<std::string> unique_info_fields;
+//
+//    file_data_format_ = format;
+//    file_path_ = file_path;
+//    input_stream_ = savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path);
+//    for (auto it = headers_beg; it != headers_end; ++it)
+//    {
+//      if (it->first == "INFO")
+//      {
+//        std::string info_field = savvy::parse_header_sub_field(it->second, "ID");
+//        if (unique_info_fields.emplace(info_field).second)
+//          metadata_fields_.emplace_back(std::move(info_field));
+//      }
+//      else if (it->first == "FORMAT")
+//      {
+//        std::string format_field = savvy::parse_header_sub_field(it->second, "ID");
+//        if (format_field == "GT")
+//          file_data_format_ = savvy::fmt::gt;
+////                    else if (format_field == "GP")
+////                      file_data_format_ = fmt::genotype_probability;
+//        else if (format_field == "HDS")
+//          file_data_format_ = savvy::fmt::hds;
+//      }
+//      headers_.emplace_back(it->first, it->second);
+//    }
+//
+//    this->sample_ids_.assign(samples_beg, samples_end);
+//    subset_map_.resize(samples().size());
+//    for (std::size_t i = 0; i < subset_map_.size(); ++i)
+//      subset_map_[i] = i;
+//    subset_size_ = subset_map_.size();
+//
+//  }
+//};
+
+namespace detail
 {
-public:
-  template<typename RandAccessStringIterator, typename RandAccessKVPIterator>
-  headless_sav_writer(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, savvy::fmt data_format)
-      :
-      savvy::sav::writer("", samples_beg, samples_end, headers_beg, headers_end, data_format)
+  inline bool reset_region(savvy::sav::reader& rdr, savvy::genomic_region reg)
   {
-    output_buf_ = std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path));
-    output_stream_.rdbuf(output_buf_.get());
-    file_path_ = file_path;
+    return false;
   }
 
-  const std::string& file_path() const { return this->file_path_; }
-};
-
-class headless_sav_reader : public savvy::sav::reader
-{
-public:
-  template<typename RandAccessStringIterator, typename RandAccessKVPIterator>
-  headless_sav_reader(const std::string& file_path, RandAccessStringIterator samples_beg, RandAccessStringIterator samples_end, RandAccessKVPIterator headers_beg, RandAccessKVPIterator headers_end, savvy::fmt format) :
-      savvy::sav::reader("", format)
+  inline bool reset_region(savvy::vcf::reader<1>& rdr, savvy::genomic_region reg)
   {
-    std::unordered_set<std::string> unique_info_fields;
-
-    file_data_format_ = format;
-    file_path_ = file_path;
-    input_stream_ = savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path);
-    for (auto it = headers_beg; it != headers_end; ++it)
-    {
-      if (it->first == "INFO")
-      {
-        std::string info_field = savvy::parse_header_sub_field(it->second, "ID");
-        if (unique_info_fields.emplace(info_field).second)
-          metadata_fields_.emplace_back(std::move(info_field));
-      }
-      else if (it->first == "FORMAT")
-      {
-        std::string format_field = savvy::parse_header_sub_field(it->second, "ID");
-        if (format_field == "GT")
-          file_data_format_ = savvy::fmt::gt;
-//                    else if (format_field == "GP")
-//                      file_data_format_ = fmt::genotype_probability;
-        else if (format_field == "HDS")
-          file_data_format_ = savvy::fmt::hds;
-      }
-      headers_.emplace_back(it->first, it->second);
-    }
-
-    this->sample_ids_.assign(samples_beg, samples_end);
-
+    return false;
   }
-};
+
+  inline bool reset_region(savvy::sav::indexed_reader& rdr, savvy::genomic_region reg)
+  {
+    rdr.reset_bounds(std::move(reg));
+    return true;
+  }
+
+  inline bool reset_region(savvy::vcf::indexed_reader<1>& rdr, savvy::genomic_region reg)
+  {
+    rdr.reset_bounds(std::move(reg));
+    return true;
+  }
+}
 
 template <typename VecType, typename Reader, typename Writer>
 bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt in_format, const std::vector<savvy::genomic_region>& regions, Writer& out, savvy::fmt out_format, bool update_info)
 {
   less_than_comparator less_than(sort);
 
+  std::size_t region_idx = 0;
+  std::size_t ploidy = 0;
+
   random_string_generator str_gen;
   std::size_t temp_file_size = 7;
-  std::deque<headless_sav_writer> temp_writers;
-  std::deque<headless_sav_reader> temp_readers;
+  std::deque<std::string> temp_file_paths;
+  std::deque<savvy::sav::writer> temp_writers;
+  std::deque<savvy::sav::reader> temp_readers;
 
 
   std::vector<savvy::variant<VecType>> in_mem_variants(temp_file_size);
@@ -117,17 +152,25 @@ bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt 
     {
       in >> in_mem_variant_refs[read_counter].get();
       if (!in.good())
-        break;
+      {
+        if (in.eof() && region_idx < regions.size())
+          ::detail::reset_region(in, regions[region_idx++]);
+        else
+          break;
+      }
+      if (!ploidy)
+        ploidy = in_mem_variant_refs[read_counter].get().data().size() / in.samples().size();
     }
 
     if (read_counter)
     {
       std::sort(in_mem_variant_refs.begin(), in_mem_variant_refs.begin() + read_counter, less_than);
 
-      std::string temp_path = "/tmp/tmp-" + str_gen(8) + ".sav";
-      temp_writers.emplace_back(temp_path, in.samples().begin(), in.samples().end(), in.headers().begin(), in.headers().end(), in_format);
-      temp_readers.emplace_back(temp_path, in.samples().begin(), in.samples().end(), in.headers().begin(), in.headers().end(), out_format);
-      std::remove(temp_path.c_str());
+      temp_file_paths.emplace_back("/tmp/tmp-" + str_gen(8) + ".sav");
+      temp_writers.emplace_back(temp_file_paths.back(), in.samples().begin(), in.samples().end(), in.headers().begin(), in.headers().end(), in_format);
+      // TODO: open FILE*  and unlink file
+      // temp_readers.emplace_back(temp_path, /*in.samples().begin(), in.samples().end(), in.headers().begin(), in.headers().end(),*/ out_format);
+      // std::remove(temp_path.c_str());
       for (std::size_t i = 0; i<read_counter; ++i)
       {
         temp_writers.back() << in_mem_variant_refs[i].get();
@@ -138,6 +181,12 @@ bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt 
 
 
   temp_writers.clear();
+
+  for (auto it = temp_file_paths.begin(); it != temp_file_paths.end(); ++it)
+  {
+    temp_readers.emplace_back(*it, out_format);
+    std::remove(it->c_str());
+  }
 
   std::vector<savvy::variant<VecType>> write_variants(temp_readers.size());
   std::size_t i = 0;
