@@ -133,7 +133,7 @@ template <typename VecType, typename Reader, typename Writer>
 bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt in_format, const std::vector<savvy::genomic_region>& regions, Writer& out, savvy::fmt out_format, bool update_info)
 {
   std::unordered_map<std::string, std::size_t> contig_order_map;
-  contig_order_map.reserve(std::count_if(in.headers().begin(), in.headers().end(), [](const std::pair<std::string,std::string>& e) { return e.first == "contig"; }));
+  contig_order_map.reserve(in.headers().size()); // std::count_if(in.headers().begin(), in.headers().end(), [](const std::pair<std::string,std::string>& e) { return e.first == "contig"; }));
 
   std::size_t contig_counter = 0;
   for (auto it = in.headers().begin(); it != in.headers().end(); ++it)
