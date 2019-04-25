@@ -147,7 +147,7 @@ bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt 
 
   less_than_comparator less_than(sort, std::move(contig_order_map));
 
-  std::size_t region_idx = 0;
+  std::size_t region_idx = 1;
   std::size_t ploidy = 0;
 
   random_string_generator str_gen;
@@ -164,7 +164,7 @@ bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt 
   while (read_counter == temp_file_size)
   {
     read_counter = 0;
-    for (; read_counter < temp_file_size; ++read_counter)
+    for (; read_counter < temp_file_size; )
     {
       in >> in_mem_variant_refs[read_counter].get();
       if (!in.good())
@@ -174,8 +174,12 @@ bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt 
         else
           break;
       }
-      if (!ploidy)
-        ploidy = in_mem_variant_refs[read_counter].get().data().size() / in.samples().size();
+      else
+      {
+        if (!ploidy)
+          ploidy = in_mem_variant_refs[read_counter].get().data().size() / in.samples().size();
+        ++read_counter;
+      }
     }
 
     if (read_counter)
