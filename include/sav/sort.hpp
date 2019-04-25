@@ -14,17 +14,20 @@
 
 #include <string>
 #include <random>
+#include <unordered_map>
 
 class less_than_comparator
 {
 public:
-  less_than_comparator(savvy::s1r::sort_point type);
+  less_than_comparator(savvy::s1r::sort_point type, std::unordered_map<std::string, std::size_t> contig_order_map);
   bool operator()(const savvy::site_info& a, const savvy::site_info& b);
 private:
+  bool contig_compare(const std::string& a, const std::string& b);
   bool left(const savvy::site_info& a, const savvy::site_info& b);
   bool right(const savvy::site_info& a, const savvy::site_info& b);
   bool mid(const savvy::site_info& a, const savvy::site_info& b);
 private:
+  std::unordered_map<std::string, std::size_t> contig_order_map_;
   savvy::s1r::sort_point sort_type_;
 };
 
@@ -129,7 +132,20 @@ namespace detail
 template <typename VecType, typename Reader, typename Writer>
 bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt in_format, const std::vector<savvy::genomic_region>& regions, Writer& out, savvy::fmt out_format, bool update_info)
 {
-  less_than_comparator less_than(sort);
+  std::unordered_map<std::string, std::size_t> contig_order_map;
+  contig_order_map.reserve(std::count_if(in.headers().begin(), in.headers().end(), [](const std::pair<std::string,std::string>& e) { return e.first == "contig"; }));
+
+  std::size_t contig_counter = 0;
+  for (auto it = in.headers().begin(); it != in.headers().end(); ++it)
+  {
+    if (it->first == "contig")
+    {
+      std::string contig = savvy::parse_header_sub_field(it->second, "ID");
+      contig_order_map[contig] = contig_counter++;
+    }
+  }
+
+  less_than_comparator less_than(sort, std::move(contig_order_map));
 
   std::size_t region_idx = 0;
   std::size_t ploidy = 0;
