@@ -39,7 +39,7 @@
     }
     else
     {
-      return a_res != contig_order_map_.end();
+      return a_res != contig_order_map_.end(); // b is not in headers so put a before b.
     }
   }
 
