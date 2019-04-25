@@ -39,7 +39,7 @@
     }
     else
     {
-      return a_res != contig_order_map_.end(); // b is not in headers so put a before b.
+      return a_res != contig_order_map_.end(); // put a before b if b is not in headers, or put b before a if a is not in headers.
     }
   }
 
