@@ -151,7 +151,7 @@ bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt 
   std::size_t ploidy = 0;
 
   random_string_generator str_gen;
-  std::size_t temp_file_size = 7;
+  const std::size_t temp_file_size = 4096;
   std::deque<std::string> temp_file_paths;
   std::deque<savvy::sav::writer> temp_writers;
   std::deque<savvy::sav::reader> temp_readers;
