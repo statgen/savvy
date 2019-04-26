@@ -260,7 +260,7 @@ private:
       ++cur;
 
     if (cur == end)
-      return {make_unique<boolean_expression>(false), false};
+      return std::make_tuple(make_unique<boolean_expression>(false), false);
 
     std::string::iterator delim;
     if (*cur == '(')
@@ -282,11 +282,11 @@ private:
       else if (*cur == '|' || *cur == ',')
         log_op = logical::op_or;
       else
-        return {make_unique<boolean_expression>(false), false};
+        return std::make_tuple(make_unique<boolean_expression>(false), false);
 
       ++cur;
       auto tmp = parse(cur, end);
-      return {make_unique<logical_expression>(std::move(std::get<0>(sub_expr)), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp)};
+      return std::make_tuple(make_unique<logical_expression>(std::move(std::get<0>(sub_expr)), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp));
     }
     else
     {
@@ -300,7 +300,7 @@ private:
 
 
       if (delim == end || !is_valid_operand(left_operand))
-        return {make_unique<boolean_expression>(false), false};
+        return std::make_tuple(make_unique<boolean_expression>(false), false);
 
       cur = delim;
 
@@ -308,14 +308,14 @@ private:
 
       cmpr comparison = parse_comparison(std::string(cur, delim));
       if (comparison == cmpr::invalid || delim == end)
-        return {make_unique<boolean_expression>(false), false};
+        return std::make_tuple(make_unique<boolean_expression>(false), false);
 
       cur = delim;
       while (cur != end && std::isspace(*cur))
         ++cur;
 
       if (cur == end)
-        return {make_unique<boolean_expression>(false), false};
+        return std::make_tuple(make_unique<boolean_expression>(false), false);
 
       if (*cur == '\'' || *cur == '"')
         delim = parse_string(cur, end);
@@ -326,7 +326,7 @@ private:
       right_operand.erase(right_operand.find_last_not_of(' ') + 1);
 
       if (!is_valid_operand(right_operand))
-        return {make_unique<boolean_expression>(false), false};
+        return std::make_tuple(make_unique<boolean_expression>(false), false);
 
       auto cmpr_expr = make_unique<comparison_expression>(left_operand, comparison, right_operand);
 
@@ -350,7 +350,7 @@ private:
 
       cur = delim + 1;
       auto tmp = parse(cur, end);
-      return {make_unique<logical_expression>(std::move(cmpr_expr), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp)};
+      return std::make_tuple(make_unique<logical_expression>(std::move(cmpr_expr), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp));
     }
   }
 private:
