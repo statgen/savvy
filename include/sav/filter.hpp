@@ -333,13 +333,13 @@ private:
       if (delim == end)
       {
         cur = delim;
-        return {std::move(cmpr_expr), true};
+        return std::make_tuple(std::move(cmpr_expr), true);
       }
 
       if (*delim == ')')
       {
         cur = delim + 1;
-        return {std::move(cmpr_expr), true};
+        return std::make_tuple(std::move(cmpr_expr), true);
       }
 
       logical log_op;
