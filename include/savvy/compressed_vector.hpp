@@ -165,6 +165,12 @@ namespace savvy
       size_ = sz;
     }
 
+    void reserve(std::size_t non_zero_size_hint)
+    {
+      this->offsets_.reserve(non_zero_size_hint);
+      this->values_.reserve(non_zero_size_hint);
+    }
+
     void clear()
     {
       resize(0);

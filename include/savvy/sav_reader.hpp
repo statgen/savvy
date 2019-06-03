@@ -310,6 +310,7 @@ namespace savvy
 
             if (subset_size_ != samples().size())
             {
+              destination.reserve(sz); // This is useful for compressed_vector.
               destination.resize(subset_size_ * ploidy_level);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
@@ -337,7 +338,9 @@ namespace savvy
             }
             else
             {
+              destination.reserve(sz); // This is useful for compressed_vector.
               destination.resize(samples().size() * ploidy_level);
+              //::savvy::reserve_sparse(destination, sz);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
               {
@@ -401,6 +404,7 @@ namespace savvy
 
             if (subset_size_ != samples().size())
             {
+              destination.reserve(sz); // This is useful for compressed_vector.
               destination.resize(subset_size_);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
@@ -428,6 +432,7 @@ namespace savvy
             }
             else
             {
+              destination.reserve(sz); // This is useful for compressed_vector.
               destination.resize(samples().size());
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
@@ -611,6 +616,7 @@ namespace savvy
 
             if (subset_size_ != samples().size())
             {
+              destination.reserve(sz); // This is useful for compressed_vector.
               destination.resize(subset_size_ * ploidy_level);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
@@ -630,6 +636,7 @@ namespace savvy
             }
             else
             {
+              destination.reserve(sz); // This is useful for compressed_vector.
               destination.resize(samples().size() * ploidy_level);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
@@ -686,6 +693,7 @@ namespace savvy
 
             if (subset_size_ != samples().size())
             {
+              destination.reserve(sz); // This is useful for compressed_vector.
               destination.resize(subset_size_);
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
@@ -704,6 +712,7 @@ namespace savvy
             }
             else
             {
+              destination.reserve(sz); // This is useful for compressed_vector.
               destination.resize(samples().size());
 
               for (std::size_t i = 0; i < sz && in_it != end_it; ++i, ++total_offset)
