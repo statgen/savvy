@@ -17,7 +17,7 @@ namespace savvy
   {
   public:
     typedef T value_type;
-    typedef compressed_vector<T> self_type;
+    typedef compressed_vector<T, AggregateT> self_type;
     static const T const_value_type;
 
     class iterator
