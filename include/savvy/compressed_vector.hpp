@@ -187,7 +187,7 @@ namespace savvy
     }
 
     template <typename AggregateT>
-    AggregateT dot(const self_type& other, AggregateT ret)
+    AggregateT dot(const self_type& other, AggregateT ret) const
     {
       if (size() < other.size())
       {
@@ -220,7 +220,7 @@ namespace savvy
     }
 
     template <typename AggregateT>
-    AggregateT dot_old(const self_type& other, AggregateT ret)
+    AggregateT dot_old(const self_type& other, AggregateT ret) const
     {
       auto it = offsets_.begin();
       auto jt = other.offsets_.begin();
