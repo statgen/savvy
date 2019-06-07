@@ -187,30 +187,34 @@ namespace savvy
     }
 
     template <typename AggregateT>
-    AggregateT dot(const self_type& other, AggregateT ret) const
+    AggregateT dot_slow(const self_type& other, AggregateT ret) const
     {
       if (size() < other.size())
       {
-        auto jt = other.offsets_.begin();
-        for (auto it = offsets_.begin(); it != offsets_.end() && jt != other.offsets_.end(); ++it)
+        auto beg_it = offsets_.begin();
+        auto beg_jt = other.offsets_.begin();
+        auto jt = beg_jt;
+        for (auto it = beg_it; it != offsets_.end() && jt != other.offsets_.end(); ++it)
         {
           jt = std::lower_bound(jt, other.offsets_.end(), *it);
           if (jt != other.offsets_.end() && *jt == *it)
           {
-            values_[std::distance(offsets_.begin(),it)] * other.values_[std::distance(other.offsets_.begin(), jt)];
+            values_[it - beg_it] * other.values_[jt - beg_jt];
             ++jt;
           }
         }
       }
       else
       {
-        auto jt = offsets_.begin();
-        for (auto it = other.offsets_.begin(); it != other.offsets_.end() && jt != offsets_.end(); ++it)
+        auto beg_it = other.offsets_.begin();
+        auto beg_jt = offsets_.begin();
+        auto jt = beg_jt;
+        for (auto it = beg_it; it != other.offsets_.end() && jt != offsets_.end(); ++it)
         {
           jt = std::lower_bound(jt, offsets_.end(), *it);
           if (jt != offsets_.end() && *jt == *it)
           {
-            ret += other.values_[std::distance(other.offsets_.begin(),it)] * values_[std::distance(offsets_.begin(), jt)];
+            ret += other.values_[it - beg_it] * values_[jt - beg_jt];
             ++jt;
           }
         }
@@ -220,10 +224,12 @@ namespace savvy
     }
 
     template <typename AggregateT>
-    AggregateT dot_old(const self_type& other, AggregateT ret) const
+    AggregateT dot(const self_type& other, AggregateT ret) const
     {
-      auto it = offsets_.begin();
-      auto jt = other.offsets_.begin();
+      auto beg_it = offsets_.begin();
+      auto beg_jt = other.offsets_.begin();
+      auto it = beg_it;
+      auto jt = beg_jt;
       while (it != offsets_.end() && jt != other.offsets_.end())
       {
         if ((*it) < (*jt))
@@ -232,7 +238,7 @@ namespace savvy
           ++jt;
         else
         {
-          ret += values_[*it] * other.values_[*jt];
+          ret += values_[it - beg_it] * other.values_[jt - beg_jt];
           ++it;
           ++jt;
         }
