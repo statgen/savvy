@@ -197,7 +197,7 @@ namespace savvy
           jt = std::lower_bound(jt, other.offsets_.end(), *it);
           if (jt != other.offsets_.end() && *jt == *it)
           {
-            ret += values_[*it] * other.values_[*jt];
+            values_[std::distance(offsets_.begin(),it)] * other.values_[std::distance(other.offsets_.begin(), jt)];
             ++jt;
           }
         }
@@ -210,7 +210,7 @@ namespace savvy
           jt = std::lower_bound(jt, offsets_.end(), *it);
           if (jt != offsets_.end() && *jt == *it)
           {
-            ret += other.values_[*it] * values_[*jt];
+            ret += other.values_[std::distance(other.offsets_.begin(),it)] * values_[std::distance(offsets_.begin(), jt)];
             ++jt;
           }
         }
