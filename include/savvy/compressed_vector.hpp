@@ -189,6 +189,39 @@ namespace savvy
     template <typename AggregateT>
     AggregateT dot(const self_type& other, AggregateT ret)
     {
+      if (size() < other.size())
+      {
+        auto jt = other.offsets_.begin();
+        for (auto it = offsets_.begin(); it != offsets_.end() && jt != other.offsets_.end(); ++it)
+        {
+          jt = std::lower_bound(jt, other.offsets_.end(), *it);
+          if (jt != other.offsets_.end() && *jt == *it)
+          {
+            ret += values_[*it] * other.values_[*jt];
+            ++jt;
+          }
+        }
+      }
+      else
+      {
+        auto jt = offsets_.begin();
+        for (auto it = other.offsets_.begin(); it != other.offsets_.end() && jt != offsets_.end(); ++it)
+        {
+          jt = std::lower_bound(jt, offsets_.end(), *it);
+          if (jt != offsets_.end() && *jt == *it)
+          {
+            ret += other.values_[*it] * values_[*jt];
+            ++jt;
+          }
+        }
+      }
+
+      return ret;
+    }
+
+    template <typename AggregateT>
+    AggregateT dot_old(const self_type& other, AggregateT ret)
+    {
       auto it = offsets_.begin();
       auto jt = other.offsets_.begin();
       while (it != offsets_.end() && jt != other.offsets_.end())
