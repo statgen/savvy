@@ -12,12 +12,12 @@
 
 namespace savvy
 {
-  template<typename T, typename AggregateT = T>
+  template<typename T>
   class compressed_vector
   {
   public:
     typedef T value_type;
-    typedef compressed_vector<T, AggregateT> self_type;
+    typedef compressed_vector<T> self_type;
     static const T const_value_type;
 
     class iterator
@@ -176,10 +176,19 @@ namespace savvy
       resize(0);
     }
 
-    AggregateT operator*(const self_type& other)
+    value_type operator*(const self_type& other) const
     {
-      auto ret = AggregateT();
+      return dot(other, value_type());
+    }
 
+    value_type dot(const self_type& other) const
+    {
+      return dot(other, value_type());
+    }
+
+    template <typename AggregateT>
+    AggregateT dot(const self_type& other, AggregateT ret)
+    {
       auto it = offsets_.begin();
       auto jt = other.offsets_.begin();
       while (it != offsets_.end() && jt != other.offsets_.end())
@@ -209,8 +218,8 @@ namespace savvy
     std::size_t size_;
   };
 
-  template <typename T, typename AggregateT>
-  const T compressed_vector<T, AggregateT>::const_value_type = T();
+  template <typename T>
+  const T compressed_vector<T>::const_value_type = T();
 }
 
 #endif //LIBSAVVY_SPARSE_VECTOR_HPP
