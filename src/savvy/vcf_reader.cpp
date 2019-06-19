@@ -355,7 +355,7 @@ namespace savvy
         std::stringstream contigs;
         contigs << reg.chromosome();
         if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())
-          contigs << ":" << reg.from() << "-" << reg.to();
+          contigs << ":" << reg.from() << "-" << std::min(reg.to(), (std::uint64_t)std::numeric_limits<std::int32_t>::max());
 
         if (bcf_sr_set_regions(sr, contigs.str().c_str(), 0) == 0 && bcf_sr_add_reader(sr, file_path.c_str()) == 1)
         {
