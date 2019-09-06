@@ -160,7 +160,7 @@ int concat_main(int argc, char **argv)
   }
 
 
-  std::ofstream ofs(args.output_path(), std::ios::binary | std::ios::ate);
+  std::ofstream ofs(args.output_path(), std::ios::binary | std::ios::app);
   if (!ofs)
   {
     std::cerr << "Could not open output path (" << args.output_path() << ")\n";
