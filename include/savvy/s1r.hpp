@@ -780,7 +780,7 @@ namespace savvy
         ofs_.flush();
 
         std::uint64_t num_leaf_nodes = detail::ceil_divide(this->chromosomes_.back().second, std::uint64_t(detail::entries_per_leaf_node(block_size_)));
-        tree_base tree(0, std::uint8_t(block_size_ / 1024 - 1), std::uint64_t(ofs_.tellp()) - block_size_ * num_leaf_nodes, this->chromosomes_.back().second);
+        tree_base tree(0, std::uint8_t(block_size_ / 1024 - 1), (std::uint64_t(ofs_.tellp()) - block_size_ * num_leaf_nodes) / block_size_, this->chromosomes_.back().second);
 
         std::vector<std::pair<std::vector<internal_entry>, tree_base::tree_position>> current_nodes_at_each_internal_level;
         current_nodes_at_each_internal_level.reserve(tree.tree_height() - 1);
