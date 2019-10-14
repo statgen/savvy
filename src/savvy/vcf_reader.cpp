@@ -357,7 +357,23 @@ namespace savvy
         if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())
           contigs << ":" << reg.from() << "-" << std::min(reg.to(), (std::uint64_t)std::numeric_limits<std::int32_t>::max());
 
-        if (bcf_sr_set_regions(sr, contigs.str().c_str(), 0) == 0 && bcf_sr_add_reader(sr, file_path.c_str()) == 1)
+        std::string contig_str = contigs.str();
+
+        if (contig_str.empty())
+        {
+          auto chroms = query_chromosomes(file_path);
+          for (auto it = chroms.begin(); it != chroms.end(); ++it)
+          {
+            if (it != chroms.begin())
+              contigs << ",";
+            contigs << (*it);
+            if (reg.from() > 1 || reg.to() != std::numeric_limits<std::uint64_t>::max())
+              contigs << ":" << reg.from() << "-" << std::min(reg.to(), (std::uint64_t)std::numeric_limits<std::int32_t>::max());
+          }
+          contig_str = contigs.str();
+        }
+
+        if (contig_str.size() && bcf_sr_set_regions(sr, contig_str.c_str(), 0) == 0 && bcf_sr_add_reader(sr, file_path.c_str()) == 1)
         {
           bcf_hdr_t* hdr = bcf_sr_get_header(sr, 0);
           if (hdr)
