@@ -60,8 +60,18 @@ namespace savvy
       }
 
       os.write((char*)&type_byte, 1);
+
       if (vec.size() >= 15)
-        write_typed_scalar(os, (std::int32_t)vec.size());
+      {
+        if (vec.size() <= 0x7F)
+          write_typed_scalar(os, (std::int8_t)vec.size());
+        else if (vec.size() <= 0x7FFF)
+          write_typed_scalar(os, (std::int16_t)vec.size());
+        else if (vec.size() <= 0x7FFFFFFF)
+          write_typed_scalar(os, (std::int32_t)vec.size());
+        else
+          throw std::runtime_error("vector too big");
+      }
 
       os.write((char*)vec.data(), std::int32_t(sizeof(T) * vec.size()));
     }
@@ -75,7 +85,16 @@ namespace savvy
 
       os.write((char*)&type_byte, 1);
       if (str.size() >= 15)
-        write_typed_scalar(os, (std::int32_t)str.size());
+      {
+        if (str.size() <= 0x7F)
+          write_typed_scalar(os, (std::int8_t)str.size());
+        else if (str.size() <= 0x7FFF)
+          write_typed_scalar(os, (std::int16_t)str.size());
+        else if (str.size() <= 0x7FFFFFFF)
+          write_typed_scalar(os, (std::int32_t)str.size());
+        else
+          throw std::runtime_error("string too big");
+      }
 
       os.write(str.data(), str.size());
     }
@@ -89,11 +108,11 @@ namespace savvy
       if (vec.size() < 15)
         ret = 1;
       else if (vec.size() <= 0x7F)
-        ret = 1 + 1;
+        ret = 2 + 1;
       else if (vec.size() <= 0x7FFF)
-        ret = 1 + 2;
+        ret = 2 + 2;
       else if (vec.size() <= 0x7FFFFFFF)
-        ret = 1 + 4;
+        ret = 2 + 4;
       else
         return -1; // vec too big
 
@@ -114,7 +133,7 @@ namespace savvy
     {
       std::uint32_t l_shared = 0;
       std::uint32_t l_indiv = 0;
-      std::int32_t chrom_idx = 0;
+      std::int32_t chrom_idx = 1;
       std::int32_t pos = 123;
       std::int32_t ref_len = 1;
       float qual = 1;
@@ -136,9 +155,9 @@ namespace savvy
       std::vector<std::pair<std::string, std::string>> headers = {
         {"fileformat","VCFv4.3"},
         {"FILTER","<ID=PASS,Description=\"Pass\">"},
-        {"FORMAT","<ID=GT,Number=1,Type=String,Description=\"Genotype\">"},
         {"FILTER","<ID=q10,Description=\"Quality below 10\">"},
         {"FILTER","<ID=s50,Description=\"Less than 50% of samples have data\">"},
+        {"FORMAT","<ID=GT,Number=1,Type=String,Description=\"Genotype\">"},
         {"fileDate","20090805"},
         {"source","myImputationProgramV3.1"},
         {"reference","file:///seq/references/1000GenomesPilot-NCBI36.fasta"},
@@ -216,6 +235,8 @@ namespace savvy
 
       ofs.write((char*)(&r.l_shared), sizeof(r.l_shared));
       ofs.write((char*)(&r.l_indiv), sizeof(r.l_indiv));
+      ofs.write((char*)(&r.chrom_idx), sizeof(r.chrom_idx));
+      ofs.write((char*)(&r.pos), sizeof(r.pos));
       ofs.write((char*)(&r.ref_len), sizeof(r.ref_len));
       ofs.write((char*)(&r.qual), sizeof(r.qual));
       ofs.write((char*)(&r.n_allele_info), sizeof(r.n_allele_info));
@@ -226,11 +247,11 @@ namespace savvy
       write_typed_str(ofs, r.alleles[0]);
       write_typed_str(ofs, r.alleles[1]);
       write_typed_vec(ofs, filter_vec);
-      write_typed_scalar(ofs, std::int8_t(1));
+      write_typed_scalar(ofs, std::int8_t(3));
 
       std::uint8_t typed_byte = (2 << 4) | 1;
       ofs.write((char*)&typed_byte, 1);
-      ofs.write("\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01", 12);
+      ofs.write("\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02", 12);
 
 
 
