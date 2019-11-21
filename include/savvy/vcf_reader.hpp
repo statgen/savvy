@@ -495,7 +495,7 @@ namespace savvy
         }
       }
 
-      if (cnt != VecCnt && empty_vector_policy_ != empty_vector_policy::skip)
+      if (cnt != VecCnt && (empty_vector_policy_ == empty_vector_policy::skip_with_warning || empty_vector_policy_ == empty_vector_policy::fail))
       {
         std::cerr << "Variant is missing requested data format type." << std::endl;
         if (empty_vector_policy_ == empty_vector_policy::fail)
