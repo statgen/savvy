@@ -262,6 +262,58 @@ namespace savvy
 
     }
   }
+
+  namespace sav2
+  {
+    void write_header(std::ostream& os, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids)
+    {
+      std::string magic = "SAV\x02\x00";
+
+      std::uint32_t header_block_sz = 0;
+      for (auto it = ids.begin(); it != ids.end(); ++it)
+      {
+        header_block_sz += it->first.size();
+        header_block_sz += it->second.size();
+        header_block_sz += 4;
+      }
+
+      std::string column_names = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
+      header_block_sz += column_names.size();
+
+      for (auto it = samples.begin(); it != samples.end(); ++it)
+      {
+        header_block_sz += 1 + it->size();
+      }
+
+      header_block_sz += 2; //new line and null
+
+      ofs.write(magic.data(), magic.size());
+      ofs.write((char*)(&header_block_sz), sizeof(header_block_sz));
+
+      for (auto it = headers.begin(); it != headers.end(); ++it)
+      {
+        ofs.write("##", 2);
+        ofs.write(it->first.data(), it->first.size());
+        ofs.write("=", 1);
+        ofs.write(it->second.data(), it->second.size());
+        ofs.write("\n", 1);
+      }
+
+      ofs.write(column_names.data(), column_names.size());
+      for (auto it = samples.begin(); it != samples.end(); ++it)
+      {
+        ofs.write("\t", 1);
+        ofs.write(it->data(), it->size());
+      }
+
+      ofs.write("\n\0", 2);
+    }
+
+    void write_site_info(std::ostream& os, const record& r)
+    {
+
+    }
+  }
 }
 
 #endif // LIBSAVVY_BCF_WRITER_HPP
