@@ -1,6 +1,8 @@
 #ifndef LIBSAVVY_BCF_WRITER_HPP
 #define LIBSAVVY_BCF_WRITER_HPP
 
+#include "savvy/varint.hpp"
+
 #include <string>
 #include <vector>
 #include <fstream>
@@ -143,6 +145,118 @@ namespace savvy
       std::vector<std::string> alleles = {"C","T"};
       std::vector<std::string> filters;
       std::vector<std::pair<std::string, std::string>> info;
+    };
+
+    class writer
+    {
+    private:
+      std::string file_path_;
+      std::ofstream file_;
+      std::vector<std::pair<std::string, std::string>> headers_;
+      std::vector<std::string> samples_;
+    public:
+      writer(const std::string& file_path,
+        std::vector<std::pair<std::string, std::string>> headers,
+        std::vector<std::string> samples) :
+        file_path_(file_path),
+        file_(file_path, std::ios::binary),
+        headers_(std::move(headers)),
+        samples_(std::move(samples))
+      {
+
+      }
+
+      void write_header()
+      {
+        std::string magic = "BCF\x02\x02";
+
+        std::uint32_t header_block_sz = 0;
+        for (auto it = headers_.begin(); it != headers_.end(); ++it)
+        {
+          header_block_sz += it->first.size();
+          header_block_sz += it->second.size();
+          header_block_sz += 4;
+        }
+
+        std::string column_names = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
+        header_block_sz += column_names.size();
+
+        std::vector<std::string> samples = {"1","2","3","4","5","6"};
+        for (auto it = samples.begin(); it != samples.end(); ++it)
+        {
+          header_block_sz += 1 + it->size();
+        }
+
+        header_block_sz += 2; //new line and null
+
+        file_.write(magic.data(), magic.size());
+        file_.write((char*)(&header_block_sz), sizeof(header_block_sz));
+
+        for (auto it = headers_.begin(); it != headers_.end(); ++it)
+        {
+          file_.write("##", 2);
+          file_.write(it->first.data(), it->first.size());
+          file_.write("=", 1);
+          file_.write(it->second.data(), it->second.size());
+          file_.write("\n", 1);
+        }
+
+        file_.write(column_names.data(), column_names.size());
+        for (auto it = samples.begin(); it != samples.end(); ++it)
+        {
+          file_.write("\t", 1);
+          file_.write(it->data(), it->size());
+        }
+
+        file_.write("\n\0", 2);
+
+      }
+
+      writer& write(record r, std::vector<std::int8_t>& genos)
+      {
+        r.l_shared += sizeof(r.chrom_idx);
+        r.l_shared += sizeof(r.pos);
+        r.l_shared += sizeof(r.ref_len);
+        r.l_shared += sizeof(r.qual);
+        r.l_shared += sizeof(r.n_allele_info);
+        r.l_shared += sizeof(r.n_fmt_sample);
+        r.l_shared += get_typed_value_size(r.variant_id);
+
+        for (auto& a : r.alleles)
+          r.l_shared += get_typed_value_size(a);
+
+        std::vector<std::int8_t> filter_vec = {0};
+        r.l_shared += get_typed_value_size(filter_vec);
+        for (auto& i: r.info)
+          r.l_shared += (get_typed_value_size(0) + get_typed_value_size(i.second));
+
+        r.l_indiv += get_typed_value_size(std::int8_t(0));
+        r.l_indiv += 1;
+        r.l_indiv += genos.size() * sizeof(std::vector<std::int8_t>::value_type);
+
+        file_.write((char*)(&r.l_shared), sizeof(r.l_shared));
+        file_.write((char*)(&r.l_indiv), sizeof(r.l_indiv));
+        file_.write((char*)(&r.chrom_idx), sizeof(r.chrom_idx));
+        file_.write((char*)(&r.pos), sizeof(r.pos));
+        file_.write((char*)(&r.ref_len), sizeof(r.ref_len));
+        file_.write((char*)(&r.qual), sizeof(r.qual));
+        file_.write((char*)(&r.n_allele_info), sizeof(r.n_allele_info));
+        file_.write((char*)(&r.n_fmt_sample), sizeof(r.n_fmt_sample));
+
+
+        write_typed_str(file_, r.variant_id);
+        write_typed_str(file_, r.alleles[0]);
+        write_typed_str(file_, r.alleles[1]);
+        write_typed_vec(file_, filter_vec);
+        write_typed_scalar(file_, std::int8_t(3));
+
+        std::uint16_t ploidy = 2;
+        std::uint8_t typed_byte = (ploidy << 4u) | 1u;
+        file_.write((char*)&typed_byte, 1);
+        file_.write((char*)genos.data(), genos.size());
+
+        return *this;
+      }
     };
 
     inline void write_bcf()
