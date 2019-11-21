@@ -44,7 +44,8 @@ namespace savvy
     {
       fail = 0,
       skip,
-      skip_with_warning
+      skip_with_warning,
+      allow
     };
     //################################################################//
 
@@ -1071,6 +1072,9 @@ namespace savvy
       {
         this->read_variant_details(annotations);
         vecs_read = this->read_requested_genos(annotations, destinations...);
+
+        if (this->empty_vector_policy_ == empty_vector_policy::allow)
+          break;
       }
 
       return *this;
@@ -1098,7 +1102,8 @@ namespace savvy
         this->read_variant_details(annotations);
         if (this->good() && region_compare(bounding_type_, annotations, region_))
         {
-          if (this->read_requested_genos(annotations, destinations...) > 0)
+          std::size_t cnt = this->read_requested_genos(annotations, destinations...);
+          if (cnt > 0 || this->empty_vector_policy_ == empty_vector_policy::allow)
             break;
         }
       }
@@ -1117,7 +1122,8 @@ namespace savvy
         {
           if (fn(annotations) && region_compare(bounding_type_, annotations, region_))
           {
-            if (this->read_requested_genos(annotations, destinations...) > 0)
+            std::size_t cnt = this->read_requested_genos(annotations, destinations...);
+            if (cnt > 0 || this->empty_vector_policy_ == empty_vector_policy::allow)
               break;
           }
         }
