@@ -7,35 +7,138 @@
 #include <unordered_map>
 #include <set>
 #include <algorithm>
+#include <cstdio>
 
 namespace savvy
 {
   namespace bcf
   {
+    template<typename T>
+    typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, std::uint8_t>::type
+    int_type(T val)
+    {
+      if (val <= std::numeric_limits<std::int8_t>::max() && val >= std::numeric_limits<std::int8_t>::min())
+        return 0x01;
+      else if (val <= std::numeric_limits<std::int16_t>::max() && val >= std::numeric_limits<std::int16_t>::min())
+        return 0x02;
+      else if (val <= std::numeric_limits<std::int32_t>::max() && val >= std::numeric_limits<std::int32_t>::min())
+        return 0x03;
+      else
+        return 0x04;
+    }
+
+    template <typename OutT, typename T>
+    typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, bool>::type
+    serialize_typed_int_exact(OutT out_it, const T& val)
+    {
+      T v = static_cast<T>(val);
+      std::uint8_t type;
+      if (std::is_same<T, std::int8_t>::value)
+        type = 0x01;
+      else if (std::is_same<T, std::int16_t>::value)
+        type = 0x02;
+      else if (std::is_same<T, std::int32_t>::value)
+        type = 0x03;
+      else if (std::is_same<T, std::int64_t>::value)
+        type = 0x04;
+      else
+        return false;
+
+      *(out_it++) = (1u << 4u) | type;
+
+      char* p_end = ((char*)&v) + sizeof(T);
+      for (char* p = (char*)&v; p != p_end; ++p)
+      {
+        *(out_it++) = *p;
+      }
+      return true;
+    }
+
+    template <typename OutT, typename T>
+    typename std::enable_if<std::is_signed<T>::value, bool>::type
+    serialize_typed_scalar(OutT out_it, const T& val)
+    {
+      std::uint8_t type_byte = 1;
+      if (std::is_integral<T>::value)
+      {
+        if (val <= std::numeric_limits<std::int8_t>::max() && val >= std::numeric_limits<std::int8_t>::min())
+          return serialize_typed_int_exact(out_it, std::int8_t(val));
+        else if (val <= std::numeric_limits<std::int16_t>::max() && val >= std::numeric_limits<std::int16_t>::min())
+          return serialize_typed_int_exact(out_it, std::int16_t(val));
+        else if (val <= std::numeric_limits<std::int32_t>::max() && val >= std::numeric_limits<std::int32_t>::min())
+          return serialize_typed_int_exact(out_it, std::int32_t(val));
+        else
+          return serialize_typed_int_exact(out_it, std::int64_t(val));
+      }
+
+      if (std::is_same<T, float>::value)
+        *(out_it++) = (1u << 4u) | 0x05u;
+      else if (std::is_same<T, double>::value)
+        *(out_it++) = (1u << 4u) | 0x06u;
+      else
+        return false;
+
+      char* p_end = ((char*)&val) + sizeof(T);
+      for (char* p = (char*)&val; p != p_end; ++p)
+      {
+        *(out_it++) = *p;
+      }
+
+      return true;
+    }
+
     template <typename T>
-    typename std::enable_if<std::is_signed<T>::value, void>::type
+    typename std::enable_if<std::is_signed<T>::value, bool>::type
     write_typed_scalar(std::ostream& os, const T& val)
     {
       std::uint8_t type_byte = 1;
-      if (std::is_same<T, std::int8_t>::value)
+      if (std::is_integral<T>::value)
       {
-        type_byte = (type_byte << 4) | 0x01;
-      }
-      else if (std::is_same<T, std::int16_t>::value)
-      {
-        type_byte = (type_byte << 4) | 0x02;
-      }
-      else if (std::is_same<T, std::int32_t>::value)
-      {
-        type_byte = (type_byte << 4) | 0x03;
+        if (std::is_same<T, std::int8_t>::value)
+        {
+          type_byte = (type_byte << 4) | 0x01;
+        }
+        else if (std::is_same<T, std::int16_t>::value)
+        {
+          type_byte = (type_byte << 4) | 0x02;
+        }
+        else if (std::is_same<T, std::int32_t>::value)
+        {
+          type_byte = (type_byte << 4) | 0x03;
+        }
+        else
+        {
+          return false;
+        }
       }
       else if (std::is_same<T, float>::value)
       {
         type_byte = (type_byte << 4) | 0x05;
       }
+      else
+      {
+        return false;
+      }
 
       os.write((char*)&type_byte, 1);
       os.write((char*)&val, sizeof(val));
+      return true;
+    }
+
+    template <typename OutT>
+    bool serialize_type_and_size(OutT out_it, std::uint8_t type, std::size_t size)
+    {
+      if (size < 15)
+      {
+        *out_it = size << 4u | type;
+        ++out_it;
+        return true;
+      }
+
+      *out_it = 0xF0 | type;
+      ++out_it;
+
+      return serialize_typed_scalar(out_it, (std::int64_t)size);
     }
 
     template <typename T>
@@ -90,11 +193,11 @@ namespace savvy
       if (str.size() >= 15)
       {
         if (str.size() <= 0x7F)
-          write_typed_scalar(os, (std::int8_t)str.size());
+          serialize_typed_int_exact(std::ostreambuf_iterator<char>(os), (std::int8_t)str.size());
         else if (str.size() <= 0x7FFF)
-          write_typed_scalar(os, (std::int16_t)str.size());
+          serialize_typed_int_exact(std::ostreambuf_iterator<char>(os), (std::int16_t)str.size());
         else if (str.size() <= 0x7FFFFFFF)
-          write_typed_scalar(os, (std::int32_t)str.size());
+          serialize_typed_int_exact(std::ostreambuf_iterator<char>(os), (std::int32_t)str.size());
         else
           throw std::runtime_error("string too big");
       }
@@ -394,7 +497,46 @@ namespace savvy
       std::uint8_t type;
       std::size_t length;
       std::vector<std::uint8_t> data;
+
+      template <typename T>
+      static std::uint8_t type_code()
+      {
+        if (std::is_same<T, std::int8_t>::value)
+          return typed_value::int8;
+        if (std::is_same<T, std::int16_t>::value)
+          return typed_value::int16;
+        if (std::is_same<T, std::int32_t>::value)
+          return typed_value::int32;
+        if (std::is_same<T, std::int64_t>::value)
+          return typed_value::int64;
+        if (std::is_same<T, float>::value)
+          return typed_value::real;
+        if (std::is_same<T, double>::value)
+          return typed_value::real64;
+      }
     };
+
+    class dictionary
+    {
+    public:
+      static const std::uint8_t id = 0;
+      static const std::uint8_t contig = 1;
+      static const std::uint8_t sample = 2;
+      std::array<std::unordered_map<std::string, std::uint32_t>, 3> str_to_int;
+      std::array<std::vector<std::string>, 3> int_to_str;
+    };
+
+    template <typename DestT, typename InT, typename OutT>
+    void compress_sparse_offsets(InT in, InT in_end, OutT out)
+    {
+      std::size_t last_off = 0;
+      for (auto it = in; it != in_end; ++it)
+      {
+        DestT off((*it) - last_off);
+        *(out++) = off;
+        last_off = (*it) + 1;
+      }
+    }
 
     class site_info
     {
@@ -444,21 +586,38 @@ namespace savvy
     public:
       class individual_data
       {
-      private:
-        std::string key_;
-        std::vector<std::uint8_t> data_;
       public:
-        individual_data(std::string k, std::vector<std::uint8_t> d) :
+        std::string key_;
+        std::vector<char> data_;
+//        std::uint8_t val_type_;
+//        std::uint8_t off_type_;
+//        std::size_t vec_size_;
+      public:
+        individual_data(std::string k, std::vector<char> d) :
           key_(std::move(k)),
           data_(std::move(d))
         {}
 
         const std::string& key() const { return key_; }
-        const std::vector<std::uint8_t>& serialized_data() const { return data_; }
+        const std::vector<char>& serialized_data() const { return data_; }
+
+        static void write(individual_data& self, std::ostream& os, const dictionary& dict)
+        {
+          std::ostreambuf_iterator<char> oit(os);
+          auto query = dict.str_to_int[dictionary::id].find(self.key_);
+          if (query == dict.str_to_int[dictionary::id].end())
+          {
+            std::fprintf(stderr, "Error: invalid FORMAT key\n");
+            os.setstate(os.rdstate() | std::ios::badbit);
+          }
+          bcf::serialize_typed_scalar(oit, (std::int32_t)query->second);
+          os.write(self.data_.data(), self.data_.size());
+        }
       };
     private:
       std::vector<individual_data> indiv_data_;
     public:
+      using site_info::site_info;
       const std::vector<individual_data>& format_fields() const { return indiv_data_; }
       template <typename T>
       void set_format(const std::string& key, const std::vector<T>& geno, std::set<std::string> sparse_keys = {"GT","EC","DS","HDS"})
@@ -490,21 +649,23 @@ namespace savvy
 
         if (it == indiv_data_.end())
         {
-          indiv_data_.emplace_back(key, std::vector<std::uint8_t>());
+          std::size_t new_idx = indiv_data_.size();
+          indiv_data_.emplace_back(key, std::vector<char>());
+          it = indiv_data_.begin() + new_idx;
         }
 
-        serialize(indiv_data_[std::distance(indiv_data_.begin(), it)], geno);
+        serialize_format(indiv_data_[std::distance(indiv_data_.begin(), it)].data_, geno);
       }
 
     private:
       template <typename T>
-      static void serialize_format(std::vector<std::uint8_t>& dest, const std::vector<T>& geno, bool sparse)
+      static void serialize_format(std::vector<char>& dest, const std::vector<T>& geno, bool sparse)
       {
 
       }
 
       template <typename T>
-      static void serialize_format(/* TODO: make this a back_inserter */ std::vector<std::uint8_t>& dest, const compressed_vector<T>& geno)
+      static void serialize_format(/* TODO: make this a back_inserter */ std::vector<char>& dest, const compressed_vector<T>& geno)
       {
         std::size_t offset_max = 0;
         std::size_t last_off = 0;
@@ -517,7 +678,7 @@ namespace savvy
         }
 
         dest.clear();
-        dest.reserve(1 + 8 + geno.non_zero_size() + sizeof(T) * geno.non_zero_size()); // TODO make this more accurate.
+        dest.reserve(1 + 8);
 
         std::uint8_t type_byte = typed_value::sparse;
         if (geno.size() >= 15u)
@@ -528,10 +689,45 @@ namespace savvy
 
         if (geno.size() >= 15u)
         {
-          bcf::write_typed_scalar(std::back_inserter(dest), geno.non_zero_size());
+          bcf::serialize_typed_scalar(std::back_inserter(dest), (std::int32_t)geno.size());
         }
 
-        // TODO: write off_type|val_type, sparse size, and data.
+
+        std::uint8_t off_type = bcf::int_type((std::int64_t)geno.size()); // (std::int64_t)offset_max);
+        std::uint8_t val_type = sav2::typed_value::type_code<T>();
+
+        dest.emplace_back((off_type << 4u) | val_type);
+        bcf::serialize_typed_scalar(std::back_inserter(dest), (std::int32_t)geno.non_zero_size());
+
+        int pair_size = 1 << bcf_type_shift[off_type];
+        pair_size += 1 << bcf_type_shift[val_type];
+        std::size_t data_pos = dest.size();
+        dest.resize(data_pos + (geno.non_zero_size() * pair_size));
+
+
+        if (off_type == 1)
+          compress_sparse_offsets<std::int8_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int8_t*) (dest.data() + data_pos));
+        else if (off_type == 2)
+          compress_sparse_offsets<std::int16_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int16_t*) (dest.data() + data_pos));
+        else if (off_type == 3)
+          compress_sparse_offsets<std::int32_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int32_t*) (dest.data() + data_pos));
+        else if (off_type == 4)
+          compress_sparse_offsets<std::int64_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int64_t*) (dest.data() + data_pos));
+
+        if (val_type == 1)
+          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int8_t*)(dest.data() + data_pos));
+        else if (val_type == 2)
+          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int16_t*)(dest.data() + data_pos));
+        else if (val_type == 3)
+          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int32_t*)(dest.data() + data_pos));
+        else if (val_type == 4)
+          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int64_t*)(dest.data() + data_pos));
+        else if (val_type == 5)
+          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (float*)(dest.data() + data_pos));
+        else if (val_type == 6)
+          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (double*)(dest.data() + data_pos));
+        else
+          throw std::runtime_error("Unsupported FORMAT type!");
       }
     };
 
@@ -552,158 +748,170 @@ namespace savvy
 //      std::vector<std::pair<std::string, typed_value>> info;
 //    };
 
-    class dictionary
+
+    class writer
     {
+    private:
+      std::ofstream ofs_;
+      dictionary dict_;
+      std::vector<char> serialized_buf_;
     public:
-      static const std::uint8_t id = 0;
-      static const std::uint8_t contig = 1;
-      static const std::uint8_t sample = 2;
-      std::array<std::unordered_map<std::string, std::uint32_t>, 3> str_to_int;
-      std::array<std::vector<std::string>, 3> int_to_str;
+      writer(const std::string& file) : ofs_(file, std::ios::binary) {}
+      void write_header(const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids)
+      {
+        std::string magic = "SAV\x02\x00";
+
+        std::uint32_t header_block_sz = 0;
+        for (auto it = headers.begin(); it != headers.end(); ++it)
+        {
+          header_block_sz += it->first.size();
+          header_block_sz += it->second.size();
+          header_block_sz += 4;
+        }
+
+        std::string column_names = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
+        header_block_sz += column_names.size();
+
+        for (auto it = ids.begin(); it != ids.end(); ++it)
+        {
+          header_block_sz += 1 + it->size();
+        }
+
+        header_block_sz += 2; //new line and null
+
+        ofs_.write(magic.data(), magic.size());
+        ofs_.write((char*)(&header_block_sz), sizeof(header_block_sz));
+
+        for (auto it = headers.begin(); it != headers.end(); ++it)
+        {
+          std::string hid = parse_header_sub_field(it->second, "ID");
+          if (!hid.empty())
+          {
+            int which_dict = it->first == "contig" ? dictionary::contig : dictionary::id;
+
+            dict_.int_to_str[which_dict].emplace_back(hid);
+            dict_.str_to_int[which_dict][hid] = dict_.int_to_str[which_dict].size() - 1;
+          }
+
+          ofs_.write("##", 2);
+          ofs_.write(it->first.data(), it->first.size());
+          ofs_.write("=", 1);
+          ofs_.write(it->second.data(), it->second.size());
+          ofs_.write("\n", 1);
+        }
+
+        ofs_.write(column_names.data(), column_names.size());
+        for (auto it = ids.begin(); it != ids.end(); ++it)
+        {
+          ofs_.write("\t", 1);
+          ofs_.write(it->data(), it->size());
+        }
+
+        ofs_.write("\n\0", 2);
+      }
+
+      void write_record(const variant& r)
+      {
+        std::uint32_t l_shared = 6 * 4; // chrom through n.fmt.sample
+
+        l_shared += bcf::get_typed_value_size(r.id());
+
+        l_shared += bcf::get_typed_value_size(r.ref());
+        for (auto& a : r.alts())
+          l_shared += bcf::get_typed_value_size(a);
+
+        std::vector<std::int8_t> filter_vec(r.filters().size()); // TODO: Allow more than 255 filters.
+        for (std::size_t i = 0; i < filter_vec.size(); ++i)
+        {
+          auto it = dict_.str_to_int[dictionary::id].find(r.filters()[i]);
+          if (it == dict_.str_to_int[dictionary::id].end())
+          {
+            std::cerr << "Error: filter not valid" << std::endl;
+            ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
+          }
+          assert(it->second <= 0xFF);
+          filter_vec[i] = it->second;
+        }
+
+        l_shared += bcf::get_typed_value_size(filter_vec);
+        for (auto& i: r.info())
+        {
+          auto it = dict_.str_to_int[dictionary::contig].find(i.first);
+          if (it == dict_.str_to_int[dictionary::contig].end())
+          {
+            std::cerr << "Error: INFO key not valid" << std::endl;
+            ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
+            return;
+          }
+
+          l_shared += bcf::get_typed_value_size((std::int32_t)it->second); // TODO: Allow for variable sized INFO keys.
+          l_shared += i.second.data.size(); //(bcf::get_typed_value_size(0) + bcf::get_typed_value_size(i.second));
+        }
+
+
+        std::uint32_t l_indiv = 0;
+        for (auto& f : r.format_fields())
+        {
+          auto it = dict_.str_to_int[dictionary::id].find(f.key());
+          if (it != dict_.str_to_int[dictionary::id].end())
+          {
+            l_indiv += bcf::get_typed_value_size((std::int32_t)it->second);
+            l_indiv += f.serialized_data().size();
+          }
+        }
+
+        ofs_.write((char*)(&l_shared), sizeof(l_shared));
+        ofs_.write((char*)(&l_indiv), sizeof(l_indiv));
+
+        {
+          auto it = dict_.str_to_int[dictionary::contig].find(r.chrom());
+          if (it == dict_.str_to_int[dictionary::contig].end())
+          {
+            std::cerr << "Error: contig not valid" << std::endl;
+            ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
+            return;
+          }
+          ofs_.write((char*)(&it->second), sizeof(it->second));
+        }
+
+
+        std::uint32_t tmp_i32 = r.pos();
+        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
+        tmp_i32 = r.ref().size();
+        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
+        float qual = r.qual();
+        ofs_.write((char*)(&qual), sizeof(qual));
+
+        tmp_i32 = ((1 + r.alts().size()) << 16) | r.info().size();
+        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
+        tmp_i32 = (r.format_fields().size() << 24) | 0; // zero for n_sample in SAV
+        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
+
+
+        bcf::write_typed_str(ofs_, r.id());
+        bcf::write_typed_str(ofs_, r.ref());
+        for (auto& a: r.alts())
+          bcf::write_typed_str(ofs_, a);
+        bcf::write_typed_vec(ofs_, filter_vec);
+
+        std::int16_t i = 0;
+        float f = static_cast<float>(i);
+        i = static_cast<std::uint16_t>(f);
+
+        for (auto& i: r.info())
+        {
+          bcf::write_typed_scalar(ofs_, (std::int32_t)dict_.str_to_int[dictionary::id].find(i.first)->second); // TODO: Allow for variable sized INFO keys.
+          bcf::serialize_type_and_size(std::ostreambuf_iterator<char>(ofs_), i.second.type, i.second.length);
+          ofs_.write((char*)(i.second.data.data()), i.second.data.size());
+        }
+
+        for (auto& f : r.format_fields())
+        {
+          bcf::write_typed_scalar(ofs_, (std::int32_t)(dict_.str_to_int[dictionary::id].find(f.key())->second)); // TODO: Allow for variable sized FMT keys.
+          ofs_.write((char*)(f.serialized_data().data()), f.serialized_data().size());
+        }
+      }
     };
-
-
-    void write_header(std::ostream& os, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids)
-    {
-      std::string magic = "SAV\x02\x00";
-
-      std::uint32_t header_block_sz = 0;
-      for (auto it = headers.begin(); it != headers.end(); ++it)
-      {
-        header_block_sz += it->first.size();
-        header_block_sz += it->second.size();
-        header_block_sz += 4;
-      }
-
-      std::string column_names = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
-      header_block_sz += column_names.size();
-
-      for (auto it = ids.begin(); it != ids.end(); ++it)
-      {
-        header_block_sz += 1 + it->size();
-      }
-
-      header_block_sz += 2; //new line and null
-
-      os.write(magic.data(), magic.size());
-      os.write((char*)(&header_block_sz), sizeof(header_block_sz));
-
-      for (auto it = headers.begin(); it != headers.end(); ++it)
-      {
-        os.write("##", 2);
-        os.write(it->first.data(), it->first.size());
-        os.write("=", 1);
-        os.write(it->second.data(), it->second.size());
-        os.write("\n", 1);
-      }
-
-      os.write(column_names.data(), column_names.size());
-      for (auto it = ids.begin(); it != ids.end(); ++it)
-      {
-        os.write("\t", 1);
-        os.write(it->data(), it->size());
-      }
-
-      os.write("\n\0", 2);
-    }
-
-    void write_record(std::ostream& os, const dictionary& dict, const variant& r)
-    {
-      std::uint32_t l_shared = 6 * 4; // chrom through n.fmt.sample
-
-      l_shared += bcf::get_typed_value_size(r.id());
-
-      l_shared += bcf::get_typed_value_size(r.ref());
-      for (auto& a : r.alts())
-        l_shared += bcf::get_typed_value_size(a);
-
-      std::vector<std::int8_t> filter_vec(r.filters().size()); // TODO: Allow more than 255 filters.
-      for (std::size_t i = 0; i < filter_vec.size(); ++i)
-      {
-        auto it = dict.str_to_int[dictionary::id].find(r.filters()[i]);
-        if (it == dict.str_to_int[dictionary::id].end())
-        {
-          std::cerr << "Error: filter not valid" << std::endl;
-          os.setstate(os.rdstate() | std::ios::badbit);
-        }
-        assert(it->second <= 0xFF);
-        filter_vec[i] = it->second;
-      }
-
-      l_shared += bcf::get_typed_value_size(filter_vec);
-      for (auto& i: r.info())
-      {
-        auto it = dict.str_to_int[dictionary::contig].find(i.first);
-        if (it == dict.str_to_int[dictionary::contig].end())
-        {
-          std::cerr << "Error: INFO key not valid" << std::endl;
-          os.setstate(os.rdstate() | std::ios::badbit);
-          return;
-        }
-
-        l_shared += bcf::get_typed_value_size((std::int32_t)it->second); // TODO: Allow for variable sized INFO keys.
-        l_shared += i.second.data.size(); //(bcf::get_typed_value_size(0) + bcf::get_typed_value_size(i.second));
-      }
-
-
-      std::uint32_t l_indiv = 0;
-      for (auto& f : r.format_fields())
-      {
-        auto it = dict.str_to_int[dictionary::id].find(f.key());
-        if (it != dict.str_to_int[dictionary::id].end())
-        {
-          l_indiv += bcf::get_typed_value_size((std::int32_t)it->second);
-          l_indiv += f.serialized_data().size();
-        }
-      }
-
-      os.write((char*)(&l_shared), sizeof(l_shared));
-      os.write((char*)(&l_indiv), sizeof(l_indiv));
-
-      {
-        auto it = dict.str_to_int[dictionary::contig].find(r.chrom());
-        if (it == dict.str_to_int[dictionary::contig].end())
-        {
-          std::cerr << "Error: contig not valid" << std::endl;
-          os.setstate(os.rdstate() | std::ios::badbit);
-          return;
-        }
-        os.write((char*)(&it->second), sizeof(it->second));
-      }
-
-
-      std::uint32_t tmp_i32 = r.pos();
-      os.write((char*)(&tmp_i32), sizeof(tmp_i32));
-      tmp_i32 = r.ref().size();
-      os.write((char*)(&tmp_i32), sizeof(tmp_i32));
-      float qual = r.qual();
-      os.write((char*)(&qual), sizeof(qual));
-
-      tmp_i32 = ((1 + r.alts().size()) << 16) | r.info().size();
-      os.write((char*)(&tmp_i32), sizeof(tmp_i32));
-      tmp_i32 = (r.format_fields().size() << 24) | 0; // zero for n_sample in SAV
-      os.write((char*)(&tmp_i32), sizeof(tmp_i32));
-
-
-      bcf::write_typed_str(os, r.id());
-      bcf::write_typed_str(os, r.ref());
-      for (auto& a: r.alts())
-        bcf::write_typed_str(os, a);
-      bcf::write_typed_vec(os, filter_vec);
-
-      for (auto& i: r.info())
-      {
-        bcf::write_typed_scalar(os, (std::int32_t)dict.str_to_int[dictionary::id].find(i.first)->second); // TODO: Allow for variable sized INFO keys.
-        bcf::write_type_and_size(os, i.second.type, i.second.length);
-        os.write((char*)(i.second.data.data()), i.second.data.size());
-      }
-
-      for (auto& f : r.format_fields())
-      {
-        bcf::write_typed_scalar(os, (std::int32_t)(dict.str_to_int[dictionary::id].find(f.key())->second)); // TODO: Allow for variable sized INFO keys.
-        os.write((char*)(f.serialized_data().data()), f.serialized_data().size());
-      }
-    }
   }
 }
 
