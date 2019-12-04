@@ -513,6 +513,7 @@ namespace savvy
           return typed_value::real;
         if (std::is_same<T, double>::value)
           return typed_value::real64;
+        return 0;
       }
     };
 
@@ -527,13 +528,17 @@ namespace savvy
     };
 
     template <typename DestT, typename InT, typename OutT>
-    void compress_sparse_offsets(InT in, InT in_end, OutT out)
+    void compress_sparse_offsets(InT in, InT in_end, OutT out, std::size_t stride)
     {
       std::size_t last_off = 0;
+      //char* char_p = (char*)out;
       for (auto it = in; it != in_end; ++it)
       {
         DestT off((*it) - last_off);
         *(out++) = off;
+        //*out = off;
+        //char_p += stride;
+        //out = (OutT)char_p;
         last_off = (*it) + 1;
       }
     }
@@ -680,54 +685,129 @@ namespace savvy
         dest.clear();
         dest.reserve(1 + 8);
 
-        std::uint8_t type_byte = typed_value::sparse;
-        if (geno.size() >= 15u)
-          type_byte = (15u << 4u) | type_byte;
-        else
-          type_byte = (geno.size() << 4u) | type_byte;
-        dest.emplace_back(type_byte);
 
-        if (geno.size() >= 15u)
-        {
-          bcf::serialize_typed_scalar(std::back_inserter(dest), (std::int32_t)geno.size());
-        }
-
-
-        std::uint8_t off_type = bcf::int_type((std::int64_t)geno.size()); // (std::int64_t)offset_max);
+        //std::uint8_t off_type = bcf::int_type(geno.size() ? (std::int64_t)geno.size() - 1 : 0);
+        std::uint8_t off_type = bcf::int_type((std::int64_t)offset_max);
         std::uint8_t val_type = sav2::typed_value::type_code<T>();
 
-        dest.emplace_back((off_type << 4u) | val_type);
-        bcf::serialize_typed_scalar(std::back_inserter(dest), (std::int32_t)geno.non_zero_size());
+        int off_size = 1u << bcf_type_shift[off_type];
+        int val_size = 1u << bcf_type_shift[val_type];
+        int pair_size = off_size + val_size;
 
-        int pair_size = 1 << bcf_type_shift[off_type];
-        pair_size += 1 << bcf_type_shift[val_type];
-        std::size_t data_pos = dest.size();
-        dest.resize(data_pos + (geno.non_zero_size() * pair_size));
+        if (val_size * geno.size() < pair_size * geno.non_zero_size())
+        {
+          std::uint8_t type_byte = val_size;
+          if (geno.size() >= 15u)
+            type_byte = (15u << 4u) | type_byte;
+          else
+            type_byte = (geno.size() << 4u) | type_byte;
+          dest.emplace_back(type_byte);
 
+          if (geno.size() >= 15u)
+          {
+            bcf::serialize_typed_scalar(std::back_inserter(dest), (std::int32_t)geno.size());
+          }
 
-        if (off_type == 1)
-          compress_sparse_offsets<std::int8_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int8_t*) (dest.data() + data_pos));
-        else if (off_type == 2)
-          compress_sparse_offsets<std::int16_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int16_t*) (dest.data() + data_pos));
-        else if (off_type == 3)
-          compress_sparse_offsets<std::int32_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int32_t*) (dest.data() + data_pos));
-        else if (off_type == 4)
-          compress_sparse_offsets<std::int64_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int64_t*) (dest.data() + data_pos));
-
-        if (val_type == 1)
-          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int8_t*)(dest.data() + data_pos));
-        else if (val_type == 2)
-          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int16_t*)(dest.data() + data_pos));
-        else if (val_type == 3)
-          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int32_t*)(dest.data() + data_pos));
-        else if (val_type == 4)
-          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int64_t*)(dest.data() + data_pos));
-        else if (val_type == 5)
-          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (float*)(dest.data() + data_pos));
-        else if (val_type == 6)
-          std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (double*)(dest.data() + data_pos));
+          std::size_t data_pos = dest.size();
+          dest.resize(data_pos + (geno.size() * val_size));
+          if (val_type == 1)
+          {
+            auto out = (std::int8_t*)(dest.data() + data_pos);
+            for (auto it = geno.begin(); it != geno.end(); ++it)
+            {
+              out[it.offset()] = *it;
+            }
+          }
+          else if (val_type == 2)
+          {
+            auto out = (std::int16_t*)(dest.data() + data_pos);
+            for (auto it = geno.begin(); it != geno.end(); ++it)
+            {
+              out[it.offset()] = *it;
+            }
+          }
+          else if (val_type == 3)
+          {
+            auto out = (std::int32_t*)(dest.data() + data_pos);
+            for (auto it = geno.begin(); it != geno.end(); ++it)
+            {
+              out[it.offset()] = *it;
+            }
+          }
+          else if (val_type == 4)
+          {
+            auto out = (std::int64_t*)(dest.data() + data_pos);
+            for (auto it = geno.begin(); it != geno.end(); ++it)
+            {
+              out[it.offset()] = *it;
+            }
+          }
+          else if (val_type == 5)
+          {
+            auto out = (float*)(dest.data() + data_pos);
+            for (auto it = geno.begin(); it != geno.end(); ++it)
+            {
+              out[it.offset()] = *it;
+            }
+          }
+//          else if (val_type == 6)
+//          {
+//            auto out = (double*)(dest.data() + data_pos);
+//            for (auto it = geno.begin(); it != geno.end(); ++it)
+//            {
+//              out[it.offset()] = *it;
+//            }
+//          }
+          else
+            throw std::runtime_error("Unsupported FORMAT type!");
+        }
         else
-          throw std::runtime_error("Unsupported FORMAT type!");
+        {
+          std::uint8_t type_byte = typed_value::sparse;
+          if (geno.size() >= 15u)
+            type_byte = (15u << 4u) | type_byte;
+          else
+            type_byte = (geno.size() << 4u) | type_byte;
+          dest.emplace_back(type_byte);
+
+          if (geno.size() >= 15u)
+          {
+            bcf::serialize_typed_scalar(std::back_inserter(dest), (std::int32_t)geno.size());
+          }
+
+          dest.emplace_back((off_type << 4u) | val_type);
+          bcf::serialize_typed_scalar(std::back_inserter(dest), (std::int32_t)geno.non_zero_size());
+
+          std::size_t data_pos = dest.size();
+          dest.resize(data_pos + (geno.non_zero_size() * pair_size));
+
+
+          if (off_type == 1)
+            compress_sparse_offsets<std::int8_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int8_t*) (dest.data() + data_pos), pair_size);
+          else if (off_type == 2)
+            compress_sparse_offsets<std::int16_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int16_t*) (dest.data() + data_pos), pair_size);
+          else if (off_type == 3)
+            compress_sparse_offsets<std::int32_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int32_t*) (dest.data() + data_pos), pair_size);
+          else if (off_type == 4)
+            compress_sparse_offsets<std::int64_t>(geno.index_data(), geno.index_data() + geno.non_zero_size(), (std::int64_t*) (dest.data() + data_pos), pair_size);
+
+          data_pos += off_size * geno.non_zero_size();
+
+          if (val_type == 1)
+            std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int8_t*)(dest.data() + data_pos));
+          else if (val_type == 2)
+            std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int16_t*)(dest.data() + data_pos));
+          else if (val_type == 3)
+            std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int32_t*)(dest.data() + data_pos));
+          else if (val_type == 4)
+            std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (std::int64_t*)(dest.data() + data_pos));
+          else if (val_type == 5)
+            std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (float*)(dest.data() + data_pos));
+//          else if (val_type == 6)
+//            std::copy(geno.value_data(), geno.value_data() + geno.non_zero_size(), (double*)(dest.data() + data_pos));
+          else
+            throw std::runtime_error("Unsupported FORMAT type!");
+        }
       }
     };
 
