@@ -16,7 +16,7 @@ namespace savvy
     template<typename T>
     typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, std::uint8_t>::type
     int_type(T val)
-    {
+    { // TODO: Handle missing values
       if (val <= std::numeric_limits<std::int8_t>::max() && val >= std::numeric_limits<std::int8_t>::min())
         return 0x01;
       else if (val <= std::numeric_limits<std::int16_t>::max() && val >= std::numeric_limits<std::int16_t>::min())
@@ -25,6 +25,140 @@ namespace savvy
         return 0x03;
       else
         return 0x04;
+    }
+
+    template <typename Iter, typename IntT>
+    Iter deserialize_int(Iter it, Iter end, IntT& dest)
+    {
+      if (it != end)
+      {
+        std::uint8_t type_byte = *(it++);
+        std::size_t int_width = 1u << bcf_type_shift[type_byte & 0x0Fu];
+        if (end - it >= int_width)
+        {
+          switch (int_width)
+          {
+          case 1u:
+            {
+              dest = IntT(*(it++));
+              return it;
+            }
+          case 2u:
+            {
+              std::int16_t tmp;
+              char *tmp_p = (char *)&tmp;
+              *(tmp_p) = *(it++);
+              *(tmp_p + 1) = *(it++);
+              dest = tmp;
+              return it;
+            }
+          case 4u:
+            {
+              std::int32_t tmp;
+              char *tmp_p = (char *)&tmp;
+              *(tmp_p) = *(it++);
+              *(tmp_p + 1) = *(it++);
+              *(tmp_p + 2) = *(it++);
+              *(tmp_p + 3) = *(it++);
+              dest = tmp;
+              return it;
+            }
+          case 8u:
+            {
+              std::int64_t tmp;
+              char *tmp_p = (char *)&tmp;
+              *(tmp_p) = *(it++);
+              *(tmp_p + 1) = *(it++);
+              *(tmp_p + 2) = *(it++);
+              *(tmp_p + 3) = *(it++);
+              *(tmp_p + 4) = *(it++);
+              *(tmp_p + 5) = *(it++);
+              *(tmp_p + 6) = *(it++);
+              *(tmp_p + 7) = *(it++);
+              dest = tmp;
+              return it;
+            }
+          }
+        }
+      }
+      throw std::runtime_error("Not a BCF integer");
+    }
+
+//    template <typename Iter>
+//    Iter deserialize_string(Iter it, Iter end, std::string& dest)
+//    {
+//      if (it == end) return end;
+//
+//      std::uint8_t type_byte = *(it++);
+//      if (it == end || (type_byte & 0x0Fu) != 0x07u)
+//        throw std::runtime_error("Not a BCF string");
+//
+//      std::int32_t sz = (type_byte >> 4u);
+//      if (sz == 15)
+//        it = deserialize_int(it, end, sz);
+//
+//      if (end - it < sz)
+//        throw std::runtime_error("Invalid byte sequence");
+//
+//      dest.resize(sz);
+//      std::copy_n(it, sz, dest.begin());
+//      return it + sz;
+//    }
+
+    template <typename Iter, typename VecT>
+    typename std::enable_if<std::is_same<typename std::iterator_traits<Iter>::value_type, char>::value, Iter>::type
+    deserialize_vec(Iter it, Iter end, VecT& dest)
+    {
+      if (it == end)
+        throw std::runtime_error("Invalid byte sequence");
+
+      std::uint8_t type_byte = *(it++);
+
+      std::int32_t sz = (type_byte >> 4u);
+      if (sz == 15)
+        it = deserialize_int(it, end, sz);
+
+      std::size_t type_width = 1u << bcf_type_shift[0x0Fu & type_byte];
+
+      if (end - it < sz * type_width)
+        throw std::runtime_error("Invalid byte sequence");
+
+      dest.resize(sz);
+      char* char_p = &(*it);
+      switch (0x0Fu & type_byte)
+      {
+      case 0x01u:
+      {
+        auto p = (std::int8_t *)char_p;
+        std::copy_n(p, sz, dest.begin());
+      }
+      case 0x02u:
+      {
+        auto p = (std::int16_t *)char_p;
+        std::copy_n(p, sz, dest.begin()); // TODO: use transform to switch endian when needed
+      }
+      case 0x03u:
+      {
+        auto p = (std::int32_t *)char_p;
+        std::copy_n(p, sz, dest.begin());
+      }
+      case 0x04u:
+      {
+        auto p = (std::int64_t *)char_p;
+        std::copy_n(p, sz, dest.begin());
+      }
+      case 0x05u:
+      {
+        auto p = (float *)char_p;
+        std::copy_n(p, sz, dest.begin());
+      }
+      case 0x07u:
+      {
+        std::copy_n(char_p, sz, dest.begin());
+      }
+      }
+
+      return it + (sz * type_width);
     }
 
     template <typename OutT, typename T>
@@ -483,8 +617,9 @@ namespace savvy
 
   namespace sav2
   {
-    struct typed_value
+    class typed_value
     {
+    public:
       static const std::uint8_t int8   = 1;
       static const std::uint8_t int16  = 2;
       static const std::uint8_t int32  = 3;
@@ -493,10 +628,6 @@ namespace savvy
       static const std::uint8_t real64 = 6;
       static const std::uint8_t str    = 7;
       static const std::uint8_t sparse = 8;
-
-      std::uint8_t type;
-      std::size_t length;
-      std::vector<std::uint8_t> data;
 
       template <typename T>
       static std::uint8_t type_code()
@@ -515,6 +646,187 @@ namespace savvy
           return typed_value::real64;
         return 0;
       }
+
+      template <typename T>
+      static std::uint8_t type_code(const T& val)
+      {
+        std::uint8_t type = type_code<T>();
+        if (type >= typed_value::int16 && type <= typed_value::int64)
+        {
+          if (val <= std::numeric_limits<std::int8_t>::max() && val > std::numeric_limits<std::int8_t>::min())
+            type = typed_value::int8;
+          else if (val <= std::numeric_limits<std::int16_t>::max() && val > std::numeric_limits<std::int16_t>::min())
+            return typed_value::int16;
+          else if (val <= std::numeric_limits<std::int32_t>::max() && val > std::numeric_limits<std::int32_t>::min())
+            return typed_value::int32;
+          else
+            return typed_value::int64;
+        }
+        return type;
+      }
+
+      enum class get_status : std::uint8_t
+      {
+        ok = 0,
+        does_not_fit,
+        not_a_scalar,
+        not_a_vector
+      };
+    public:
+      typed_value()
+      {
+      }
+
+      template<typename T>
+      typed_value(const T& v)
+      {
+        init(v);
+      }
+
+      typed_value(std::uint8_t type, std::size_t sz, char* data_ptr) :
+        val_type_(type),
+        size_(sz),
+        val_ptr_(data_ptr)
+      {
+      }
+
+      typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char* data_ptr) :
+        val_type_(val_type),
+        off_type_(off_type),
+        size_(sz),
+        sparse_size_(sp_sz),
+        val_ptr_(data_ptr + sp_sz * (1u << bcf_type_shift[off_type])),
+        off_ptr_(data_ptr)
+      {
+      }
+    private:
+      template<typename T>
+      typename std::enable_if<std::is_signed<T>::value, void>::type
+      init(const T& v)
+      {
+        val_type_ = type_code<T>();
+        size_ = 1;
+        std::size_t width = 1 << bcf_type_shift[val_type_];
+        // TODO: handle endianess
+        local_data_.resize(width);
+        std::memcpy(local_data_.data(), &v, width);
+        val_ptr_ = local_data_.data();
+      }
+
+      template<typename T>
+      typename std::enable_if<std::is_signed<typename T::value_type>::value && !std::is_same<T, std::string>::value, void>::type
+      init(const T& vec)
+      {
+        typedef typename T::value_type vtype;
+        if (std::is_integral<vtype>::value)
+        {
+          vtype min_val = 0;
+          vtype max_val = 0;
+          for (auto it = vec.begin(); it != vec.end(); ++it)
+          {
+            if (*it > max_val)
+              max_val = *it;
+            if (*it < min_val)
+              min_val = *it;
+          }
+
+          val_type_ = type_code(std::max(max_val, -min_val));
+        }
+        else
+        {
+          val_type_ = type_code<vtype>();
+        }
+
+        size_ = vec.size();
+        std::size_t width = 1 << bcf_type_shift[val_type_];
+
+        local_data_.resize(width * size_);
+        val_ptr_ = local_data_.data();
+
+        switch (val_type_)
+        {
+        case 0x01u:
+          std::copy_n(vec.begin(), size_, (std::int8_t*)val_ptr_);
+          break;
+        case 0x02u:
+          std::copy_n(vec.begin(), size_, (std::int16_t*)val_ptr_); // TODO: handle endianess
+          break;
+        case 0x03u:
+          std::copy_n(vec.begin(), size_, (std::int32_t*)val_ptr_);
+          break;
+        case 0x04u:
+          std::copy_n(vec.begin(), size_, (std::int64_t*)val_ptr_);
+          break;
+        case 0x05u:
+          std::copy_n(vec.begin(), size_, (float*)val_ptr_);
+          break;
+        }
+      }
+
+      template<typename T>
+      typename std::enable_if<std::is_same<T, std::string>::value, void>::type
+      init(const T& vec)
+      {
+        val_type_ = typed_value::str;
+
+        size_ = vec.size();
+
+        local_data_.resize(size_);
+        val_ptr_ = local_data_.data();
+        std::copy_n(vec.begin(), size_, local_data_.begin());
+      }
+    private:
+      std::uint8_t val_type_ = 0;
+      std::uint8_t off_type_ = 0;
+      std::size_t size_ = 0;
+      std::size_t sparse_size_ = 0;
+      char* val_ptr_ = nullptr;
+      char* off_ptr_ = nullptr;
+      std::vector<char> local_data_;
+    };
+
+    class typed_value_old
+    {
+    public:
+      static const std::uint8_t int8   = 1;
+      static const std::uint8_t int16  = 2;
+      static const std::uint8_t int32  = 3;
+      static const std::uint8_t int64  = 4;
+      static const std::uint8_t real   = 5;
+      static const std::uint8_t real64 = 6;
+      static const std::uint8_t str    = 7;
+      static const std::uint8_t sparse = 8;
+
+      enum class get_status : std::uint8_t
+      {
+        ok = 0,
+        does_not_fit,
+        not_a_scalar,
+        not_a_vector
+      };
+
+      template <typename T>
+      static std::uint8_t type_code()
+      {
+        if (std::is_same<T, std::int8_t>::value)
+          return typed_value_old::int8;
+        if (std::is_same<T, std::int16_t>::value)
+          return typed_value_old::int16;
+        if (std::is_same<T, std::int32_t>::value)
+          return typed_value_old::int32;
+        if (std::is_same<T, std::int64_t>::value)
+          return typed_value_old::int64;
+        if (std::is_same<T, float>::value)
+          return typed_value_old::real;
+        if (std::is_same<T, double>::value)
+          return typed_value_old::real64;
+        return 0;
+      }
+
+    public:
+      std::uint8_t type;
+      std::size_t length;
+      std::vector<std::uint8_t> data;
     };
 
     class dictionary
@@ -548,21 +860,26 @@ namespace savvy
     private:
       std::string chrom_;
       std::string id_;
-      std::int32_t pos_;
-      float qual_;
+      std::uint32_t pos_ = (std::uint32_t)-1;
+      float qual_ = 0.f;
       std::string ref_;
       std::vector<std::string> alts_;
       std::vector<std::string> filters_;
       std::vector<std::pair<std::string, typed_value>> info_;
+      std::vector<std::pair<std::string, typed_value_old>> info_old_;
+      std::vector<char> shared_data_;
+    protected:
+      std::size_t n_fmt_ = 0;
     public:
+      site_info() {}
       site_info(std::string chrom,
         std::string id,
-        std::int32_t pos,
+        std::uint32_t pos,
         float qual,
         std::string ref,
         std::vector<std::string> alts,
         std::vector<std::string> filters,
-        std::vector<std::pair<std::string, typed_value>> info)
+        std::vector<std::pair<std::string, typed_value_old>> info)
         :
         chrom_(std::move(chrom)),
         id_(std::move(id)),
@@ -571,24 +888,237 @@ namespace savvy
         ref_(std::move(ref)),
         alts_(std::move(alts)),
         filters_(std::move(filters)),
-        info_(std::move(info))
+        info_old_(std::move(info))
       {
 
       }
 
       const std::string& chrom() const { return chrom_; }
       const std::string& id() const { return id_; }
-      std::int32_t pos() const { return pos_; }
+      std::uint32_t pos() const { return pos_ + 1u; }
       float qual() const { return qual_; }
       const std::string& ref() const { return ref_; }
       const std::vector<std::string>& alts() const { return alts_; }
       const std::vector<std::string>& filters() const { return filters_; }
-      const std::vector<std::pair<std::string, typed_value>>& info() const { return info_; }
+      const std::vector<std::pair<std::string, typed_value_old>>& info() const { return info_old_; }
+
+      class internal
+      {
+      public:
+        static bool read(site_info& s, std::istream& ifs, const dictionary& dict, std::uint32_t shared_sz)
+        {
+          union u
+          {
+            std::int32_t i;
+            float f;
+          };
+
+          std::array<u, 6> buf; // chrom through n.fmt.sample
+
+          if (ifs.read((char*)buf.data(), buf.size() * 4))
+          {
+            std::int32_t tmp_int = buf[0].i;
+
+            if (dict.int_to_str[dictionary::contig].size() <= tmp_int)
+            {
+              std::fprintf(stderr, "Error: Invalid contig id");
+              return false;
+            }
+            s.chrom_ = dict.int_to_str[dictionary::contig][tmp_int];
+
+            s.pos_ = static_cast<std::uint32_t>(buf[1].i);
+            // skip rlen
+            s.qual_ = buf[3].f;
+
+            std::uint32_t tmp_uint = static_cast<std::uint32_t>(buf[4].i);
+            std::size_t n_allele = tmp_uint >> 16u;
+            std::size_t n_info = 0xFFFFu & tmp_uint;
+
+            tmp_uint = static_cast<std::uint32_t>(buf[5].i);
+            s.n_fmt_ = tmp_uint >> 24u;
+            //std::size_t n_sample = 0xFFFFFFu & tmp_uint;
+
+            s.shared_data_.resize(shared_sz - 6 * 4);
+            ifs.read(s.shared_data_.data(), s.shared_data_.size());
+
+            auto shared_it = s.shared_data_.begin();
+
+            try
+            {
+              // Parse ID
+              shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), s.id_);
+
+              // Parse REF/ALT
+              if (n_allele)
+              {
+                shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), s.ref_);
+                s.alts_.resize(n_allele - 1);
+                for (auto it = s.alts_.begin(); it != s.alts_.end(); ++it)
+                {
+                  shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), *it);
+                }
+              }
+
+              // Parse FILTER
+              std::vector<std::int32_t> filter_ints;
+              shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), filter_ints);
+              s.filters_.clear();
+              s.filters_.reserve(filter_ints.size());
+              for (auto it = filter_ints.begin(); it != filter_ints.end(); ++it)
+              {
+                if (dict.int_to_str[dictionary::id].size() <= *it)
+                {
+                  std::fprintf(stderr, "Error: Invalid filter id");
+                  return false;
+                }
+                s.filters_.emplace_back(dict.int_to_str[dictionary::id][*it]);
+              }
+
+              // Parse INFO
+              s.info_.resize(n_info);
+              auto info_it = s.info_.begin();
+              for ( ; info_it != s.info_.end(); ++info_it)
+              {
+                std::int32_t info_key_id;
+                shared_it = bcf::deserialize_int(shared_it, s.shared_data_.end(), info_key_id);
+                if (dict.int_to_str[dictionary::id].size() <= info_key_id)
+                {
+                  std::fprintf(stderr, "Error: Invalid info id");
+                  return false;
+                }
+                std::string info_key = dict.int_to_str[dictionary::id][info_key_id];
+
+                if (shared_it == s.shared_data_.end())
+                  break;
+
+                // ------------------------------------------- //
+                // TODO: potentially move this to static method since it's similar to FMT parsing
+                std::uint8_t type_byte = *(shared_it++);
+                std::size_t type_width = 1u << bcf_type_shift[type_byte & 0x0Fu];
+                std::size_t sz = type_byte >> 4u;
+                if (sz == 15u)
+                  shared_it = bcf::deserialize_int(shared_it, s.shared_data_.end(), sz);
+
+                if (s.shared_data_.end() - shared_it < (sz * type_width))
+                  break;
+
+                *info_it = std::make_pair(std::move(info_key), typed_value(type_byte & 0x0Fu, sz, sz * type_width ? &(*shared_it) : nullptr));
+                shared_it += sz * type_width;
+                // ------------------------------------------- //
+
+              }
+
+              if (info_it == s.info_.end())
+                return true;
+            }
+            catch (const std::exception& e)
+            {
+              std::fprintf(stderr, "Error: Invalid record data");
+              return false;
+            }
+          }
+
+          std::fprintf(stderr, "Error: Invalid record data");
+          return false;
+        }
+      };
     };
 
     class variant : public site_info
     {
     public:
+      class internal
+      {
+      public:
+        static bool read(variant& v, std::istream& ifs, const dictionary& dict /*, std::size_t sample_size, file_format file_fmt*/)
+        {
+          std::uint32_t shared_sz, indiv_sz;
+          ifs.read((char*)&shared_sz, sizeof(shared_sz)); // TODO: endian
+          ifs.read((char*)&indiv_sz, sizeof(indiv_sz));
+
+          if (ifs && site_info::internal::read(v, ifs, dict, shared_sz))
+          {
+            v.indiv_buf_.resize(indiv_sz);
+            if (ifs.read(v.indiv_buf_.data(), v.indiv_buf_.size()))
+            {
+              auto indiv_it = v.indiv_buf_.begin();
+              v.format_fields_.resize(v.n_fmt_);
+
+              auto fmt_it = v.format_fields_.begin();
+              for (; fmt_it != v.format_fields_.end(); ++fmt_it)
+              {
+                try
+                {
+                  std::int32_t fmt_key_id;
+                  indiv_it = bcf::deserialize_int(indiv_it, v.indiv_buf_.end(), fmt_key_id);
+                  if (dict.int_to_str[dictionary::id].size() <= fmt_key_id)
+                  {
+                    std::fprintf(stderr, "Error: Invalid FMT id");
+                    return false;
+                  }
+                  std::string fmt_key = dict.int_to_str[dictionary::id][fmt_key_id];
+
+                  if (indiv_it == v.indiv_buf_.end())
+                    break;
+
+                  // ------------------------------------------- //
+                  // TODO: potentially move this to static method since it's similar to INFO parsing.
+                  std::uint8_t type_byte = *(indiv_it++);
+                  std::uint8_t type = 0x0Fu & type_byte;
+
+                  std::size_t sz = type_byte >> 4u; // TODO: support BCF vector size.
+                  if (sz == 15u)
+                    indiv_it = bcf::deserialize_int(indiv_it, v.indiv_buf_.end(), sz);
+
+                  if (type == typed_value::sparse)
+                  {
+                    if (indiv_it == v.indiv_buf_.end())
+                      break;
+
+                    std::uint8_t sp_type_byte = *(indiv_it++);
+                    std::uint8_t off_type = sp_type_byte >> 4u;
+                    std::uint8_t val_type = sp_type_byte & 0x0Fu;
+                    std::size_t sp_sz;
+                    bcf::deserialize_int(indiv_it, v.indiv_buf_.end(), sp_sz);
+                    std::size_t pair_width = 1u << bcf_type_shift[off_type];
+                    pair_width += 1u << bcf_type_shift[val_type];
+
+                    if (v.indiv_buf_.end() - indiv_it < (sp_sz * pair_width))
+                      break;
+
+                    *fmt_it = std::make_pair(std::move(fmt_key), typed_value(val_type, sz, off_type, sp_sz, sp_sz * pair_width ? &(*indiv_it) : nullptr));
+                    indiv_it += sp_sz * pair_width;
+                  }
+                  else
+                  {
+
+                    std::size_t type_width = 1u << bcf_type_shift[type];
+
+                    if (v.indiv_buf_.end() - indiv_it < (sz * type_width))
+                      break;
+
+                    *fmt_it = std::make_pair(std::move(fmt_key), typed_value(type, sz, sz * type_width ? &(*indiv_it) : nullptr));
+                    indiv_it += sz * type_byte;
+                    // ------------------------------------------- //
+                  }
+                }
+                catch (const std::exception& e)
+                {
+                  std::fprintf(stderr, "Error: Invalid record data");
+                  return false;
+                }
+              }
+
+              if (fmt_it == v.format_fields_.end())
+                return true;
+            }
+          }
+
+          std::fprintf(stderr, "Error: Invalid record data");
+          return false;
+        }
+      };
+
       class individual_data
       {
       public:
@@ -621,6 +1151,8 @@ namespace savvy
       };
     private:
       std::vector<individual_data> indiv_data_;
+      std::vector<std::pair<std::string, typed_value>> format_fields_;
+      std::vector<char> indiv_buf_;
     public:
       using site_info::site_info;
       const std::vector<individual_data>& format_fields() const { return indiv_data_; }
@@ -688,7 +1220,7 @@ namespace savvy
 
         //std::uint8_t off_type = bcf::int_type(geno.size() ? (std::int64_t)geno.size() - 1 : 0);
         std::uint8_t off_type = bcf::int_type((std::int64_t)offset_max);
-        std::uint8_t val_type = sav2::typed_value::type_code<T>();
+        std::uint8_t val_type = sav2::typed_value_old::type_code<T>();
 
         int off_size = 1u << bcf_type_shift[off_type];
         int val_size = 1u << bcf_type_shift[val_type];
@@ -763,7 +1295,7 @@ namespace savvy
         }
         else
         {
-          std::uint8_t type_byte = typed_value::sparse;
+          std::uint8_t type_byte = typed_value_old::sparse;
           if (geno.size() >= 15u)
             type_byte = (15u << 4u) | type_byte;
           else
@@ -827,6 +1359,112 @@ namespace savvy
 //      std::vector<std::string> filters;
 //      std::vector<std::pair<std::string, typed_value>> info;
 //    };
+
+    class reader
+    {
+    private:
+      std::ifstream ifs_;
+      std::vector<std::pair<std::string, std::string>> headers_;
+      std::vector<std::string> ids_;
+      dictionary dict_;
+    public:
+      reader(const std::string& file_path) :
+        ifs_(file_path, std::ios::binary)
+      {
+        if (!read_header(ifs_, headers_, ids_, dict_))
+          ifs_.setstate(ifs_.rdstate() | std::ios::badbit);
+      }
+
+      reader& read_record(variant& r)
+      {
+        variant::internal::read(r, ifs_, dict_);
+
+        return *this;
+      }
+    private:
+      static bool read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict)
+      {
+        std::string magic(5, '\0');
+        ifs.read(&magic[0], magic.size());
+
+        std::uint32_t header_block_sz;
+        ifs.read((char*)&header_block_sz, sizeof(header_block_sz));
+
+        std::int64_t bytes_read = 0;
+        std::string hdr_line;
+        while (std::getline(ifs, hdr_line))
+        {
+          bytes_read += hdr_line.size() + 1;
+          if (hdr_line.size() > 1 && hdr_line[1] == 'C')
+          {
+            std::size_t tab_pos = 0;
+            std::size_t last_pos = tab_pos;
+
+            std::int64_t tab_cnt = std::count(hdr_line.begin(), hdr_line.end(), '\t');
+            std::size_t sample_size = tab_cnt - 8;
+            ids.reserve(sample_size);
+
+            while ((tab_pos = hdr_line.find('\t', tab_pos)) != std::string::npos)
+            {
+              if (tab_cnt < sample_size)
+              {
+                ids.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos));
+              }
+              last_pos = ++tab_pos;
+              --tab_cnt;
+            }
+
+            assert(tab_cnt == 0);
+
+            ids.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos));
+
+            assert(ids.size() == sample_size);
+
+            if (header_block_sz - bytes_read < 0)
+              break;
+
+            std::array<char, 64> discard;
+            while (header_block_sz - bytes_read)
+            {
+              ifs.read(discard.data(), std::min(std::size_t(header_block_sz - bytes_read), discard.size()));
+              bytes_read += ifs.gcount();
+            }
+
+            return true;
+          }
+
+          if (hdr_line.size() < 2)
+          {
+            break;
+          }
+
+          if (hdr_line[1] == '#')
+          {
+            auto equal_it = std::find(hdr_line.begin(), hdr_line.end(), '=');
+            std::string key(hdr_line.begin() + 2, equal_it);
+            if (equal_it == hdr_line.end())
+            {
+              break;
+            }
+            std::string val(equal_it + 1, hdr_line.end());
+
+            std::string hid = parse_header_sub_field(val, "ID");
+            if (!hid.empty())
+            {
+              int which_dict = key == "contig" ? dictionary::contig : dictionary::id;
+
+              dict.int_to_str[which_dict].emplace_back(hid);
+              dict.str_to_int[which_dict][hid] = dict.int_to_str[which_dict].size() - 1;
+            }
+
+            headers.emplace_back(std::move(key), std::move(val));
+          }
+        }
+
+        std::fprintf(stderr, "Error: corrupt header");
+        return false;
+      }
+    };
 
 
     class writer
