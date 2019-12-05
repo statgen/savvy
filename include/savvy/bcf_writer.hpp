@@ -869,7 +869,7 @@ namespace savvy
       std::vector<std::pair<std::string, typed_value_old>> info_old_;
       std::vector<char> shared_data_;
     protected:
-      std::size_t n_fmt_ = 0;
+      std::uint32_t n_fmt_ = 0;
     public:
       site_info() {}
       site_info(std::string chrom,
@@ -1017,6 +1017,122 @@ namespace savvy
               return false;
             }
           }
+
+          std::fprintf(stderr, "Error: Invalid record data");
+          return false;
+        }
+
+        template <typename Itr>
+        static bool write(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample)
+        {
+          union u
+          {
+            std::int32_t i;
+            float f;
+          };
+
+          std::array<u, 6> buf; // chrom through n.fmt.sample
+          auto res = dict.str_to_int[dictionary::contig].find(s.chrom_);
+          if (res == dict.str_to_int[dictionary::contig].end())
+          {
+            std::fprintf(stderr, "Error: Contig not in header");
+            return false;
+          }
+
+          buf[0].i = static_cast<std::int32_t>(res->second);
+          buf[1].i = static_cast<std::int32_t>(s.pos_);
+          buf[2].i = static_cast<std::int32_t>(s.chrom_.size());
+          buf[3].f = s.qual_;
+
+          std::uint32_t tmp_uint = (std::uint32_t(s.alts_.size() + 1) << 16u) | (0xFFFFu & std::uint32_t(s.info_.size()));
+          buf[4].i = static_cast<std::int32_t>(tmp_uint);
+
+          tmp_uint = (s.n_fmt_ << 24u) | (0xFFFFFFu & n_sample);
+          buf[5].i = static_cast<std::int32_t>(tmp_uint);
+
+          std::copy_n((char*)buf.data(), buf.size() * sizeof(u), out_it);
+
+//
+//
+//            s.shared_data_.resize(shared_sz - 6 * 4);
+//            ifs.read(s.shared_data_.data(), s.shared_data_.size());
+//
+//            auto shared_it = s.shared_data_.begin();
+//
+//            try
+//            {
+//              // Parse ID
+//              shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), s.id_);
+//
+//              // Parse REF/ALT
+//              if (n_allele)
+//              {
+//                shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), s.ref_);
+//                s.alts_.resize(n_allele - 1);
+//                for (auto it = s.alts_.begin(); it != s.alts_.end(); ++it)
+//                {
+//                  shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), *it);
+//                }
+//              }
+//
+//              // Parse FILTER
+//              std::vector<std::int32_t> filter_ints;
+//              shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), filter_ints);
+//              s.filters_.clear();
+//              s.filters_.reserve(filter_ints.size());
+//              for (auto it = filter_ints.begin(); it != filter_ints.end(); ++it)
+//              {
+//                if (dict.int_to_str[dictionary::id].size() <= *it)
+//                {
+//                  std::fprintf(stderr, "Error: Invalid filter id");
+//                  return false;
+//                }
+//                s.filters_.emplace_back(dict.int_to_str[dictionary::id][*it]);
+//              }
+//
+//              // Parse INFO
+//              s.info_.resize(n_info);
+//              auto info_it = s.info_.begin();
+//              for ( ; info_it != s.info_.end(); ++info_it)
+//              {
+//                std::int32_t info_key_id;
+//                shared_it = bcf::deserialize_int(shared_it, s.shared_data_.end(), info_key_id);
+//                if (dict.int_to_str[dictionary::id].size() <= info_key_id)
+//                {
+//                  std::fprintf(stderr, "Error: Invalid info id");
+//                  return false;
+//                }
+//                std::string info_key = dict.int_to_str[dictionary::id][info_key_id];
+//
+//                if (shared_it == s.shared_data_.end())
+//                  break;
+//
+//                // ------------------------------------------- //
+//                // TODO: potentially move this to static method since it's similar to FMT parsing
+//                std::uint8_t type_byte = *(shared_it++);
+//                std::size_t type_width = 1u << bcf_type_shift[type_byte & 0x0Fu];
+//                std::size_t sz = type_byte >> 4u;
+//                if (sz == 15u)
+//                  shared_it = bcf::deserialize_int(shared_it, s.shared_data_.end(), sz);
+//
+//                if (s.shared_data_.end() - shared_it < (sz * type_width))
+//                  break;
+//
+//                *info_it = std::make_pair(std::move(info_key), typed_value(type_byte & 0x0Fu, sz, sz * type_width ? &(*shared_it) : nullptr));
+//                shared_it += sz * type_width;
+//                // ------------------------------------------- //
+//
+//              }
+//
+//              if (info_it == s.info_.end())
+//                return true;
+//            }
+//            catch (const std::exception& e)
+//            {
+//              std::fprintf(stderr, "Error: Invalid record data");
+//              return false;
+//            }
+
 
           std::fprintf(stderr, "Error: Invalid record data");
           return false;
