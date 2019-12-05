@@ -275,6 +275,47 @@ namespace savvy
       return serialize_typed_scalar(out_it, (std::int64_t)size);
     }
 
+    template <typename Iter, typename T>
+    typename std::enable_if<std::is_signed<T>::value, void>::type
+    serialize_typed_vec(Iter out_it, const std::vector<T>& vec) // TODO: use smallest int type.
+    {
+      static_assert(!std::is_same<T, std::int64_t>::value && !std::is_same<T, double>::value, "64-bit integers not allowed in BCF spec.");
+
+      std::uint8_t type_byte = vec.size() < 15 ? vec.size() : 15;
+      if (std::is_same<T, std::int8_t>::value)
+      {
+        type_byte = (type_byte << 4) | 0x01;
+      }
+      else if (std::is_same<T, std::int16_t>::value)
+      {
+        type_byte = (type_byte << 4) | 0x02;
+      }
+      else if (std::is_same<T, std::int32_t>::value)
+      {
+        type_byte = (type_byte << 4) | 0x03;
+      }
+      else if (std::is_same<T, float>::value)
+      {
+        type_byte = (type_byte << 4) | 0x05;
+      }
+
+      *out_it = type_byte;
+
+      if (vec.size() >= 15)
+      {
+        if (vec.size() <= 0x7F)
+          serialize_typed_int_exact(out_it, (std::int8_t)vec.size());
+        else if (vec.size() <= 0x7FFF)
+          serialize_typed_int_exact(out_it, (std::int16_t)vec.size());
+        else if (vec.size() <= 0x7FFFFFFF)
+          serialize_typed_int_exact(out_it, (std::int32_t)vec.size());
+        else
+          throw std::runtime_error("string too big");
+      }
+
+      std::copy_n((char*)vec.data(), sizeof(T) * vec.size(), out_it);
+    }
+
     template <typename T>
     typename std::enable_if<std::is_signed<T>::value, void>::type
     write_typed_vec(std::ostream& os, const std::vector<T>& vec)
@@ -316,6 +357,28 @@ namespace savvy
       os.write((char*)vec.data(), std::int32_t(sizeof(T) * vec.size()));
     }
 
+    template <typename OutT>
+    void serialize_typed_str(OutT out_it, const std::string& str)
+    {
+      std::uint8_t type_byte = str.size() < 15 ? str.size() : 15;
+      type_byte = (type_byte << 4) | 0x07;
+
+      *out_it = type_byte;
+
+      if (str.size() >= 15)
+      {
+        if (str.size() <= 0x7F)
+          serialize_typed_int_exact(out_it, (std::int8_t)str.size());
+        else if (str.size() <= 0x7FFF)
+          serialize_typed_int_exact(out_it, (std::int16_t)str.size());
+        else if (str.size() <= 0x7FFFFFFF)
+          serialize_typed_int_exact(out_it, (std::int32_t)str.size());
+        else
+          throw std::runtime_error("string too big");
+      }
+
+      std::copy_n(str.begin(), str.size(), out_it);
+    }
 
     void write_typed_str(std::ostream& os, const std::string& str)
     {
@@ -699,6 +762,53 @@ namespace savvy
         off_ptr_(data_ptr)
       {
       }
+
+      class internal
+      {
+      public:
+        template <typename Iter>
+        static void serialize(const typed_value& v, Iter out_it)
+        {
+
+          std::uint8_t type_byte =  v.off_type_ ? typed_value::sparse : v.val_type_;
+          type_byte = (std::uint8_t(std::min(std::size_t(15), v.size_)) << 4u) | type_byte;
+          *(out_it++) = type_byte;
+          if (v.size_ >= 15u)
+            bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.size_));
+
+          if (v.off_type_)
+          {
+            type_byte = (v.off_type_ << 4u) | v.val_type_;
+            *(out_it++) = type_byte;
+            bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.sparse_size_));
+            std::size_t pair_width = (1u << bcf_type_shift[v.off_type_]) + (1u << bcf_type_shift[v.val_type_]);
+            std::copy_n(v.val_ptr_, v.sparse_size_ * pair_width, out_it);
+          }
+          else
+          {
+            std::copy_n(v.val_ptr_, v.size_ * (1u << bcf_type_shift[v.val_type_]), out_it);
+          }
+        }
+
+//        template <typename Iter>
+//        static Iter deserialize(typed_value& v, Iter in_it, Iter end_it)
+//        {
+//          std::uint8_t type_byte = *(in_it++);
+//          std::size_t type_width = 1u << bcf_type_shift[type_byte & 0x0Fu];
+//          std::size_t sz = type_byte >> 4u;
+//          if (sz == 15u)
+//            in_it = bcf::deserialize_int(in_it, end_it, sz);
+//
+//          if (end_it - in_it < (sz * type_width))
+//          {
+//            throw std::runtime_error("Invalid data");
+//          }
+//
+//          v = typed_value(type_byte & 0x0Fu, sz, sz * type_width ? &(*in_it) : nullptr));
+//          in_it += sz * type_width;
+//          return in_it;
+//        }
+      };
     private:
       template<typename T>
       typename std::enable_if<std::is_signed<T>::value, void>::type
@@ -1023,7 +1133,7 @@ namespace savvy
         }
 
         template <typename Itr>
-        static bool write(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample)
+        static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample)
         {
           union u
           {
@@ -1052,90 +1162,42 @@ namespace savvy
 
           std::copy_n((char*)buf.data(), buf.size() * sizeof(u), out_it);
 
-//
-//
-//            s.shared_data_.resize(shared_sz - 6 * 4);
-//            ifs.read(s.shared_data_.data(), s.shared_data_.size());
-//
-//            auto shared_it = s.shared_data_.begin();
-//
-//            try
-//            {
-//              // Parse ID
-//              shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), s.id_);
-//
-//              // Parse REF/ALT
-//              if (n_allele)
-//              {
-//                shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), s.ref_);
-//                s.alts_.resize(n_allele - 1);
-//                for (auto it = s.alts_.begin(); it != s.alts_.end(); ++it)
-//                {
-//                  shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), *it);
-//                }
-//              }
-//
-//              // Parse FILTER
-//              std::vector<std::int32_t> filter_ints;
-//              shared_it = bcf::deserialize_vec(shared_it, s.shared_data_.end(), filter_ints);
-//              s.filters_.clear();
-//              s.filters_.reserve(filter_ints.size());
-//              for (auto it = filter_ints.begin(); it != filter_ints.end(); ++it)
-//              {
-//                if (dict.int_to_str[dictionary::id].size() <= *it)
-//                {
-//                  std::fprintf(stderr, "Error: Invalid filter id");
-//                  return false;
-//                }
-//                s.filters_.emplace_back(dict.int_to_str[dictionary::id][*it]);
-//              }
-//
-//              // Parse INFO
-//              s.info_.resize(n_info);
-//              auto info_it = s.info_.begin();
-//              for ( ; info_it != s.info_.end(); ++info_it)
-//              {
-//                std::int32_t info_key_id;
-//                shared_it = bcf::deserialize_int(shared_it, s.shared_data_.end(), info_key_id);
-//                if (dict.int_to_str[dictionary::id].size() <= info_key_id)
-//                {
-//                  std::fprintf(stderr, "Error: Invalid info id");
-//                  return false;
-//                }
-//                std::string info_key = dict.int_to_str[dictionary::id][info_key_id];
-//
-//                if (shared_it == s.shared_data_.end())
-//                  break;
-//
-//                // ------------------------------------------- //
-//                // TODO: potentially move this to static method since it's similar to FMT parsing
-//                std::uint8_t type_byte = *(shared_it++);
-//                std::size_t type_width = 1u << bcf_type_shift[type_byte & 0x0Fu];
-//                std::size_t sz = type_byte >> 4u;
-//                if (sz == 15u)
-//                  shared_it = bcf::deserialize_int(shared_it, s.shared_data_.end(), sz);
-//
-//                if (s.shared_data_.end() - shared_it < (sz * type_width))
-//                  break;
-//
-//                *info_it = std::make_pair(std::move(info_key), typed_value(type_byte & 0x0Fu, sz, sz * type_width ? &(*shared_it) : nullptr));
-//                shared_it += sz * type_width;
-//                // ------------------------------------------- //
-//
-//              }
-//
-//              if (info_it == s.info_.end())
-//                return true;
-//            }
-//            catch (const std::exception& e)
-//            {
-//              std::fprintf(stderr, "Error: Invalid record data");
-//              return false;
-//            }
+          // Encode REF/ALTS
+          bcf::serialize_typed_str(out_it, s.id_);
+          bcf::serialize_typed_str(out_it, s.ref_);
+          for (auto it = s.alts_.begin(); it != s.alts_.end(); ++it)
+            bcf::serialize_typed_str(out_it, *it);
 
+          // Encode FILTER
+          std::vector<std::int32_t> filter_ints;
+          filter_ints.reserve(s.filters_.size());
+          for (auto it = s.filters_.begin(); it != s.filters_.end(); ++it)
+          {
+            res = dict.str_to_int[dictionary::id].find(*it);
+            if (res == dict.str_to_int[dictionary::id].end())
+            {
+              std::fprintf(stderr, "Error: Filter not in header");
+              return false;
+            }
+            filter_ints.emplace_back(res->second);
+          }
+          bcf::serialize_typed_vec(out_it, filter_ints);
 
-          std::fprintf(stderr, "Error: Invalid record data");
-          return false;
+          // Encode INFO
+          for (auto it = s.info_.begin(); it != s.info_.end(); ++it)
+          {
+            res = dict.str_to_int[dictionary::id].find(it->first);
+            if (res == dict.str_to_int[dictionary::id].end())
+            {
+              std::fprintf(stderr, "Error: INFO key not in header");
+              return false;
+            }
+
+            bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
+            typed_value::internal::serialize(it->second, out_it);
+          }
+
+          return true;
         }
       };
     };
@@ -1146,7 +1208,7 @@ namespace savvy
       class internal
       {
       public:
-        static bool read(variant& v, std::istream& ifs, const dictionary& dict /*, std::size_t sample_size, file_format file_fmt*/)
+        static bool read(variant& v, std::istream& ifs, const dictionary& dict, std::size_t sample_size, bool is_bcf)
         {
           std::uint32_t shared_sz, indiv_sz;
           ifs.read((char*)&shared_sz, sizeof(shared_sz)); // TODO: endian
@@ -1188,6 +1250,8 @@ namespace savvy
 
                   if (type == typed_value::sparse)
                   {
+                    assert(!is_bcf);
+
                     if (indiv_it == v.indiv_buf_.end())
                       break;
 
@@ -1207,6 +1271,8 @@ namespace savvy
                   }
                   else
                   {
+                    if (is_bcf)
+                      sz = sz * sample_size;
 
                     std::size_t type_width = 1u << bcf_type_shift[type];
 
@@ -1214,7 +1280,7 @@ namespace savvy
                       break;
 
                     *fmt_it = std::make_pair(std::move(fmt_key), typed_value(type, sz, sz * type_width ? &(*indiv_it) : nullptr));
-                    indiv_it += sz * type_byte;
+                    indiv_it += sz * type_width;
                     // ------------------------------------------- //
                   }
                 }
@@ -1232,6 +1298,50 @@ namespace savvy
 
           std::fprintf(stderr, "Error: Invalid record data");
           return false;
+        }
+
+
+        static bool serialize(const variant& v, std::vector<char> buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, std::uint32_t& shared_sz, std::uint32_t& indiv_sz)
+        {
+          buf.clear();
+          buf.reserve(24);
+
+          if (!site_info::internal::serialize(v, std::back_inserter(buf), dict, sample_size))
+            return false;
+
+          if (buf.size() > std::numeric_limits<std::uint32_t>::max())
+          {
+            fprintf(stderr, "Error: shared data too big");
+            return false;
+          }
+
+          shared_sz = buf.size();
+
+          // Encode FMT
+          auto out_it = std::back_inserter(buf);
+          for (auto it = v.format_fields_.begin(); it != v.format_fields_.end(); ++it)
+          {
+            auto res = dict.str_to_int[dictionary::id].find(it->first);
+            if (res == dict.str_to_int[dictionary::id].end())
+            {
+              std::fprintf(stderr, "Error: FMT key not in header");
+              return false;
+            }
+
+            // TODO: Allow for BCF writing.
+            bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
+            typed_value::internal::serialize(it->second, out_it);
+          }
+
+          if (buf.size() - shared_sz > std::numeric_limits<std::uint32_t>::max())
+          {
+            std::fprintf(stderr, "Error: individual data too big");
+            return false;
+          }
+
+          indiv_sz = buf.size() - shared_sz;
+
+          return true;
         }
       };
 
@@ -1493,7 +1603,8 @@ namespace savvy
 
       reader& read_record(variant& r)
       {
-        variant::internal::read(r, ifs_, dict_);
+        bool is_bcf = true; // TODO ...
+        variant::internal::read(r, ifs_, dict_, ids_.size(), is_bcf);
 
         return *this;
       }
@@ -1588,6 +1699,7 @@ namespace savvy
     private:
       std::ofstream ofs_;
       dictionary dict_;
+      std::size_t n_samples_ = 0;
       std::vector<char> serialized_buf_;
     public:
       writer(const std::string& file) : ofs_(file, std::ios::binary) {}
@@ -1640,110 +1752,128 @@ namespace savvy
           ofs_.write("\t", 1);
           ofs_.write(it->data(), it->size());
         }
+        n_samples_ = ids.size();
 
         ofs_.write("\n\0", 2);
       }
 
-      void write_record(const variant& r)
+      writer& write_record(const variant& r)
       {
-        std::uint32_t l_shared = 6 * 4; // chrom through n.fmt.sample
-
-        l_shared += bcf::get_typed_value_size(r.id());
-
-        l_shared += bcf::get_typed_value_size(r.ref());
-        for (auto& a : r.alts())
-          l_shared += bcf::get_typed_value_size(a);
-
-        std::vector<std::int8_t> filter_vec(r.filters().size()); // TODO: Allow more than 255 filters.
-        for (std::size_t i = 0; i < filter_vec.size(); ++i)
+        bool is_bcf = true; // TODO: ...
+        std::uint32_t shared_sz, indiv_sz;
+        if (!variant::internal::serialize(r, serialized_buf_, dict_, n_samples_, is_bcf, shared_sz, indiv_sz))
         {
-          auto it = dict_.str_to_int[dictionary::id].find(r.filters()[i]);
-          if (it == dict_.str_to_int[dictionary::id].end())
-          {
-            std::cerr << "Error: filter not valid" << std::endl;
-            ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
-          }
-          assert(it->second <= 0xFF);
-          filter_vec[i] = it->second;
+          ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
+        }
+        else
+        {
+          ofs_.write((char*)&shared_sz, sizeof(shared_sz));
+          ofs_.write((char*)&indiv_sz, sizeof(indiv_sz));
+          ofs_.write(serialized_buf_.data(), serialized_buf_.size());
         }
 
-        l_shared += bcf::get_typed_value_size(filter_vec);
-        for (auto& i: r.info())
-        {
-          auto it = dict_.str_to_int[dictionary::contig].find(i.first);
-          if (it == dict_.str_to_int[dictionary::contig].end())
-          {
-            std::cerr << "Error: INFO key not valid" << std::endl;
-            ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
-            return;
-          }
+        return *this;
 
-          l_shared += bcf::get_typed_value_size((std::int32_t)it->second); // TODO: Allow for variable sized INFO keys.
-          l_shared += i.second.data.size(); //(bcf::get_typed_value_size(0) + bcf::get_typed_value_size(i.second));
-        }
-
-
-        std::uint32_t l_indiv = 0;
-        for (auto& f : r.format_fields())
-        {
-          auto it = dict_.str_to_int[dictionary::id].find(f.key());
-          if (it != dict_.str_to_int[dictionary::id].end())
-          {
-            l_indiv += bcf::get_typed_value_size((std::int32_t)it->second);
-            l_indiv += f.serialized_data().size();
-          }
-        }
-
-        ofs_.write((char*)(&l_shared), sizeof(l_shared));
-        ofs_.write((char*)(&l_indiv), sizeof(l_indiv));
-
-        {
-          auto it = dict_.str_to_int[dictionary::contig].find(r.chrom());
-          if (it == dict_.str_to_int[dictionary::contig].end())
-          {
-            std::cerr << "Error: contig not valid" << std::endl;
-            ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
-            return;
-          }
-          ofs_.write((char*)(&it->second), sizeof(it->second));
-        }
-
-
-        std::uint32_t tmp_i32 = r.pos();
-        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
-        tmp_i32 = r.ref().size();
-        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
-        float qual = r.qual();
-        ofs_.write((char*)(&qual), sizeof(qual));
-
-        tmp_i32 = ((1 + r.alts().size()) << 16) | r.info().size();
-        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
-        tmp_i32 = (r.format_fields().size() << 24) | 0; // zero for n_sample in SAV
-        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
-
-
-        bcf::write_typed_str(ofs_, r.id());
-        bcf::write_typed_str(ofs_, r.ref());
-        for (auto& a: r.alts())
-          bcf::write_typed_str(ofs_, a);
-        bcf::write_typed_vec(ofs_, filter_vec);
-
-        std::int16_t i = 0;
-        float f = static_cast<float>(i);
-        i = static_cast<std::uint16_t>(f);
-
-        for (auto& i: r.info())
-        {
-          bcf::write_typed_scalar(ofs_, (std::int32_t)dict_.str_to_int[dictionary::id].find(i.first)->second); // TODO: Allow for variable sized INFO keys.
-          bcf::serialize_type_and_size(std::ostreambuf_iterator<char>(ofs_), i.second.type, i.second.length);
-          ofs_.write((char*)(i.second.data.data()), i.second.data.size());
-        }
-
-        for (auto& f : r.format_fields())
-        {
-          bcf::write_typed_scalar(ofs_, (std::int32_t)(dict_.str_to_int[dictionary::id].find(f.key())->second)); // TODO: Allow for variable sized FMT keys.
-          ofs_.write((char*)(f.serialized_data().data()), f.serialized_data().size());
-        }
+        //variant::internal::write(r, ofs_, );
+//
+//        std::uint32_t l_shared = 6 * 4; // chrom through n.fmt.sample
+//
+//        l_shared += bcf::get_typed_value_size(r.id());
+//
+//        l_shared += bcf::get_typed_value_size(r.ref());
+//        for (auto& a : r.alts())
+//          l_shared += bcf::get_typed_value_size(a);
+//
+//        std::vector<std::int8_t> filter_vec(r.filters().size()); // TODO: Allow more than 255 filters.
+//        for (std::size_t i = 0; i < filter_vec.size(); ++i)
+//        {
+//          auto it = dict_.str_to_int[dictionary::id].find(r.filters()[i]);
+//          if (it == dict_.str_to_int[dictionary::id].end())
+//          {
+//            std::cerr << "Error: filter not valid" << std::endl;
+//            ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
+//          }
+//          assert(it->second <= 0xFF);
+//          filter_vec[i] = it->second;
+//        }
+//
+//        l_shared += bcf::get_typed_value_size(filter_vec);
+//        for (auto& i: r.info())
+//        {
+//          auto it = dict_.str_to_int[dictionary::contig].find(i.first);
+//          if (it == dict_.str_to_int[dictionary::contig].end())
+//          {
+//            std::cerr << "Error: INFO key not valid" << std::endl;
+//            ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
+//            return;
+//          }
+//
+//          l_shared += bcf::get_typed_value_size((std::int32_t)it->second); // TODO: Allow for variable sized INFO keys.
+//          l_shared += i.second.data.size(); //(bcf::get_typed_value_size(0) + bcf::get_typed_value_size(i.second));
+//        }
+//
+//
+//        std::uint32_t l_indiv = 0;
+//        for (auto& f : r.format_fields())
+//        {
+//          auto it = dict_.str_to_int[dictionary::id].find(f.key());
+//          if (it != dict_.str_to_int[dictionary::id].end())
+//          {
+//            l_indiv += bcf::get_typed_value_size((std::int32_t)it->second);
+//            l_indiv += f.serialized_data().size();
+//          }
+//        }
+//
+//        ofs_.write((char*)(&l_shared), sizeof(l_shared));
+//        ofs_.write((char*)(&l_indiv), sizeof(l_indiv));
+//
+//        {
+//          auto it = dict_.str_to_int[dictionary::contig].find(r.chrom());
+//          if (it == dict_.str_to_int[dictionary::contig].end())
+//          {
+//            std::cerr << "Error: contig not valid" << std::endl;
+//            ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
+//            return;
+//          }
+//          ofs_.write((char*)(&it->second), sizeof(it->second));
+//        }
+//
+//
+//        std::uint32_t tmp_i32 = r.pos();
+//        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
+//        tmp_i32 = r.ref().size();
+//        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
+//        float qual = r.qual();
+//        ofs_.write((char*)(&qual), sizeof(qual));
+//
+//        tmp_i32 = ((1 + r.alts().size()) << 16) | r.info().size();
+//        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
+//        tmp_i32 = (r.format_fields().size() << 24) | 0; // zero for n_sample in SAV
+//        ofs_.write((char*)(&tmp_i32), sizeof(tmp_i32));
+//
+//
+//        bcf::write_typed_str(ofs_, r.id());
+//        bcf::write_typed_str(ofs_, r.ref());
+//        for (auto& a: r.alts())
+//          bcf::write_typed_str(ofs_, a);
+//        bcf::write_typed_vec(ofs_, filter_vec);
+//
+//        std::int16_t i = 0;
+//        float f = static_cast<float>(i);
+//        i = static_cast<std::uint16_t>(f);
+//
+//        for (auto& i: r.info())
+//        {
+//          bcf::write_typed_scalar(ofs_, (std::int32_t)dict_.str_to_int[dictionary::id].find(i.first)->second); // TODO: Allow for variable sized INFO keys.
+//          bcf::serialize_type_and_size(std::ostreambuf_iterator<char>(ofs_), i.second.type, i.second.length);
+//          ofs_.write((char*)(i.second.data.data()), i.second.data.size());
+//        }
+//
+//        for (auto& f : r.format_fields())
+//        {
+//          bcf::write_typed_scalar(ofs_, (std::int32_t)(dict_.str_to_int[dictionary::id].find(f.key())->second)); // TODO: Allow for variable sized FMT keys.
+//          ofs_.write((char*)(f.serialized_data().data()), f.serialized_data().size());
+//        }
       }
     };
   }
