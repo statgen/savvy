@@ -900,13 +900,15 @@ namespace savvy
 
         return *this;
       }
+
+      operator bool() const { return (bool)ifs_; };
     private:
       static bool read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict)
       {
         std::string magic(5, '\0');
         ifs.read(&magic[0], magic.size());
 
-        std::uint32_t header_block_sz;
+        std::uint32_t header_block_sz = 0;
         ifs.read((char*)&header_block_sz, sizeof(header_block_sz));
 
         std::int64_t bytes_read = 0;
@@ -943,10 +945,12 @@ namespace savvy
               break;
 
             std::array<char, 64> discard;
-            while (header_block_sz - bytes_read)
+            while (header_block_sz - bytes_read > 0)
             {
-              ifs.read(discard.data(), std::min(std::size_t(header_block_sz - bytes_read), discard.size()));
-              bytes_read += ifs.gcount();
+              auto gcount = ifs.read(discard.data(), std::min(std::size_t(header_block_sz - bytes_read), discard.size())).gcount();
+              if (gcount == 0)
+                return false;
+              bytes_read += gcount;
             }
 
             return true;
@@ -997,7 +1001,7 @@ namespace savvy
       writer(const std::string& file) : ofs_(file, std::ios::binary) {}
       void write_header(const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids)
       {
-        std::string magic = "SAV\x02\x00";
+        std::string magic = {'S','A','V','\x02','\x00'};
 
         std::uint32_t header_block_sz = 0;
         for (auto it = headers.begin(); it != headers.end(); ++it)

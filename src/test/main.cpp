@@ -729,9 +729,69 @@ void subset_test(const std::string& path)
 }
 
 
+#include "savvy/bcf_writer.hpp"
 
 int main(int argc, char** argv)
 {
+  if (false)
+  {
+    if (argc < 3)
+      return -1;
+
+    savvy::reader rdr(argv[1], savvy::fmt::hds);
+    savvy::sav2::writer wrt(argv[2]);
+    auto hdrs = rdr.headers();
+    hdrs.emplace_back("contig", "<ID=chr10>");
+    wrt.write_header(hdrs, rdr.samples());
+    savvy::compressed_vector<float> vec;
+    savvy::site_info site;
+    savvy::sav2::variant var;
+
+
+    while (rdr.read(site, vec))
+    {
+      var = savvy::sav2::variant(site.chromosome(), site.position(), site.ref(), {site.alt()}, site.prop("ID"), std::atof(site.prop("QUAL").c_str()));
+      var.set_format("HDS", vec);
+      wrt.write_record(var);
+    }
+
+    return rdr.bad() ? EXIT_FAILURE : EXIT_SUCCESS;
+  }
+
+  if (false)
+  {
+    if (argc < 3)
+      return -1;
+
+    savvy::sav2::reader rdr(argv[1]);
+    savvy::compressed_vector<float> vec;
+    savvy::site_info site;
+    savvy::sav2::variant var;
+
+
+    while (rdr.read_record(var))
+    {
+      std::cout << site.chromosome() << "\t"
+        << var.pos() << "\t"
+        << var.ref() << "\t"
+        << var.alts()[0] << "\t"
+        << var.id() << "\t"
+        << var.qual() << "\n";
+      std::cout.flush();
+    }
+
+    return 0;
+  }
+
+//  {
+//    std::vector<float> vec;
+//    savvy::sav2::typed_value tv(vec);
+//    savvy::sav2::reader sav2_rdr("../test-data/merged.chr1_103900001_104000000.genotypes.ubcf");
+//    savvy::sav2::variant v;
+//    v.set_format("GT", savvy::compressed_vector<float>());
+//    sav2_rdr.read_record(v);
+//  }
+//  return -1;
   std::string cmd = (argc < 2) ? "" : argv[1];
 
   if (cmd.empty())
