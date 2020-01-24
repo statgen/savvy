@@ -739,6 +739,19 @@ namespace savvy
 
       typed_value& operator=(typed_value&& src);
 
+      template <typename T>
+      bool operator>>(savvy::compressed_vector<T>& dest) const
+      {
+        if (this->off_ptr_)
+        {
+        }
+        else if (this->val_ptr_)
+        {
+
+        }
+        return false;
+      }
+
       class internal
       {
       public:
@@ -849,7 +862,7 @@ namespace savvy
         static bool read(site_info& s, std::istream& ifs, const dictionary& dict, std::uint32_t shared_sz);
 
         template <typename Itr>
-        static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample);
+        static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint16_t n_fmt);
       };
     };
 
@@ -861,7 +874,7 @@ namespace savvy
       public:
         static bool read(variant& v, std::istream& ifs, const dictionary& dict, std::size_t sample_size, bool is_bcf);
 
-        static bool serialize(const variant& v, std::vector<char> buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, std::uint32_t& shared_sz, std::uint32_t& indiv_sz);
+        static bool serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, std::uint32_t& shared_sz, std::uint32_t& indiv_sz);
       };
     private:
       std::vector<std::pair<std::string, typed_value>> format_fields_;
@@ -895,8 +908,9 @@ namespace savvy
 
       reader& read_record(variant& r)
       {
-        bool is_bcf = true; // TODO ...
-        variant::internal::read(r, ifs_, dict_, ids_.size(), is_bcf);
+        bool is_bcf = false; // TODO ...
+        if (!variant::internal::read(r, ifs_, dict_, ids_.size(), is_bcf))
+          ifs_.setstate(ifs_.rdstate() | std::ios::badbit);
 
         return *this;
       }
@@ -1612,7 +1626,7 @@ namespace savvy
     }
 
     template <typename Itr>
-    bool site_info::internal::serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample)
+    bool site_info::internal::serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint16_t n_fmt)
     {
       union u
       {
@@ -1636,7 +1650,7 @@ namespace savvy
       std::uint32_t tmp_uint = (std::uint32_t(s.alts_.size() + 1) << 16u) | (0xFFFFu & std::uint32_t(s.info_.size()));
       buf[4].i = static_cast<std::int32_t>(tmp_uint);
 
-      tmp_uint = (s.n_fmt_ << 24u) | (0xFFFFFFu & n_sample);
+      tmp_uint = (n_fmt << 24u) | (0xFFFFFFu & n_sample);
       buf[5].i = static_cast<std::int32_t>(tmp_uint);
 
       std::copy_n((char*)buf.data(), buf.size() * sizeof(u), out_it);
@@ -1773,12 +1787,12 @@ namespace savvy
     }
 
     inline
-    bool variant::internal::serialize(const variant& v, std::vector<char> buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, std::uint32_t& shared_sz, std::uint32_t& indiv_sz)
+    bool variant::internal::serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, std::uint32_t& shared_sz, std::uint32_t& indiv_sz)
     {
       buf.clear();
       buf.reserve(24);
 
-      if (!site_info::internal::serialize(v, std::back_inserter(buf), dict, sample_size))
+      if (!site_info::internal::serialize(v, std::back_inserter(buf), dict, sample_size, v.format_fields_.size()))
         return false;
 
       if (buf.size() > std::numeric_limits<std::uint32_t>::max())

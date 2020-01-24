@@ -765,16 +765,16 @@ int main(int argc, char** argv)
 
     savvy::sav2::reader rdr(argv[1]);
     savvy::compressed_vector<float> vec;
-    savvy::site_info site;
     savvy::sav2::variant var;
 
 
     while (rdr.read_record(var))
     {
-      std::cout << site.chromosome() << "\t"
+      var.format_fields().begin()->second >> vec;
+      std::cout << var.chrom() << "\t"
         << var.pos() << "\t"
         << var.ref() << "\t"
-        << var.alts()[0] << "\t"
+        << (var.alts().size() ? var.alts()[0] : "") << "\t"
         << var.id() << "\t"
         << var.qual() << "\n";
       std::cout.flush();
