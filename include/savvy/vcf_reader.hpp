@@ -449,59 +449,61 @@ namespace savvy
     std::size_t reader_base<VecCnt>::read_requested_genos(savvy::site_info& annotations, T&... destinations)
     {
       std::size_t cnt = 0;
-      clear_destinations(destinations...);
-
-      for (int i = 0; i < hts_file_->cur_fmt_field_size(); ++i)
+      if (good())
       {
-        std::string fmt_key = hts_file_->cur_fmt_field(i);
+        clear_destinations(destinations...);
 
-        std::int64_t gt_idx     = std::distance(requested_data_formats_.begin(), std::find(requested_data_formats_.begin(), requested_data_formats_.end(), fmt::ac));
-        std::int64_t allele_idx = std::distance(requested_data_formats_.begin(), std::find(requested_data_formats_.begin(), requested_data_formats_.end(), fmt::gt));
+        for (int i = 0; i < hts_file_->cur_fmt_field_size(); ++i)
+        {
+          std::string fmt_key = hts_file_->cur_fmt_field(i);
 
-        if (fmt_key == "GT" && (gt_idx < VecCnt || allele_idx < VecCnt))
-        {
-          if (gt_idx < VecCnt)
+          std::int64_t gt_idx = std::distance(requested_data_formats_.begin(), std::find(requested_data_formats_.begin(), requested_data_formats_.end(), fmt::ac));
+          std::int64_t allele_idx = std::distance(requested_data_formats_.begin(), std::find(requested_data_formats_.begin(), requested_data_formats_.end(), fmt::gt));
+
+          if (fmt_key == "GT" && (gt_idx < VecCnt || allele_idx < VecCnt))
           {
-            cnt += read_genos_to<0>(fmt::ac, annotations, destinations...);
+            if (gt_idx < VecCnt)
+            {
+              cnt += read_genos_to<0>(fmt::ac, annotations, destinations...);
+            }
+            else // allele_idx < VecCnt
+            {
+              cnt += read_genos_to<0>(fmt::gt, annotations, destinations...);
+            }
           }
-          else // allele_idx < VecCnt
+          else if (fmt_key == "DS")
           {
-            cnt += read_genos_to<0>(fmt::gt, annotations, destinations...);
+            cnt += read_genos_to<0>(fmt::ds, annotations, destinations...);
+          }
+          else if (fmt_key == "HDS")
+          {
+            cnt += read_genos_to<0>(fmt::hds, annotations, destinations...);
+          }
+          else if (fmt_key == "GP")
+          {
+            cnt += read_genos_to<0>(fmt::gp, annotations, destinations...);
+          }
+          else if (fmt_key == "GL")
+          {
+            cnt += read_genos_to<0>(fmt::gl, annotations, destinations...);
+          }
+          else if (fmt_key == "PL")
+          {
+            cnt += read_genos_to<0>(fmt::pl, annotations, destinations...);
+          }
+          else
+          {
+            // Discard
           }
         }
-        else if (fmt_key == "DS")
+
+        if (cnt != VecCnt && (empty_vector_policy_ == empty_vector_policy::skip_with_warning || empty_vector_policy_ == empty_vector_policy::fail))
         {
-          cnt += read_genos_to<0>(fmt::ds, annotations, destinations...);
-        }
-        else if (fmt_key == "HDS")
-        {
-          cnt += read_genos_to<0>(fmt::hds, annotations, destinations...);
-        }
-        else if (fmt_key == "GP")
-        {
-          cnt += read_genos_to<0>(fmt::gp, annotations, destinations...);
-        }
-        else if (fmt_key == "GL")
-        {
-          cnt += read_genos_to<0>(fmt::gl, annotations, destinations...);
-        }
-        else if (fmt_key == "PL")
-        {
-          cnt += read_genos_to<0>(fmt::pl, annotations, destinations...);
-        }
-        else
-        {
-          // Discard
+          std::cerr << "Variant is missing requested data format type." << std::endl;
+          if (empty_vector_policy_ == empty_vector_policy::fail)
+            state_ = std::ios::badbit | state_;
         }
       }
-
-      if (cnt != VecCnt && (empty_vector_policy_ == empty_vector_policy::skip_with_warning || empty_vector_policy_ == empty_vector_policy::fail))
-      {
-        std::cerr << "Variant is missing requested data format type." << std::endl;
-        if (empty_vector_policy_ == empty_vector_policy::fail)
-          state_ = std::ios::badbit | state_;
-      }
-
       return cnt;
     }
 

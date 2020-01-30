@@ -1052,6 +1052,9 @@ namespace savvy
 
       ~writer()
       {
+        if (ploidy_ == 0)
+          write_header(2);
+
         // TODO: This is only a temp solution.
         if (index_file_)
         {
