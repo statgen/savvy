@@ -1,6 +1,10 @@
 #ifndef LIBSAVVY_BCF_WRITER_HPP
 #define LIBSAVVY_BCF_WRITER_HPP
 
+#include "savvy/utility.hpp"
+
+#include <shrinkwrap/zstd.hpp>
+
 #include <string>
 #include <vector>
 #include <fstream>
@@ -8,6 +12,7 @@
 #include <set>
 #include <algorithm>
 #include <cstdio>
+#include <chrono>
 
 namespace savvy
 {
@@ -1007,12 +1012,53 @@ namespace savvy
     class writer
     {
     private:
-      std::ofstream ofs_;
+      std::mt19937_64 rng_;
+      std::unique_ptr<std::streambuf> output_buf_;
+      std::string file_path_;
+      std::ostream ofs_;
+      std::array<std::uint8_t, 16> uuid_;
       dictionary dict_;
       std::size_t n_samples_ = 0;
       std::vector<char> serialized_buf_;
+
+      // Data members to support indexing
+      std::unique_ptr<s1r::writer> index_file_;
+      std::string current_chromosome_;
+      std::size_t block_size_ = 4096;
+      std::size_t record_count_ = 0;
+      std::size_t record_count_in_block_ = 0;
+      std::uint32_t current_block_min_ = std::numeric_limits<std::uint32_t>::max();
+      std::uint32_t current_block_max_ = 0;
+    private:
+      static std::filebuf* create_std_filebuf(const std::string& file_path, std::ios::openmode mode)
+      {
+        std::filebuf* ret = new std::filebuf();
+        ret->open(file_path.c_str(), mode);
+        return ret;
+      }
+
+      static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, std::int8_t compression_level)
+      {
+        if (compression_level > 0)
+          return std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, compression_level));
+        else
+          return std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out));
+      }
     public:
-      writer(const std::string& file) : ofs_(file, std::ios::binary) {}
+      writer(const std::string& file_path) :
+        rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t)this),
+        output_buf_(create_out_streambuf(file_path, 3)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
+        ofs_(output_buf_.get()),
+        //samples_(samples_beg, samples_end),
+        file_path_(file_path),
+        uuid_(::savvy::detail::gen_uuid(rng_))
+      {
+        // TODO: Use mkstemp when shrinkwrap supports FILE*
+        if (true && file_path_ != "/dev/stdout") // TODO: Check if indexing and zstd is enabled.
+        {
+          index_file_ = ::savvy::detail::make_unique<s1r::writer>(file_path + ".s1r" , uuid_);
+        }
+      }
       void write_header(const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids)
       {
         std::string magic = {'S','A','V','\x02','\x00'};
@@ -1070,6 +1116,34 @@ namespace savvy
       writer& write_record(const variant& r)
       {
         bool is_bcf = true; // TODO: ...
+
+        if (block_size_ != 0 && ((record_count_ % block_size_) == 0 || r.chrom() != current_chromosome_))
+        {
+          if (index_file_ && record_count_in_block_)
+          {
+            auto file_pos = std::uint64_t(ofs_.tellp());
+            if (record_count_in_block_ > 0x10000) // Max records per block: 64*1024
+            {
+              assert(!"Too many records in zstd frame to be indexed!");
+              ofs_.setstate(std::ios::badbit);
+            }
+
+            if (file_pos > 0x0000FFFFFFFFFFFF) // Max file size: 256 TiB
+            {
+              assert(!"File size to large to be indexed!");
+              ofs_.setstate(std::ios::badbit);
+            }
+
+            s1r::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
+            index_file_->write(current_chromosome_, e);
+          }
+          ofs_.flush();
+          current_chromosome_ = r.chrom();
+          record_count_in_block_ = 0;
+          current_block_min_ = std::numeric_limits<std::uint32_t>::max();
+          current_block_max_ = 0;
+        }
+
         std::uint32_t shared_sz, indiv_sz;
         if (!variant::internal::serialize(r, serialized_buf_, dict_, n_samples_, is_bcf, shared_sz, indiv_sz))
         {
@@ -1080,6 +1154,14 @@ namespace savvy
           ofs_.write((char*)&shared_sz, sizeof(shared_sz));
           ofs_.write((char*)&indiv_sz, sizeof(indiv_sz));
           ofs_.write(serialized_buf_.data(), serialized_buf_.size());
+
+          current_block_min_ = std::min(current_block_min_, std::uint32_t(r.pos()));
+          std::size_t max_alt_size = 0;
+          for (auto it = r.alts().begin(); it != r.alts().end(); ++it)
+            max_alt_size = std::max(max_alt_size, it->size());
+          current_block_max_ = std::max(current_block_max_, std::uint32_t(r.pos() + std::max(r.ref().size(), max_alt_size)) - 1);
+          ++record_count_in_block_;
+          ++record_count_;
         }
 
         return *this;
