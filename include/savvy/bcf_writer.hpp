@@ -1354,7 +1354,7 @@ namespace savvy
           }
         }
 
-        val_type_ = type_code(std::min(-max_val, min_val));
+        val_type_ = type_code(std::min(vtype(-max_val), min_val));
       }
       else
       {
@@ -1419,7 +1419,7 @@ namespace savvy
           }
         }
 
-        val_type_ = type_code(std::min(-max_val, min_val));
+        val_type_ = type_code(std::min(vtype(-max_val), min_val));
       }
       else
       {
