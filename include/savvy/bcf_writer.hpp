@@ -836,7 +836,7 @@ namespace savvy
       std::string chrom_;
       std::string id_;
       std::uint32_t pos_ = (std::uint32_t)-1;
-      float qual_ = 0.f;
+      float qual_; //0.f;
       std::string ref_;
       std::vector<std::string> alts_;
       std::vector<std::string> filters_;
@@ -848,7 +848,7 @@ namespace savvy
       site_info() {}
       site_info(std::string chrom, std::uint32_t pos, std::string ref, std::vector<std::string> alts,
         std::string id = "",
-        float qual = 0.f,
+        float qual = std::numeric_limits<float>::quiet_NaN(), // bcf_missing_value = 0x7F800001
         std::vector<std::string> filters = {},
         std::vector<std::pair<std::string, typed_value>> info = {});
 
@@ -870,6 +870,62 @@ namespace savvy
         static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint16_t n_fmt);
       };
     };
+
+    namespace detail
+    {
+      struct any_coordinate_within_region
+      {
+        static bool compare(const site_info& var, const genomic_region& reg)
+        {
+          std::size_t max_alt_size = 0;
+          for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
+            max_alt_size = std::max(max_alt_size, it->size());
+          return (var.pos() <= reg.to() && (var.pos() + std::max(var.ref().size(), max_alt_size) - 1) >= reg.from() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
+        }
+      };
+
+      struct all_coordinates_within_region
+      {
+        static bool compare(const site_info& var, const genomic_region& reg)
+        {
+          std::size_t max_alt_size = 0;
+          for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
+            max_alt_size = std::max(max_alt_size, it->size());
+          return (var.pos() >= reg.from() && (var.pos() + std::max(var.ref().size(), max_alt_size) - 1) <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
+        }
+      };
+
+      struct leftmost_coordinate_within_region
+      {
+        static bool compare(const site_info& var, const genomic_region& reg)
+        {
+          return (var.pos() >= reg.from() && var.pos() <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
+        }
+      };
+
+      struct rightmost_coordinate_within_region
+      {
+        static bool compare(const site_info& var, const genomic_region& reg)
+        {
+          std::size_t max_alt_size = 0;
+          for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
+            max_alt_size = std::max(max_alt_size, it->size());
+          std::uint64_t right = (var.pos() + std::max(var.ref().size(), max_alt_size) - 1);
+          return (right >= reg.from() && right <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
+        }
+      };
+    }
+
+    bool region_compare(bounding_point bounding_type, const site_info& var, const genomic_region& reg)
+    {
+      switch (bounding_type)
+      {
+      case bounding_point::any:   return detail::any_coordinate_within_region::compare(var, reg);
+      case bounding_point::all:   return detail::all_coordinates_within_region::compare(var, reg);
+      case bounding_point::beg:  return detail::leftmost_coordinate_within_region::compare(var, reg);
+      case bounding_point::end: return detail::rightmost_coordinate_within_region::compare(var, reg);
+      }
+    }
 
     class variant : public site_info
     {
@@ -899,28 +955,129 @@ namespace savvy
     class reader
     {
     private:
-      std::ifstream ifs_;
+      std::string file_path_;
+      std::unique_ptr<std::istream> input_stream_;
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> ids_;
       dictionary dict_;
+
+      // Random access
+      struct index_data
+      {
+        s1r::reader file;
+        genomic_region reg;
+        s1r::reader::query query;
+        s1r::reader::query::iterator iter;
+        bounding_point bounding_type;
+        std::uint32_t current_offset_in_block;
+        std::uint32_t total_in_block;
+        std::uint64_t total_records_read;
+        std::uint64_t max_records_to_read;
+        index_data(const std::string& file_path, genomic_region bounds, bounding_point bound_type = bounding_point::beg) :
+          file(file_path),
+          reg(bounds),
+          query(file.create_query(bounds)),
+          iter(query.begin()),
+          bounding_type(bound_type),
+          current_offset_in_block(0),
+          total_in_block(0),
+          total_records_read(0),
+          max_records_to_read(std::numeric_limits<std::uint64_t>::max())
+        {
+        }
+      };
+      std::unique_ptr<index_data> index_;
     public:
       reader(const std::string& file_path) :
-        ifs_(file_path, std::ios::binary)
+        file_path_(file_path),
+        input_stream_(savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path))
       {
-        if (!read_header(ifs_, headers_, ids_, dict_))
-          ifs_.setstate(ifs_.rdstate() | std::ios::badbit);
+        if (!read_header(*input_stream_, headers_, ids_, dict_))
+          input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
       }
 
-      reader& read_record(variant& r)
+      reader& reset_bounds(genomic_region reg)
       {
-        bool is_bcf = false; // TODO ...
-        if (!variant::internal::read(r, ifs_, dict_, ids_.size(), is_bcf))
-          ifs_.setstate(ifs_.rdstate() | std::ios::badbit);
+
+        input_stream_->clear();
+
+        index_ = ::savvy::detail::make_unique<index_data>(::savvy::detail::file_exists(file_path_ + ".s1r") ? file_path_ + ".s1r" : file_path_, reg);
+        if (!index_->file.good())
+        {
+          input_stream_->setstate(input_stream_->rdstate() | std::ios::failbit);
+        }
 
         return *this;
       }
 
-      operator bool() const { return (bool)ifs_; };
+      bool good() const { return this->input_stream_->good(); }
+
+      reader& read_indexed_record(variant& r)
+      {
+        while (this->good())
+        {
+          if (index_->total_records_read == index_->max_records_to_read)
+          {
+            this->input_stream_->setstate(std::ios::eofbit);
+            break;
+          }
+
+          if (index_->current_offset_in_block >= index_->total_in_block)
+          {
+            if (index_->iter == index_->query.end())
+              this->input_stream_->setstate(std::ios::eofbit);
+            else
+            {
+              index_->total_in_block = std::uint32_t(0x000000000000FFFF & index_->iter->value()) + 1;
+              index_->current_offset_in_block = 0;
+              this->input_stream_->seekg(std::streampos((index_->iter->value() >> 16) & 0x0000FFFFFFFFFFFF));
+              ++(index_->iter);
+            }
+          }
+
+          bool is_bcf = false; // TODO ...
+          if (!variant::internal::read(r, *input_stream_, dict_, ids_.size(), is_bcf))
+            input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+
+          if (!this->good())
+          {
+            if (index_->current_offset_in_block < index_->total_in_block)
+            {
+              assert(!"Truncated block");
+              this->input_stream_->setstate(std::ios::badbit);
+            }
+          }
+          else
+          {
+            ++(index_->current_offset_in_block);
+            ++(index_->total_records_read);
+            if (region_compare(index_->bounding_type, r, index_->reg))
+            {
+              //this->read_genotypes(annotations, destination);
+              break;
+            }
+            else
+            {
+              //this->discard_genotypes();
+            }
+          }
+        }
+        return *this; //TODO: clear site info before returning if not good
+      }
+
+      reader& read_record(variant& r)
+      {
+        if (index_)
+          return read_indexed_record(r);
+
+        bool is_bcf = false; // TODO ...
+        if (!variant::internal::read(r, *input_stream_, dict_, ids_.size(), is_bcf))
+          input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+
+        return *this;
+      }
+
+      operator bool() const { return (bool)input_stream_; };
     private:
       static bool read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict)
       {
