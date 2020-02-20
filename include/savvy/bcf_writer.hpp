@@ -747,15 +747,39 @@ namespace savvy
       typed_value& operator=(typed_value&& src);
 
       template <typename T>
+      bool operator>>(std::vector<T>& dest) const
+      {
+        if (this->off_ptr_)
+        {
+          dest.resize(0);
+          dest.resize(size_);
+          for (std::size_t i = 0; i < sparse_size_; ++i)
+          {
+            dest[off_ptr_[i]] = val_ptr_[i];
+          }
+        }
+        else if (val_ptr_)
+        {
+          dest.resize(size_);
+          std::copy_n(val_ptr_, size_, dest.begin());
+        }
+        return false;
+      }
+
+      template <typename T>
       bool operator>>(savvy::compressed_vector<T>& dest) const
       {
         if (this->off_ptr_)
         {
-
+          dest.assign(size_, sparse_size_, val_ptr_, off_ptr_);
         }
-        else if (this->val_ptr_)
+        else if (val_ptr_)
         {
-
+          dest.resize(0);
+          dest.resize(size_);
+          for (std::size_t i = 0; i < size_; ++i)
+            if (val_ptr_[i])
+              dest[i] = val_ptr_[i];
         }
         return false;
       }

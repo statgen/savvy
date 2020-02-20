@@ -109,6 +109,24 @@ namespace savvy
       resize(sz);
     }
 
+    template <typename ValT, typename OffT>
+    compressed_vector(std::size_t sz, std::size_t sp_sz, ValT val_it, OffT off_it)
+    {
+      assign(sz, sp_sz, val_it, off_it);
+    }
+
+    template <typename ValT, typename OffT>
+    void assign(std::size_t sz, std::size_t sp_sz, ValT val_it, OffT off_it)
+    {
+      size_ = sz;
+      this->values_.clear();
+      this->offsets_.clear();
+      this->values_.resize(sp_sz);
+      this->offsets_.resize(sp_sz);
+      std::copy_n(val_it, sp_sz, values_.begin());
+      std::copy_n(off_it, sp_sz, offsets_.begin());
+    }
+
     value_type& operator[](std::size_t pos)
     {
       if (offsets_.size() && offsets_.back() < pos)
