@@ -11,6 +11,123 @@
 #include "savvy/sav_reader.hpp"
 
 #include <getopt.h>
+#include <savvy/bcf_writer.hpp>
+
+class stat_prog_args
+{
+private:
+  std::vector<option> long_options_;
+  std::string input_path_;
+  bool help_ = false;
+public:
+  stat_prog_args() :
+    long_options_(
+      {
+        {"help", no_argument, 0, 'h'},
+        {0, 0, 0, 0}
+      })
+  {
+  }
+
+  const std::string& input_path() const { return input_path_; }
+  bool help_is_set() const { return help_; }
+
+  void print_usage(std::ostream& os)
+  {
+    os << "Usage: sav stat [opts ...] <in.sav> \n";
+    os << "\n";
+    os << " -h, --help  Print usage\n";
+    os << std::flush;
+  }
+
+  bool parse(int argc, char** argv)
+  {
+    int long_index = 0;
+    int opt = 0;
+    while ((opt = getopt_long(argc, argv, "h", long_options_.data(), &long_index )) != -1)
+    {
+      char copt = char(opt & 0xFF);
+      switch (copt)
+      {
+      case 'h':
+        help_ = true;
+        return true;
+      default:
+        return false;
+      }
+    }
+
+    int remaining_arg_count = argc - optind;
+
+    if (remaining_arg_count == 1)
+    {
+      input_path_ = argv[optind];
+    }
+    else if (remaining_arg_count < 1)
+    {
+      std::cerr << "Too few arguments\n";
+      return false;
+    }
+    else
+    {
+      std::cerr << "Too many arguments\n";
+      return false;
+    }
+
+    return true;
+  }
+};
+
+int stat_main(int argc, char** argv)
+{
+  stat_prog_args args;
+  if (!args.parse(argc, argv))
+  {
+    args.print_usage(std::cerr);
+    return EXIT_FAILURE;
+  }
+
+  if (args.help_is_set())
+  {
+    args.print_usage(std::cout);
+    return EXIT_SUCCESS;
+  }
+
+  std::size_t multi_allelic{}, record_cnt{}, variant_cnt{};
+  savvy::compressed_vector<float> geno;
+
+  bool is_sav2 = true;
+  if (is_sav2)
+  {
+    savvy::sav2::reader rdr(args.input_path());
+    savvy::sav2::variant rec;
+
+    while (rdr.read_record(rec))
+    {
+      rec.format_fields().front().second >> geno;
+      if (rec.alts().size() > 1)
+        ++multi_allelic;
+      variant_cnt += rec.alts().size();
+      ++record_cnt;
+    }
+  }
+  else
+  {
+    savvy::sav::reader rdr(args.input_path(), savvy::fmt::hds);
+    savvy::site_info site;
+
+    while (rdr.read(site, geno))
+    {
+      variant_cnt += 1;
+      ++record_cnt;
+    }
+
+  }
+
+  std::cout << record_cnt << "\t" << variant_cnt << "\t" << multi_allelic << "\n";
+
+  return EXIT_SUCCESS;
+}
 
 class stat_index_prog_args
 {
@@ -78,9 +195,6 @@ public:
     return true;
   }
 };
-
-
-
 
 int stat_index_main(int argc, char** argv)
 {

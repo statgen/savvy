@@ -124,6 +124,10 @@ int main(int argc, char** argv)
   {
     return rehead_main(argc, argv);
   }
+  else if (args.sub_command() == "stat")
+  {
+    return stat_main(argc, argv);
+  }
   else if (args.sub_command() == "stat-index")
   {
     return stat_index_main(argc, argv);

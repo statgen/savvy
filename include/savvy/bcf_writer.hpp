@@ -16,6 +16,8 @@
 
 namespace savvy
 {
+  std::vector<std::uint8_t> bcf_type_shift = { 0, 0, 1, 2, 3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
   namespace bcf
   {
     template<typename T>
@@ -749,6 +751,7 @@ namespace savvy
       {
         if (this->off_ptr_)
         {
+
         }
         else if (this->val_ptr_)
         {
@@ -1067,17 +1070,20 @@ namespace savvy
 
       reader& read_record(variant& r)
       {
-        if (index_)
-          return read_indexed_record(r);
+        if (good())
+        {
+          if (index_)
+            return read_indexed_record(r);
 
-        bool is_bcf = false; // TODO ...
-        if (!variant::internal::read(r, *input_stream_, dict_, ids_.size(), is_bcf))
-          input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+          bool is_bcf = false; // TODO ...
+          if (!variant::internal::read(r, *input_stream_, dict_, ids_.size(), is_bcf) && input_stream_->good())
+            input_stream_->setstate(std::ios::badbit);
+        }
 
         return *this;
       }
 
-      operator bool() const { return (bool)input_stream_; };
+      operator bool() const { return (bool)(*input_stream_); };
     private:
       static bool read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict)
       {
@@ -1160,7 +1166,7 @@ namespace savvy
           }
         }
 
-        std::fprintf(stderr, "Error: corrupt header");
+        std::fprintf(stderr, "Error: corrupt header\n");
         return false;
       }
     };
@@ -1763,7 +1769,7 @@ namespace savvy
 
         if (dict.int_to_str[dictionary::contig].size() <= tmp_int)
         {
-          std::fprintf(stderr, "Error: Invalid contig id");
+          std::fprintf(stderr, "Error: Invalid contig id\n");
           return false;
         }
         s.chrom_ = dict.int_to_str[dictionary::contig][tmp_int];
@@ -1810,7 +1816,7 @@ namespace savvy
           {
             if (dict.int_to_str[dictionary::id].size() <= *it)
             {
-              std::fprintf(stderr, "Error: Invalid filter id");
+              std::fprintf(stderr, "Error: Invalid filter id\n");
               return false;
             }
             s.filters_.emplace_back(dict.int_to_str[dictionary::id][*it]);
@@ -1825,7 +1831,7 @@ namespace savvy
             shared_it = bcf::deserialize_int(shared_it, s.shared_data_.end(), info_key_id);
             if (dict.int_to_str[dictionary::id].size() <= info_key_id)
             {
-              std::fprintf(stderr, "Error: Invalid info id");
+              std::fprintf(stderr, "Error: Invalid info id\n");
               return false;
             }
             std::string info_key = dict.int_to_str[dictionary::id][info_key_id];
@@ -1855,12 +1861,12 @@ namespace savvy
         }
         catch (const std::exception& e)
         {
-          std::fprintf(stderr, "Error: Invalid record data");
+          std::fprintf(stderr, "Error: Invalid record data\n");
           return false;
         }
       }
 
-      std::fprintf(stderr, "Error: Invalid record data");
+      std::fprintf(stderr, "Error: Invalid record data\n");
       return false;
     }
 
@@ -1877,7 +1883,7 @@ namespace savvy
       auto res = dict.str_to_int[dictionary::contig].find(s.chrom_);
       if (res == dict.str_to_int[dictionary::contig].end())
       {
-        std::fprintf(stderr, "Error: Contig not in header");
+        std::fprintf(stderr, "Error: Contig not in header\n");
         return false;
       }
 
@@ -1908,7 +1914,7 @@ namespace savvy
         res = dict.str_to_int[dictionary::id].find(*it);
         if (res == dict.str_to_int[dictionary::id].end())
         {
-          std::fprintf(stderr, "Error: Filter not in header");
+          std::fprintf(stderr, "Error: Filter not in header\n");
           return false;
         }
         filter_ints.emplace_back(res->second);
@@ -1921,7 +1927,7 @@ namespace savvy
         res = dict.str_to_int[dictionary::id].find(it->first);
         if (res == dict.str_to_int[dictionary::id].end())
         {
-          std::fprintf(stderr, "Error: INFO key not in header");
+          std::fprintf(stderr, "Error: INFO key not in header\n");
           return false;
         }
 
@@ -1937,6 +1943,10 @@ namespace savvy
     {
       std::uint32_t shared_sz, indiv_sz;
       ifs.read((char*)&shared_sz, sizeof(shared_sz)); // TODO: endian
+      if (!ifs)
+      {
+        return false;
+      }
       ifs.read((char*)&indiv_sz, sizeof(indiv_sz));
 
       if (ifs && site_info::internal::read(v, ifs, dict, shared_sz))
@@ -1956,7 +1966,7 @@ namespace savvy
               indiv_it = bcf::deserialize_int(indiv_it, v.indiv_buf_.end(), fmt_key_id);
               if (dict.int_to_str[dictionary::id].size() <= fmt_key_id)
               {
-                std::fprintf(stderr, "Error: Invalid FMT id");
+                std::fprintf(stderr, "Error: Invalid FMT id\n");
                 return false;
               }
               std::string fmt_key = dict.int_to_str[dictionary::id][fmt_key_id];
@@ -2011,7 +2021,7 @@ namespace savvy
             }
             catch (const std::exception& e)
             {
-              std::fprintf(stderr, "Error: Invalid record data");
+              std::fprintf(stderr, "Error: Invalid record data\n");
               return false;
             }
           }
@@ -2021,7 +2031,7 @@ namespace savvy
         }
       }
 
-      std::fprintf(stderr, "Error: Invalid record data");
+      std::fprintf(stderr, "Error: Invalid record data\n");
       return false;
     }
 
@@ -2036,7 +2046,7 @@ namespace savvy
 
       if (buf.size() > std::numeric_limits<std::uint32_t>::max())
       {
-        fprintf(stderr, "Error: shared data too big");
+        fprintf(stderr, "Error: shared data too big\n");
         return false;
       }
 
@@ -2049,7 +2059,7 @@ namespace savvy
         auto res = dict.str_to_int[dictionary::id].find(it->first);
         if (res == dict.str_to_int[dictionary::id].end())
         {
-          std::fprintf(stderr, "Error: FMT key not in header");
+          std::fprintf(stderr, "Error: FMT key not in header\n");
           return false;
         }
 
@@ -2060,7 +2070,7 @@ namespace savvy
 
       if (buf.size() - shared_sz > std::numeric_limits<std::uint32_t>::max())
       {
-        std::fprintf(stderr, "Error: individual data too big");
+        std::fprintf(stderr, "Error: individual data too big\n");
         return false;
       }
 
