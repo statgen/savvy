@@ -862,7 +862,7 @@ namespace savvy
     private:
       std::string chrom_;
       std::string id_;
-      std::uint32_t pos_ = (std::uint32_t)-1;
+      std::uint32_t pos_ = 0;
       float qual_; //0.f;
       std::string ref_;
       std::vector<std::string> alts_;
@@ -881,7 +881,7 @@ namespace savvy
 
       const std::string& chrom() const { return chrom_; }
       const std::string& id() const { return id_; }
-      std::uint32_t pos() const { return pos_ + 1u; }
+      std::uint32_t pos() const { return pos_; }
       float qual() const { return qual_; }
       const std::string& ref() const { return ref_; }
       const std::vector<std::string>& alts() const { return alts_; }
@@ -1246,6 +1246,31 @@ namespace savvy
           index_file_ = ::savvy::detail::make_unique<s1r::writer>(file_path + ".s1r" , uuid_);
         }
       }
+
+      ~writer()
+      {
+        // TODO: This is only a temp solution.
+        if (index_file_)
+        {
+          if (record_count_in_block_)
+          {
+            auto file_pos = std::uint64_t(ofs_.tellp());
+            if (record_count_in_block_ > 0x10000) // Max records per block: 64*1024
+            {
+              assert(!"Too many records in zstd frame to be indexed!");
+            }
+
+            if (file_pos > 0x0000FFFFFFFFFFFF) // Max file size: 256 TiB
+            {
+              assert(!"File size to large to be indexed!");
+            }
+
+            s1r::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
+            index_file_->write(current_chromosome_, e);
+          }
+        }
+      }
+
       void write_header(const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids)
       {
         std::string magic = {'S','A','V','\x02','\x00'};
@@ -1798,7 +1823,7 @@ namespace savvy
         }
         s.chrom_ = dict.int_to_str[dictionary::contig][tmp_int];
 
-        s.pos_ = static_cast<std::uint32_t>(buf[1].i);
+        s.pos_ = static_cast<std::uint32_t>(buf[1].i) + 1;
         // skip rlen
         s.qual_ = buf[3].f;
 
@@ -1912,7 +1937,7 @@ namespace savvy
       }
 
       buf[0].i = static_cast<std::int32_t>(res->second);
-      buf[1].i = static_cast<std::int32_t>(s.pos_);
+      buf[1].i = static_cast<std::int32_t>(s.pos_ - 1);
       buf[2].i = static_cast<std::int32_t>(s.chrom_.size());
       buf[3].f = s.qual_;
 
