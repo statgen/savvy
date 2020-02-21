@@ -744,6 +744,9 @@ namespace savvy
         operator=(std::move(src));
       }
 
+      std::size_t size() const { return size_; }
+      bool is_sparse() const { return off_ptr_ != nullptr; }
+
       typed_value& operator=(typed_value&& src);
 
       template <typename T>
@@ -771,6 +774,7 @@ namespace savvy
       {
         if (this->off_ptr_)
         {
+          // TODO: support relative offsets
           dest.assign(size_, sparse_size_, val_ptr_, off_ptr_);
         }
         else if (val_ptr_)
@@ -778,8 +782,10 @@ namespace savvy
           dest.resize(0);
           dest.resize(size_);
           for (std::size_t i = 0; i < size_; ++i)
+          {
             if (val_ptr_[i])
               dest[i] = val_ptr_[i];
+          }
         }
         return false;
       }
@@ -826,8 +832,8 @@ namespace savvy
       std::uint8_t off_type_ = 0;
       std::size_t size_ = 0;
       std::size_t sparse_size_ = 0;
-      char* val_ptr_ = nullptr;
       char* off_ptr_ = nullptr;
+      char* val_ptr_ = nullptr;
       std::vector<char> local_data_;
     };
 
@@ -1216,6 +1222,17 @@ namespace savvy
       std::size_t record_count_in_block_ = 0;
       std::uint32_t current_block_min_ = std::numeric_limits<std::uint32_t>::max();
       std::uint32_t current_block_max_ = 0;
+
+      // PBWT
+      struct pbwt_sort_context
+      {
+        std::string field;
+        std::string id;
+        std::size_t ploidy = 0;
+        std::vector<std::size_t> sort_map;
+      };
+      std::unordered_map<std::string, pbwt_sort_context> sort_contexts_;
+      std::unordered_multimap<std::string, std::reference_wrapper<pbwt_sort_context>> fmt_to_pbwt_context_;
     private:
       static std::filebuf* create_std_filebuf(const std::string& file_path, std::ios::openmode mode)
       {
@@ -1232,7 +1249,7 @@ namespace savvy
           return std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out));
       }
     public:
-      writer(const std::string& file_path) :
+      writer(const std::string& file_path, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids) :
         rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t)this),
         output_buf_(create_out_streambuf(file_path, 3)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         ofs_(output_buf_.get()),
@@ -1245,6 +1262,8 @@ namespace savvy
         {
           index_file_ = ::savvy::detail::make_unique<s1r::writer>(file_path + ".s1r" , uuid_);
         }
+
+        write_header(headers, ids);
       }
 
       ~writer()
@@ -1269,60 +1288,6 @@ namespace savvy
             index_file_->write(current_chromosome_, e);
           }
         }
-      }
-
-      void write_header(const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids)
-      {
-        std::string magic = {'S','A','V','\x02','\x00'};
-
-        std::uint32_t header_block_sz = 0;
-        for (auto it = headers.begin(); it != headers.end(); ++it)
-        {
-          header_block_sz += it->first.size();
-          header_block_sz += it->second.size();
-          header_block_sz += 4;
-        }
-
-        std::string column_names = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
-        header_block_sz += column_names.size();
-
-        for (auto it = ids.begin(); it != ids.end(); ++it)
-        {
-          header_block_sz += 1 + it->size();
-        }
-
-        header_block_sz += 2; //new line and null
-
-        ofs_.write(magic.data(), magic.size());
-        ofs_.write((char*)(&header_block_sz), sizeof(header_block_sz));
-
-        for (auto it = headers.begin(); it != headers.end(); ++it)
-        {
-          std::string hid = parse_header_sub_field(it->second, "ID");
-          if (!hid.empty())
-          {
-            int which_dict = it->first == "contig" ? dictionary::contig : dictionary::id;
-
-            dict_.int_to_str[which_dict].emplace_back(hid);
-            dict_.str_to_int[which_dict][hid] = dict_.int_to_str[which_dict].size() - 1;
-          }
-
-          ofs_.write("##", 2);
-          ofs_.write(it->first.data(), it->first.size());
-          ofs_.write("=", 1);
-          ofs_.write(it->second.data(), it->second.size());
-          ofs_.write("\n", 1);
-        }
-
-        ofs_.write(column_names.data(), column_names.size());
-        for (auto it = ids.begin(); it != ids.end(); ++it)
-        {
-          ofs_.write("\t", 1);
-          ofs_.write(it->data(), it->size());
-        }
-        n_samples_ = ids.size();
-
-        ofs_.write("\n\0", 2);
       }
 
       writer& write_record(const variant& r)
@@ -1355,6 +1320,24 @@ namespace savvy
           current_block_min_ = std::numeric_limits<std::uint32_t>::max();
           current_block_max_ = 0;
         }
+
+//        std::vector<std::string> pbwt_info_flags;
+//        pbwt_info_flags.reserve(fmt_to_pbwt_context_.size());
+//        for (auto it = r.format_fields().begin(); it != r.format_fields().end(); ++it)
+//        {
+//          if (!it->second.is_sparse())
+//          {
+//            auto res = fmt_to_pbwt_context_.find(it->first);
+//            for (auto jt = res; jt != r.format_fields().end(); ++jt)
+//            {
+//              if (jt->second.get().ploidy == it->second.size() / n_samples_)
+//              {
+//                pbwt_info_flags.emplace_back(jt->second.get().id);
+//                break;
+//              }
+//            }
+//          }
+//        }
 
         std::uint32_t shared_sz, indiv_sz;
         if (!variant::internal::serialize(r, serialized_buf_, dict_, n_samples_, is_bcf, shared_sz, indiv_sz))
@@ -1478,6 +1461,70 @@ namespace savvy
 //          bcf::write_typed_scalar(ofs_, (std::int32_t)(dict_.str_to_int[dictionary::id].find(f.key())->second)); // TODO: Allow for variable sized FMT keys.
 //          ofs_.write((char*)(f.serialized_data().data()), f.serialized_data().size());
 //        }
+      }
+    private:
+      void write_header(const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids)
+      {
+        std::string magic = {'S','A','V','\x02','\x00'};
+
+        std::uint32_t header_block_sz = 0;
+        for (auto it = headers.begin(); it != headers.end(); ++it)
+        {
+          header_block_sz += it->first.size();
+          header_block_sz += it->second.size();
+          header_block_sz += 4;
+        }
+
+        std::string column_names = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
+        header_block_sz += column_names.size();
+
+        for (auto it = ids.begin(); it != ids.end(); ++it)
+        {
+          header_block_sz += 1 + it->size();
+        }
+
+        header_block_sz += 2; //new line and null
+
+        ofs_.write(magic.data(), magic.size());
+        ofs_.write((char*)(&header_block_sz), sizeof(header_block_sz));
+
+        for (auto it = headers.begin(); it != headers.end(); ++it)
+        {
+          std::string hid = parse_header_sub_field(it->second, "ID");
+          if (!hid.empty())
+          {
+            int which_dict = it->first == "contig" ? dictionary::contig : dictionary::id;
+
+            dict_.int_to_str[which_dict].emplace_back(hid);
+            dict_.str_to_int[which_dict][hid] = dict_.int_to_str[which_dict].size() - 1;
+          }
+
+          if (it->first == "INFO")
+          {
+            if (hid.substr(0, 10) == "_PBWT_SORT")
+            {
+              pbwt_sort_context ctx;
+              ctx.field = parse_header_sub_field(it->second, "Field");
+              sort_contexts_[hid] = std::move(ctx);
+            }
+          }
+
+          ofs_.write("##", 2);
+          ofs_.write(it->first.data(), it->first.size());
+          ofs_.write("=", 1);
+          ofs_.write(it->second.data(), it->second.size());
+          ofs_.write("\n", 1);
+        }
+
+        ofs_.write(column_names.data(), column_names.size());
+        for (auto it = ids.begin(); it != ids.end(); ++it)
+        {
+          ofs_.write("\t", 1);
+          ofs_.write(it->data(), it->size());
+        }
+        n_samples_ = ids.size();
+
+        ofs_.write("\n\0", 2);
       }
     };
 
@@ -1607,7 +1654,8 @@ namespace savvy
         *(out_it++) = type_byte;
         bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.sparse_size_));
         std::size_t pair_width = (1u << bcf_type_shift[v.off_type_]) + (1u << bcf_type_shift[v.val_type_]);
-        std::copy_n(v.val_ptr_, v.sparse_size_ * pair_width, out_it);
+        assert(v.off_ptr_ == (v.val_ptr_ - (1u << bcf_type_shift[v.off_type_]) * v.sparse_size_));
+        std::copy_n(v.off_ptr_, v.sparse_size_ * pair_width, out_it);
       }
       else
       {
@@ -1681,6 +1729,19 @@ namespace savvy
       }
     }
 
+    template <typename T>
+    void copy_offsets(const std::size_t* index_data, std::size_t sp_sz, T* off_ptr)
+    {
+      const std::size_t* index_data_end = index_data + sp_sz;
+      std::size_t last_off = 0;
+      for (auto it = index_data; it != index_data_end; ++it)
+      {
+        std::size_t off = (*it) - last_off;
+        last_off = (*it) + 1;
+        *(off_ptr++) = off;
+      }
+    }
+
     template<typename T>
     typename std::enable_if<std::is_same<T, ::savvy::compressed_vector<typename T::value_type>>::value && std::is_signed<typename T::value_type>::value, void>::type
     typed_value::init(const T& vec)
@@ -1730,19 +1791,22 @@ namespace savvy
       off_ptr_ = local_data_.data();
       val_ptr_ = local_data_.data() + (sparse_size_ * off_width);
 
+
+
+
       switch (off_type_)
       {
       case 0x01u:
-        std::copy_n(vec.value_data(), sparse_size_, (std::int8_t*)off_ptr_);
+        copy_offsets(vec.index_data(), sparse_size_, (std::uint8_t*)off_ptr_);
         break;
       case 0x02u:
-        std::copy_n(vec.value_data(), sparse_size_, (std::int16_t*)off_ptr_); // TODO: handle endianess
+        copy_offsets(vec.index_data(), sparse_size_, (std::uint16_t*)off_ptr_); // TODO: handle endianess
         break;
       case 0x03u:
-        std::copy_n(vec.value_data(), sparse_size_, (std::int32_t*)off_ptr_);
+        copy_offsets(vec.index_data(), sparse_size_, (std::uint32_t*)off_ptr_);
         break;
       case 0x04u:
-        std::copy_n(vec.value_data(), sparse_size_, (std::int64_t*)off_ptr_);
+        copy_offsets(vec.index_data(), sparse_size_, (std::uint64_t*)off_ptr_);
         break;
       }
 
