@@ -8,6 +8,7 @@
 #define LIBSAVVY_DATA_FORMAT_HPP
 
 #include <cstdint>
+#include <string>
 
 namespace savvy
 {
@@ -40,6 +41,20 @@ namespace savvy
       case fmt::pl: return ploidy + 1;
       case fmt::ds: return 1;
       case fmt::hds: return ploidy;
+    }
+  }
+
+  inline std::string fmt_to_string(fmt f)
+  {
+    switch (f)
+    {
+    case fmt::gt: return "GT";
+    case fmt::ac: return "AC";
+    case fmt::gp: return "GP";
+    case fmt::gl: return "GL";
+    case fmt::pl: return "PL";
+    case fmt::ds: return "DS";
+    case fmt::hds: return "HDS";
     }
   }
 }

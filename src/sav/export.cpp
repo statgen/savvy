@@ -29,6 +29,7 @@ private:
 
   std::vector<option> long_options_;
   std::set<std::string> subset_ids_;
+  std::set<std::string> fields_to_generate_;
   std::vector<savvy::genomic_region> regions_;
   std::unique_ptr<savvy::slice_bounds> slice_;
   std::vector<std::string> info_fields_;
@@ -44,6 +45,7 @@ private:
   int update_info_ = -1;
   int compression_level_ = -1;
   std::uint16_t block_size_ = default_block_size;
+  bool sites_only_ = false;
   bool help_ = false;
   bool index_ = false;
 public:
@@ -55,6 +57,7 @@ public:
         {"data-format", required_argument, 0, 'd'},
         {"file-format", required_argument, 0, 'f'},
         {"filter", required_argument, 0, 'e'},
+        {"generate-info", required_argument, 0, '\x01'},
         {"headers", required_argument, 0, '\x01'},
         {"help", no_argument, 0, 'h'},
         {"index", no_argument, 0, 'x'},
@@ -67,6 +70,7 @@ public:
         {"slice", required_argument, 0, 'c'},
         {"sort", no_argument, 0, 's'},
         {"sort-point", required_argument, 0, 'S'},
+        {"sites-only", no_argument, 0, '\x02'},
         {"update-info", required_argument, 0, '\x01'},
         {0, 0, 0, 0}
       }),
@@ -81,6 +85,7 @@ public:
   const std::string& headers_path() const { return headers_path_; }
   const filter& filter_functor() const { return filter_; }
   const std::set<std::string>& subset_ids() const { return subset_ids_; }
+  const std::set<std::string>& fields_to_generate() const { return fields_to_generate_; }
   const std::vector<savvy::genomic_region>& regions() const { return regions_; }
   const std::vector<std::string>& info_fields() const { return info_fields_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
@@ -91,6 +96,7 @@ public:
   std::uint16_t block_size() const { return block_size_; }
   bool update_info() const { return update_info_ != 0; }
   bool index_is_set() const { return index_; }
+  bool sites_only_is_set() const { return sites_only_; }
   bool help_is_set() const { return help_; }
 
   void print_usage(std::ostream& os)
@@ -103,6 +109,7 @@ public:
     os << " -d, --data-format      Format field to export (GT, DS, HDS or GP, default: GT)\n";
     os << " -e, --filter           Expression for filtering based on info fields (eg, -e 'AC>=10;AF>0.01') # (IN DEVELOPMENT) More complex expressions in the works\n";
     os << " -f, --file-format      File format (vcf, vcf.gz or sav, default: vcf)\n";
+    os << " -g, --generate-info    Generate info fields specified as a comma separated list (AC,AN,AF,MAF,SPARSE_OFFSETS_<FMT>,SPARSE_VALUES_<FMT>)\n";
     os << " -h, --help             Print usage\n";
     os << " -i, --sample-ids       Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file  Path to file containing list of sample IDs to subset\n";
@@ -115,8 +122,9 @@ public:
     os << " -x, --index            Enables indexing (SAV output only)\n";
     os << " -X, --index-file       Enables indexing and specifies index output file (SAV output only)\n";
     os << "\n";
-    os << "     --headers          Path to headers file that is either formated as VCF headers or tab-delimited key value pairs\n";
-    os << "     --update-info      Specifies whether AC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
+    os << "     --headers          Path to headers file that is either formatted as VCF headers or tab-delimited key value pairs\n";
+    os << "     --sites-only       Exclude individual level data.\n";
+    //os << "     --update-info      Specifies whether AC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
     os << std::flush;
   }
 
@@ -131,7 +139,12 @@ public:
       {
         case '\x01':
         {
-          if (std::string(long_options_[long_index].name) == "headers")
+          if (std::string(long_options_[long_index].name) == "generate-info")
+          {
+            fields_to_generate_ = split_string_to_set(optarg ? optarg : "", ',');
+            break;
+          }
+          else if (std::string(long_options_[long_index].name) == "headers")
           {
             headers_path_ = std::string(optarg ? optarg : "");
             break;
@@ -155,6 +168,13 @@ public:
           }
           std::cerr << "Invalid long only index (" << long_index << ")\n";
           return false;
+        }
+        case '\x02':
+        {
+          if (std::string(long_options_[long_index].name) == "sites-only")
+          {
+            sites_only_ = true;
+          }
         }
         case '0':
         case '1':
@@ -411,6 +431,33 @@ public:
       info_fields_.emplace_back("FILTER");
     }
 
+    if (sites_only_ && file_format_ != "vcf" && file_format_ != "vcf.gz")
+    {
+      std::cerr << "--sites-only is only supported for VCF file format\n";
+      return false;
+    }
+
+    {
+      std::set<std::string> allowed = {"AC", "AN", "AF", "MAF"};
+      for (auto it = fields_to_generate_.begin(); it != fields_to_generate_.end(); ++it)
+      {
+        if (allowed.find(*it) == allowed.end())
+        {
+          if (*it != "SPARSE_OFFSETS_" + savvy::fmt_to_string(format_) && *it != "SPARSE_VALUES_" + savvy::fmt_to_string(format_))
+          {
+            std::cerr << "Invalid --generate-info value (" << (*it) << ")\n";
+            return false;
+          }
+
+          if (format_ != savvy::fmt::gt && format_ != savvy::fmt::hds)
+          {
+            std::cerr << "Only GT and HDS are supported with --generate-info (" + *it + ")\n";
+            return false;
+          }
+        }
+      }
+    }
+
     return true;
   }
 };
@@ -438,6 +485,128 @@ public:
 //  }
 //}
 
+template <typename T>
+std::string create_sparse_offsets_string(const std::vector<T>& genotypes)
+{
+  std::stringstream ret;
+  //ret.reserve(genotypes.size());
+
+  bool first_entry = true;
+  const int max_size = std::numeric_limits<std::size_t>::digits10 + 1;
+  char buffer[max_size] = {0};
+  const T empty_value = T();
+  for (std::size_t i = 0; i < genotypes.size(); ++i)
+  {
+    if (genotypes[i] != empty_value)
+    {
+      if (!first_entry)
+        ret.put(',');
+      //std::snprintf(buffer, max_size, "%lu", i);
+      ret << i; //buffer;
+      first_entry = false;
+    }
+  }
+
+  return ret.str();
+}
+
+template <typename T>
+std::string create_sparse_values_string(const std::vector<T>& genotypes)
+{
+  std::stringstream ret;
+
+  bool first_entry = true;
+  for (std::size_t i = 0; i < genotypes.size(); ++i)
+  {
+    if (genotypes[i] != T())
+    {
+      if (!first_entry)
+        ret.put(',');
+      ret << genotypes[i];
+      first_entry = false;
+    }
+  }
+
+  return ret.str();
+}
+
+template <typename T>
+std::string create_sparse_offsets_string(const savvy::compressed_vector<T>& genotypes)
+{
+  std::stringstream ret;
+
+  bool first_entry = true;
+  for (auto it = genotypes.begin(); it != genotypes.end(); ++it)
+  {
+    if (!first_entry)
+      ret.put(',');
+    ret << it.offset();
+    first_entry = false;
+  }
+
+  return ret.str();
+}
+
+template <typename T>
+std::string create_sparse_values_string(const savvy::compressed_vector<T>& genotypes)
+{
+  std::stringstream ret;
+
+  bool first_entry = true;
+  for (auto it = genotypes.begin(); it != genotypes.end(); ++it)
+  {
+    if (!first_entry)
+      ret.put(',');
+    ret << (*it);
+    first_entry = false;
+  }
+
+  return ret.str();
+}
+
+
+template <typename Vec>
+void set_info(savvy::site_info& variant, const Vec& genotypes, const std::set<std::string>& fields_to_generate, savvy::fmt format)
+{
+  std::size_t ac = 0, an = 0;
+  float af = -1.f, maf = 0.f;
+  for (auto it = fields_to_generate.begin(); it != fields_to_generate.end(); ++it)
+  {
+    if (*it == "AC")
+    {
+      if (af < 0.f)
+        std::tie(ac, an, af, maf) = savvy::generate_standard_info_fields(genotypes);
+      variant.prop("AC", std::to_string(ac));
+    }
+    else if (*it == "AN")
+    {
+      if (af < 0.f)
+        std::tie(ac, an, af, maf) = savvy::generate_standard_info_fields(genotypes);
+      variant.prop("AN", std::to_string(an));
+    }
+    else if (*it == "AF")
+    {
+      if (af < 0.f)
+        std::tie(ac, an, af, maf) = savvy::generate_standard_info_fields(genotypes);
+      variant.prop("AF", std::to_string(af));
+    }
+    else if (*it == "MAF")
+    {
+      if (af < 0.f)
+        std::tie(ac, an, af, maf) = savvy::generate_standard_info_fields(genotypes);
+      variant.prop("MAF", std::to_string(maf));
+    }
+    else if (*it == "SPARSE_OFFSETS_" + savvy::fmt_to_string(format))
+    {
+      variant.prop("SPARSE_OFFSETS_" + savvy::fmt_to_string(format), create_sparse_offsets_string(genotypes));
+    }
+    else if (*it == "SPARSE_VALUES_" + savvy::fmt_to_string(format))
+    {
+      variant.prop("SPARSE_VALUES_" + savvy::fmt_to_string(format), create_sparse_values_string(genotypes));
+    }
+  }
+}
+
 template <typename Vec, typename Writer>
 int export_records(savvy::sav::reader& in, const export_prog_args& args, Writer& out)
 {
@@ -451,7 +620,10 @@ int export_records(savvy::sav::reader& in, const export_prog_args& args, Writer&
   {
     if (args.update_info())
       savvy::update_info_fields(variant, genotypes, args.format());
-    out.write(variant, genotypes);
+
+    set_info(variant, genotypes, args.fields_to_generate(), args.format());
+
+    out.write(variant, args.sites_only_is_set() ? Vec() : genotypes);
   }
 
   return out.good() && !in.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
@@ -469,6 +641,9 @@ int export_records(savvy::sav::indexed_reader& in, const export_prog_args& args,
   {
     if (args.update_info())
       savvy::update_info_fields(variant, genotypes, args.format());
+
+    set_info(variant, genotypes, args.fields_to_generate(), args.format());
+
     out.write(variant, genotypes);
   }
 
@@ -481,6 +656,9 @@ int export_records(savvy::sav::indexed_reader& in, const export_prog_args& args,
       {
         if (args.update_info())
           savvy::update_info_fields(variant, genotypes, args.format());
+
+        set_info(variant, genotypes, args.fields_to_generate(), args.format());
+
         out.write(variant, genotypes);
       }
     }
@@ -551,7 +729,7 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
     }
   }
 
-
+  std::set<std::string> info_fields_already_included;
   for (auto it = headers.begin(); it != headers.end(); )
   {
     std::string header_id = savvy::parse_header_sub_field(it->second, "ID");
@@ -572,9 +750,24 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
           it->second = std::string(datestr);
         }
       }
+      else if (it->first == "INFO")
+      {
+        info_fields_already_included.insert(savvy::parse_header_sub_field(it->second, "ID"));
+      }
 
       ++it;
     }
+  }
+
+  for (auto it = args.fields_to_generate().begin(); it != args.fields_to_generate().end(); ++it)
+  {
+    if (info_fields_already_included.find(*it) == info_fields_already_included.end())
+      headers.emplace_back("INFO", "<ID=" + (*it) + ">");
+  }
+
+  if (args.sites_only_is_set())
+  {
+    sample_ids.clear();
   }
 
 //  if (args.format() == savvy::fmt::allele)

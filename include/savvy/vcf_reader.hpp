@@ -1275,7 +1275,9 @@ namespace savvy
           (*output_stream_) << "##FORMAT=<ID=GP,Number=G,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes\">\n";
       }
 
-      (*output_stream_) << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
+      (*output_stream_) << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO";
+      if (sample_size_)
+        (*output_stream_) << "\tFORMAT";
       for (auto it = samples_beg; it != samples_end; ++it)
       {
         (*output_stream_) << (std::string("\t") + *it);
@@ -1316,41 +1318,44 @@ namespace savvy
       {
         // VALIDATE VECTOR SIZES
         std::size_t ploidy = 0;
-        for (std::size_t i = 0; i < format_fields_.size(); ++i)
+        if (sample_size_)
         {
-          fmt f = format_fields_[i];
-          if (f == fmt::gt || f == fmt::hds)
+          for (std::size_t i = 0; i < format_fields_.size(); ++i)
           {
-            if (ploidy)
+            fmt f = format_fields_[i];
+            if (f == fmt::gt || f == fmt::hds)
             {
-              if ((get_vec(i, data...).size() / sample_size_) != ploidy || (get_vec(i, data...).size() % sample_size_) != 0)
+              if (ploidy)
+              {
+                if ((get_vec(i, data...).size() / sample_size_) != ploidy || (get_vec(i, data...).size() % sample_size_) != 0)
+                  this->output_stream_->setstate(std::ios::failbit);
+              }
+              else
+              {
+                ploidy = (get_vec(i, data...).size() / sample_size_);
+                if ((get_vec(i, data...).size() % sample_size_) != 0 || ploidy == 0)
+                  this->output_stream_->setstate(std::ios::failbit);
+              }
+            }
+            else if (f == fmt::gp)
+            {
+              if (ploidy)
+              {
+                if ((get_vec(i, data...).size() / sample_size_) - 1 != ploidy || (get_vec(i, data...).size() % sample_size_) != 0)
+                  this->output_stream_->setstate(std::ios::failbit);
+              }
+              else
+              {
+                ploidy = (get_vec(i, data...).size() / sample_size_) - 1;
+                if ((get_vec(i, data...).size() % sample_size_) != 0 || ploidy == 0)
+                  this->output_stream_->setstate(std::ios::failbit);
+              }
+            }
+            else if (f == fmt::ds)
+            {
+              if (sample_size_ != get_vec(i, data...).size())
                 this->output_stream_->setstate(std::ios::failbit);
             }
-            else
-            {
-              ploidy = (get_vec(i, data...).size() / sample_size_);
-              if ((get_vec(i, data...).size() % sample_size_) != 0 || ploidy == 0)
-                this->output_stream_->setstate(std::ios::failbit);
-            }
-          }
-          else if (f == fmt::gp)
-          {
-            if (ploidy)
-            {
-              if ((get_vec(i, data...).size() / sample_size_) - 1 != ploidy || (get_vec(i, data...).size() % sample_size_) != 0)
-                this->output_stream_->setstate(std::ios::failbit);
-            }
-            else
-            {
-              ploidy = (get_vec(i, data...).size() / sample_size_) - 1;
-              if ((get_vec(i, data...).size() % sample_size_) != 0 || ploidy == 0)
-                this->output_stream_->setstate(std::ios::failbit);
-            }
-          }
-          else if (f == fmt::ds)
-          {
-            if (sample_size_ != get_vec(i, data...).size())
-              this->output_stream_->setstate(std::ios::failbit);
           }
         }
 
@@ -1386,18 +1391,21 @@ namespace savvy
           if (i == 0)
             (*output_stream_) << "\t.";
 
-          for (auto it = format_fields_.begin(); it != format_fields_.end(); ++it)
+          if (sample_size_)
           {
-            if (std::distance(format_fields_.begin(), it) > 0)
-              output_stream_->put(':');
-            if (*it == fmt::ds)
-              (*output_stream_) << "\tDS";
-            else if (*it == fmt::hds)
-              (*output_stream_) << "\tHDS";
-            else if (*it == fmt::gp)
-              (*output_stream_) << "\tGP";
-            else
-              (*output_stream_) << "\tGT";
+            for (auto it = format_fields_.begin(); it != format_fields_.end(); ++it)
+            {
+              if (std::distance(format_fields_.begin(), it) > 0)
+                output_stream_->put(':');
+              if (*it == fmt::ds)
+                (*output_stream_) << "\tDS";
+              else if (*it == fmt::hds)
+                (*output_stream_) << "\tHDS";
+              else if (*it == fmt::gp)
+                (*output_stream_) << "\tGP";
+              else
+                (*output_stream_) << "\tGT";
+            }
           }
 
 //          if (VecCnt == 1)

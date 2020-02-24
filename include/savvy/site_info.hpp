@@ -182,7 +182,7 @@ namespace savvy
   }
 
   template <typename T>
-  void update_info_fields(site_info& site, const T& data, savvy::fmt data_format)
+  std::tuple<std::size_t, std::size_t, float, float> generate_standard_info_fields(const T& data)
   {
     std::size_t ac = 0;
     std::size_t an = data.size();
@@ -201,6 +201,15 @@ namespace savvy
 
     af /= an;
     float maf = af > 0.5 ? 1.f - af : af;
+    return std::make_tuple(ac, an, af, maf);
+  }
+
+  template <typename T>
+  void update_info_fields(site_info& site, const T& data, savvy::fmt data_format)
+  {
+    std::size_t ac = 0, an = 0;
+    float af = 0.f, maf = 0.f;
+    std::tie(ac, an, af, maf) = generate_standard_info_fields(data);
 
     if (data_format == savvy::fmt::gt || data_format == savvy::fmt::hds || data_format == savvy::fmt::ds || data_format == savvy::fmt::ac)
     {
