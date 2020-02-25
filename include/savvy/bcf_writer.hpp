@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <chrono>
+#include <list>
 
 namespace savvy
 {
@@ -687,6 +688,15 @@ namespace savvy
 
   namespace sav2
   {
+    // PBWT
+    struct pbwt_sort_context
+    {
+      std::string field;
+      std::string id;
+      std::size_t ploidy = 0;
+      std::vector<std::size_t> sort_map;
+    };
+
     class typed_value
     {
     public:
@@ -795,6 +805,8 @@ namespace savvy
       public:
         template <typename Iter>
         static void serialize(const typed_value& v, Iter out_it);
+        template <typename Iter>
+        static void serialize(const typed_value& v, Iter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
       };
     private:
       template<typename T>
@@ -968,7 +980,7 @@ namespace savvy
       public:
         static bool read(variant& v, std::istream& ifs, const dictionary& dict, std::size_t sample_size, bool is_bcf);
 
-        static bool serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, std::uint32_t& shared_sz, std::uint32_t& indiv_sz);
+        static bool serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, std::unordered_multimap<std::string, std::reference_wrapper<pbwt_sort_context>>& sort_contexts, std::vector<std::size_t>& sort_mapping_temp_buf, std::vector<std::size_t>& counts, std::uint32_t& shared_sz, std::uint32_t& indiv_sz);
       };
     private:
       std::vector<std::pair<std::string, typed_value>> format_fields_;
@@ -1223,16 +1235,9 @@ namespace savvy
       std::uint32_t current_block_min_ = std::numeric_limits<std::uint32_t>::max();
       std::uint32_t current_block_max_ = 0;
 
-      // PBWT
-      struct pbwt_sort_context
-      {
-        std::string field;
-        std::string id;
-        std::size_t ploidy = 0;
-        std::vector<std::size_t> sort_map;
-      };
       std::unordered_map<std::string, pbwt_sort_context> sort_contexts_;
       std::unordered_multimap<std::string, std::reference_wrapper<pbwt_sort_context>> fmt_to_pbwt_context_;
+      std::vector<std::size_t> sort_mapping_prev_buf_, sort_mapping_counts_buf_;
     private:
       static std::filebuf* create_std_filebuf(const std::string& file_path, std::ios::openmode mode)
       {
@@ -1339,8 +1344,12 @@ namespace savvy
 //          }
 //        }
 
+        std::unordered_multimap<std::string, std::reference_wrapper<pbwt_sort_context>> sort_contexts;
+        if (sort_contexts_.size())
+          sort_contexts.insert(std::make_pair(sort_contexts_.begin()->second.field, std::ref(sort_contexts_.begin()->second)));
+
         std::uint32_t shared_sz, indiv_sz;
-        if (!variant::internal::serialize(r, serialized_buf_, dict_, n_samples_, is_bcf, shared_sz, indiv_sz))
+        if (!variant::internal::serialize(r, serialized_buf_, dict_, n_samples_, is_bcf, sort_contexts, sort_mapping_prev_buf_, sort_mapping_counts_buf_, shared_sz, indiv_sz))
         {
           ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
         }
@@ -1505,6 +1514,7 @@ namespace savvy
             {
               pbwt_sort_context ctx;
               ctx.field = parse_header_sub_field(it->second, "Field");
+              ctx.id = hid;
               sort_contexts_[hid] = std::move(ctx);
             }
           }
@@ -1641,7 +1651,6 @@ namespace savvy
     template <typename Iter>
     void typed_value::internal::serialize(const typed_value& v, Iter out_it)
     {
-
       std::uint8_t type_byte =  v.off_type_ ? typed_value::sparse : v.val_type_;
       type_byte = std::uint8_t(std::min(std::size_t(15), v.size_) << 4u) | type_byte;
       *(out_it++) = type_byte;
@@ -1660,6 +1669,72 @@ namespace savvy
       else
       {
         std::copy_n(v.val_ptr_, v.size_ * (1u << bcf_type_shift[v.val_type_]), out_it);
+      }
+    }
+
+    template <typename Iter>
+    void typed_value::internal::serialize(const typed_value& v, Iter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts)
+    {
+      std::uint8_t type_byte =  v.off_type_ ? typed_value::sparse : v.val_type_;
+      type_byte = std::uint8_t(std::min(std::size_t(15), v.size_) << 4u) | type_byte;
+      *(out_it++) = type_byte;
+      if (v.size_ >= 15u)
+        bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.size_));
+
+      if (v.off_type_)
+      {
+        type_byte = std::uint8_t(v.off_type_ << 4u) | v.val_type_;
+        *(out_it++) = type_byte;
+        bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.sparse_size_));
+        std::size_t pair_width = (1u << bcf_type_shift[v.off_type_]) + (1u << bcf_type_shift[v.val_type_]);
+        assert(v.off_ptr_ == (v.val_ptr_ - (1u << bcf_type_shift[v.off_type_]) * v.sparse_size_));
+        std::copy_n(v.off_ptr_, v.sparse_size_ * pair_width, out_it);
+      }
+      else
+      {
+        // ---- PBWT ---- //
+        auto data_sz = v.size_;
+        std::swap(sort_mapping, prev_sort_mapping);
+        if (prev_sort_mapping.empty())
+        {
+          prev_sort_mapping.resize(data_sz);
+          for (int i = 0; i < data_sz; ++i)
+            prev_sort_mapping[i] = i;
+        }
+
+        if (sort_mapping.empty())
+          sort_mapping.resize(data_sz);
+
+        if (prev_sort_mapping.size() != data_sz)
+        {
+          fprintf(stderr, "Variable-sized data vectors not allowed with PBWT\n");
+          exit(-1);
+        }
+
+        counts.clear();
+        for (int i = 0; i < data_sz; ++i)
+        {
+          std::uint8_t d(v.val_ptr_[i]);
+          if (d + 1u >= counts.size())
+            counts.resize(std::size_t(d) + 2u);
+          ++counts[d + 1u];
+        }
+        for (int i = 1; i < counts.size(); ++i)
+          counts[i] = counts[i - 1] + counts[i];
+
+        for (int i = 0; i < prev_sort_mapping.size(); ++i)
+        {
+          std::size_t unsorted_index = prev_sort_mapping[i];
+          std::uint8_t d(v.val_ptr_[unsorted_index]);
+          sort_mapping[counts[d]++] = unsorted_index;
+        }
+
+        //sorted_data.resize(data_sz);
+        for (int i = 0; i < prev_sort_mapping.size(); ++i)
+        {
+          out_it++ = v.val_ptr_[prev_sort_mapping[i]];
+        }
+        // ---- PBWT_END ---- //
       }
     }
 
@@ -2149,7 +2224,7 @@ namespace savvy
     }
 
     inline
-    bool variant::internal::serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, std::uint32_t& shared_sz, std::uint32_t& indiv_sz)
+    bool variant::internal::serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, std::unordered_multimap<std::string, std::reference_wrapper<pbwt_sort_context>>& sort_contexts, std::vector<std::size_t>& sort_mapping_temp_buf, std::vector<std::size_t>& counts, std::uint32_t& shared_sz, std::uint32_t& indiv_sz)
     {
       buf.clear();
       buf.reserve(24);
@@ -2178,7 +2253,12 @@ namespace savvy
 
         // TODO: Allow for BCF writing.
         bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
-        typed_value::internal::serialize(it->second, out_it);
+
+        auto pbwt_range = sort_contexts.equal_range(it->first);
+        if (pbwt_range.first != pbwt_range.second)
+          typed_value::internal::serialize(it->second, out_it, pbwt_range.first->second.get().sort_map, sort_mapping_temp_buf, counts);
+        else
+          typed_value::internal::serialize(it->second, out_it);
       }
 
       if (buf.size() - shared_sz > std::numeric_limits<std::uint32_t>::max())

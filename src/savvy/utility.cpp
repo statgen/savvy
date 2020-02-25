@@ -84,6 +84,8 @@ namespace savvy
         {
           std::string key(curr_pos, equals_pos);
           std::string val(equals_pos + 1, comma_pos);
+          detail::trim(key);
+          detail::trim(val, " \t\n\r\f\v\"");
 
           if (key == field_to_parse)
             return val;
@@ -98,6 +100,8 @@ namespace savvy
       {
         std::string key(curr_pos, equals_pos);
         std::string val(equals_pos + 1, comma_pos);
+        detail::trim(key);
+        detail::trim(val, " \t\n\r\f\v\"");
 
         if (key == field_to_parse)
           return val;

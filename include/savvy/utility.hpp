@@ -67,6 +67,24 @@ namespace savvy
     }
 
     bool file_exists(const std::string& file_path);
+
+
+    inline std::string& rtrim(std::string& s, const char* d = " \t\n\r\f\v")
+    {
+      s.erase(s.find_last_not_of(d) + 1);
+      return s;
+    }
+
+    inline std::string& ltrim(std::string& s, const char* d = " \t\n\r\f\v")
+    {
+      s.erase(0, s.find_first_not_of(d));
+      return s;
+    }
+
+    inline std::string& trim(std::string& s, const char* d = " \t\n\r\f\v")
+    {
+      return ltrim(rtrim(s, d), d);
+    }
   }
 
   std::string savvy_version();
