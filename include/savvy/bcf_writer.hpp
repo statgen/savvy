@@ -757,18 +757,32 @@ namespace savvy
       std::size_t size() const { return size_; }
       bool is_sparse() const { return off_ptr_ != nullptr; }
 
+      template<typename T>
+      typed_value& operator=(const T& v)
+      {
+        if ((void*)this != (void*)&v)
+        {
+          clear();
+          init(v);
+        }
+        return *this;
+      }
+
       typed_value& operator=(typed_value&& src);
+
 
       template <typename T>
       bool operator>>(std::vector<T>& dest) const
       {
-        if (this->off_ptr_)
+        if (off_ptr_)
         {
           dest.resize(0);
           dest.resize(size_);
-          for (std::size_t i = 0; i < sparse_size_; ++i)
+          std::size_t total_offset = 0;
+          for (std::size_t i = 0; i < sparse_size_; ++i,++total_offset)
           {
-            dest[off_ptr_[i]] = val_ptr_[i];
+            total_offset += off_ptr_[i];
+            dest[total_offset] = val_ptr_[i];
           }
         }
         else if (val_ptr_)
@@ -776,16 +790,28 @@ namespace savvy
           dest.resize(size_);
           std::copy_n(val_ptr_, size_, dest.begin());
         }
-        return false;
+        else
+        {
+          return false;
+        }
+        return true;
       }
 
       template <typename T>
       bool operator>>(savvy::compressed_vector<T>& dest) const
       {
-        if (this->off_ptr_)
+        if (off_ptr_)
         {
           // TODO: support relative offsets
-          dest.assign(size_, sparse_size_, val_ptr_, off_ptr_);
+          //dest.assign(size_, sparse_size_, val_ptr_, off_ptr_);
+          dest.resize(0);
+          dest.resize(size_);
+          std::size_t total_offset = 0;
+          for (std::size_t i = 0; i < sparse_size_; ++i,++total_offset)
+          {
+            total_offset += off_ptr_[i];
+            dest[total_offset] = val_ptr_[i];
+          }
         }
         else if (val_ptr_)
         {
@@ -797,7 +823,11 @@ namespace savvy
               dest[i] = val_ptr_[i];
           }
         }
-        return false;
+        else
+        {
+          return false;
+        }
+        return true;
       }
 
       class internal
@@ -809,6 +839,17 @@ namespace savvy
         static void serialize(const typed_value& v, Iter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
       };
     private:
+      void clear()
+      {
+        sparse_size_ = 0;
+        size_ = 0;
+        off_ptr_ = nullptr;
+        val_ptr_ = nullptr;
+        off_type_ = 0;
+        val_type_ = 0;
+        local_data_.clear();
+      }
+
       template<typename T>
       typename std::enable_if<std::is_signed<T>::value, void>::type
       init(const T& v);
@@ -1832,6 +1873,8 @@ namespace savvy
       }
 
       off_type_ = type_code_ignore_missing(static_cast<std::int64_t>(offset_max));
+      //auto max_abs_offset = vec.non_zero_size() ? *(vec.index_data() + vec.non_zero_size() - 1) : 0;
+      //off_type_ = type_code_ignore_missing(static_cast<std::int64_t>(max_abs_offset)); //TODO: Revert back to line above
 
       typedef typename T::value_type vtype;
       if (std::is_integral<vtype>::value && !std::is_same<std::int8_t, vtype>::value)
@@ -2280,7 +2323,7 @@ namespace savvy
       {
         if (it->first == key)
         {
-          it->second = typed_value(geno);
+          it->second = geno;
           return;
         }
       }
@@ -2301,7 +2344,7 @@ namespace savvy
       {
         if (it->first == key)
         {
-          it->second = typed_value(geno);
+          it->second = geno;
           return;
         }
       }
