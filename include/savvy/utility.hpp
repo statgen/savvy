@@ -19,6 +19,20 @@
 
 namespace savvy
 {
+  class endianness
+  {
+  private:
+    union test_union
+    {
+      std::uint32_t i;
+      char c[4];
+    };
+  public:
+
+    static bool is_big() { return (test_union{0x01000000}).c[0] == 0x01;};
+    static bool is_little() { return (test_union{0x01000000}).c[0] == 0x00;};
+  };
+
   namespace detail
   {
     template<typename T, typename... Args>
