@@ -694,14 +694,25 @@ namespace savvy
 
   namespace sav2
   {
-    // PBWT
-    struct pbwt_sort_context
+    namespace internal
     {
-      std::string field;
-      std::string id;
-      std::size_t ploidy = 0;
-      std::vector<std::size_t> sort_map;
-    };
+      // PBWT
+      struct pbwt_sort_format_context
+      {
+        std::string format;
+        std::string id;
+        std::size_t ploidy = 0;
+        std::vector<std::size_t> sort_map;
+      };
+
+      struct pbwt_sort_context
+      {
+        std::vector<std::size_t> prev_sort_mapping;
+        std::vector<std::size_t> counts;
+        std::unordered_multimap<std::string, pbwt_sort_format_context*> field_to_format_contexts;
+        std::unordered_map<std::string, pbwt_sort_format_context> format_contexts;
+      };
+    }
 
     class typed_value
     {
@@ -1202,7 +1213,7 @@ namespace savvy
         static bool read(site_info& s, std::istream& ifs, const dictionary& dict, std::uint32_t shared_sz);
 
         template <typename Itr>
-        static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint16_t n_fmt);
+        static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<std::pair<std::string, typed_value>>& format_fields, const ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx);
       };
     };
 
@@ -1270,7 +1281,7 @@ namespace savvy
       public:
         static bool read(variant& v, std::istream& ifs, const dictionary& dict, std::size_t sample_size, bool is_bcf);
 
-        static bool serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, std::unordered_multimap<std::string, std::reference_wrapper<pbwt_sort_context>>& sort_contexts, std::vector<std::size_t>& sort_mapping_temp_buf, std::vector<std::size_t>& counts, std::uint32_t& shared_sz, std::uint32_t& indiv_sz);
+        static bool serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx, std::uint32_t& shared_sz, std::uint32_t& indiv_sz);
       };
     private:
       std::vector<std::pair<std::string, typed_value>> format_fields_;
@@ -1528,9 +1539,7 @@ namespace savvy
       std::uint32_t current_block_min_ = std::numeric_limits<std::uint32_t>::max();
       std::uint32_t current_block_max_ = 0;
 
-      std::unordered_map<std::string, pbwt_sort_context> sort_contexts_;
-      std::unordered_multimap<std::string, std::reference_wrapper<pbwt_sort_context>> fmt_to_pbwt_context_;
-      std::vector<std::size_t> sort_mapping_prev_buf_, sort_mapping_counts_buf_;
+      ::savvy::sav2::internal::pbwt_sort_context sort_context_;
     private:
       static std::filebuf* create_std_filebuf(const std::string& file_path, std::ios::openmode mode)
       {
@@ -1637,12 +1646,8 @@ namespace savvy
 //          }
 //        }
 
-        std::unordered_multimap<std::string, std::reference_wrapper<pbwt_sort_context>> sort_contexts;
-        if (sort_contexts_.size())
-          sort_contexts.insert(std::make_pair(sort_contexts_.begin()->second.field, std::ref(sort_contexts_.begin()->second)));
-
         std::uint32_t shared_sz, indiv_sz;
-        if (!variant::internal::serialize(r, serialized_buf_, dict_, n_samples_, is_bcf, sort_contexts, sort_mapping_prev_buf_, sort_mapping_counts_buf_, shared_sz, indiv_sz))
+        if (!variant::internal::serialize(r, serialized_buf_, dict_, n_samples_, is_bcf, sort_context_, shared_sz, indiv_sz))
         {
           ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
         }
@@ -1805,10 +1810,12 @@ namespace savvy
           {
             if (hid.substr(0, 10) == "_PBWT_SORT")
             {
-              pbwt_sort_context ctx;
-              ctx.field = parse_header_sub_field(it->second, "Field");
+              ::savvy::sav2::internal::pbwt_sort_format_context ctx;
+              ctx.format = parse_header_sub_field(it->second, "Format");
               ctx.id = hid;
-              sort_contexts_[hid] = std::move(ctx);
+
+              auto insert_it = sort_context_.format_contexts.insert(std::make_pair(std::string(hid), std::move(ctx)));
+              sort_context_.field_to_format_contexts.insert(std::make_pair(insert_it.first->second.format, &(insert_it.first->second)));
             }
           }
 
@@ -2355,7 +2362,7 @@ namespace savvy
     }
 
     template <typename Itr>
-    bool site_info::internal::serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint16_t n_fmt)
+    bool site_info::internal::serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<std::pair<std::string, typed_value>>& format_fields, const ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx)
     {
       union u
       {
@@ -2376,10 +2383,10 @@ namespace savvy
       buf[2].i = static_cast<std::int32_t>(s.chrom_.size());
       buf[3].f = s.qual_;
 
-      std::uint32_t tmp_uint = (std::uint32_t(s.alts_.size() + 1) << 16u) | (0xFFFFu & std::uint32_t(s.info_.size()));
+      std::uint32_t tmp_uint = (std::uint32_t(s.alts_.size() + 1) << 16u) | (0xFFFFu & std::uint32_t(s.info_.size())); // TODO: append pbwt info flags.
       buf[4].i = static_cast<std::int32_t>(tmp_uint);
 
-      tmp_uint = (n_fmt << 24u) | (0xFFFFFFu & n_sample);
+      tmp_uint = (format_fields.size() << 24u) | (0xFFFFFFu & n_sample);
       buf[5].i = static_cast<std::int32_t>(tmp_uint);
 
       std::copy_n((char*)buf.data(), buf.size() * sizeof(u), out_it);
@@ -2522,12 +2529,12 @@ namespace savvy
     }
 
     inline
-    bool variant::internal::serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, std::unordered_multimap<std::string, std::reference_wrapper<pbwt_sort_context>>& sort_contexts, std::vector<std::size_t>& sort_mapping_temp_buf, std::vector<std::size_t>& counts, std::uint32_t& shared_sz, std::uint32_t& indiv_sz)
+    bool variant::internal::serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx, std::uint32_t& shared_sz, std::uint32_t& indiv_sz)
     {
       buf.clear();
       buf.reserve(24);
 
-      if (!site_info::internal::serialize(v, std::back_inserter(buf), dict, sample_size, v.format_fields_.size()))
+      if (!site_info::internal::serialize(v, std::back_inserter(buf), dict, sample_size, v.format_fields_, pbwt_ctx))
         return false;
 
       if (buf.size() > std::numeric_limits<std::uint32_t>::max())
@@ -2552,9 +2559,9 @@ namespace savvy
         // TODO: Allow for BCF writing.
         bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
 
-        auto pbwt_range = sort_contexts.equal_range(it->first);
+        auto pbwt_range = pbwt_ctx.field_to_format_contexts.equal_range(it->first);
         if (pbwt_range.first != pbwt_range.second)
-          typed_value::internal::serialize(it->second, out_it, pbwt_range.first->second.get().sort_map, sort_mapping_temp_buf, counts);
+          typed_value::internal::serialize(it->second, out_it, pbwt_range.first->second->sort_map, pbwt_ctx.prev_sort_mapping, pbwt_ctx.counts);
         else
           typed_value::internal::serialize(it->second, out_it);
       }
