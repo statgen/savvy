@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 #ifndef LIBSAVVY_BCF_WRITER_HPP
 #define LIBSAVVY_BCF_WRITER_HPP
 
@@ -1162,6 +1168,34 @@ namespace savvy
       const std::vector<std::string>& filters() const { return filters_; }
       const std::vector<std::pair<std::string, typed_value>>& info() const { return info_; }
 
+      template <typename T>
+      bool get_info(const std::string& key, T& dest) const
+      {
+        auto res = std::find_if(info_.begin(), info_.end(), [&key](const std::pair<std::string, savvy::sav2::typed_value>& v) { return v.first == key;});
+        if (res != info_.end())
+          return res->second >> dest;
+        return false;
+      }
+
+      template <typename T>
+      void set_info(const std::string& key, const T& val)
+      {
+        auto it = info_.begin();
+        for ( ; it != info_.end(); ++it)
+        {
+          if (it->first == key)
+          {
+            it->second = val;
+            return;
+          }
+        }
+
+        if (it == info_.end())
+        {
+          info_.emplace_back(key, val);
+        }
+      }
+
       class internal
       {
       public:
@@ -1246,7 +1280,7 @@ namespace savvy
       const decltype(format_fields_)& format_fields() const { return format_fields_; }
 
       template <typename T>
-      bool get_format(const std::string& key, T& destination_vector);
+      bool get_format(const std::string& key, T& destination_vector) const;
 
       template <typename T>
       void set_format(const std::string& key, const std::vector<T>& geno, std::set<std::string> sparse_keys = {"GT","EC","DS","HDS"});
@@ -2537,7 +2571,7 @@ namespace savvy
     }
 
     template <typename T>
-    bool variant::get_format(const std::string& key, T& destination_vector)
+    bool variant::get_format(const std::string& key, T& destination_vector) const
     {
       auto res = std::find_if(format_fields_.begin(), format_fields_.end(), [&key](const std::pair<std::string, savvy::sav2::typed_value>& v) { return v.first == key;});
       if (res != format_fields_.end())
