@@ -8,9 +8,13 @@
 #define LIBSAVVY_BCF_WRITER_HPP
 
 #include "savvy/utility.hpp"
+#include "savvy/compressed_vector.hpp"
+#include "savvy/region.hpp"
+#include "savvy/s1r.hpp"
 
 #include <shrinkwrap/zstd.hpp>
 
+#include <random>
 #include <string>
 #include <vector>
 #include <fstream>
@@ -23,7 +27,7 @@
 
 namespace savvy
 {
-  std::vector<std::uint8_t> bcf_type_shift = { 0, 0, 1, 2, 3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  static const std::vector<std::uint8_t> bcf_type_shift = { 0, 0, 1, 2, 3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
   namespace bcf
   {
@@ -1090,6 +1094,7 @@ namespace savvy
       struct is_dense_vector
       {
         static const bool value =
+          !std::is_signed<T>::value &&
           std::is_signed<typename T::value_type>::value
             && !std::is_same<std::string, T>::value
             &&
@@ -1100,6 +1105,14 @@ namespace savvy
 #endif
           );
       };
+
+      template <> struct is_dense_vector<std::int8_t> { static const bool value = false; };
+      template <> struct is_dense_vector<std::int16_t> { static const bool value = false; };
+      template <> struct is_dense_vector<std::int32_t> { static const bool value = false; };
+      template <> struct is_dense_vector<std::int64_t> { static const bool value = false; };
+      template <> struct is_dense_vector<float> { static const bool value = false; };
+      template <> struct is_dense_vector<double> { static const bool value = false; };
+
 
       template<typename T>
       typename std::enable_if<is_dense_vector<T>::value, void>::type
@@ -1213,7 +1226,7 @@ namespace savvy
         static bool read(site_info& s, std::istream& ifs, const dictionary& dict, std::uint32_t shared_sz);
 
         template <typename Itr>
-        static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<std::pair<std::string, typed_value>>& format_fields, const ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx);
+        static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<::savvy::sav2::internal::pbwt_sort_format_context*>& pbwt_format_context_pointers);
       };
     };
 
@@ -1262,7 +1275,7 @@ namespace savvy
       };
     }
 
-    bool region_compare(bounding_point bounding_type, const site_info& var, const genomic_region& reg)
+    inline bool region_compare(bounding_point bounding_type, const site_info& var, const genomic_region& reg)
     {
       switch (bounding_type)
       {
@@ -1983,6 +1996,7 @@ namespace savvy
 
       if (v.off_type_)
       {
+        assert(!"This should never happen"); // TODO: Then why is this here?
         type_byte = std::uint8_t(v.off_type_ << 4u) | v.val_type_;
         *(out_it++) = type_byte;
         bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.sparse_size_));
@@ -2362,7 +2376,7 @@ namespace savvy
     }
 
     template <typename Itr>
-    bool site_info::internal::serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<std::pair<std::string, typed_value>>& format_fields, const ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx)
+    bool site_info::internal::serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<::savvy::sav2::internal::pbwt_sort_format_context*>& pbwt_format_context_pointers)
     {
       union u
       {
@@ -2383,10 +2397,13 @@ namespace savvy
       buf[2].i = static_cast<std::int32_t>(s.chrom_.size());
       buf[3].f = s.qual_;
 
-      std::uint32_t tmp_uint = (std::uint32_t(s.alts_.size() + 1) << 16u) | (0xFFFFu & std::uint32_t(s.info_.size())); // TODO: append pbwt info flags.
+      std::size_t extra_info_cnt = 0;
+      for (auto it = pbwt_format_context_pointers.begin(); it != pbwt_format_context_pointers.end(); ++it)
+        extra_info_cnt += (*it != nullptr);
+      std::uint32_t tmp_uint = (std::uint32_t(s.alts_.size() + 1) << 16u) | (0xFFFFu & std::uint32_t(s.info_.size() + extra_info_cnt)); // TODO: append pbwt info flags.
       buf[4].i = static_cast<std::int32_t>(tmp_uint);
 
-      tmp_uint = (format_fields.size() << 24u) | (0xFFFFFFu & n_sample);
+      tmp_uint = (pbwt_format_context_pointers.size() << 24u) | (0xFFFFFFu & n_sample);
       buf[5].i = static_cast<std::int32_t>(tmp_uint);
 
       std::copy_n((char*)buf.data(), buf.size() * sizeof(u), out_it);
@@ -2424,6 +2441,22 @@ namespace savvy
 
         bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
         typed_value::internal::serialize(it->second, out_it);
+      }
+
+      for (auto it = pbwt_format_context_pointers.begin(); it != pbwt_format_context_pointers.end(); ++it)
+      {
+        if ((*it) != nullptr)
+        {
+          res = dict.str_to_int[dictionary::id].find((*it)->id);
+          if (res == dict.str_to_int[dictionary::id].end())
+          {
+            std::fprintf(stderr, "Error: INFO key not in header\n");
+            return false;
+          }
+
+          bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
+          typed_value::internal::serialize(typed_value(std::int8_t(1)), out_it);
+        }
       }
 
       return true;
@@ -2534,7 +2567,25 @@ namespace savvy
       buf.clear();
       buf.reserve(24);
 
-      if (!site_info::internal::serialize(v, std::back_inserter(buf), dict, sample_size, v.format_fields_, pbwt_ctx))
+      std::vector<::savvy::sav2::internal::pbwt_sort_format_context*> pbwt_format_pointers;
+      pbwt_format_pointers.reserve(v.format_fields_.size());
+      for (auto it = v.format_fields_.begin(); it != v.format_fields_.end(); ++it)
+      {
+        pbwt_format_pointers.emplace_back(nullptr);
+        if (!it->second.is_sparse())
+        {
+          auto f = pbwt_ctx.field_to_format_contexts.find(it->first);
+          if (f != pbwt_ctx.field_to_format_contexts.end())
+          {
+            if (f->second->sort_map.size() == it->second.size() || f->second->sort_map.empty())
+            {
+              pbwt_format_pointers.back() = f->second;
+            }
+          }
+        }
+      }
+
+      if (!site_info::internal::serialize(v, std::back_inserter(buf), dict, sample_size, pbwt_format_pointers))
         return false;
 
       if (buf.size() > std::numeric_limits<std::uint32_t>::max())
@@ -2559,9 +2610,9 @@ namespace savvy
         // TODO: Allow for BCF writing.
         bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
 
-        auto pbwt_range = pbwt_ctx.field_to_format_contexts.equal_range(it->first);
-        if (pbwt_range.first != pbwt_range.second)
-          typed_value::internal::serialize(it->second, out_it, pbwt_range.first->second->sort_map, pbwt_ctx.prev_sort_mapping, pbwt_ctx.counts);
+        auto* pbwt_ptr = pbwt_format_pointers[it - v.format_fields_.begin()];
+        if (pbwt_ptr)
+          typed_value::internal::serialize(it->second, out_it, pbwt_ptr->sort_map, pbwt_ctx.prev_sort_mapping, pbwt_ctx.counts);
         else
           typed_value::internal::serialize(it->second, out_it);
       }

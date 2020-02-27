@@ -743,9 +743,10 @@ int main(int argc, char** argv)
 
       auto hdrs = rdr.headers();
       hdrs.emplace_back("contig", "<ID=chr10>");
-      //hdrs.emplace_back("INFO", "<ID=_PBWT_SORT_GT, Type=Flag, Field=\"GT\">");
+      hdrs.emplace_back("INFO", "<ID=_PBWT_SORT_GT, Type=Flag, Format=\"GT\">");
       savvy::sav2::writer wrt("../test-data/test_file.sav2", hdrs, rdr.samples());
       savvy::compressed_vector<std::int16_t> vec;
+      std::vector<std::int16_t> dense_vec;
       savvy::site_info site;
       savvy::sav2::variant var;
 
@@ -762,7 +763,12 @@ int main(int argc, char** argv)
           }
         }
 
-        var.set_format("GT", vec);
+        dense_vec.resize(0);
+        dense_vec.resize(vec.size());
+        for (auto it = vec.begin(); it != vec.end(); ++it)
+          dense_vec[it.offset()] = *it;
+
+        var.set_format("GT", dense_vec);
         wrt.write_record(var);
       }
 
