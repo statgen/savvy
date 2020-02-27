@@ -735,27 +735,50 @@ int main(int argc, char** argv)
 {
   if (false)
   {
-    if (argc < 3)
-      return -1;
+//    if (argc < 3)
+//      return -1;
 
-    savvy::reader rdr(argv[1], savvy::fmt::hds);
-    savvy::sav2::writer wrt(argv[2]);
-    auto hdrs = rdr.headers();
-    hdrs.emplace_back("contig", "<ID=chr10>");
-    wrt.write_header(hdrs, rdr.samples());
-    savvy::compressed_vector<float> vec;
-    savvy::site_info site;
-    savvy::sav2::variant var;
-
-
-    while (rdr.read(site, vec))
     {
-      var = savvy::sav2::variant(site.chromosome(), site.position(), site.ref(), {site.alt()}, site.prop("ID"), std::atof(site.prop("QUAL").c_str()));
-      var.set_format("HDS", vec);
-      wrt.write_record(var);
+      savvy::reader rdr("../test_file.vcf", savvy::fmt::gt);
+
+      auto hdrs = rdr.headers();
+      hdrs.emplace_back("contig", "<ID=chr10>");
+      savvy::sav2::writer wrt("../test-data/test_file.sav2", hdrs, rdr.samples());
+      savvy::compressed_vector<std::int8_t> vec;
+      savvy::site_info site;
+      savvy::sav2::variant var;
+
+
+      while (rdr.read(site, vec))
+      {
+        var = savvy::sav2::variant(site.chromosome(), site.position(), site.ref(), {site.alt()}, site.prop("ID"), std::atof(site.prop("QUAL").c_str()));
+        var.set_format("GT", vec);
+        wrt.write_record(var);
+      }
+
+      if (rdr.bad())
+        return EXIT_FAILURE;
     }
 
-    return rdr.bad() ? EXIT_FAILURE : EXIT_SUCCESS;
+    {
+      std::vector<std::int16_t> vec;
+      savvy::sav2::variant var;
+      savvy::sav2::reader rdr("../test-data/test_file.sav2");
+      while (rdr.read_record(var))
+      {
+        var.get_format("GT", vec);
+
+        std::cout << var.pos();
+        for (auto it = vec.begin(); it != vec.end(); ++it)
+        {
+          std::cout << "\t" /*<< it.offset() << ":"*/ << (*it);
+        }
+        std::cout << std::endl;
+      }
+    }
+
+
+    return EXIT_SUCCESS;
   }
 
   if (false)

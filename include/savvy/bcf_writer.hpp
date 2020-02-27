@@ -778,17 +778,27 @@ namespace savvy
         {
           dest.resize(0);
           dest.resize(size_);
-          std::size_t total_offset = 0;
-          for (std::size_t i = 0; i < sparse_size_; ++i,++total_offset)
+          switch (val_type_)
           {
-            total_offset += off_ptr_[i];
-            dest[total_offset] = val_ptr_[i];
+          case 0x01u:
+            return copy_sparse1<std::int8_t>(dest);
+          case 0x02u:
+            return copy_sparse1<std::int16_t>(dest); // TODO: handle endianess
+          case 0x03u:
+            return copy_sparse1<std::int32_t>(dest);
+          case 0x04u:
+            return copy_sparse1<std::int64_t>(dest);
+          case 0x05u:
+            return copy_sparse1<float>(dest);
+          default:
+            return false;
           }
         }
         else if (val_ptr_)
         {
           dest.resize(size_);
-          std::copy_n(val_ptr_, size_, dest.begin());
+          std::size_t val_width = 1u << bcf_type_shift[val_type_];
+          std::copy_n(val_ptr_, size_ * val_width, dest.data());
         }
         else
         {
@@ -806,6 +816,8 @@ namespace savvy
           //dest.assign(size_, sparse_size_, val_ptr_, off_ptr_);
           dest.resize(0);
           dest.resize(size_);
+
+
           std::size_t total_offset = 0;
           for (std::size_t i = 0; i < sparse_size_; ++i,++total_offset)
           {
@@ -848,6 +860,40 @@ namespace savvy
         off_type_ = 0;
         val_type_ = 0;
         local_data_.clear();
+      }
+
+      template <typename OffT, typename ValT, typename DestT>
+      void copy_sparse2(std::vector<DestT>& dest) const
+      {
+        std::size_t total_offset = 0;
+        for (std::size_t i = 0; i < sparse_size_; ++i)
+        {
+          total_offset += ((const OffT*)off_ptr_)[i];
+          dest[total_offset++] = ((const ValT*)val_ptr_)[i];
+        }
+      }
+
+      template <typename ValT, typename DestT>
+      bool copy_sparse1(std::vector<DestT>& dest) const
+      {
+        switch (off_type_)
+        {
+        case 0x01u:
+          copy_sparse2<ValT, std::int8_t>(dest);
+          break;
+        case 0x02u:
+          copy_sparse2<ValT, std::int16_t>(dest); // TODO: handle endianess
+          break;
+        case 0x03u:
+          copy_sparse2<ValT, std::int32_t>(dest);
+          break;
+        case 0x04u:
+          copy_sparse2<ValT, std::int64_t>(dest);
+          break;
+        default:
+          return false;
+        }
+        return true;
       }
 
       template<typename T>
@@ -1029,6 +1075,9 @@ namespace savvy
     public:
       using site_info::site_info;
       const decltype(format_fields_)& format_fields() const { return format_fields_; }
+
+      template <typename T>
+      bool get_format(const std::string& key, T& destination_vector);
 
       template <typename T>
       void set_format(const std::string& key, const std::vector<T>& geno, std::set<std::string> sparse_keys = {"GT","EC","DS","HDS"});
@@ -1854,7 +1903,8 @@ namespace savvy
       {
         std::size_t off = (*it) - last_off;
         last_off = (*it) + 1;
-        *(off_ptr++) = off;
+        (*off_ptr) = off;
+        ++off_ptr;
       }
     }
 
@@ -2225,7 +2275,9 @@ namespace savvy
                 std::uint8_t off_type = sp_type_byte >> 4u;
                 std::uint8_t val_type = sp_type_byte & 0x0Fu;
                 std::size_t sp_sz;
-                bcf::deserialize_int(indiv_it, v.indiv_buf_.end(), sp_sz);
+                indiv_it = bcf::deserialize_int(indiv_it, v.indiv_buf_.end(), sp_sz);
+                if (indiv_it == v.indiv_buf_.end())
+                  break;
                 std::size_t pair_width = 1u << bcf_type_shift[off_type];
                 pair_width += 1u << bcf_type_shift[val_type];
 
@@ -2313,6 +2365,15 @@ namespace savvy
       indiv_sz = buf.size() - shared_sz;
 
       return true;
+    }
+
+    template <typename T>
+    bool variant::get_format(const std::string& key, T& destination_vector)
+    {
+      auto res = std::find_if(format_fields_.begin(), format_fields_.end(), [&key](const std::pair<std::string, savvy::sav2::typed_value>& v) { return v.first == key;});
+      if (res != format_fields_.end())
+        return res->second >> destination_vector;
+      return false;
     }
 
     template <typename T>
