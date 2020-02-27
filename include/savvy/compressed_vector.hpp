@@ -115,14 +115,33 @@ namespace savvy
       assign(sz, sp_sz, val_it, off_it);
     }
 
+    template <typename ValT>
+    void assign(ValT val_it, ValT val_end)
+    {
+      size_ = val_end - val_it;
+      values_.clear();
+      offsets_.clear();
+      values_.reserve(size_);
+      offsets_.reserve(size_);
+      for (auto it = val_it; it != val_end; ++it)
+      {
+        if (*it)
+        {
+          offsets_.emplace_back(it - val_it);
+          values_.emplace_back(*it);
+        }
+      }
+    }
+
     template <typename ValT, typename OffT>
-    void assign(std::size_t sz, std::size_t sp_sz, ValT val_it, OffT off_it)
+    void assign(ValT val_it, ValT val_end, OffT off_it, std::size_t sz)
     {
       size_ = sz;
-      this->values_.clear();
-      this->offsets_.clear();
-      this->values_.resize(sp_sz);
-      this->offsets_.resize(sp_sz);
+      values_.clear();
+      offsets_.clear();
+      std::size_t sp_sz = val_end - val_it;
+      values_.resize(sp_sz);
+      offsets_.resize(sp_sz);
       std::copy_n(val_it, sp_sz, values_.begin());
       std::copy_n(off_it, sp_sz, offsets_.begin());
     }

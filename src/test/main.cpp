@@ -743,15 +743,25 @@ int main(int argc, char** argv)
 
       auto hdrs = rdr.headers();
       hdrs.emplace_back("contig", "<ID=chr10>");
+      //hdrs.emplace_back("INFO", "<ID=_PBWT_SORT_GT, Type=Flag, Field=\"GT\">");
       savvy::sav2::writer wrt("../test-data/test_file.sav2", hdrs, rdr.samples());
-      savvy::compressed_vector<std::int8_t> vec;
+      savvy::compressed_vector<std::int16_t> vec;
       savvy::site_info site;
       savvy::sav2::variant var;
 
 
       while (rdr.read(site, vec))
       {
-        var = savvy::sav2::variant(site.chromosome(), site.position(), site.ref(), {site.alt()}, site.prop("ID"), std::atof(site.prop("QUAL").c_str()));
+        savvy::sav2::site_info* p = &var;
+        *p = savvy::sav2::site_info(site.chromosome(), site.position(), site.ref(), {site.alt()}, site.prop("ID"), std::atof(site.prop("QUAL").c_str()));
+        for (auto it = vec.begin(); it != vec.end(); ++it)
+        {
+          if (!(*it))
+          {
+            *it = savvy::sav2::typed_value::missing_value<std::int16_t>();
+          }
+        }
+
         var.set_format("GT", vec);
         wrt.write_record(var);
       }
@@ -761,7 +771,7 @@ int main(int argc, char** argv)
     }
 
     {
-      std::vector<std::int16_t> vec;
+      savvy::compressed_vector<std::int16_t> vec;
       savvy::sav2::variant var;
       savvy::sav2::reader rdr("../test-data/test_file.sav2");
       while (rdr.read_record(var))

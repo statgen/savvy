@@ -710,6 +710,35 @@ namespace savvy
       static const std::uint8_t sparse = 8;
 
       template <typename T>
+      static T missing_value()
+      {
+        std::uint8_t tcode = type_code<T>();
+
+        if (tcode >= 1 && tcode <= 4)
+          return std::numeric_limits<T>::min();
+
+        if (tcode == 5)
+        {
+          std::uint32_t i =  0x7F800001;
+          T ret;
+          std::memcpy(&ret, &i, sizeof(i));
+          return ret;
+        }
+
+        if (tcode == 6)
+        {
+          std::uint64_t i =  0x7FF0000000000001;
+          T ret;
+          std::memcpy(&ret, &i, sizeof(i));
+        }
+
+        if (tcode == 7)
+          return 0x07;
+
+        return T();
+      }
+
+      template <typename T>
       static typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, bool>::type
       is_missing(const T& v);
 
@@ -729,12 +758,62 @@ namespace savvy
       static typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type
       type_code_ignore_missing(const T& val);
 
+      template <typename DestT, typename SrcT>
+      static DestT missing_transformation(SrcT in)
+      {
+        if (is_missing(in))
+          return missing_value<DestT>();
+        return DestT(in);
+      }
+
       enum class get_status : std::uint8_t
       {
         ok = 0,
         does_not_fit,
         not_a_scalar,
         not_a_vector
+      };
+
+      template <typename T>
+      class compressed_offset_iterator
+      {
+      public:
+        typedef compressed_offset_iterator self_type;
+        typedef std::ptrdiff_t difference_type;
+        typedef std::size_t value_type;
+        typedef void reference;
+        typedef void pointer;
+        typedef std::input_iterator_tag iterator_category;
+
+        compressed_offset_iterator() : ptr_(nullptr), last_offset_(0) {}
+        compressed_offset_iterator(const T* p) :
+          ptr_(p),
+          last_offset_(0)
+        {
+
+        }
+
+        self_type operator++()
+        {
+          self_type ret = *this;
+          last_offset_ += (*ptr_) + 1;
+          ++ptr_;
+          return ret;
+        }
+
+        void operator++(int)
+        {
+          last_offset_ += (*ptr_) + 1;
+          ++ptr_;
+        }
+
+        value_type operator*() const { return last_offset_ + (*ptr_); }
+        //const pointer operator->() const { return &uncompressed_offset_; }
+        bool operator==(const self_type& rhs) const { return (ptr_ == rhs.ptr_); }
+        bool operator!=(const self_type& rhs) const { return (ptr_ != rhs.ptr_); }
+      private:
+        const T* ptr_;
+        value_type last_offset_;
       };
     public:
       typed_value() { }
@@ -813,33 +892,123 @@ namespace savvy
         if (off_ptr_)
         {
           // TODO: support relative offsets
-          //dest.assign(size_, sparse_size_, val_ptr_, off_ptr_);
           dest.resize(0);
-          dest.resize(size_);
 
-
-          std::size_t total_offset = 0;
-          for (std::size_t i = 0; i < sparse_size_; ++i,++total_offset)
+          switch (val_type_)
           {
-            total_offset += off_ptr_[i];
-            dest[total_offset] = val_ptr_[i];
+          case 0x01u:
+          {
+            auto* vp = (std::int8_t*)val_ptr_;
+            switch (off_type_)
+            {
+            case 0x01u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t*)off_ptr_), size_); break;
+            case 0x02u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t*)off_ptr_), size_); break; // TODO: handle endianess
+            case 0x03u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t*)off_ptr_), size_); break;
+            case 0x04u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t*)off_ptr_), size_); break;
+            default: return false;
+            }
+            break;
           }
+          case 0x02u:
+          {
+            auto* vp = (std::int16_t*)val_ptr_;
+            switch (off_type_)
+            {
+            case 0x01u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t*)off_ptr_), size_); break;
+            case 0x02u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t*)off_ptr_), size_); break; // TODO: handle endianess
+            case 0x03u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t*)off_ptr_), size_); break;
+            case 0x04u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t*)off_ptr_), size_); break;
+            default: return false;
+            }
+            break;
+          }// TODO: handle endianess
+          case 0x03u:
+          {
+            auto* vp = (std::int32_t*)val_ptr_;
+            switch (off_type_)
+            {
+            case 0x01u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t*)off_ptr_), size_); break;
+            case 0x02u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t*)off_ptr_), size_); break; // TODO: handle endianess
+            case 0x03u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t*)off_ptr_), size_); break;
+            case 0x04u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t*)off_ptr_), size_); break;
+            default: return false;
+            }
+            break;
+          }
+          case 0x04u:
+          {
+            auto* vp = (std::int64_t*)val_ptr_;
+            switch (off_type_)
+            {
+            case 0x01u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t*)off_ptr_), size_); break;
+            case 0x02u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t*)off_ptr_), size_); break; // TODO: handle endianess
+            case 0x03u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t*)off_ptr_), size_); break;
+            case 0x04u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t*)off_ptr_), size_); break;
+            default: return false;
+            }
+            break;
+          }
+          case 0x05u:
+          {
+            auto* vp = (float*)val_ptr_;
+            switch (off_type_)
+            {
+            case 0x01u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t*)off_ptr_), size_); break;
+            case 0x02u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t*)off_ptr_), size_); break; // TODO: handle endianess
+            case 0x03u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t*)off_ptr_), size_); break;
+            case 0x04u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t*)off_ptr_), size_); break;
+            default: return false;
+            }
+            break;
+          }
+          default:
+            return false;
+          }
+
+          return true;
         }
         else if (val_ptr_)
         {
           dest.resize(0);
-          dest.resize(size_);
-          for (std::size_t i = 0; i < size_; ++i)
+          switch (val_type_)
           {
-            if (val_ptr_[i])
-              dest[i] = val_ptr_[i];
+          case 0x01u:
+          {
+            auto* p = (std::int8_t*)val_ptr_;
+            dest.assign(p, p + size_);
+            break;
           }
+          case 0x02u:
+          {
+            auto* p = (std::int16_t*)val_ptr_;
+            dest.assign(p, p + size_);
+            break;
+          }// TODO: handle endianess
+          case 0x03u:
+          {
+            auto* p = (std::int32_t*)val_ptr_;
+            dest.assign(p, p + size_);
+            break;
+          }
+          case 0x04u:
+          {
+            auto* p = (std::int64_t*)val_ptr_;
+            dest.assign(p, p + size_);
+            break;
+          }
+          case 0x05u:
+          {
+            auto* p = (float*)val_ptr_;
+            dest.assign(p, p + size_);
+            break;
+          }
+          default:
+            return false;
+          }
+          return true;
         }
-        else
-        {
-          return false;
-        }
-        return true;
+
+        return false;
       }
 
       class internal
@@ -1684,7 +1853,7 @@ namespace savvy
       std::uint8_t type = type_code<T>();
       if (type >= typed_value::int16 && type <= typed_value::int64)
       {
-        if (val <= std::numeric_limits<std::int8_t>::max() && val > std::numeric_limits<std::int8_t>::min())
+        if (val <= std::numeric_limits<std::int8_t>::max() && val > std::numeric_limits<std::int8_t>::min()) // TODO: include other reserved values
           type = typed_value::int8;
         else if (val <= std::numeric_limits<std::int16_t>::max() && val > std::numeric_limits<std::int16_t>::min())
           return typed_value::int16;
@@ -1852,7 +2021,7 @@ namespace savvy
         vtype max_val = 0;
         for (auto it = vec.begin(); it != vec.end(); ++it)
         {
-          if (!is_missing(*it))
+          if (!is_missing(*it)) // TODO: handle vector_end use is_reserved()
           {
             if (*it > max_val)
               max_val = *it;
@@ -1877,19 +2046,19 @@ namespace savvy
       switch (val_type_)
       {
       case 0x01u:
-        std::copy_n(vec.begin(), size_, (std::int8_t*)val_ptr_);
+        std::transform(vec.begin(), vec.begin() + size_, (std::int8_t*)val_ptr_, missing_transformation<std::int8_t, typename T::value_type>);
         break;
       case 0x02u:
-        std::copy_n(vec.begin(), size_, (std::int16_t*)val_ptr_); // TODO: handle endianess
+        std::transform(vec.begin(), vec.begin() + size_, (std::int16_t*)val_ptr_, missing_transformation<std::int16_t, typename T::value_type>); // TODO: handle endianess
         break;
       case 0x03u:
-        std::copy_n(vec.begin(), size_, (std::int32_t*)val_ptr_);
+        std::transform(vec.begin(), vec.begin() + size_, (std::int32_t*)val_ptr_, missing_transformation<std::int32_t, typename T::value_type>);
         break;
       case 0x04u:
-        std::copy_n(vec.begin(), size_, (std::int64_t*)val_ptr_);
+        std::transform(vec.begin(), vec.begin() + size_, (std::int64_t*)val_ptr_, missing_transformation<std::int64_t, typename T::value_type>);
         break;
       case 0x05u:
-        std::copy_n(vec.begin(), size_, (float*)val_ptr_);
+        std::transform(vec.begin(), vec.begin() + size_, (float*)val_ptr_, missing_transformation<float, typename T::value_type>);
         break;
       }
     }
@@ -1933,7 +2102,7 @@ namespace savvy
         vtype max_val = 0;
         for (auto it = vec.begin(); it != vec.end(); ++it)
         {
-          if (!is_missing(*it))
+          if (!is_missing(*it)) // TODO: handle vector_end use is_reserved()
           {
             if (*it > max_val)
               max_val = *it;
@@ -1981,19 +2150,19 @@ namespace savvy
       switch (val_type_)
       {
       case 0x01u:
-        std::copy_n(vec.value_data(), sparse_size_, (std::int8_t*)val_ptr_);
+        std::transform(vec.value_data(), vec.value_data() + sparse_size_, (std::int8_t*)val_ptr_, missing_transformation<std::int8_t, typename T::value_type>);
         break;
       case 0x02u:
-        std::copy_n(vec.value_data(), sparse_size_, (std::int16_t*)val_ptr_); // TODO: handle endianess
+        std::transform(vec.value_data(), vec.value_data() + sparse_size_, (std::int16_t*)val_ptr_, missing_transformation<std::int16_t, typename T::value_type>); // TODO: handle endianess
         break;
       case 0x03u:
-        std::copy_n(vec.value_data(), sparse_size_, (std::int32_t*)val_ptr_);
+        std::transform(vec.value_data(), vec.value_data() + sparse_size_, (std::int32_t*)val_ptr_, missing_transformation<std::int32_t, typename T::value_type>);
         break;
       case 0x04u:
-        std::copy_n(vec.value_data(), sparse_size_, (std::int64_t*)val_ptr_);
+        std::transform(vec.value_data(), vec.value_data() + sparse_size_, (std::int64_t*)val_ptr_, missing_transformation<std::int64_t, typename T::value_type>);
         break;
       case 0x05u:
-        std::copy_n(vec.value_data(), sparse_size_, (float*)val_ptr_);
+        std::transform(vec.value_data(), vec.value_data() + sparse_size_, (float*)val_ptr_, missing_transformation<float, typename T::value_type>);
         break;
       }
     }
