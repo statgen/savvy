@@ -2155,6 +2155,7 @@ namespace savvy
           fprintf(stderr, "PBWT sorted vector values cannot be wider than 16 bits\n"); // TODO: handle better
           exit(-1);
         }
+        v.val_ptr_ = v.local_data_.data();
       }
     }
 
@@ -2674,17 +2675,19 @@ namespace savvy
       {
         std::vector<::savvy::sav2::internal::pbwt_sort_format_context*> pbwt_format_pointers;
         pbwt_format_pointers.reserve(v.format_fields_.size());
-        for (auto it = v.info().begin(); it != v.info().end(); ++it)
+        for (auto it = v.info().begin(); it != v.info().end(); )
         {
           if (it->first.substr(0, 10) == "_PBWT_SORT")
           {
             auto f = pbwt_ctx.format_contexts.find(it->first);
             if (f != pbwt_ctx.format_contexts.end())
             {
-               pbwt_format_pointers.emplace_back(&(f->second));
-               v.remove_info(it);
+              pbwt_format_pointers.emplace_back(&(f->second));
+              it = v.remove_info(it);
+              continue;
             }
           }
+          ++it;
         }
 
         v.indiv_buf_.resize(indiv_sz);
@@ -2739,7 +2742,7 @@ namespace savvy
                 if (v.indiv_buf_.end() - indiv_it < (sp_sz * pair_width))
                   break;
 
-                *fmt_it = std::make_pair(std::move(fmt_key), typed_value(val_type, sz, off_type, sp_sz, sp_sz * pair_width ? &(*indiv_it) : nullptr));
+                *fmt_it = std::make_pair(std::string(fmt_key), typed_value(val_type, sz, off_type, sp_sz, sp_sz * pair_width ? &(*indiv_it) : nullptr));
                 indiv_it += sp_sz * pair_width;
               }
               else
@@ -2752,9 +2755,22 @@ namespace savvy
                 if (v.indiv_buf_.end() - indiv_it < (sz * type_width))
                   break;
 
-                *fmt_it = std::make_pair(std::move(fmt_key), typed_value(type, sz, sz * type_width ? &(*indiv_it) : nullptr));
+                *fmt_it = std::make_pair(std::string(fmt_key), typed_value(type, sz, sz * type_width ? &(*indiv_it) : nullptr));
                 indiv_it += sz * type_width;
                 // ------------------------------------------- //
+              }
+
+              for (auto pt = pbwt_format_pointers.begin(); pt != pbwt_format_pointers.end(); )
+              {
+                if ((*pt)->format == fmt_key)
+                {
+                  typed_value::internal::pbwt_unsort(fmt_it->second, (*pt)->sort_map, pbwt_ctx.prev_sort_mapping, pbwt_ctx.counts);
+                  pt = pbwt_format_pointers.erase(pt);
+                }
+                else
+                {
+                  ++pt;
+                }
               }
             }
             catch (const std::exception& e)

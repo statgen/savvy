@@ -738,13 +738,14 @@ int main(int argc, char** argv)
 //    if (argc < 3)
 //      return -1;
 
+    if (false)
     {
-      savvy::reader rdr("../test_file.vcf", savvy::fmt::gt);
+      savvy::reader rdr("../test-data/freeze.6a.chr20.pass_only.phased.b4096.1-1000000.sav" /*"../test_file.vcf"*/, savvy::fmt::gt);
 
       auto hdrs = rdr.headers();
       hdrs.emplace_back("contig", "<ID=chr10>");
       hdrs.emplace_back("INFO", "<ID=_PBWT_SORT_GT, Type=Flag, Format=\"GT\">");
-      savvy::sav2::writer wrt("../test-data/test_file.sav2", hdrs, rdr.samples());
+      savvy::sav2::writer wrt("../test-data/freeze.6a.chr20.pass_only.phased.b4096.1-1000000.pbwt.t0.001.sav2" /*"../test-data/test_file.sav2"*/, hdrs, rdr.samples());
       savvy::compressed_vector<std::int16_t> vec;
       std::vector<std::int16_t> dense_vec;
       savvy::site_info site;
@@ -768,7 +769,11 @@ int main(int argc, char** argv)
         for (auto it = vec.begin(); it != vec.end(); ++it)
           dense_vec[it.offset()] = *it;
 
-        var.set_format("GT", dense_vec);
+        if ((float(vec.non_zero_size()) / float(rdr.samples().size())) > 0.001)
+          var.set_format("GT", dense_vec);
+        else
+          var.set_format("GT", vec);
+
         wrt.write_record(var);
       }
 
@@ -776,21 +781,26 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
+
+    if (true)
     {
-      savvy::compressed_vector<std::int16_t> vec;
+      //savvy::compressed_vector<std::int16_t> vec;
+      std::vector<std::int16_t> vec;
       savvy::sav2::variant var;
-      savvy::sav2::reader rdr("../test-data/test_file.sav2");
+      savvy::sav2::reader rdr("../test-data/freeze.6a.chr20.pass_only.phased.b4096.1-1000000.pbwt.t0.001.sav2" /*"../test-data/test_file.sav2"*/);
+      std::size_t cnt = 0;
       while (rdr.read_record(var))
       {
+        ++cnt;
         var.get_format("GT", vec);
-
-        std::cout << var.pos();
-        for (auto it = vec.begin(); it != vec.end(); ++it)
-        {
-          std::cout << "\t" /*<< it.offset() << ":"*/ << (*it);
-        }
-        std::cout << std::endl;
+//        std::cout << var.pos();
+//        for (auto it = vec.begin(); it != vec.end(); ++it)
+//        {
+//          std::cout << "\t" /*<< it.offset() << ":"*/ << (*it);
+//        }
+//        std::cout << std::endl;
       }
+      std::cerr << cnt << std::endl;
     }
 
 
