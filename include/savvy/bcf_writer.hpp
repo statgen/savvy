@@ -713,7 +713,7 @@ namespace savvy
       {
         std::vector<std::size_t> prev_sort_mapping;
         std::vector<std::size_t> counts;
-        std::unordered_multimap<std::string, pbwt_sort_format_context*> field_to_format_contexts;
+        std::unordered_multimap<std::string, pbwt_sort_format_context *> field_to_format_contexts;
         std::unordered_map<std::string, pbwt_sort_format_context> format_contexts;
       };
     }
@@ -721,16 +721,16 @@ namespace savvy
     class typed_value
     {
     public:
-      static const std::uint8_t int8   = 1;
-      static const std::uint8_t int16  = 2;
-      static const std::uint8_t int32  = 3;
-      static const std::uint8_t int64  = 4;
-      static const std::uint8_t real   = 5;
+      static const std::uint8_t int8 = 1;
+      static const std::uint8_t int16 = 2;
+      static const std::uint8_t int32 = 3;
+      static const std::uint8_t int64 = 4;
+      static const std::uint8_t real = 5;
       static const std::uint8_t real64 = 6;
-      static const std::uint8_t str    = 7;
+      static const std::uint8_t str = 7;
       static const std::uint8_t sparse = 8;
 
-      template <typename T>
+      template<typename T>
       static T missing_value()
       {
         std::uint8_t tcode = type_code<T>();
@@ -740,7 +740,7 @@ namespace savvy
 
         if (tcode == 5)
         {
-          std::uint32_t i =  0x7F800001;
+          std::uint32_t i = 0x7F800001;
           T ret;
           std::memcpy(&ret, &i, sizeof(i));
           return ret;
@@ -748,7 +748,7 @@ namespace savvy
 
         if (tcode == 6)
         {
-          std::uint64_t i =  0x7FF0000000000001;
+          std::uint64_t i = 0x7FF0000000000001;
           T ret;
           std::memcpy(&ret, &i, sizeof(i));
         }
@@ -759,27 +759,27 @@ namespace savvy
         return T();
       }
 
-      template <typename T>
+      template<typename T>
       static typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, bool>::type
       is_missing(const T& v);
 
-      template <typename T>
+      template<typename T>
       static typename std::enable_if<std::is_same<T, float>::value || std::is_same<T, double>::value, bool>::type
       is_missing(const T& v);
 
-      template <typename T>
+      template<typename T>
       static typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type
       type_code();
 
-      template <typename T>
+      template<typename T>
       static typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type
       type_code(const T& val);
 
-      template <typename T>
+      template<typename T>
       static typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type
       type_code_ignore_missing(const T& val);
 
-      template <typename DestT, typename SrcT>
+      template<typename DestT, typename SrcT>
       static DestT missing_transformation(SrcT in)
       {
         if (is_missing(in))
@@ -795,7 +795,7 @@ namespace savvy
         not_a_vector
       };
 
-      template <typename T>
+      template<typename T>
       class compressed_offset_iterator
       {
       public:
@@ -807,7 +807,8 @@ namespace savvy
         typedef std::input_iterator_tag iterator_category;
 
         compressed_offset_iterator() : ptr_(nullptr), last_offset_(0) {}
-        compressed_offset_iterator(const T* p) :
+
+        compressed_offset_iterator(const T *p) :
           ptr_(p),
           last_offset_(0)
         {
@@ -829,15 +830,19 @@ namespace savvy
         }
 
         value_type operator*() const { return last_offset_ + (*ptr_); }
+
         //const pointer operator->() const { return &uncompressed_offset_; }
         bool operator==(const self_type& rhs) const { return (ptr_ == rhs.ptr_); }
+
         bool operator!=(const self_type& rhs) const { return (ptr_ != rhs.ptr_); }
+
       private:
-        const T* ptr_;
+        const T *ptr_;
         value_type last_offset_;
       };
+
     public:
-      typed_value() { }
+      typed_value() {}
 
       template<typename T>
       typed_value(const T& v)
@@ -845,9 +850,9 @@ namespace savvy
         init(v);
       }
 
-      typed_value(std::uint8_t type, std::size_t sz, char* data_ptr);
+      typed_value(std::uint8_t type, std::size_t sz, char *data_ptr);
 
-      typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char* data_ptr);
+      typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr);
 
       typed_value(typed_value&& src)
       {
@@ -855,12 +860,13 @@ namespace savvy
       }
 
       std::size_t size() const { return size_; }
+
       bool is_sparse() const { return off_ptr_ != nullptr; }
 
       template<typename T>
       typed_value& operator=(const T& v)
       {
-        if ((void*)this != (void*)&v)
+        if ((void *) this != (void *) &v)
         {
           clear();
           init(v);
@@ -871,7 +877,7 @@ namespace savvy
       typed_value& operator=(typed_value&& src);
 
 
-      template <typename T>
+      template<typename T>
       bool operator>>(std::vector<T>& dest) const
       {
         if (off_ptr_)
@@ -907,7 +913,7 @@ namespace savvy
         return true;
       }
 
-      template <typename T>
+      template<typename T>
       bool operator>>(savvy::compressed_vector<T>& dest) const
       {
         if (off_ptr_)
@@ -919,66 +925,111 @@ namespace savvy
           {
           case 0x01u:
           {
-            auto* vp = (std::int8_t*)val_ptr_;
+            auto *vp = (std::int8_t *) val_ptr_;
             switch (off_type_)
             {
-            case 0x01u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t*)off_ptr_), size_); break;
-            case 0x02u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t*)off_ptr_), size_); break; // TODO: handle endianess
-            case 0x03u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t*)off_ptr_), size_); break;
-            case 0x04u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t*)off_ptr_), size_); break;
-            default: return false;
+            case 0x01u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_);
+              break;
+            case 0x02u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_);
+              break; // TODO: handle endianess
+            case 0x03u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_);
+              break;
+            case 0x04u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_);
+              break;
+            default:
+              return false;
             }
             break;
           }
           case 0x02u:
           {
-            auto* vp = (std::int16_t*)val_ptr_;
+            auto *vp = (std::int16_t *) val_ptr_;
             switch (off_type_)
             {
-            case 0x01u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t*)off_ptr_), size_); break;
-            case 0x02u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t*)off_ptr_), size_); break; // TODO: handle endianess
-            case 0x03u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t*)off_ptr_), size_); break;
-            case 0x04u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t*)off_ptr_), size_); break;
-            default: return false;
+            case 0x01u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_);
+              break;
+            case 0x02u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_);
+              break; // TODO: handle endianess
+            case 0x03u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_);
+              break;
+            case 0x04u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_);
+              break;
+            default:
+              return false;
             }
             break;
           }// TODO: handle endianess
           case 0x03u:
           {
-            auto* vp = (std::int32_t*)val_ptr_;
+            auto *vp = (std::int32_t *) val_ptr_;
             switch (off_type_)
             {
-            case 0x01u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t*)off_ptr_), size_); break;
-            case 0x02u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t*)off_ptr_), size_); break; // TODO: handle endianess
-            case 0x03u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t*)off_ptr_), size_); break;
-            case 0x04u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t*)off_ptr_), size_); break;
-            default: return false;
+            case 0x01u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_);
+              break;
+            case 0x02u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_);
+              break; // TODO: handle endianess
+            case 0x03u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_);
+              break;
+            case 0x04u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_);
+              break;
+            default:
+              return false;
             }
             break;
           }
           case 0x04u:
           {
-            auto* vp = (std::int64_t*)val_ptr_;
+            auto *vp = (std::int64_t *) val_ptr_;
             switch (off_type_)
             {
-            case 0x01u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t*)off_ptr_), size_); break;
-            case 0x02u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t*)off_ptr_), size_); break; // TODO: handle endianess
-            case 0x03u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t*)off_ptr_), size_); break;
-            case 0x04u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t*)off_ptr_), size_); break;
-            default: return false;
+            case 0x01u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_);
+              break;
+            case 0x02u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_);
+              break; // TODO: handle endianess
+            case 0x03u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_);
+              break;
+            case 0x04u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_);
+              break;
+            default:
+              return false;
             }
             break;
           }
           case 0x05u:
           {
-            auto* vp = (float*)val_ptr_;
+            auto *vp = (float *) val_ptr_;
             switch (off_type_)
             {
-            case 0x01u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t*)off_ptr_), size_); break;
-            case 0x02u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t*)off_ptr_), size_); break; // TODO: handle endianess
-            case 0x03u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t*)off_ptr_), size_); break;
-            case 0x04u: dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t*)off_ptr_), size_); break;
-            default: return false;
+            case 0x01u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_);
+              break;
+            case 0x02u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_);
+              break; // TODO: handle endianess
+            case 0x03u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_);
+              break;
+            case 0x04u:
+              dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_);
+              break;
+            default:
+              return false;
             }
             break;
           }
@@ -995,31 +1046,31 @@ namespace savvy
           {
           case 0x01u:
           {
-            auto* p = (std::int8_t*)val_ptr_;
+            auto *p = (std::int8_t *) val_ptr_;
             dest.assign(p, p + size_);
             break;
           }
           case 0x02u:
           {
-            auto* p = (std::int16_t*)val_ptr_;
+            auto *p = (std::int16_t *) val_ptr_;
             dest.assign(p, p + size_);
             break;
           }// TODO: handle endianess
           case 0x03u:
           {
-            auto* p = (std::int32_t*)val_ptr_;
+            auto *p = (std::int32_t *) val_ptr_;
             dest.assign(p, p + size_);
             break;
           }
           case 0x04u:
           {
-            auto* p = (std::int64_t*)val_ptr_;
+            auto *p = (std::int64_t *) val_ptr_;
             dest.assign(p, p + size_);
             break;
           }
           case 0x05u:
           {
-            auto* p = (float*)val_ptr_;
+            auto *p = (float *) val_ptr_;
             dest.assign(p, p + size_);
             break;
           }
@@ -1035,11 +1086,15 @@ namespace savvy
       class internal
       {
       public:
-        template <typename Iter>
+        static void pbwt_unsort(typed_value& v, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
+
+        template<typename Iter>
         static void serialize(const typed_value& v, Iter out_it);
-        template <typename Iter>
+
+        template<typename Iter>
         static void serialize(const typed_value& v, Iter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
       };
+
     private:
       void clear()
       {
@@ -1052,18 +1107,18 @@ namespace savvy
         local_data_.clear();
       }
 
-      template <typename OffT, typename ValT, typename DestT>
+      template<typename OffT, typename ValT, typename DestT>
       void copy_sparse2(std::vector<DestT>& dest) const
       {
         std::size_t total_offset = 0;
         for (std::size_t i = 0; i < sparse_size_; ++i)
         {
-          total_offset += ((const OffT*)off_ptr_)[i];
-          dest[total_offset++] = ((const ValT*)val_ptr_)[i];
+          total_offset += ((const OffT *) off_ptr_)[i];
+          dest[total_offset++] = ((const ValT *) val_ptr_)[i];
         }
       }
 
-      template <typename ValT, typename DestT>
+      template<typename ValT, typename DestT>
       bool copy_sparse1(std::vector<DestT>& dest) const
       {
         switch (off_type_)
@@ -1090,28 +1145,52 @@ namespace savvy
       typename std::enable_if<std::is_signed<T>::value, void>::type
       init(const T& v);
 
-      template <typename T>
+      template<typename T>
       struct is_dense_vector
       {
         static const bool value =
           !std::is_signed<T>::value &&
-          std::is_signed<typename T::value_type>::value
-            && !std::is_same<std::string, T>::value
+            std::is_signed<typename T::value_type>::value
+              && !std::is_same<std::string, T>::value
             &&
             (
-              std::is_same<std::random_access_iterator_tag, typename std::iterator_traits<typename T::iterator>::iterator_category>::value
+            std::is_same<std::random_access_iterator_tag, typename std::iterator_traits<typename T::iterator>::iterator_category>::value
 #if 0
             || std::is_same<T, boost::numeric::ublas::vector<typename T::value_type>>::value
 #endif
           );
       };
 
-      template <> struct is_dense_vector<std::int8_t> { static const bool value = false; };
-      template <> struct is_dense_vector<std::int16_t> { static const bool value = false; };
-      template <> struct is_dense_vector<std::int32_t> { static const bool value = false; };
-      template <> struct is_dense_vector<std::int64_t> { static const bool value = false; };
-      template <> struct is_dense_vector<float> { static const bool value = false; };
-      template <> struct is_dense_vector<double> { static const bool value = false; };
+      template<>
+      struct is_dense_vector<std::int8_t>
+      {
+        static const bool value = false;
+      };
+      template<>
+      struct is_dense_vector<std::int16_t>
+      {
+        static const bool value = false;
+      };
+      template<>
+      struct is_dense_vector<std::int32_t>
+      {
+        static const bool value = false;
+      };
+      template<>
+      struct is_dense_vector<std::int64_t>
+      {
+        static const bool value = false;
+      };
+      template<>
+      struct is_dense_vector<float>
+      {
+        static const bool value = false;
+      };
+      template<>
+      struct is_dense_vector<double>
+      {
+        static const bool value = false;
+      };
 
 
       template<typename T>
@@ -1125,13 +1204,14 @@ namespace savvy
       template<typename T>
       typename std::enable_if<std::is_same<T, std::string>::value, void>::type
       init(const T& vec);
+
     private:
       std::uint8_t val_type_ = 0;
       std::uint8_t off_type_ = 0;
       std::size_t size_ = 0;
       std::size_t sparse_size_ = 0;
-      char* off_ptr_ = nullptr;
-      char* val_ptr_ = nullptr;
+      char *off_ptr_ = nullptr;
+      char *val_ptr_ = nullptr;
       std::vector<char> local_data_;
     };
 
@@ -1177,6 +1257,7 @@ namespace savvy
       std::uint32_t n_fmt_ = 0;
     public:
       site_info() {}
+
       site_info(std::string chrom, std::uint32_t pos, std::string ref, std::vector<std::string> alts,
         std::string id = "",
         float qual = std::numeric_limits<float>::quiet_NaN(), // bcf_missing_value = 0x7F800001
@@ -1184,28 +1265,54 @@ namespace savvy
         std::vector<std::pair<std::string, typed_value>> info = {});
 
       const std::string& chrom() const { return chrom_; }
+
       const std::string& id() const { return id_; }
+
       std::uint32_t pos() const { return pos_; }
+
       float qual() const { return qual_; }
+
       const std::string& ref() const { return ref_; }
+
       const std::vector<std::string>& alts() const { return alts_; }
+
       const std::vector<std::string>& filters() const { return filters_; }
+
       const std::vector<std::pair<std::string, typed_value>>& info() const { return info_; }
 
-      template <typename T>
+      std::vector<std::pair<std::string, typed_value>>::const_iterator remove_info(std::vector<std::pair<std::string, typed_value>>::const_iterator it)
+      {
+        return info_.erase(it);
+      }
+
+      void remove_info(const std::string& key)
+      {
+        auto res = std::find_if(info_.begin(), info_.end(), [&key](const std::pair<std::string, savvy::sav2::typed_value>& v) { return v.first == key; });
+        if (res != info_.end())
+          info_.erase(res);
+      }
+
+      template<typename T>
       bool get_info(const std::string& key, T& dest) const
       {
-        auto res = std::find_if(info_.begin(), info_.end(), [&key](const std::pair<std::string, savvy::sav2::typed_value>& v) { return v.first == key;});
+        auto res = std::find_if(info_.begin(), info_.end(), [&key](const std::pair<std::string, savvy::sav2::typed_value>& v) { return v.first == key; });
         if (res != info_.end())
           return res->second >> dest;
         return false;
       }
 
-      template <typename T>
+
+      template<typename T>
+      void set_info(decltype(info_)::const_iterator off, const T& val)
+      {
+        (info_.begin() + std::distance(info_.cbegin(), off))->second = val;
+      }
+
+      template<typename T>
       void set_info(const std::string& key, const T& val)
       {
         auto it = info_.begin();
-        for ( ; it != info_.end(); ++it)
+        for (; it != info_.end(); ++it)
         {
           if (it->first == key)
           {
@@ -1225,8 +1332,8 @@ namespace savvy
       public:
         static bool read(site_info& s, std::istream& ifs, const dictionary& dict, std::uint32_t shared_sz);
 
-        template <typename Itr>
-        static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<::savvy::sav2::internal::pbwt_sort_format_context*>& pbwt_format_context_pointers);
+        template<typename Itr>
+        static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<::savvy::sav2::internal::pbwt_sort_format_context *>& pbwt_format_context_pointers);
       };
     };
 
@@ -1279,10 +1386,14 @@ namespace savvy
     {
       switch (bounding_type)
       {
-      case bounding_point::any:   return detail::any_coordinate_within_region::compare(var, reg);
-      case bounding_point::all:   return detail::all_coordinates_within_region::compare(var, reg);
-      case bounding_point::beg:  return detail::leftmost_coordinate_within_region::compare(var, reg);
-      case bounding_point::end: return detail::rightmost_coordinate_within_region::compare(var, reg);
+      case bounding_point::any:
+        return detail::any_coordinate_within_region::compare(var, reg);
+      case bounding_point::all:
+        return detail::all_coordinates_within_region::compare(var, reg);
+      case bounding_point::beg:
+        return detail::leftmost_coordinate_within_region::compare(var, reg);
+      case bounding_point::end:
+        return detail::rightmost_coordinate_within_region::compare(var, reg);
       }
     }
 
@@ -1292,25 +1403,27 @@ namespace savvy
       class internal
       {
       public:
-        static bool read(variant& v, std::istream& ifs, const dictionary& dict, std::size_t sample_size, bool is_bcf);
+        static bool read(variant& v, std::istream& ifs, const dictionary& dict, ::savvy::sav2::internal::pbwt_sort_context& sort_ctx, std::size_t sample_size, bool is_bcf);
 
         static bool serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx, std::uint32_t& shared_sz, std::uint32_t& indiv_sz);
       };
+
     private:
       std::vector<std::pair<std::string, typed_value>> format_fields_;
       std::vector<char> indiv_buf_;
     public:
       using site_info::site_info;
+
       const decltype(format_fields_)& format_fields() const { return format_fields_; }
 
-      template <typename T>
+      template<typename T>
       bool get_format(const std::string& key, T& destination_vector) const;
 
-      template <typename T>
-      void set_format(const std::string& key, const std::vector<T>& geno, std::set<std::string> sparse_keys = {"GT","EC","DS","HDS"});
+      template<typename T>
+      void set_format(const std::string& key, const std::vector<T>& geno, std::set<std::string> sparse_keys = {"GT", "EC", "DS", "HDS"});
 
-      template <typename T>
-      void set_format(const std::string& key, const compressed_vector<T>& geno);
+      template<typename T>
+      void set_format(const std::string& key, const compressed_vector <T>& geno);
     };
 
 
@@ -1322,6 +1435,8 @@ namespace savvy
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> ids_;
       dictionary dict_;
+
+      ::savvy::sav2::internal::pbwt_sort_context sort_context_;
 
       // Random access
       struct index_data
@@ -1335,6 +1450,7 @@ namespace savvy
         std::uint32_t total_in_block;
         std::uint64_t total_records_read;
         std::uint64_t max_records_to_read;
+
         index_data(const std::string& file_path, genomic_region bounds, bounding_point bound_type = bounding_point::beg) :
           file(file_path),
           reg(bounds),
@@ -1348,13 +1464,14 @@ namespace savvy
         {
         }
       };
+
       std::unique_ptr<index_data> index_;
     public:
       reader(const std::string& file_path) :
         file_path_(file_path),
         input_stream_(savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path))
       {
-        if (!read_header(*input_stream_, headers_, ids_, dict_))
+        if (!read_header(*input_stream_, headers_, ids_, dict_, sort_context_))
           input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
       }
 
@@ -1398,7 +1515,7 @@ namespace savvy
           }
 
           bool is_bcf = false; // TODO ...
-          if (!variant::internal::read(r, *input_stream_, dict_, ids_.size(), is_bcf))
+          if (!variant::internal::read(r, *input_stream_, dict_, sort_context_, ids_.size(), is_bcf))
             input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
 
           if (!this->good())
@@ -1435,22 +1552,22 @@ namespace savvy
             return read_indexed_record(r);
 
           bool is_bcf = false; // TODO ...
-          if (!variant::internal::read(r, *input_stream_, dict_, ids_.size(), is_bcf) && input_stream_->good())
+          if (!variant::internal::read(r, *input_stream_, dict_, sort_context_, ids_.size(), is_bcf) && input_stream_->good())
             input_stream_->setstate(std::ios::badbit);
         }
 
         return *this;
       }
 
-      operator bool() const { return (bool)(*input_stream_); };
+      operator bool() const { return (bool) (*input_stream_); };
     private:
-      static bool read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict)
+      static bool read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict, ::savvy::sav2::internal::pbwt_sort_context& sort_context)
       {
         std::string magic(5, '\0');
         ifs.read(&magic[0], magic.size());
 
         std::uint32_t header_block_sz = 0;
-        ifs.read((char*)&header_block_sz, sizeof(header_block_sz));
+        ifs.read((char *) &header_block_sz, sizeof(header_block_sz));
 
         std::int64_t bytes_read = 0;
         std::string hdr_line;
@@ -1521,6 +1638,19 @@ namespace savvy
               dict.str_to_int[which_dict][hid] = dict.int_to_str[which_dict].size() - 1;
             }
 
+            if (key == "INFO")
+            {
+              if (hid.substr(0, 10) == "_PBWT_SORT")
+              {
+                ::savvy::sav2::internal::pbwt_sort_format_context ctx;
+                ctx.format = parse_header_sub_field(val, "Format");
+                ctx.id = hid;
+
+                auto insert_it = sort_context.format_contexts.insert(std::make_pair(std::string(hid), std::move(ctx)));
+                sort_context.field_to_format_contexts.insert(std::make_pair(insert_it.first->second.format, &(insert_it.first->second)));
+              }
+            }
+
             headers.emplace_back(std::move(key), std::move(val));
           }
         }
@@ -1554,9 +1684,9 @@ namespace savvy
 
       ::savvy::sav2::internal::pbwt_sort_context sort_context_;
     private:
-      static std::filebuf* create_std_filebuf(const std::string& file_path, std::ios::openmode mode)
+      static std::filebuf *create_std_filebuf(const std::string& file_path, std::ios::openmode mode)
       {
-        std::filebuf* ret = new std::filebuf();
+        std::filebuf *ret = new std::filebuf();
         ret->open(file_path.c_str(), mode);
         return ret;
       }
@@ -1568,9 +1698,10 @@ namespace savvy
         else
           return std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out));
       }
+
     public:
       writer(const std::string& file_path, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids) :
-        rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t)this),
+        rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t) this),
         output_buf_(create_out_streambuf(file_path, 3)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         ofs_(output_buf_.get()),
         //samples_(samples_beg, samples_end),
@@ -1580,7 +1711,7 @@ namespace savvy
         // TODO: Use mkstemp when shrinkwrap supports FILE*
         if (true && file_path_ != "/dev/stdout") // TODO: Check if indexing and zstd is enabled.
         {
-          index_file_ = ::savvy::detail::make_unique<s1r::writer>(file_path + ".s1r" , uuid_);
+          index_file_ = ::savvy::detail::make_unique<s1r::writer>(file_path + ".s1r", uuid_);
         }
 
         write_header(headers, ids);
@@ -1666,8 +1797,8 @@ namespace savvy
         }
         else
         {
-          ofs_.write((char*)&shared_sz, sizeof(shared_sz));
-          ofs_.write((char*)&indiv_sz, sizeof(indiv_sz));
+          ofs_.write((char *) &shared_sz, sizeof(shared_sz));
+          ofs_.write((char *) &indiv_sz, sizeof(indiv_sz));
           ofs_.write(serialized_buf_.data(), serialized_buf_.size());
 
           current_block_min_ = std::min(current_block_min_, std::uint32_t(r.pos()));
@@ -1782,10 +1913,11 @@ namespace savvy
 //          ofs_.write((char*)(f.serialized_data().data()), f.serialized_data().size());
 //        }
       }
+
     private:
       void write_header(const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids)
       {
-        std::string magic = {'S','A','V','\x02','\x00'};
+        std::string magic = {'S', 'A', 'V', '\x02', '\x00'};
 
         std::uint32_t header_block_sz = 0;
         for (auto it = headers.begin(); it != headers.end(); ++it)
@@ -1806,7 +1938,7 @@ namespace savvy
         header_block_sz += 2; //new line and null
 
         ofs_.write(magic.data(), magic.size());
-        ofs_.write((char*)(&header_block_sz), sizeof(header_block_sz));
+        ofs_.write((char *) (&header_block_sz), sizeof(header_block_sz));
 
         for (auto it = headers.begin(); it != headers.end(); ++it)
         {
@@ -1851,21 +1983,21 @@ namespace savvy
       }
     };
 
-    template <typename T>
+    template<typename T>
     typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, bool>::type
     typed_value::is_missing(const T& v)
     {
       return v == std::numeric_limits<T>::min();
     }
 
-    template <typename T>
+    template<typename T>
     typename std::enable_if<std::is_same<T, float>::value || std::is_same<T, double>::value, bool>::type
     typed_value::is_missing(const T& v)
     {
       return std::isnan(v);
     }
 
-    template <typename T>
+    template<typename T>
     typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type typed_value::type_code()
     {
       if (std::is_same<T, std::int8_t>::value)
@@ -1883,7 +2015,7 @@ namespace savvy
       return 0;
     }
 
-    template <typename T>
+    template<typename T>
     typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type typed_value::type_code_ignore_missing(const T& val)
     {
       std::uint8_t type = type_code<T>();
@@ -1901,7 +2033,7 @@ namespace savvy
       return type;
     }
 
-    template <typename T>
+    template<typename T>
     typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type typed_value::type_code(const T& val)
     {
       std::uint8_t type = type_code<T>();
@@ -1920,7 +2052,7 @@ namespace savvy
     }
 
     inline
-    typed_value::typed_value(std::uint8_t type, std::size_t sz, char* data_ptr) :
+    typed_value::typed_value(std::uint8_t type, std::size_t sz, char *data_ptr) :
       val_type_(type),
       size_(sz),
       val_ptr_(data_ptr)
@@ -1928,7 +2060,7 @@ namespace savvy
     }
 
     inline
-    typed_value::typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char* data_ptr) :
+    typed_value::typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr) :
       val_type_(val_type),
       off_type_(off_type),
       size_(sz),
@@ -1959,6 +2091,71 @@ namespace savvy
         src.off_ptr_ = nullptr;
       }
       return *this;
+    }
+
+    template<typename SrcT, typename DestT>
+    static void pbwt_unsort(SrcT src_ptr, std::size_t sz, DestT dest_ptr, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts)
+    {
+      std::swap(sort_mapping, prev_sort_mapping);
+      if (prev_sort_mapping.empty())
+      {
+        prev_sort_mapping.resize(sz);
+        for (int i = 0; i < sz; ++i)
+          prev_sort_mapping[i] = i;
+      }
+
+      if (sort_mapping.empty())
+        sort_mapping.resize(sz);
+
+      if (prev_sort_mapping.size() != sz)
+      {
+        fprintf(stderr, "Variable-sized data vectors not allowed with PBWT\n"); // TODO: handle better
+        exit(-1);
+      }
+
+      counts.clear();
+      for (int i = 0; i < sz; ++i)
+      {
+        std::uint8_t d(src_ptr[i]);
+        if (d + 1u >= counts.size())
+          counts.resize(std::size_t(d) + 2u);
+        ++counts[d + 1u];
+      }
+
+      for (int i = 1; i < counts.size(); ++i)
+        counts[i] = counts[i - 1] + counts[i];
+
+      for (int i = 0; i < prev_sort_mapping.size(); ++i)
+      {
+        std::size_t unsorted_index = prev_sort_mapping[i];
+        dest_ptr[unsorted_index] = src_ptr[i];
+        std::uint8_t d(dest_ptr[unsorted_index]);
+        sort_mapping[counts[d]++] = unsorted_index;
+      }
+    }
+
+    inline void typed_value::internal::pbwt_unsort(typed_value& v, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts)
+    {
+      assert(v.off_ptr_ == nullptr);
+      assert(v.local_data_.empty());
+
+      if (v.off_ptr_)
+      {
+        fprintf(stderr, "PBWT sort not yet supported with sparse vectors\n"); // TODO: implement
+        exit(-1);
+      }
+      else if (v.val_ptr_)
+      {
+
+        v.local_data_.resize(v.size_ * (1u << bcf_type_shift[v.val_type_]));
+        if (v.val_type_ == 0x01u) ::savvy::sav2::pbwt_unsort((std::int8_t *) v.val_ptr_, v.size_, (std::int8_t *) v.local_data_.data(), sort_mapping, prev_sort_mapping, counts);
+        else if (v.val_type_ == 0x02u) ::savvy::sav2::pbwt_unsort((std::int16_t *) v.val_ptr_, v.size_, (std::int8_t *) v.local_data_.data(), sort_mapping, prev_sort_mapping, counts); // TODO: make sure this works
+        else
+        {
+          fprintf(stderr, "PBWT sorted vector values cannot be wider than 16 bits\n"); // TODO: handle better
+          exit(-1);
+        }
+      }
     }
 
     template <typename Iter>
@@ -2021,7 +2218,7 @@ namespace savvy
 
         if (prev_sort_mapping.size() != data_sz)
         {
-          fprintf(stderr, "Variable-sized data vectors not allowed with PBWT\n");
+          fprintf(stderr, "Variable-sized data vectors not allowed with PBWT\n"); // TODO: handle better
           exit(-1);
         }
 
@@ -2463,7 +2660,7 @@ namespace savvy
     }
 
     inline
-    bool variant::internal::read(variant& v, std::istream& ifs, const dictionary& dict, std::size_t sample_size, bool is_bcf)
+    bool variant::internal::read(variant& v, std::istream& ifs, const dictionary& dict, ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx, std::size_t sample_size, bool is_bcf)
     {
       std::uint32_t shared_sz, indiv_sz;
       ifs.read((char*)&shared_sz, sizeof(shared_sz)); // TODO: endian
@@ -2475,6 +2672,21 @@ namespace savvy
 
       if (ifs && site_info::internal::read(v, ifs, dict, shared_sz))
       {
+        std::vector<::savvy::sav2::internal::pbwt_sort_format_context*> pbwt_format_pointers;
+        pbwt_format_pointers.reserve(v.format_fields_.size());
+        for (auto it = v.info().begin(); it != v.info().end(); ++it)
+        {
+          if (it->first.substr(0, 10) == "_PBWT_SORT")
+          {
+            auto f = pbwt_ctx.format_contexts.find(it->first);
+            if (f != pbwt_ctx.format_contexts.end())
+            {
+               pbwt_format_pointers.emplace_back(&(f->second));
+               v.remove_info(it);
+            }
+          }
+        }
+
         v.indiv_buf_.resize(indiv_sz);
         if (ifs.read(v.indiv_buf_.data(), v.indiv_buf_.size()))
         {

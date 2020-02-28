@@ -759,7 +759,7 @@ int main(int argc, char** argv)
         {
           if (!(*it))
           {
-            *it = savvy::sav2::typed_value::missing_value<std::int16_t>();
+            *it = savvy::sav2::typed_value::missing_value<decltype(vec)::value_type>();
           }
         }
 
