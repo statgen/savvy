@@ -125,10 +125,11 @@ namespace savvy
       offsets_.reserve(size_);
       for (auto it = val_it; it != val_end; ++it)
       {
+        //typename std::iterator_traits<ValT>::value_type tmp = *it;
         if (*it)
         {
-          offsets_.emplace_back(it - val_it);
           values_.emplace_back(*it);
+          offsets_.emplace_back(it - val_it);
         }
       }
     }
@@ -185,7 +186,12 @@ namespace savvy
 
     void resize(std::size_t sz, value_type val = value_type())
     {
-      if (sz < size_)
+      if (!sz)
+      {
+        offsets_.clear();
+        values_.clear();
+      }
+      else if (sz < size_)
       {
         auto it = std::lower_bound(offsets_.begin(), offsets_.end(), sz);
         offsets_.erase(it, offsets_.end());
