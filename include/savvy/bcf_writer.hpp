@@ -24,6 +24,8 @@
 #include <cstdio>
 #include <chrono>
 #include <list>
+#include <cstdint>
+#include <type_traits>
 
 namespace savvy
 {
@@ -903,8 +905,26 @@ namespace savvy
         else if (val_ptr_)
         {
           dest.resize(size_);
-          std::size_t val_width = 1u << bcf_type_shift[val_type_];
-          std::copy_n(val_ptr_, size_ * val_width, dest.data());
+          switch (val_type_)
+          {
+          case 0x01u:
+            std::copy_n((std::int8_t*)val_ptr_, size_, dest.data());
+            break;
+          case 0x02u:
+            std::copy_n((std::int16_t*)val_ptr_, size_, dest.data()); // TODO: handle endianess
+            break;
+          case 0x03u:
+            std::copy_n((std::int32_t*)val_ptr_, size_, dest.data());
+            break;
+          case 0x04u:
+            std::copy_n((std::int64_t*)val_ptr_, size_, dest.data());
+            break;
+          case 0x05u:
+            std::copy_n((float*)val_ptr_, size_, dest.data());
+            break;
+          default:
+            return false;
+          }
         }
         else
         {
@@ -1041,7 +1061,7 @@ namespace savvy
         }
         else if (val_ptr_)
         {
-          dest.resize(0);
+          //dest.resize(0);
           switch (val_type_)
           {
           case 0x01u:
@@ -1107,13 +1127,14 @@ namespace savvy
         local_data_.clear();
       }
 
-      template<typename OffT, typename ValT, typename DestT>
+      template<typename ValT, typename OffT, typename DestT>
       void copy_sparse2(std::vector<DestT>& dest) const
       {
         std::size_t total_offset = 0;
         for (std::size_t i = 0; i < sparse_size_; ++i)
         {
-          total_offset += ((const OffT *) off_ptr_)[i];
+          int tmp_off = ((const OffT *) off_ptr_)[i];
+          total_offset += tmp_off;
           dest[total_offset++] = ((const ValT *) val_ptr_)[i];
         }
       }
@@ -1124,16 +1145,16 @@ namespace savvy
         switch (off_type_)
         {
         case 0x01u:
-          copy_sparse2<ValT, std::int8_t>(dest);
+          copy_sparse2<ValT, std::uint8_t>(dest);
           break;
         case 0x02u:
-          copy_sparse2<ValT, std::int16_t>(dest); // TODO: handle endianess
+          copy_sparse2<ValT, std::uint16_t>(dest); // TODO: handle endianess
           break;
         case 0x03u:
-          copy_sparse2<ValT, std::int32_t>(dest);
+          copy_sparse2<ValT, std::uint32_t>(dest);
           break;
         case 0x04u:
-          copy_sparse2<ValT, std::int64_t>(dest);
+          copy_sparse2<ValT, std::uint64_t>(dest);
           break;
         default:
           return false;
@@ -2472,7 +2493,7 @@ namespace savvy
 
         if (dict.int_to_str[dictionary::contig].size() <= tmp_int)
         {
-          std::fprintf(stderr, "Error: Invalid contig id\n");
+          std::fprintf(stderr, "Error: Invalid contig id (%i)\n", tmp_int);
           return false;
         }
         s.chrom_ = dict.int_to_str[dictionary::contig][tmp_int];
@@ -2519,7 +2540,7 @@ namespace savvy
           {
             if (dict.int_to_str[dictionary::id].size() <= *it)
             {
-              std::fprintf(stderr, "Error: Invalid filter id\n");
+              std::fprintf(stderr, "Error: Invalid filter id (%i)\n", *it);
               return false;
             }
             s.filters_.emplace_back(dict.int_to_str[dictionary::id][*it]);
@@ -2534,7 +2555,7 @@ namespace savvy
             shared_it = bcf::deserialize_int(shared_it, s.shared_data_.end(), info_key_id);
             if (dict.int_to_str[dictionary::id].size() <= info_key_id)
             {
-              std::fprintf(stderr, "Error: Invalid info id\n");
+              std::fprintf(stderr, "Error: Invalid info id (%i)\n", info_key_id);
               return false;
             }
             std::string info_key = dict.int_to_str[dictionary::id][info_key_id];
