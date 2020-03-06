@@ -1762,6 +1762,10 @@ namespace savvy
         }
       }
 
+      bool good() const { return ofs_.good(); }
+      operator bool() const { return ofs_.good(); }
+      //bool bad() const { return ofs_.bad(); }
+
       writer& write_record(const variant& r)
       {
         bool is_bcf = true; // TODO: ...
@@ -2753,10 +2757,10 @@ namespace savvy
                 std::uint8_t sp_type_byte = *(indiv_it++);
                 std::uint8_t off_type = sp_type_byte >> 4u;
                 std::uint8_t val_type = sp_type_byte & 0x0Fu;
-                std::size_t sp_sz;
+                std::size_t sp_sz = 0;
                 indiv_it = bcf::deserialize_int(indiv_it, v.indiv_buf_.end(), sp_sz);
-                if (indiv_it == v.indiv_buf_.end())
-                  break;
+//                if (indiv_it == v.indiv_buf_.end())
+//                  break;
                 std::size_t pair_width = 1u << bcf_type_shift[off_type];
                 pair_width += 1u << bcf_type_shift[val_type];
 
@@ -2770,7 +2774,7 @@ namespace savvy
               {
                 if (is_bcf)
                   sz = sz * sample_size;
-
+                // TODO: make sure size is multiple of sample size and not zero
                 std::size_t type_width = 1u << bcf_type_shift[type];
 
                 if (v.indiv_buf_.end() - indiv_it < (sz * type_width))
