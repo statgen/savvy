@@ -1182,37 +1182,6 @@ namespace savvy
           );
       };
 
-      template<>
-      struct is_dense_vector<std::int8_t>
-      {
-        static const bool value = false;
-      };
-      template<>
-      struct is_dense_vector<std::int16_t>
-      {
-        static const bool value = false;
-      };
-      template<>
-      struct is_dense_vector<std::int32_t>
-      {
-        static const bool value = false;
-      };
-      template<>
-      struct is_dense_vector<std::int64_t>
-      {
-        static const bool value = false;
-      };
-      template<>
-      struct is_dense_vector<float>
-      {
-        static const bool value = false;
-      };
-      template<>
-      struct is_dense_vector<double>
-      {
-        static const bool value = false;
-      };
-
 
       template<typename T>
       typename std::enable_if<is_dense_vector<T>::value, void>::type
@@ -1234,6 +1203,37 @@ namespace savvy
       char *off_ptr_ = nullptr;
       char *val_ptr_ = nullptr;
       std::vector<char> local_data_;
+    };
+
+    template<>
+    struct typed_value::is_dense_vector<std::int8_t>
+    {
+      static const bool value = false;
+    };
+    template<>
+    struct typed_value::is_dense_vector<std::int16_t>
+    {
+      static const bool value = false;
+    };
+    template<>
+    struct typed_value::is_dense_vector<std::int32_t>
+    {
+      static const bool value = false;
+    };
+    template<>
+    struct typed_value::is_dense_vector<std::int64_t>
+    {
+      static const bool value = false;
+    };
+    template<>
+    struct typed_value::is_dense_vector<float>
+    {
+      static const bool value = false;
+    };
+    template<>
+    struct typed_value::is_dense_vector<double>
+    {
+      static const bool value = false;
     };
 
     class dictionary

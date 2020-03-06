@@ -9,9 +9,9 @@
 #include "savvy/s1r.hpp"
 #include "savvy/savvy.hpp"
 #include "savvy/sav_reader.hpp"
+#include "savvy/bcf_writer.hpp"
 
 #include <getopt.h>
-#include <savvy/bcf_writer.hpp>
 
 class stat_prog_args
 {
