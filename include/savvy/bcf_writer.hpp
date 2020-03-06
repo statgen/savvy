@@ -1303,7 +1303,7 @@ namespace savvy
 
       std::vector<std::pair<std::string, typed_value>>::const_iterator remove_info(std::vector<std::pair<std::string, typed_value>>::const_iterator it)
       {
-        return info_.erase(it);
+        return info_.erase(info_.begin() + (it - info_.cbegin()));
       }
 
       void remove_info(const std::string& key)
