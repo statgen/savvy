@@ -717,6 +717,15 @@ namespace savvy
         std::vector<std::size_t> counts;
         std::unordered_multimap<std::string, pbwt_sort_format_context *> field_to_format_contexts;
         std::unordered_map<std::string, pbwt_sort_format_context> format_contexts;
+
+        void reset()
+        {
+          for (auto it = format_contexts.begin(); it != format_contexts.end(); ++it)
+          {
+            for (std::size_t i = 0; i < it->second.sort_map.size(); ++i)
+              it->second.sort_map[i] = i;
+          }
+        }
       };
     }
 
@@ -877,6 +886,36 @@ namespace savvy
       }
 
       typed_value& operator=(typed_value&& src);
+
+      template<typename T>
+      bool operator>>(T& dest) const
+      {
+        if (!val_ptr_ || size_ == 0)
+          return false;
+
+        switch (val_type_)
+        {
+        case 0x01u:
+          dest = *((std::int8_t*)val_ptr_);
+          break;
+        case 0x02u:
+          dest = *((std::int16_t*)val_ptr_); // TODO: handle endianess
+          break;
+        case 0x03u:
+          dest = *((std::int32_t*)val_ptr_);
+          break;
+        case 0x04u:
+          dest = *((std::int64_t*)val_ptr_);
+          break;
+        case 0x05u:
+          dest = *((float*)val_ptr_);
+          break;
+        default:
+          return false;
+        }
+
+        return true;
+      }
 
 
       template<typename T>
@@ -1354,7 +1393,7 @@ namespace savvy
         static bool read(site_info& s, std::istream& ifs, const dictionary& dict, std::uint32_t shared_sz);
 
         template<typename Itr>
-        static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<::savvy::sav2::internal::pbwt_sort_format_context *>& pbwt_format_context_pointers);
+        static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<::savvy::sav2::internal::pbwt_sort_format_context *>& pbwt_format_context_pointers, bool pbwt_reset);
       };
     };
 
@@ -1426,7 +1465,7 @@ namespace savvy
       public:
         static bool read(variant& v, std::istream& ifs, const dictionary& dict, ::savvy::sav2::internal::pbwt_sort_context& sort_ctx, std::size_t sample_size, bool is_bcf);
 
-        static bool serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx, std::uint32_t& shared_sz, std::uint32_t& indiv_sz);
+        static bool serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx, bool pbwt_reset, std::uint32_t& shared_sz, std::uint32_t& indiv_sz);
       };
 
     private:
@@ -1769,6 +1808,7 @@ namespace savvy
       writer& write_record(const variant& r)
       {
         bool is_bcf = true; // TODO: ...
+        bool flushed = false;
 
         if (block_size_ != 0 && ((record_count_ % block_size_) == 0 || r.chrom() != current_chromosome_))
         {
@@ -1796,11 +1836,8 @@ namespace savvy
           current_block_min_ = std::numeric_limits<std::uint32_t>::max();
           current_block_max_ = 0;
 
-          for (auto it = sort_context_.format_contexts.begin(); it != sort_context_.format_contexts.end(); ++it)
-          {
-            for (std::size_t i = 0; i < it->second.sort_map.size(); ++i)
-              it->second.sort_map[i] = i;
-          }
+          sort_context_.reset();
+          flushed = true;
         }
 
 //        std::vector<std::string> pbwt_info_flags;
@@ -1822,7 +1859,7 @@ namespace savvy
 //        }
 
         std::uint32_t shared_sz, indiv_sz;
-        if (!variant::internal::serialize(r, serialized_buf_, dict_, n_samples_, is_bcf, sort_context_, shared_sz, indiv_sz))
+        if (!variant::internal::serialize(r, serialized_buf_, dict_, n_samples_, is_bcf, sort_context_, flushed, shared_sz, indiv_sz))
         {
           ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
         }
@@ -2605,7 +2642,7 @@ namespace savvy
     }
 
     template <typename Itr>
-    bool site_info::internal::serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<::savvy::sav2::internal::pbwt_sort_format_context*>& pbwt_format_context_pointers)
+    bool site_info::internal::serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, const std::vector<::savvy::sav2::internal::pbwt_sort_format_context*>& pbwt_format_context_pointers, bool pbwt_reset)
     {
       union u
       {
@@ -2617,7 +2654,7 @@ namespace savvy
       auto res = dict.str_to_int[dictionary::contig].find(s.chrom_);
       if (res == dict.str_to_int[dictionary::contig].end())
       {
-        std::fprintf(stderr, "Error: Contig not in header\n");
+        std::fprintf(stderr, "Error: Contig not in header (%s)\n", s.chrom_.c_str());
         return false;
       }
 
@@ -2626,7 +2663,7 @@ namespace savvy
       buf[2].i = static_cast<std::int32_t>(s.chrom_.size());
       buf[3].f = s.qual_;
 
-      std::size_t extra_info_cnt = 0;
+      std::size_t extra_info_cnt = (int)pbwt_reset;
       for (auto it = pbwt_format_context_pointers.begin(); it != pbwt_format_context_pointers.end(); ++it)
         extra_info_cnt += (*it != nullptr);
       std::uint32_t tmp_uint = (std::uint32_t(s.alts_.size() + 1) << 16u) | (0xFFFFu & std::uint32_t(s.info_.size() + extra_info_cnt)); // TODO: append pbwt info flags.
@@ -2651,7 +2688,7 @@ namespace savvy
         res = dict.str_to_int[dictionary::id].find(*it);
         if (res == dict.str_to_int[dictionary::id].end())
         {
-          std::fprintf(stderr, "Error: Filter not in header\n");
+          std::fprintf(stderr, "Error: Filter not in header (%s)\n", it->c_str());
           return false;
         }
         filter_ints.emplace_back(res->second);
@@ -2664,12 +2701,26 @@ namespace savvy
         res = dict.str_to_int[dictionary::id].find(it->first);
         if (res == dict.str_to_int[dictionary::id].end())
         {
-          std::fprintf(stderr, "Error: INFO key not in header\n");
+          std::fprintf(stderr, "Error: INFO key not in header (%s)\n", it->first.c_str());
           return false;
         }
 
         bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
         typed_value::internal::serialize(it->second, out_it);
+      }
+
+      if (pbwt_reset)
+      {
+        std::string k = "_PBWT_RESET";
+        res = dict.str_to_int[dictionary::id].find(k);
+        if (res == dict.str_to_int[dictionary::id].end())
+        {
+          std::fprintf(stderr, "Error: INFO key not in header (%s)\n", k.c_str());
+          return false;
+        }
+
+        bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
+        typed_value::internal::serialize(typed_value(std::int8_t(1)), out_it);
       }
 
       for (auto it = pbwt_format_context_pointers.begin(); it != pbwt_format_context_pointers.end(); ++it)
@@ -2679,7 +2730,7 @@ namespace savvy
           res = dict.str_to_int[dictionary::id].find((*it)->id);
           if (res == dict.str_to_int[dictionary::id].end())
           {
-            std::fprintf(stderr, "Error: INFO key not in header\n");
+            std::fprintf(stderr, "Error: INFO key not in header (%s)\n", (*it)->id.c_str());
             return false;
           }
 
@@ -2704,6 +2755,10 @@ namespace savvy
 
       if (ifs && site_info::internal::read(v, ifs, dict, shared_sz))
       {
+        int pbwt_reset{}; v.get_info("_PBWT_RESET", pbwt_reset);
+        if (pbwt_reset)
+          pbwt_ctx.reset();
+
         std::vector<::savvy::sav2::internal::pbwt_sort_format_context*> pbwt_format_pointers;
         pbwt_format_pointers.reserve(v.format_fields_.size());
         for (auto it = v.info().begin(); it != v.info().end(); )
@@ -2821,7 +2876,7 @@ namespace savvy
     }
 
     inline
-    bool variant::internal::serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx, std::uint32_t& shared_sz, std::uint32_t& indiv_sz)
+    bool variant::internal::serialize(const variant& v, std::vector<char>& buf, const dictionary& dict, std::size_t sample_size, bool is_bcf, ::savvy::sav2::internal::pbwt_sort_context& pbwt_ctx, bool pbwt_reset, std::uint32_t& shared_sz, std::uint32_t& indiv_sz)
     {
       buf.clear();
       buf.reserve(24);
@@ -2844,7 +2899,7 @@ namespace savvy
         }
       }
 
-      if (!site_info::internal::serialize(v, std::back_inserter(buf), dict, sample_size, pbwt_format_pointers))
+      if (!site_info::internal::serialize(v, std::back_inserter(buf), dict, sample_size, pbwt_format_pointers, pbwt_reset))
         return false;
 
       if (buf.size() > std::numeric_limits<std::uint32_t>::max())

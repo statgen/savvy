@@ -728,9 +728,21 @@ void subset_test(const std::string& path)
   assert(cnt == (F == savvy::fmt::hds ? SAVVYT_MARKER_COUNT_DOSE : SAVVYT_MARKER_COUNT_HARD));
 }
 
+template<typename T>
+std::uint32_t adler32(T beg_it, T end_it)
+{
+  uint32_t r0 = 1, r1 = 0;
+
+  for (T it = beg_it; it != end_it; ++it)
+  {
+    r0 = (r0 + *it) % 65521;
+    r1 = (r1 + r0) % 65521;
+  }
+
+  return (r1 << 16) | r0;
+}
 
 #include "savvy/bcf_writer.hpp"
-
 int main(int argc, char** argv)
 {
   if (false)
@@ -738,14 +750,18 @@ int main(int argc, char** argv)
 //    if (argc < 3)
 //      return -1;
 
-    if (false)
+    std::uint32_t orig_checksum = 0;
+    std::string sav2_file_path = "../test-data/freeze65k.chr20.phased.pass.minDP0.remDuplicates.1-1000000.pbwt.t0.001.sav2";
+    if (true)
     {
       savvy::reader rdr("../test-data/freeze.6a.chr20.pass_only.phased.b4096.1-1000000.sav" /*"../test_file.vcf"*/, savvy::fmt::gt);
 
       auto hdrs = rdr.headers();
       hdrs.emplace_back("contig", "<ID=chr10>");
+      hdrs.emplace_back("contig", "<ID=chr20>");
       hdrs.emplace_back("INFO", "<ID=_PBWT_SORT_GT, Type=Flag, Format=\"GT\">");
-      savvy::sav2::writer wrt("../test-data/freeze.6a.chr20.pass_only.phased.b4096.1-1000000.pbwt.t0.001.sav2" /*"../test-data/test_file.sav2"*/, hdrs, rdr.samples());
+      hdrs.emplace_back("INFO", "<ID=_PBWT_RESET, Type=Flag");
+      savvy::sav2::writer wrt(sav2_file_path /*"../test-data/test_file.sav2"*/, hdrs, rdr.samples());
       savvy::compressed_vector<std::int16_t> vec;
       std::vector<std::int16_t> dense_vec;
       savvy::site_info site;
@@ -769,7 +785,10 @@ int main(int argc, char** argv)
         for (auto it = vec.begin(); it != vec.end(); ++it)
           dense_vec[it.offset()] = *it;
 
-        if ((float(vec.non_zero_size()) / float(rdr.samples().size())) > 0.001)
+        orig_checksum = (orig_checksum << 8) ^ adler32(vec.value_data(), vec.value_data() + vec.non_zero_size());
+        orig_checksum = (orig_checksum << 8) ^ adler32(vec.index_data(), vec.index_data() + vec.non_zero_size());
+
+        if ((float(vec.non_zero_size()) / float(vec.size())) > 0.001)
           var.set_format("GT", dense_vec);
         else
           var.set_format("GT", vec);
@@ -777,17 +796,17 @@ int main(int argc, char** argv)
         wrt.write_record(var);
       }
 
-      if (rdr.bad())
+      if (rdr.bad() || !wrt)
         return EXIT_FAILURE;
     }
 
-
+    std::uint32_t sav2_checksum = 0;
     if (true)
     {
-      //savvy::compressed_vector<std::int16_t> vec;
-      std::vector<std::int16_t> vec;
+      savvy::compressed_vector<std::int16_t> vec;
+      //std::vector<std::int16_t> vec;
       savvy::sav2::variant var;
-      savvy::sav2::reader rdr("../test-data/freeze.6a.chr20.pass_only.phased.b4096.1-1000000.pbwt.t0.001.sav2" /*"../test-data/test_file.sav2"*/);
+      savvy::sav2::reader rdr(sav2_file_path /*"../test-data/test_file.sav2"*/);
       std::size_t cnt = 0;
       while (rdr.read_record(var))
       {
@@ -799,7 +818,11 @@ int main(int argc, char** argv)
 //          std::cout << "\t" /*<< it.offset() << ":"*/ << (*it);
 //        }
 //        std::cout << std::endl;
+
+        sav2_checksum = (sav2_checksum << 8) ^ adler32(vec.value_data(), vec.value_data() + vec.non_zero_size());
+        sav2_checksum = (sav2_checksum << 8) ^ adler32(vec.index_data(), vec.index_data() + vec.non_zero_size());
       }
+      std::cerr << orig_checksum << "\t" << sav2_checksum << std::endl;
       std::cerr << cnt << std::endl;
     }
 
