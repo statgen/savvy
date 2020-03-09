@@ -1795,6 +1795,12 @@ namespace savvy
           record_count_in_block_ = 0;
           current_block_min_ = std::numeric_limits<std::uint32_t>::max();
           current_block_max_ = 0;
+
+          for (auto it = sort_context_.format_contexts.begin(); it != sort_context_.format_contexts.end(); ++it)
+          {
+            for (std::size_t i = 0; i < it->second.sort_map.size(); ++i)
+              it->second.sort_map[i] = i;
+          }
         }
 
 //        std::vector<std::string> pbwt_info_flags;
