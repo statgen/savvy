@@ -1746,7 +1746,7 @@ namespace savvy
     private:
       static std::filebuf *create_std_filebuf(const std::string& file_path, std::ios::openmode mode)
       {
-        std::filebuf *ret = new std::filebuf();
+        std::filebuf* ret = new std::filebuf();
         ret->open(file_path.c_str(), mode);
         return ret;
       }
@@ -2828,7 +2828,7 @@ namespace savvy
                 if (v.indiv_buf_.end() - indiv_it < (sp_sz * pair_width))
                   break;
 
-                *fmt_it = std::make_pair(std::string(fmt_key), typed_value(val_type, sz, off_type, sp_sz, sp_sz * pair_width ? &(*indiv_it) : nullptr));
+                *fmt_it = std::make_pair(std::string(fmt_key), typed_value(val_type, sz, off_type, sp_sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin())));
                 indiv_it += sp_sz * pair_width;
               }
               else
@@ -2841,7 +2841,7 @@ namespace savvy
                 if (v.indiv_buf_.end() - indiv_it < (sz * type_width))
                   break;
 
-                *fmt_it = std::make_pair(std::string(fmt_key), typed_value(type, sz, sz * type_width ? &(*indiv_it) : nullptr));
+                *fmt_it = std::make_pair(std::string(fmt_key), typed_value(type, sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin())));
                 indiv_it += sz * type_width;
                 // ------------------------------------------- //
               }
