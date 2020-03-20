@@ -729,9 +729,9 @@ void subset_test(const std::string& path)
 }
 
 template<typename T>
-std::uint32_t adler32(T beg_it, T end_it)
+std::uint32_t adler32(T beg_it, T end_it, std::uint32_t cs = 1)
 {
-  uint32_t r0 = 1, r1 = 0;
+  uint32_t r0 = cs, r1 = 0;
 
   for (T it = beg_it; it != end_it; ++it)
   {
@@ -750,11 +750,11 @@ int main(int argc, char** argv)
 //    if (argc < 3)
 //      return -1;
 
-    std::uint32_t orig_checksum = 0;
+    std::uint32_t orig_checksum = 1;
     std::string sav2_file_path = "../test-data/freeze65k.chr20.phased.pass.minDP0.remDuplicates.1-1000000.pbwt.t0.001.sav2";
     if (true)
     {
-      savvy::reader rdr("../test-data/freeze.6a.chr20.pass_only.phased.b4096.1-1000000.sav" /*"../test_file.vcf"*/, savvy::fmt::gt);
+      savvy::reader rdr("../test-data/freeze65k.chr20.phased.pass.minDP0.remDuplicates.1-1000000.sav" /*"../test_file.vcf"*/, savvy::fmt::gt);
 
       auto hdrs = rdr.headers();
       hdrs.emplace_back("contig", "<ID=chr10>");
@@ -767,9 +767,10 @@ int main(int argc, char** argv)
       savvy::site_info site;
       savvy::sav2::variant var;
 
-
+      std::size_t cnt = 0;
       while (rdr.read(site, vec))
       {
+        ++cnt;
         savvy::sav2::site_info* p = &var;
         *p = savvy::sav2::site_info(site.chromosome(), site.position(), site.ref(), {site.alt()}, site.prop("ID"), std::atof(site.prop("QUAL").c_str()));
         for (auto it = vec.begin(); it != vec.end(); ++it)
@@ -780,13 +781,20 @@ int main(int argc, char** argv)
           }
         }
 
+//        std::cout << var.pos();
+//        for (auto it = vec.begin(); it != vec.end(); ++it)
+//        {
+//          std::cout << "\t" << it.offset() << ":"<< (*it);
+//        }
+//        std::cout << std::endl;
+
         dense_vec.resize(0);
         dense_vec.resize(vec.size());
         for (auto it = vec.begin(); it != vec.end(); ++it)
           dense_vec[it.offset()] = *it;
 
-        orig_checksum = (orig_checksum << 8) ^ adler32(vec.value_data(), vec.value_data() + vec.non_zero_size());
-        orig_checksum = (orig_checksum << 8) ^ adler32(vec.index_data(), vec.index_data() + vec.non_zero_size());
+        orig_checksum = adler32(vec.value_data(), vec.value_data() + vec.non_zero_size(), orig_checksum);
+        orig_checksum = adler32(vec.index_data(), vec.index_data() + vec.non_zero_size(), orig_checksum);
 
         if ((float(vec.non_zero_size()) / float(vec.size())) > 0.001)
           var.set_format("GT", dense_vec);
@@ -796,11 +804,13 @@ int main(int argc, char** argv)
         wrt.write_record(var);
       }
 
+      std::cerr << cnt << std::endl;
+
       if (rdr.bad() || !wrt)
         return EXIT_FAILURE;
     }
-
-    std::uint32_t sav2_checksum = 0;
+    //std::cout << std::endl;
+    std::uint32_t sav2_checksum = 1;
     if (true)
     {
       savvy::compressed_vector<std::int16_t> vec;
@@ -812,15 +822,16 @@ int main(int argc, char** argv)
       {
         ++cnt;
         var.get_format("GT", vec);
+
 //        std::cout << var.pos();
 //        for (auto it = vec.begin(); it != vec.end(); ++it)
 //        {
-//          std::cout << "\t" /*<< it.offset() << ":"*/ << (*it);
+//          std::cout << "\t" << it.offset() << ":" << (*it);
 //        }
 //        std::cout << std::endl;
 
-        sav2_checksum = (sav2_checksum << 8) ^ adler32(vec.value_data(), vec.value_data() + vec.non_zero_size());
-        sav2_checksum = (sav2_checksum << 8) ^ adler32(vec.index_data(), vec.index_data() + vec.non_zero_size());
+        sav2_checksum = adler32(vec.value_data(), vec.value_data() + vec.non_zero_size(), sav2_checksum);
+        sav2_checksum = adler32(vec.index_data(), vec.index_data() + vec.non_zero_size(), sav2_checksum);
       }
       std::cerr << orig_checksum << "\t" << sav2_checksum << std::endl;
       std::cerr << cnt << std::endl;
