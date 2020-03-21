@@ -1751,7 +1751,7 @@ namespace savvy
         return ret;
       }
 
-      static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, std::int8_t compression_level)
+      static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, std::uint8_t compression_level)
       {
         if (compression_level > 0)
           return std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, compression_level));
@@ -1760,9 +1760,9 @@ namespace savvy
       }
 
     public:
-      writer(const std::string& file_path, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids) :
+      writer(const std::string& file_path, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids, std::uint8_t compression_level = 3) :
         rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t) this),
-        output_buf_(create_out_streambuf(file_path, 3)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
+        output_buf_(create_out_streambuf(file_path, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
         ofs_(output_buf_.get()),
         //samples_(samples_beg, samples_end),
         file_path_(file_path),
@@ -1801,6 +1801,40 @@ namespace savvy
         }
       }
 
+      void set_block_size(std::uint16_t bs)
+      {
+//        if (bs != 0 && record_count_in_block_)
+//        {
+//          if (index_file_)
+//          {
+//            auto file_pos = std::uint64_t(ofs_.tellp());
+//            if (record_count_in_block_ > 0x10000) // Max records per block: 64*1024
+//            {
+//              assert(!"Too many records in zstd frame to be indexed!");
+//              ofs_.setstate(std::ios::badbit);
+//            }
+//
+//            if (file_pos > 0x0000FFFFFFFFFFFF) // Max file size: 256 TiB
+//            {
+//              assert(!"File size to large to be indexed!");
+//              ofs_.setstate(std::ios::badbit);
+//            }
+//
+//            s1r::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
+//            index_file_->write(current_chromosome_, e);
+//          }
+//          ofs_.flush();
+//          record_count_in_block_ = 0;
+//          current_block_min_ = std::numeric_limits<std::uint32_t>::max();
+//          current_block_max_ = 0;
+//
+//          sort_context_.reset();
+//          sort_flushed_ = true;
+//        }
+
+        block_size_ = bs;
+      }
+
       bool good() const { return ofs_.good(); }
       operator bool() const { return ofs_.good(); }
       //bool bad() const { return ofs_.bad(); }
@@ -1810,7 +1844,7 @@ namespace savvy
         bool is_bcf = true; // TODO: ...
         bool flushed = false;
 
-        if (block_size_ != 0 && ((record_count_ % block_size_) == 0 || r.chrom() != current_chromosome_))
+        if (block_size_ != 0 && (block_size_ <= record_count_in_block_ || r.chrom() != current_chromosome_)) // TODO: this needs to be fixed to support variable block size
         {
           if (index_file_ && record_count_in_block_)
           {
@@ -1859,7 +1893,10 @@ namespace savvy
 //        }
 
         std::uint32_t shared_sz, indiv_sz;
-        if (!variant::internal::serialize(r, serialized_buf_, dict_, n_samples_, is_bcf, sort_context_, flushed, shared_sz, indiv_sz))
+        if (!variant::internal::serialize(r,
+          serialized_buf_, dict_, n_samples_, is_bcf,
+          sort_context_, sort_context_.format_contexts.size() ? flushed : false,
+          shared_sz, indiv_sz))
         {
           ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
         }

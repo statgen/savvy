@@ -91,6 +91,9 @@ add_custom_target(manuals
 if(BUILD_TESTS)
     enable_testing()
 
+    add_executable(sav-eval src/eval/main.cpp)
+    target_link_libraries(sav-eval savvy)
+
     add_definitions(-DSAVVYT_VCF_FILE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file.vcf\"
                     -DSAVVYT_SAV_FILE_HARD=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file_hard.sav\"
                     -DSAVVYT_SAV_FILE_DOSE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file_dose.sav\"
