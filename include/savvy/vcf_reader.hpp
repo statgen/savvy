@@ -1276,7 +1276,7 @@ namespace savvy
       }
 
       (*output_stream_) << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO";
-      if (sample_size_)
+      if (samples_end - samples_beg)
         (*output_stream_) << "\tFORMAT";
       for (auto it = samples_beg; it != samples_end; ++it)
       {
