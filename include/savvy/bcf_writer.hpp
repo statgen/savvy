@@ -862,8 +862,10 @@ namespace savvy
       }
 
       typed_value(std::uint8_t type, std::size_t sz, char *data_ptr);
-
       typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr);
+
+      void init(std::uint8_t type, std::size_t sz, char *data_ptr);
+      void init(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr);
 
       typed_value(typed_value&& src)
       {
@@ -1146,6 +1148,9 @@ namespace savvy
       {
       public:
         static void pbwt_unsort(typed_value& v, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
+
+        template<typename InIter, typename OutIter>
+        static void pbwt_sort(InIter in_data, std::size_t in_data_size, OutIter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
 
         template<typename Iter>
         static void serialize(const typed_value& v, Iter out_it);
@@ -1655,7 +1660,7 @@ namespace savvy
 
             assert(tab_cnt == 0);
 
-            ids.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos));
+            ids.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos)); // TODO: allow for no samples.
 
             assert(ids.size() == sample_size);
 
@@ -2164,6 +2169,17 @@ namespace savvy
     {
     }
 
+    void typed_value::init(std::uint8_t type, std::size_t sz, char *data_ptr)
+    {
+      val_type_ = type;
+      off_type_ =  0;
+      size_ = sz;
+      sparse_size_ = 0;
+      val_ptr_ = data_ptr;
+      off_ptr_ = nullptr;
+      //local_data_.clear();
+    }
+
     inline
     typed_value::typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr) :
       val_type_(val_type),
@@ -2173,6 +2189,18 @@ namespace savvy
       val_ptr_(data_ptr + sp_sz * (1u << bcf_type_shift[off_type])),
       off_ptr_(data_ptr)
     {
+    }
+
+    inline
+    void typed_value::init(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr)
+    {
+      val_type_ = val_type;
+      off_type_ = off_type;
+      size_ = sz;
+      sparse_size_ = sp_sz;
+      val_ptr_ = data_ptr + sp_sz * (1u << bcf_type_shift[off_type]);
+      off_ptr_ = data_ptr;
+      //local_data_.clear();
     }
 
     inline
@@ -2198,6 +2226,76 @@ namespace savvy
       return *this;
     }
 
+    /*template<typename SrcT, typename DestT>
+    static void pbwt_unsort(SrcT src_ptr, std::size_t sz, DestT dest_ptr, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts_old, omp::internal::thread_pool2& tpool)
+    {
+      std::swap(sort_mapping, prev_sort_mapping);
+      if (prev_sort_mapping.empty())
+      {
+        prev_sort_mapping.resize(sz);
+        std::iota(prev_sort_mapping.begin(), prev_sort_mapping.end(), 0);
+      }
+
+      if (sort_mapping.empty())
+        sort_mapping.resize(sz);
+
+      if (prev_sort_mapping.size() != sz)
+      {
+        fprintf(stderr, "Variable-sized data vectors not allowed with PBWT\n"); // TODO: handle better
+        exit(-1);
+      }
+
+      std::size_t thread_cnt = tpool.thread_count();
+      std::size_t counts_vec_size = std::numeric_limits<typename std::make_unsigned<typename std::iterator_traits<SrcT>::value_type>::type>::max() + 2;
+      std::vector<std::vector<std::size_t>> counts(thread_cnt + 1, std::vector<std::size_t>(counts_vec_size));
+      omp::parallel_for_exp(omp::static_schedule{}, counts.begin(), counts.begin() + thread_cnt, [src_ptr, sz, thread_cnt](std::vector<std::size_t>& c, const omp::iteration_context& ctx)
+      {
+        std::size_t* counts_ptr = c.data() + 1;
+        std::size_t chunk_size = omp::internal::ceil_divide(sz, thread_cnt);
+        auto* src_uptr = ((typename std::make_unsigned<typename std::iterator_traits<SrcT>::value_type>::type*)src_ptr) + ctx.thread_index * chunk_size;
+        auto* end_uptr = std::min(((typename std::make_unsigned<typename std::iterator_traits<SrcT>::value_type>::type*)src_ptr) + sz, src_uptr + chunk_size);
+        for (auto it = src_uptr; it != end_uptr; ++it)
+        {
+          ++(counts_ptr[*it]);
+        }
+      }, tpool);
+
+//      tpool([&counts, counts_vec_size, thread_cnt](std::size_t tidx)
+//      {
+//        std::size_t chunk_size = omp::internal::ceil_divide(counts_vec_size, thread_cnt);
+//        std::size_t off = chunk_size * tidx;
+//
+//        for (int i = 1; i < counts.size(); ++i)
+//          counts[i][off] = counts[i - 1][off] + counts[i][off];
+//      });
+
+      for (std::size_t i = 0; i < counts_vec_size; ++i)
+      {
+        for (std::size_t j = 1; j < thread_cnt; ++j)
+        {
+          counts[j][i]
+        }
+      }
+
+      for (int j = 1; j < counts.size(); ++j)
+        counts[i][off] = counts[j - 1][off] + counts[i][off];
+
+      for (int i = 1; i < counts.size(); ++i)
+        counts[i] = counts[i - 1] + counts[i];
+
+      for (int i = 0; i < prev_sort_mapping.size(); ++i)
+      {
+//        std::size_t unsorted_index = prev_sort_mapping[i];
+//        dest_ptr[unsorted_index] = src_ptr[i];
+//        std::uint8_t d(dest_ptr[unsorted_index]);
+//        sort_mapping[counts[d]++] = unsorted_index;
+
+        const std::size_t unsorted_index = prev_sort_mapping[i];
+        dest_ptr[unsorted_index] = src_ptr[i];
+        sort_mapping[counts[src_uptr[i]]++] = unsorted_index;
+      }
+    }*/
+
     template<typename SrcT, typename DestT>
     static void pbwt_unsort(SrcT src_ptr, std::size_t sz, DestT dest_ptr, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts)
     {
@@ -2218,13 +2316,18 @@ namespace savvy
         exit(-1);
       }
 
+      typedef typename std::make_unsigned<typename std::iterator_traits<SrcT>::value_type>::type utype;
+      auto src_uptr = (utype*)src_ptr;
       counts.clear();
+      counts.resize(std::numeric_limits<utype>::max() + 2);
+      auto counts_ptr = counts.data() + 1;
       for (int i = 0; i < sz; ++i)
       {
-        std::uint8_t d(src_ptr[i]);
-        if (d + 1u >= counts.size())
-          counts.resize(std::size_t(d) + 2u);
-        ++counts[d + 1u];
+//        unsigned int d = utype(src_ptr[i]) + 1u;
+//        if (d >= counts.size())
+//          counts.resize(d + 1u);
+//        ++counts[d];
+        ++(counts_ptr[src_uptr[i]]);
       }
 
       for (int i = 1; i < counts.size(); ++i)
@@ -2232,9 +2335,14 @@ namespace savvy
 
       for (int i = 0; i < prev_sort_mapping.size(); ++i)
       {
-        std::size_t unsorted_index = prev_sort_mapping[i];
+//        std::size_t unsorted_index = prev_sort_mapping[i];
+//        dest_ptr[unsorted_index] = src_ptr[i];
+//        std::uint8_t d(dest_ptr[unsorted_index]);
+//        sort_mapping[counts[d]++] = unsorted_index;
+
+        const std::size_t unsorted_index = prev_sort_mapping[i];
         dest_ptr[unsorted_index] = src_ptr[i];
-        std::uint8_t d(dest_ptr[unsorted_index]);
+        const utype d(src_ptr[i]);
         sort_mapping[counts[d]++] = unsorted_index;
       }
     }
@@ -2242,7 +2350,7 @@ namespace savvy
     inline void typed_value::internal::pbwt_unsort(typed_value& v, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts)
     {
       assert(v.off_ptr_ == nullptr);
-      assert(v.local_data_.empty());
+      //assert(v.local_data_.empty());
 
       if (v.off_ptr_)
       {
@@ -2254,7 +2362,7 @@ namespace savvy
 
         v.local_data_.resize(v.size_ * (1u << bcf_type_shift[v.val_type_]));
         if (v.val_type_ == 0x01u) ::savvy::sav2::pbwt_unsort((std::int8_t *) v.val_ptr_, v.size_, (std::int8_t *) v.local_data_.data(), sort_mapping, prev_sort_mapping, counts);
-        else if (v.val_type_ == 0x02u) ::savvy::sav2::pbwt_unsort((std::int16_t *) v.val_ptr_, v.size_, (std::int8_t *) v.local_data_.data(), sort_mapping, prev_sort_mapping, counts); // TODO: make sure this works
+        else if (v.val_type_ == 0x02u) ::savvy::sav2::pbwt_unsort((std::int16_t *) v.val_ptr_, v.size_, (std::int16_t *) v.local_data_.data(), sort_mapping, prev_sort_mapping, counts); // TODO: make sure this works
         else
         {
           fprintf(stderr, "PBWT sorted vector values cannot be wider than 16 bits\n"); // TODO: handle better
@@ -2288,6 +2396,68 @@ namespace savvy
       }
     }
 
+    template<typename InIter, typename OutIter>
+    inline void typed_value::internal::pbwt_sort(InIter in_data, std::size_t in_data_sz, OutIter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts)
+    {
+      std::swap(sort_mapping, prev_sort_mapping);
+      if (prev_sort_mapping.empty())
+      {
+        prev_sort_mapping.resize(in_data_sz);
+        for (int i = 0; i < in_data_sz; ++i)
+          prev_sort_mapping[i] = i;
+      }
+
+      if (sort_mapping.empty())
+        sort_mapping.resize(in_data_sz);
+
+      if (prev_sort_mapping.size() != in_data_sz)
+      {
+        fprintf(stderr, "Variable-sized data vectors not allowed with PBWT\n"); // TODO: handle better
+        exit(-1);
+      }
+
+      typedef typename std::iterator_traits<InIter>::value_type val_t;
+      typedef typename std::make_unsigned<val_t>::type utype;
+      counts.clear();
+      for (std::size_t i = 0; i < in_data_sz; ++i)
+      {
+        unsigned int d = utype(in_data[i]) + 1u;
+        if (d >= counts.size())
+          counts.resize(d + 1u);
+        ++counts[d];
+      }
+
+      for (int i = 1; i < counts.size(); ++i)
+        counts[i] = counts[i - 1] + counts[i];
+
+      for (int i = 0; i < prev_sort_mapping.size(); ++i)
+      {
+        std::size_t unsorted_index = prev_sort_mapping[i];
+        val_t d(in_data[unsorted_index]);
+        sort_mapping[counts[d]++] = unsorted_index;
+      }
+
+      //sorted_data.resize(in_data_sz);
+      if (std::is_same<val_t, std::int8_t>::value)
+      {
+        for (int i = 0; i < prev_sort_mapping.size(); ++i)
+        {
+          *(out_it++) = in_data[prev_sort_mapping[i]];
+        }
+      }
+      else //std::is_same<val_t, std::int16_t>::value
+      {
+        for (int i = 0; i < prev_sort_mapping.size(); ++i)
+        {
+          char* v_ptr = (char*)(&in_data[prev_sort_mapping[i]]);
+          std::array<char, 2> bytes;
+          std::memcpy(bytes.data(), v_ptr, 2); // TODO: handle endianess
+          *(out_it++) = bytes[0];
+          *(out_it++) = bytes[1];
+        }
+      }
+    }
+
     template <typename Iter>
     void typed_value::internal::serialize(const typed_value& v, Iter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts)
     {
@@ -2310,46 +2480,12 @@ namespace savvy
       else
       {
         // ---- PBWT ---- //
-        auto data_sz = v.size_;
-        std::swap(sort_mapping, prev_sort_mapping);
-        if (prev_sort_mapping.empty())
+        if (v.val_type_ == 0x01u) internal::pbwt_sort((std::int8_t *) v.val_ptr_, v.size_, out_it, sort_mapping, prev_sort_mapping, counts);
+        else if (v.val_type_ == 0x02u) internal::pbwt_sort((std::int16_t *) v.val_ptr_, v.size_, out_it, sort_mapping, prev_sort_mapping, counts); // TODO: make sure this works
+        else
         {
-          prev_sort_mapping.resize(data_sz);
-          for (int i = 0; i < data_sz; ++i)
-            prev_sort_mapping[i] = i;
-        }
-
-        if (sort_mapping.empty())
-          sort_mapping.resize(data_sz);
-
-        if (prev_sort_mapping.size() != data_sz)
-        {
-          fprintf(stderr, "Variable-sized data vectors not allowed with PBWT\n"); // TODO: handle better
+          fprintf(stderr, "PBWT sorted vector values cannot be wider than 16 bits\n"); // TODO: handle better
           exit(-1);
-        }
-
-        counts.clear();
-        for (int i = 0; i < data_sz; ++i)
-        {
-          std::uint8_t d(v.val_ptr_[i]);
-          if (d + 1u >= counts.size())
-            counts.resize(std::size_t(d) + 2u);
-          ++counts[d + 1u];
-        }
-        for (int i = 1; i < counts.size(); ++i)
-          counts[i] = counts[i - 1] + counts[i];
-
-        for (int i = 0; i < prev_sort_mapping.size(); ++i)
-        {
-          std::size_t unsorted_index = prev_sort_mapping[i];
-          std::uint8_t d(v.val_ptr_[unsorted_index]);
-          sort_mapping[counts[d]++] = unsorted_index;
-        }
-
-        //sorted_data.resize(data_sz);
-        for (int i = 0; i < prev_sort_mapping.size(); ++i)
-        {
-          out_it++ = v.val_ptr_[prev_sort_mapping[i]];
         }
         // ---- PBWT_END ---- //
       }
@@ -2865,6 +3001,8 @@ namespace savvy
                 if (v.indiv_buf_.end() - indiv_it < (sp_sz * pair_width))
                   break;
 
+                //fmt_it->first = fmt_key;
+                //fmt_it->second.init(val_type, sz, off_type, sp_sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin()));
                 *fmt_it = std::make_pair(std::string(fmt_key), typed_value(val_type, sz, off_type, sp_sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin())));
                 indiv_it += sp_sz * pair_width;
               }
@@ -2878,6 +3016,8 @@ namespace savvy
                 if (v.indiv_buf_.end() - indiv_it < (sz * type_width))
                   break;
 
+                //fmt_it->first = fmt_key;
+                //fmt_it->second.init(type, sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin()));
                 *fmt_it = std::make_pair(std::string(fmt_key), typed_value(type, sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin())));
                 indiv_it += sz * type_width;
                 // ------------------------------------------- //
