@@ -91,9 +91,6 @@ add_custom_target(manuals
 if(BUILD_TESTS)
     enable_testing()
 
-    add_executable(sav-eval src/eval/main.cpp)
-    target_link_libraries(sav-eval savvy)
-
     add_definitions(-DSAVVYT_VCF_FILE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file.vcf\"
                     -DSAVVYT_SAV_FILE_HARD=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file_hard.sav\"
                     -DSAVVYT_SAV_FILE_DOSE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file_dose.sav\"
@@ -106,6 +103,14 @@ if(BUILD_TESTS)
     add_test(convert_file_test savvy-test convert-file)
     add_test(subset_test savvy-test subset)
     add_test(varint_test savvy-test varint)
+endif()
+
+if (BUILD_EVAL)
+    add_executable(sav-eval src/eval/main.cpp)
+    target_link_libraries(sav-eval savvy)
+
+    add_executable(columnar-eval src/eval/columnar_main.cpp)
+    target_link_libraries(columnar-eval savvy)
 endif()
 
 if(BUILD_SLR_EXAMPLES)
