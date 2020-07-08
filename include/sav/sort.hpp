@@ -31,6 +31,21 @@ private:
   savvy::s1r::sort_point sort_type_;
 };
 
+class greater_than_comparator
+{
+public:
+  greater_than_comparator(savvy::s1r::sort_point type, std::unordered_map<std::string, std::size_t> contig_order_map);
+  bool operator()(const savvy::site_info& a, const savvy::site_info& b);
+private:
+  bool contig_compare(const std::string& a, const std::string& b);
+  bool left(const savvy::site_info& a, const savvy::site_info& b);
+  bool right(const savvy::site_info& a, const savvy::site_info& b);
+  bool mid(const savvy::site_info& a, const savvy::site_info& b);
+private:
+  std::unordered_map<std::string, std::size_t> contig_order_map_;
+  savvy::s1r::sort_point sort_type_;
+};
+
 class random_string_generator
 {
 public:
@@ -129,7 +144,7 @@ namespace detail
   }
 }
 
-template <typename VecType, typename Reader, typename Writer>
+template <typename VecType, typename SiteCompare, typename Reader, typename Writer>
 bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt in_format, const std::vector<savvy::genomic_region>& regions, Writer& out, savvy::fmt out_format, bool update_info)
 {
   std::unordered_map<std::string, std::size_t> contig_order_map;
@@ -145,13 +160,13 @@ bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt 
     }
   }
 
-  less_than_comparator less_than(sort, std::move(contig_order_map));
+  SiteCompare less_than(sort, std::move(contig_order_map));
 
   std::size_t region_idx = 1;
   std::size_t ploidy = 0;
 
   random_string_generator str_gen;
-  const std::size_t temp_file_size = 4096;
+  const std::size_t temp_file_size = 8192;
   std::deque<std::string> temp_file_paths;
   std::deque<savvy::sav::writer> temp_writers;
   std::deque<savvy::sav::reader> temp_readers;
@@ -186,7 +201,7 @@ bool sort_and_write_records(savvy::s1r::sort_point sort, Reader& in, savvy::fmt 
     {
       std::sort(in_mem_variant_refs.begin(), in_mem_variant_refs.begin() + read_counter, less_than);
 
-      temp_file_paths.emplace_back("/tmp/tmp-" + str_gen(8) + ".sav");
+      temp_file_paths.emplace_back("/tmp/tmp-" + str_gen(32) + ".sav");
       temp_writers.emplace_back(temp_file_paths.back(), in.samples().begin(), in.samples().end(), in.headers().begin(), in.headers().end(), in_format);
       // TODO: open FILE*  and unlink file
       // temp_readers.emplace_back(temp_path, /*in.samples().begin(), in.samples().end(), in.headers().begin(), in.headers().end(),*/ out_format);

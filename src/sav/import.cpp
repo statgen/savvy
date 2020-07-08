@@ -383,7 +383,7 @@ int prep_reader_for_import(T& input, const import_prog_args& args)
     {
       if (args.sort_type())
       {
-        return (sort_and_write_records<std::vector<float>>((*args.sort_type()), input, args.format(), args.regions(), output, args.format(), args.update_info()) && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE);
+        return (sort_and_write_records<std::vector<float>, less_than_comparator>((*args.sort_type()), input, args.format(), args.regions(), output, args.format(), args.update_info()) && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE);
       }
       else
       {

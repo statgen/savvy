@@ -8,6 +8,7 @@
 
 #include <chrono>
 
+  //================================================================//
   less_than_comparator::less_than_comparator(savvy::s1r::sort_point type, std::unordered_map<std::string, std::size_t> contig_order_map) :
     contig_order_map_(std::move(contig_order_map)),
     sort_type_(type)
@@ -69,7 +70,73 @@
 
     return contig_compare(a.chromosome(), b.chromosome());
   }
+  //================================================================//
 
+//================================================================//
+greater_than_comparator::greater_than_comparator(savvy::s1r::sort_point type, std::unordered_map<std::string, std::size_t> contig_order_map) :
+  contig_order_map_(std::move(contig_order_map)),
+  sort_type_(type)
+{
+}
+
+bool greater_than_comparator::operator()(const savvy::site_info& a, const savvy::site_info& b)
+{
+  switch (sort_type_)
+  {
+  case savvy::s1r::sort_point::mid: return mid(a, b);
+  case savvy::s1r::sort_point::beg: return left(a, b);
+  default: return right(a, b);
+  }
+}
+
+bool greater_than_comparator::contig_compare(const std::string& a, const std::string& b)
+{
+  auto a_res = contig_order_map_.find(a);
+  auto b_res = contig_order_map_.find(b);
+
+  if (a_res != contig_order_map_.end() && b_res != contig_order_map_.end())
+  {
+    return (a_res->second > b_res->second);
+  }
+  else if (a_res == contig_order_map_.end() && b_res == contig_order_map_.end())
+  {
+    return a > b;
+  }
+  else
+  {
+    return b_res != contig_order_map_.end(); // put b before a if a is not in headers, or put a before b if b is not in headers.
+  }
+}
+
+bool greater_than_comparator::left(const savvy::site_info& a, const savvy::site_info& b)
+{
+  if (a.chromosome() == b.chromosome())
+    return a.position() > b.position();
+  return contig_compare(a.chromosome(), b.chromosome());
+}
+
+bool greater_than_comparator::right(const savvy::site_info& a, const savvy::site_info& b)
+{
+  if (a.chromosome() == b.chromosome())
+    return (a.position() + std::max(a.ref().size(), a.alt().size())) > (b.position() + std::max(b.ref().size(), b.alt().size()));
+  return contig_compare(a.chromosome(), b.chromosome());
+}
+
+bool greater_than_comparator::mid(const savvy::site_info& a, const savvy::site_info& b)
+{
+  if (a.chromosome() == b.chromosome())
+  {
+    double mid_a = static_cast<double>(a.position()) + (static_cast<double>(std::max(a.ref().size(), a.alt().size())) / 2.0);
+    double mid_b = static_cast<double>(b.position()) + (static_cast<double>(std::max(b.ref().size(), b.alt().size())) / 2.0);
+
+    return mid_a > mid_b;
+  }
+
+  return contig_compare(a.chromosome(), b.chromosome());
+}
+//================================================================//
+
+  //================================================================//
   random_string_generator::random_string_generator() :
     rg_(std::random_device{}()^std::chrono::high_resolution_clock().now().time_since_epoch().count()),
     dist_(0, char_array_.size() - 1)
@@ -86,4 +153,5 @@
 
     return ret;
   }
+  //================================================================//
 
