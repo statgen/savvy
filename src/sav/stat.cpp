@@ -96,7 +96,7 @@ int stat_main(int argc, char** argv)
   std::size_t multi_allelic{}, record_cnt{}, variant_cnt{};
   savvy::compressed_vector<float> geno;
 
-  bool is_sav2 = true;
+  bool is_sav2 = false;
   if (is_sav2)
   {
     savvy::sav2::reader rdr(args.input_path());
