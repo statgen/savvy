@@ -11,7 +11,11 @@
 #include "sav_reader.hpp"
 #include "vcf_reader.hpp"
 #include "savvy.hpp"
+#include "file.hpp"
 
+#include <shrinkwrap/zstd.hpp>
+
+#include <cstdlib>
 #include <string>
 #include <memory>
 #include <stdexcept>
@@ -270,6 +274,362 @@ namespace savvy
     return *this;
   }
   //################################################################//
+
+  namespace v2
+  {
+    class reader : public file
+    {
+    private:
+      std::string file_path_;
+      std::unique_ptr<std::istream> input_stream_;
+      std::vector<std::pair<std::string, std::string>> headers_;
+      std::vector<std::string> ids_;
+      dictionary dict_;
+
+      ::savvy::internal::pbwt_sort_context sort_context_;
+
+      // Random access
+      struct index_data
+      {
+        s1r::reader file;
+        genomic_region reg;
+        s1r::reader::query query;
+        s1r::reader::query::iterator iter;
+        bounding_point bounding_type;
+        std::uint32_t current_offset_in_block;
+        std::uint32_t total_in_block;
+        std::uint64_t total_records_read;
+        std::uint64_t max_records_to_read;
+
+        index_data(const std::string& file_path, genomic_region bounds, bounding_point bound_type = bounding_point::beg) :
+          file(file_path),
+          reg(bounds),
+          query(file.create_query(bounds)),
+          iter(query.begin()),
+          bounding_type(bound_type),
+          current_offset_in_block(0),
+          total_in_block(0),
+          total_records_read(0),
+          max_records_to_read(std::numeric_limits<std::uint64_t>::max())
+        {
+        }
+      };
+
+      std::unique_ptr<index_data> index_;
+    public:
+      reader(const std::string& file_path);
+
+      reader& reset_bounds(genomic_region reg);
+
+      bool good() const { return this->input_stream_->good(); }
+
+      reader& read(variant& r);
+      reader& operator>>(variant& r) { return read(r); }
+
+      operator bool() const { return (bool) (*input_stream_); };
+    private:
+      static bool read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict, ::savvy::internal::pbwt_sort_context& sort_context);
+
+      reader& read_record(variant& r);
+      reader& read_indexed_record(variant& r);
+    };
+
+    //================================================================//
+    // Reader definitions
+    inline
+    reader::reader(const std::string& file_path) :
+      file_path_(file_path),
+      input_stream_(savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path))
+    {
+      if (!read_header(*input_stream_, headers_, ids_, dict_, sort_context_))
+        input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+    }
+
+    inline
+    reader& reader::reset_bounds(genomic_region reg)
+    {
+
+      input_stream_->clear();
+
+      index_ = ::savvy::detail::make_unique<index_data>(::savvy::detail::file_exists(file_path_ + ".s1r") ? file_path_ + ".s1r" : file_path_, reg);
+      if (!index_->file.good())
+      {
+        input_stream_->setstate(input_stream_->rdstate() | std::ios::failbit);
+      }
+
+      return *this;
+    }
+
+    inline
+    reader& reader::read_indexed_record(variant& r)
+    {
+      while (this->good())
+      {
+        if (index_->total_records_read == index_->max_records_to_read)
+        {
+          this->input_stream_->setstate(std::ios::eofbit);
+          break;
+        }
+
+        if (index_->current_offset_in_block >= index_->total_in_block)
+        {
+          if (index_->iter == index_->query.end())
+            this->input_stream_->setstate(std::ios::eofbit);
+          else
+          {
+            index_->total_in_block = std::uint32_t(0x000000000000FFFF & index_->iter->value()) + 1;
+            index_->current_offset_in_block = 0;
+            this->input_stream_->seekg(std::streampos((index_->iter->value() >> 16) & 0x0000FFFFFFFFFFFF));
+            ++(index_->iter);
+          }
+        }
+
+        if (!read_record(r))
+          input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+
+        if (!this->good())
+        {
+          if (index_->current_offset_in_block < index_->total_in_block)
+          {
+            assert(!"Truncated block");
+            this->input_stream_->setstate(std::ios::badbit);
+          }
+        }
+        else
+        {
+          ++(index_->current_offset_in_block);
+          ++(index_->total_records_read);
+          if (region_compare(index_->bounding_type, r, index_->reg))
+          {
+            //this->read_genotypes(annotations, destination);
+            break;
+          }
+          else
+          {
+            //this->discard_genotypes();
+          }
+        }
+      }
+      return *this; //TODO: clear site info before returning if not good
+    }
+
+    inline
+    reader& reader::read(variant& r)
+    {
+      if (good())
+      {
+        if (index_)
+          return read_indexed_record(r);
+
+        if (!read_record(r) && input_stream_->good())
+          input_stream_->setstate(std::ios::badbit);
+      }
+
+      return *this;
+    }
+
+    inline
+    reader& reader::read_record(variant& r)
+    {
+      if (good())
+      {
+        std::uint32_t shared_sz, indiv_sz;
+        if (!input_stream_->read((char*)&shared_sz, sizeof(shared_sz))) // TODO: set to bad if gcount > 0.
+        {
+          return *this;
+        }
+
+        if (!input_stream_->read((char*)&indiv_sz, sizeof(indiv_sz)))
+        {
+          std::fprintf(stderr, "Error: Invalid record data\n");
+          input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+          return *this;
+        }
+
+        // TODO: endianess
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+        // Read and parse shared and individual data
+        r.shared_data_.resize(shared_sz);
+        r.indiv_buf_.resize(indiv_sz);
+        if (!input_stream_->read(r.shared_data_.data(), r.shared_data_.size()) || !input_stream_->read(r.indiv_buf_.data(), r.indiv_buf_.size()))
+        {
+          std::fprintf(stderr, "Error: Invalid record data\n");
+          input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+          return *this;
+        }
+
+        bool is_bcf = false; // TODO
+        if (!variant::deserialize(r, dict_, this->ids_.size(), is_bcf))
+        {
+          std::fprintf(stderr, "Error: Invalid record data\n");
+          input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+          return *this;
+        }
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+        // Handle semantic INFO fields
+        int pbwt_reset{}; r.get_info("_PBWT_RESET", pbwt_reset);
+        if (pbwt_reset)
+          sort_context_.reset();
+
+        std::vector<::savvy::internal::pbwt_sort_format_context*> pbwt_format_pointers;
+        pbwt_format_pointers.reserve(r.format_fields_.size());
+        for (auto it = r.info().begin(); it != r.info().end(); )
+        {
+          if (it->first.substr(0, 10) == "_PBWT_SORT")
+          {
+            auto f = sort_context_.format_contexts.find(it->first);
+            if (f != sort_context_.format_contexts.end())
+            {
+              pbwt_format_pointers.emplace_back(&(f->second));
+              it = r.remove_info(it);
+              continue;
+            }
+          }
+          ++it;
+        }
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+        // Unsort FMT fields
+        for (auto fmt_it = r.format_fields_.begin(); fmt_it != r.format_fields_.end(); ++fmt_it)
+        {
+          for (auto pt = pbwt_format_pointers.begin(); pt != pbwt_format_pointers.end(); )
+          {
+            if ((*pt)->format == fmt_it->first)
+            {
+              typed_value::internal::pbwt_unsort(fmt_it->second, (*pt)->sort_map, sort_context_.prev_sort_mapping, sort_context_.counts);
+              pt = pbwt_format_pointers.erase(pt);
+              break;
+            }
+            else
+            {
+              ++pt;
+            }
+          }
+        }
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
+      }
+
+      return *this;
+    }
+
+    inline
+    bool reader::read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict, ::savvy::internal::pbwt_sort_context& sort_context)
+    {
+      std::string magic(5, '\0');
+      ifs.read(&magic[0], magic.size());
+
+      std::uint32_t header_block_sz = 0;
+      ifs.read((char *) &header_block_sz, sizeof(header_block_sz));
+
+      std::int64_t bytes_read = 0;
+      std::string hdr_line;
+      while (std::getline(ifs, hdr_line))
+      {
+        bytes_read += hdr_line.size() + 1;
+        if (hdr_line.size() > 1 && hdr_line[1] == 'C')
+        {
+          std::size_t tab_pos = 0;
+          std::size_t last_pos = tab_pos;
+
+          std::int64_t tab_cnt = std::count(hdr_line.begin(), hdr_line.end(), '\t');
+          std::size_t sample_size = tab_cnt - 8;
+          ids.reserve(sample_size);
+
+          while ((tab_pos = hdr_line.find('\t', tab_pos)) != std::string::npos)
+          {
+            if (tab_cnt < sample_size)
+            {
+              ids.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos));
+            }
+            last_pos = ++tab_pos;
+            --tab_cnt;
+          }
+
+          assert(tab_cnt == 0);
+
+          ids.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos)); // TODO: allow for no samples.
+
+          assert(ids.size() == sample_size);
+
+          if (header_block_sz - bytes_read < 0)
+            break;
+
+          std::array<char, 64> discard;
+          while (header_block_sz - bytes_read > 0)
+          {
+            auto gcount = ifs.read(discard.data(), std::min(std::size_t(header_block_sz - bytes_read), discard.size())).gcount();
+            if (gcount == 0)
+              return false;
+            bytes_read += gcount;
+          }
+
+          return true;
+        }
+
+        if (hdr_line.size() < 2)
+        {
+          break;
+        }
+
+        if (hdr_line[1] == '#')
+        {
+          auto equal_it = std::find(hdr_line.begin(), hdr_line.end(), '=');
+          std::string key(hdr_line.begin() + 2, equal_it);
+          if (equal_it == hdr_line.end())
+          {
+            break;
+          }
+          std::string val(equal_it + 1, hdr_line.end());
+
+          //std::string hid = parse_header_sub_field(val, "ID");
+          auto hval = parse_header_value(val);
+          if (!hval.id.empty())
+          {
+            int which_dict = key == "contig" ? dictionary::contig : dictionary::id;
+
+            dictionary::entry e;
+            e.id = hval.id;
+            e.number = hval.number; // TODO: handle special character values.
+            if (hval.type == "Integer")
+              e.type = typed_value::int32;
+            else if (hval.type == "Float")
+              e.type = typed_value::real;
+            else if (hval.type == "String")
+              e.type = typed_value::str;
+
+
+            dict.entries[which_dict].emplace_back(std::move(e));
+            dict.str_to_int[which_dict][hval.id] = dict.entries[which_dict].size() - 1;
+          }
+
+          if (key == "INFO")
+          {
+            if (hval.id.substr(0, 10) == "_PBWT_SORT")
+            {
+              ::savvy::internal::pbwt_sort_format_context ctx;
+              ctx.format = parse_header_sub_field(val, "Format");
+              ctx.id = hval.id;
+
+              auto insert_it = sort_context.format_contexts.insert(std::make_pair(std::string(hval.id), std::move(ctx)));
+              sort_context.field_to_format_contexts.insert(std::make_pair(insert_it.first->second.format, &(insert_it.first->second)));
+            }
+          }
+
+          headers.emplace_back(std::move(key), std::move(val));
+        }
+      }
+
+      std::fprintf(stderr, "Error: corrupt header\n");
+      return false;
+    }
+    //================================================================//
+  }
 }
 
 #endif //VC_READER_HPP

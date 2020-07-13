@@ -129,6 +129,69 @@ namespace savvy
   }
 
   bool region_compare(bounding_point bounding_type, const site_info& var, const genomic_region& reg);
+
+  namespace v2
+  {
+    namespace detail
+    {
+      struct any_coordinate_within_region
+      {
+        static bool compare(const site_info& var, const genomic_region& reg)
+        {
+          std::size_t max_alt_size = 0;
+          for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
+            max_alt_size = std::max(max_alt_size, it->size());
+          return (var.pos() <= reg.to() && (var.pos() + std::max(var.ref().size(), max_alt_size) - 1) >= reg.from() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
+        }
+      };
+
+      struct all_coordinates_within_region
+      {
+        static bool compare(const site_info& var, const genomic_region& reg)
+        {
+          std::size_t max_alt_size = 0;
+          for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
+            max_alt_size = std::max(max_alt_size, it->size());
+          return (var.pos() >= reg.from() && (var.pos() + std::max(var.ref().size(), max_alt_size) - 1) <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
+        }
+      };
+
+      struct leftmost_coordinate_within_region
+      {
+        static bool compare(const site_info& var, const genomic_region& reg)
+        {
+          return (var.pos() >= reg.from() && var.pos() <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
+        }
+      };
+
+      struct rightmost_coordinate_within_region
+      {
+        static bool compare(const site_info& var, const genomic_region& reg)
+        {
+          std::size_t max_alt_size = 0;
+          for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
+            max_alt_size = std::max(max_alt_size, it->size());
+          std::uint64_t right = (var.pos() + std::max(var.ref().size(), max_alt_size) - 1);
+          return (right >= reg.from() && right <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
+        }
+      };
+    }
+
+    inline bool region_compare(bounding_point bounding_type, const site_info& var, const genomic_region& reg)
+    {
+      switch (bounding_type)
+      {
+      case bounding_point::any:
+        return detail::any_coordinate_within_region::compare(var, reg);
+      case bounding_point::all:
+        return detail::all_coordinates_within_region::compare(var, reg);
+      case bounding_point::beg:
+        return detail::leftmost_coordinate_within_region::compare(var, reg);
+      case bounding_point::end:
+        return detail::rightmost_coordinate_within_region::compare(var, reg);
+      }
+    }
+  }
 }
 
 #endif //LIBSAVVY_REGION_HPP

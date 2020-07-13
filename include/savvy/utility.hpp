@@ -35,6 +35,31 @@ namespace savvy
 
   namespace detail
   {
+    inline
+    std::vector<std::string> split_string_to_vector(const char* in, char delim)
+    {
+      std::vector<std::string> ret;
+      const char* d = nullptr;
+      std::string token;
+      const char* s = in;
+      const char*const e = in + strlen(in);
+      while ((d = std::find(s, e,  delim)) != e)
+      {
+        ret.emplace_back(std::string(s, d));
+        s = d ? d + 1 : d;
+      }
+      ret.emplace_back(std::string(s,d));
+      return ret;
+    }
+
+    inline
+    std::vector<std::string> split_string_to_vector(const std::string& in, char delim)
+    {
+      return split_string_to_vector(in.c_str(), delim);
+    }
+
+
+
     template<typename T, typename... Args>
     std::unique_ptr<T> make_unique(Args&&... args)
     {
