@@ -517,6 +517,7 @@ namespace savvy
       if (is >> info_line)
       {
         auto info_pairs = detail::split_string_to_vector(info_line, ';');
+        s.info_.clear();
         s.info_.reserve(info_pairs.size());
         for (auto it = info_pairs.begin(); it != info_pairs.end(); ++it)
         {
@@ -735,6 +736,7 @@ namespace savvy
     inline
     bool variant::deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size)
     {
+      v.format_fields_.clear();
       std::vector<std::string> fmt_keys(1);
       is >> fmt_keys.front();
       fmt_keys = detail::split_string_to_vector(fmt_keys.front(), ':');
@@ -747,13 +749,15 @@ namespace savvy
       //delims.reserve(fmt_keys.size());
       v.format_fields_.reserve(fmt_keys.size());
 
+      bool gt_field_present = false;
+
       for (auto it = fmt_keys.begin(); it != fmt_keys.end(); ++it)
       {
         // TDOO: get fmt type from header
         auto fmt_id_it = dict.str_to_int[dictionary::id].find(*it);
-        if (fmt_id_it == dict.str_to_int[dictionary::id].end() || fmt_id_it->second < dict.entries[dictionary::id].size())
+        if (fmt_id_it == dict.str_to_int[dictionary::id].end() || fmt_id_it->second >= dict.entries[dictionary::id].size())
         {
-          std::fprintf(stderr, "Error: FMT key not in header\n");
+          std::fprintf(stderr, "Error: FMT key not in header: %s\n", it->c_str());
           return false;
         }
 
@@ -800,32 +804,64 @@ namespace savvy
 //        else
 //          delims.emplace_back(',');
 
+        if (*it == "GT")
+        {
+          type = typed_value::int8;
+          number = 0;
+          gt_field_present = true;
+        }
+
         v.format_fields_.emplace_back(*it, typed_value(type, sample_size * number, nullptr));
+        // TODO: update format fields whose "number" is G
       }
 
       std::string sample_line;
       if (std::getline(is, sample_line, '\n') && sample_line.size())
       {
+        if (gt_field_present)
+        {
+          std::size_t max_cnt = 0;
+          std::size_t cnt = 0;
+          for (auto it = sample_line.begin(); it != sample_line.end(); ++it)
+          {
+            if (*it == '\t')
+            {
+              if (cnt > max_cnt)
+                max_cnt = cnt;
+              cnt = 0;
+            }
+            else if (*it == '|' || *it == '/')
+            {
+              ++cnt;
+            }
+          }
 
-        auto start_pos = sample_line.begin();
+          strides[0] = (max_cnt + 1);
+          v.format_fields_.front().second = typed_value(typed_value::int8, sample_size * strides[0], nullptr);
+        }
+
+        auto start_pos = sample_line.begin() + 1; // +1 excludes first tab
         for (std::size_t i = 0; i < sample_size; ++i)
         {
           auto tab_pos = std::find(start_pos, sample_line.end(), '\t');
           for (std::size_t j = 0; j < v.format_fields_.size(); ++j)
           {
             auto colon_pos = std::find(start_pos, tab_pos, ':');
-            if (colon_pos != sample_line.end())
+            *colon_pos = '\0'; // (*sample_line.end()) will always be '\0' so this should be fine.
+            v.format_fields_[j].second.deserialize_vcf(i * strides[j], strides[j], &(*start_pos)); // if start_pos is end iterator then it points to null character, so it should be valid to dereference though this id technically undefined behavior.
+            if (colon_pos != tab_pos)
             {
-              *colon_pos = '\0';
-              v.format_fields_[j].second.deserialize_vcf(i * strides[j], strides[j], &(*start_pos)); // if start_pos is end iterator then it points to null character, so it should be valid to dereference though this id technically undefined behavior.
               start_pos = colon_pos + 1;
             }
             else
             {
-              v.format_fields_[j].second.deserialize_vcf(i * strides[j], strides[j], &(*start_pos)); // if start_pos is end iterator then it points to null character, so it should be valid to dereference though this id technically undefined behavior.
               start_pos = colon_pos;
             }
           }
+
+          if (start_pos != sample_line.end())
+            ++start_pos;
+
         }
 
         return true;

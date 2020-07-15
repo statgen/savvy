@@ -14,6 +14,7 @@
 #include "file.hpp"
 
 #include <shrinkwrap/zstd.hpp>
+#include <shrinkwrap/gz.hpp>
 
 #include <cstdlib>
 #include <string>
@@ -281,10 +282,12 @@ namespace savvy
     {
     private:
       std::string file_path_;
+      std::unique_ptr<std::streambuf> sbuf_;
       std::unique_ptr<std::istream> input_stream_;
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> ids_;
       dictionary dict_;
+      format file_format_;
 
       ::savvy::internal::pbwt_sort_context sort_context_;
 
@@ -328,9 +331,10 @@ namespace savvy
 
       operator bool() const { return (bool) (*input_stream_); };
     private:
-      static bool read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict, ::savvy::internal::pbwt_sort_context& sort_context);
+      bool read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict, ::savvy::internal::pbwt_sort_context& sort_context);
 
       reader& read_record(variant& r);
+      reader& read_vcf_record(variant& r);
       reader& read_indexed_record(variant& r);
     };
 
@@ -338,9 +342,28 @@ namespace savvy
     // Reader definitions
     inline
     reader::reader(const std::string& file_path) :
-      file_path_(file_path),
-      input_stream_(savvy::detail::make_unique<shrinkwrap::zstd::istream>(file_path))
+      file_path_(file_path)
     {
+
+      FILE* fp = fopen(file_path.c_str(), "rb");
+
+      int first_byte = fgetc(fp);
+      ungetc(first_byte, fp);
+
+      switch (char(first_byte))
+      {
+      case '\x1F':
+        sbuf_ = ::savvy::detail::make_unique<::shrinkwrap::bgzf::ibuf>(fp);
+        break;
+      case '\x28':
+        sbuf_ = ::savvy::detail::make_unique<::shrinkwrap::zstd::ibuf>(fp);
+        break;
+      default:
+        throw std::runtime_error("uncompressed files not yet supported.");
+      }
+
+      input_stream_ = savvy::detail::make_unique<std::istream>(sbuf_.get());
+
       if (!read_header(*input_stream_, headers_, ids_, dict_, sort_context_))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
     }
@@ -429,10 +452,24 @@ namespace savvy
     }
 
     inline
+    reader& reader::read_vcf_record(variant& r)
+    {
+      if (!site_info::deserialize_vcf(r, *input_stream_, dict_))
+        input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+      else if (!variant::deserialize_vcf(r, *input_stream_, dict_, ids_.size()))
+        input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+
+      return *this;
+    }
+
+    inline
     reader& reader::read_record(variant& r)
     {
       if (good())
       {
+        if (file_format_ == format::vcf)
+          return read_vcf_record(r);
+
         std::uint32_t shared_sz, indiv_sz;
         if (!input_stream_->read((char*)&shared_sz, sizeof(shared_sz))) // TODO: set to bad if gcount > 0.
         {
@@ -521,11 +558,41 @@ namespace savvy
     inline
     bool reader::read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict, ::savvy::internal::pbwt_sort_context& sort_context)
     {
-      std::string magic(5, '\0');
-      ifs.read(&magic[0], magic.size());
+      std::uint32_t header_block_sz = std::uint32_t(-1);
 
-      std::uint32_t header_block_sz = 0;
-      ifs.read((char *) &header_block_sz, sizeof(header_block_sz));
+      int first_byte = ifs.peek();
+      if (first_byte == '#')
+      {
+        file_format_ = format::vcf;
+      }
+      else
+      {
+        std::string magic(5, '\0');
+        ifs.read(&magic[0], magic.size());
+        transform(magic.begin(), magic.begin() + 3, magic.begin(), ::toupper);
+        if (magic[0] == 'B')
+        {
+          file_format_ = format::bcf;
+          ifs.read((char *) &header_block_sz, sizeof(header_block_sz));
+        }
+        else if (magic.compare(0, 4, "SAV\x02") == 0)
+        {
+          file_format_ = format::sav2;
+          ifs.read((char *) &header_block_sz, sizeof(header_block_sz));
+        }
+        else if (magic.compare(0, 3, "SAV") == 0)
+        {
+          file_format_ = format::sav1;
+          std::array<char, 2> discard;
+          ifs.read(discard.data(), 2);
+          return false; //read_header_sav1();
+        }
+        else
+        {
+          std::fprintf(stderr, "Unsupported file format\n");
+          return false;
+        }
+      }
 
       std::int64_t bytes_read = 0;
       std::string hdr_line;
@@ -561,7 +628,7 @@ namespace savvy
             break;
 
           std::array<char, 64> discard;
-          while (header_block_sz - bytes_read > 0)
+          while (header_block_sz - bytes_read > 0 && file_format_ != format::vcf)
           {
             auto gcount = ifs.read(discard.data(), std::min(std::size_t(header_block_sz - bytes_read), discard.size())).gcount();
             if (gcount == 0)

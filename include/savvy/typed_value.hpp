@@ -1182,7 +1182,6 @@ namespace savvy
 
     if (tcode == 5)
     {
-      assert(!"should not enter");
       std::uint32_t i = 0x7F800002;
       T ret;
       std::memcpy(&ret, &i, sizeof(i));
@@ -1191,7 +1190,6 @@ namespace savvy
 
     if (tcode == 6)
     {
-      assert(!"should not enter");
       std::uint64_t i = 0x7FF0000000000002;
       T ret;
       std::memcpy(&ret, &i, sizeof(i));
@@ -1771,7 +1769,8 @@ namespace savvy
     {
       for ( ; idx < end && *str != '\0'; ++idx,++str)
       {
-        ((std::int8_t*)val_ptr_)[idx] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int8_t*)val_ptr_)[idx] = std::int8_t(0x80), ++str;
+        else ((std::int8_t*)val_ptr_)[idx] = std::strtol(str, &str, 10);
       }
 
       for ( ; idx < end; ++idx)
@@ -1782,7 +1781,8 @@ namespace savvy
     {
       for ( ; idx < end && *str != '\0'; ++idx,++str)
       {
-        ((std::int16_t*)val_ptr_)[idx] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int16_t*)val_ptr_)[idx] = std::int16_t(0x8000), ++str;
+        else ((std::int16_t*)val_ptr_)[idx] = std::strtol(str, &str, 10);
       }
 
       for ( ; idx < end; ++idx)
@@ -1793,7 +1793,8 @@ namespace savvy
     {
       for ( ; idx < end && *str != '\0'; ++idx,++str)
       {
-        ((std::int32_t*)val_ptr_)[idx] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int32_t*)val_ptr_)[idx] = std::int32_t(0x80000000), ++str;
+        else ((std::int32_t*)val_ptr_)[idx] = std::strtol(str, &str, 10);
       }
 
       for ( ; idx < end; ++idx)
@@ -1804,7 +1805,8 @@ namespace savvy
     {
       for ( ; idx < end && *str != '\0'; ++idx,++str)
       {
-        ((std::int64_t*)val_ptr_)[idx] = std::strtoll(str, &str, 10);
+        if (*str == '.') ((std::int64_t*)val_ptr_)[idx] = std::int64_t(0x8000000000000000), ++str;
+        else ((std::int64_t*)val_ptr_)[idx] = std::strtoll(str, &str, 10);
       }
 
       for ( ; idx < end; ++idx)
@@ -1815,7 +1817,8 @@ namespace savvy
     {
       for ( ; idx < end && *str != '\0'; ++idx,++str)
       {
-        ((float*)val_ptr_)[idx] = std::strtof(str, &str);
+        if (*str == '.') ((std::int64_t*)val_ptr_)[idx] = missing_value<float>(), ++str;
+        else ((float*)val_ptr_)[idx] = std::strtof(str, &str);
       }
 
       for ( ; idx < end; ++idx)

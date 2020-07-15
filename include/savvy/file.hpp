@@ -14,6 +14,14 @@ namespace savvy
   private:
 
   public:
+    enum class format
+    {
+      sav1 = 1,
+      sav2,
+      bcf,
+      vcf
+    };
+
     virtual ~file() {}
   };
 }
