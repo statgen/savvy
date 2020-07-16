@@ -7,6 +7,8 @@
 #ifndef LIBSAVVY_BCF_WRITER_HPP
 #define LIBSAVVY_BCF_WRITER_HPP
 
+#include "file.hpp"
+#include "typed_value.hpp"
 #include "utility.hpp"
 #include "compressed_vector.hpp"
 #include "region.hpp"
@@ -50,9 +52,10 @@ namespace savvy
 //      }
 //    }
 
-    class writer
+    class writer : public file
     {
     private:
+      format file_format_;
       std::mt19937_64 rng_;
       std::unique_ptr<std::streambuf> output_buf_;
       std::string file_path_;
@@ -72,13 +75,14 @@ namespace savvy
       std::uint32_t current_block_max_ = 0;
 
       ::savvy::internal::pbwt_sort_context sort_context_;
+      bool phased_ = false;
     private:
       static std::filebuf *create_std_filebuf(const std::string& file_path, std::ios::openmode mode);
 
-      static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, std::uint8_t compression_level);
+      static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, format file_format, std::uint8_t compression_level);
 
     public:
-      writer(const std::string& file_path, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids, std::uint8_t compression_level = 3);
+      writer(const std::string& file_path, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids, file::format file_format, std::uint8_t compression_level = 3);
 
       ~writer();
 
@@ -92,6 +96,7 @@ namespace savvy
       writer& operator<<(const variant& v) { return write(v); }
 
     private:
+      writer& write_vcf(const variant& r);
       void write_header(const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids);
 
       bool serialize_vcf_shared(const site_info& s);
@@ -110,25 +115,33 @@ namespace savvy
     }
 
     inline
-    std::unique_ptr<std::streambuf> writer::create_out_streambuf(const std::string& file_path, std::uint8_t compression_level)
+    std::unique_ptr<std::streambuf> writer::create_out_streambuf(const std::string& file_path, format file_fmt, std::uint8_t compression_level)
     {
       if (compression_level > 0)
-        return std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, compression_level));
+      {
+        if (file_fmt == format::sav2 || file_fmt == format::sav1)
+          return std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, compression_level));
+        else
+          return std::unique_ptr<std::streambuf>(new shrinkwrap::bgzf::obuf(file_path));  //, compression_level)); TODO: Add compression level
+      }
       else
+      {
         return std::unique_ptr<std::streambuf>(create_std_filebuf(file_path, std::ios::binary | std::ios::out));
+      }
     }
 
     inline
-    writer::writer(const std::string& file_path, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids, std::uint8_t compression_level) :
+    writer::writer(const std::string& file_path, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids, file::format file_format, std::uint8_t compression_level) :
+      file_format_(file_format),
       rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t) this),
-      output_buf_(create_out_streambuf(file_path, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
+      output_buf_(create_out_streambuf(file_path, file_format_, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
       ofs_(output_buf_.get()),
       //samples_(samples_beg, samples_end),
       file_path_(file_path),
       uuid_(::savvy::detail::gen_uuid(rng_))
     {
       // TODO: Use mkstemp when shrinkwrap supports FILE*
-      if (true && file_path_ != "/dev/stdout") // TODO: Check if indexing and zstd is enabled.
+      if (file_format_ == format::sav2 && file_path_ != "/dev/stdout") // TODO: Check if indexing and zstd is enabled.
       {
         index_file_ = ::savvy::detail::make_unique<s1r::writer>(file_path + ".s1r", uuid_);
       }
@@ -136,6 +149,7 @@ namespace savvy
       write_header(headers, ids);
     }
 
+    inline
     writer::~writer()
     {
       // TODO: This is only a temp solution.
@@ -166,11 +180,22 @@ namespace savvy
       block_size_ = bs;
     }
 
+    inline
+    writer& writer::write_vcf(const variant& r)
+    {
+      if (!serialize_vcf_shared(r) || !serialize_vcf_indiv(r, phased_))
+        ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
+
+      return *this;
+    }
 
     inline
     writer& writer::write(const variant& r)
     {
-      bool is_bcf = true; // TODO: ...
+      if (file_format_ == format::vcf)
+        return write_vcf(r);
+
+      bool is_bcf = file_format_ == format::bcf; // TODO: ...
       bool flushed = false;
 
       if (block_size_ != 0 && (block_size_ <= record_count_in_block_ || r.chrom() != current_chromosome_)) // TODO: this needs to be fixed to support variable block size
@@ -330,8 +355,13 @@ namespace savvy
 
       header_block_sz += 2; //new line and null
 
-      ofs_.write(magic.data(), magic.size());
-      ofs_.write((char *) (&header_block_sz), sizeof(header_block_sz));
+      if (file_format_ != format::vcf)
+      {
+        if (file_format_ == format::bcf)
+          magic = {'B', 'C', 'F', '\x02', '\x01'};
+        ofs_.write(magic.data(), magic.size());
+        ofs_.write((char *) (&header_block_sz), sizeof(header_block_sz));
+      }
 
       for (auto it = headers.begin(); it != headers.end(); ++it)
       {
@@ -366,6 +396,10 @@ namespace savvy
             sort_context_.field_to_format_contexts.insert(std::make_pair(insert_it.first->second.format, &(insert_it.first->second)));
           }
         }
+        else if (it->first == "phasing" && it->second == "phased")
+        {
+          phased_ = true;
+        }
 
         ofs_.write("##", 2);
         ofs_.write(it->first.data(), it->first.size());
@@ -382,7 +416,9 @@ namespace savvy
       }
       n_samples_ = ids.size();
 
-      ofs_.write("\n\0", 2);
+      ofs_.put('\n');
+      if (file_format_ != format::vcf)
+        ofs_.put('\0');
     }
 
     inline
@@ -407,7 +443,7 @@ namespace savvy
       if (std::isnan(s.qual_))
         ofs_ << "\t.";
       else
-        ofs_ << s.qual_;
+        ofs_ << "\t" << s.qual_;
 
       if (s.filters_.empty())
       {
@@ -483,7 +519,9 @@ namespace savvy
         }
       }
 
-      return true;
+      ofs_.put('\n');
+
+      return ofs_.good();
     }
     //================================================================//
 

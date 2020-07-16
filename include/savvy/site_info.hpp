@@ -544,7 +544,8 @@ namespace savvy
             }
 
             // TODO: get info data type from header
-            s.info_.emplace_back(kvp[0], typed_value(kvp[1]));
+            char* p = kvp[1].size() ? &kvp[1][0] : nullptr;
+            s.info_.emplace_back(kvp[0], typed_value(dict.entries[dictionary::id][res->second].type, p, p + kvp[1].size()));
           }
           else
           {
@@ -815,7 +816,7 @@ namespace savvy
         // TODO: update format fields whose "number" is G
       }
 
-      std::string sample_line;
+      std::string sample_line; // TODO: use string instead of vector for local_data_
       if (std::getline(is, sample_line, '\n') && sample_line.size())
       {
         if (gt_field_present)
@@ -837,7 +838,7 @@ namespace savvy
           }
 
           strides[0] = (max_cnt + 1);
-          v.format_fields_.front().second = typed_value(typed_value::int8, sample_size * strides[0], nullptr);
+          v.format_fields_.front().second = typed_value(typed_value::type_code((std::int64_t)v.alts().size()), sample_size * strides[0], nullptr);
         }
 
         auto start_pos = sample_line.begin() + 1; // +1 excludes first tab

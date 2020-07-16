@@ -588,6 +588,7 @@ namespace savvy
 
     typed_value(std::uint8_t type, std::size_t sz, char *data_ptr);
     typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr);
+    typed_value(std::int8_t type, char* str, char*const str_end);
 
     void init(std::uint8_t type, std::size_t sz, char *data_ptr);
     void init(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr);
@@ -974,7 +975,7 @@ namespace savvy
       switch (val_type_)
       {
       case 0x01u:
-        os << ((std::int8_t*)val_ptr_)[idx];
+        os << static_cast<int>(((std::int8_t*)val_ptr_)[idx]);
         break;
       case 0x02u:
         os << ((std::int16_t*)val_ptr_)[idx]; // TODO: handle endianess
@@ -993,7 +994,7 @@ namespace savvy
       }
     }
 
-    void deserialize_vcf(std::size_t idx, std::size_t length, char* str) const;
+    void deserialize_vcf(std::size_t idx, std::size_t length, char* str);
 
     template<typename ValT, typename OffT, typename DestT>
     void copy_sparse2(DestT& dest) const
@@ -1727,37 +1728,117 @@ namespace savvy
   std::ostream& operator<<(std::ostream& os, const typed_value& v)
   {
     if (!v.val_ptr_ || v.size_ == 0)
-      os << ".";
-
-    switch (v.val_type_)
     {
-    case 0x01u:
-      os << *((std::int8_t*)v.val_ptr_);
-      break;
-    case 0x02u:
-      os << *((std::int16_t*)v.val_ptr_); // TODO: handle endianess
-      break;
-    case 0x03u:
-      os << *((std::int32_t*)v.val_ptr_);
-      break;
-    case 0x04u:
-      os << *((std::int64_t*)v.val_ptr_);
-      break;
-    case 0x05u:
-      os << *((float*)v.val_ptr_);
-      break;
-    case 0x07u:
-      os << (const char*)v.val_ptr_;
-      break;
-    default:
-      os.setstate(os.rdstate() | std::ios::failbit);
+      os << ".";
+    }
+    else
+    {
+      switch (v.val_type_)
+      {
+      case 0x01u:
+        os << static_cast<int>(*((std::int8_t*)v.val_ptr_));
+        break;
+      case 0x02u:
+        os << *((std::int16_t*)v.val_ptr_); // TODO: handle endianess
+        break;
+      case 0x03u:
+        os << *((std::int32_t*)v.val_ptr_);
+        break;
+      case 0x04u:
+        os << *((std::int64_t*)v.val_ptr_);
+        break;
+      case 0x05u:
+        os << *((float*)v.val_ptr_);
+        break;
+      case 0x07u:
+        os.write(v.val_ptr_, v.size_);
+        break;
+      default:
+        os.setstate(os.rdstate() | std::ios::failbit);
+      }
     }
 
     return os;
   }
 
   inline
-  void typed_value::deserialize_vcf(std::size_t idx, std::size_t length, char* str) const
+  typed_value::typed_value(std::int8_t type, char* str, char*const str_end)
+  {
+    val_type_ = type;
+    size_ = 0;
+    switch (val_type_)
+    {
+    case 0x01u:
+    {
+      for ( ; str < str_end; ++str)
+      {
+        typedef std::int8_t T;
+        local_data_.resize(local_data_.size() + sizeof(T));
+        if (*str == '.') ((T*)val_ptr_)[size_++] = T(0x80), ++str;
+        else ((T*)local_data_.data())[size_++] = std::strtol(str, &str, 10);
+      }
+      break;
+    }
+    case 0x02u:
+    {
+      for ( ; str < str_end; ++str)
+      {
+        typedef std::int16_t T;
+        local_data_.resize(local_data_.size() + sizeof(T));
+        if (*str == '.') ((T*)val_ptr_)[size_++] = T(0x8000), ++str;
+        else ((T*)local_data_.data())[size_++] = std::strtol(str, &str, 10);
+      }
+      break;
+    }
+    case 0x03u:
+    {
+      for ( ; str < str_end; ++str)
+      {
+        typedef std::int32_t T;
+        local_data_.resize(local_data_.size() + sizeof(T));
+        if (*str == '.') ((T*)val_ptr_)[size_++] = T(0x80000000), ++str;
+        else ((T*)local_data_.data())[size_++] = std::strtol(str, &str, 10);
+      }
+      break;
+    }
+    case 0x04u:
+    {
+      for ( ; str < str_end; ++str)
+      {
+        typedef std::int64_t T;
+        local_data_.resize(local_data_.size() + sizeof(T));
+        if (*str == '.') ((T*)val_ptr_)[size_++] = T(0x8000000000000000), ++str;
+        else ((T*)local_data_.data())[size_++] = std::strtol(str, &str, 10);
+      }
+      break;
+    }
+    case 0x05u:
+    {
+      for ( ; str < str_end; ++str)
+      {
+        typedef float T;
+        local_data_.resize(local_data_.size() + sizeof(T));
+        if (*str == '.') ((T*)val_ptr_)[size_++] = missing_value<float>(), ++str;
+        else ((T*)local_data_.data())[size_++] = std::strtof(str, &str);
+      }
+      break;
+    }
+    case 0x07u:
+    {
+      local_data_.assign(str, str_end);
+      size_ = local_data_.size();
+      break;
+    }
+    default:
+      return; // TODO: Maybe return false
+
+    }
+
+    val_ptr_ = local_data_.data();
+  }
+
+  inline
+  void typed_value::deserialize_vcf(std::size_t idx, std::size_t length, char* str)
   {
     assert(!off_ptr_ && idx < size_);
 

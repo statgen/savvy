@@ -322,6 +322,9 @@ namespace savvy
     public:
       reader(const std::string& file_path);
 
+      const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
+      const std::vector<std::string>& samples() const { return ids_; }
+
       reader& reset_bounds(genomic_region reg);
 
       bool good() const { return this->input_stream_->good(); }
@@ -329,7 +332,7 @@ namespace savvy
       reader& read(variant& r);
       reader& operator>>(variant& r) { return read(r); }
 
-      operator bool() const { return (bool) (*input_stream_); };
+      operator bool() const { return good(); };
     private:
       bool read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict, ::savvy::internal::pbwt_sort_context& sort_context);
 
@@ -454,7 +457,9 @@ namespace savvy
     inline
     reader& reader::read_vcf_record(variant& r)
     {
-      if (!site_info::deserialize_vcf(r, *input_stream_, dict_))
+      if (input_stream_->peek() < 0)
+        input_stream_->setstate(input_stream_->rdstate() | std::ios::eofbit);
+      else if (!site_info::deserialize_vcf(r, *input_stream_, dict_))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
       else if (!variant::deserialize_vcf(r, *input_stream_, dict_, ids_.size()))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
