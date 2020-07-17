@@ -501,8 +501,7 @@ namespace savvy
           return *this;
         }
 
-        bool is_bcf = false; // TODO
-        if (!variant::deserialize(r, dict_, this->ids_.size(), is_bcf))
+        if (!variant::deserialize(r, dict_, this->ids_.size(), file_format_ == format::bcf))
         {
           std::fprintf(stderr, "Error: Invalid record data\n");
           input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);

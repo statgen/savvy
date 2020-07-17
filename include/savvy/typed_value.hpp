@@ -523,6 +523,46 @@ namespace savvy
       return DestT(in);
     }
 
+    class bcf_code_gt
+    {
+    public:
+      bcf_code_gt(bool phased) :
+        phased_(phased)
+      {}
+
+      template <typename T>
+      void operator()(T& val)
+      {
+        if (val == std::numeric_limits<T>::min() + 1) return;
+        if (val == std::numeric_limits<T>::min())
+          val = T(-1);
+        val = ((val + 1) << 1u) | T(phased_); // TODO: restrict values so that they fit (max val for int8_t is 126).
+      }
+
+      void operator()(float& val) { return; }
+    private:
+      bool phased_;
+    };
+
+    class bcf_uncode_gt
+    {
+    public:
+      bcf_uncode_gt()
+      {}
+
+      template <typename T>
+      void operator()(T& val)
+      {
+        if (val == std::numeric_limits<T>::min() + 1) return;
+        val = T(unsigned(val) >> 1u) - 1;
+        if (val == -1)
+          val = std::numeric_limits<T>::min();
+      }
+
+      void operator()(float& val) { return; }
+    private:
+    };
+
     enum class get_status : std::uint8_t
     {
       ok = 0,
@@ -679,6 +719,49 @@ namespace savvy
         dest.val_type_ = val_type_;
         dest.size_ = size_;
         dest.val_ptr_ = dest.local_data_.data();
+      }
+
+      return true;
+    }
+
+    template <typename Transform>
+    bool transform_values(Transform& fn)
+    {
+      std::size_t sz = off_ptr_ ? sparse_size_ : size_;
+      switch (val_type_)
+      {
+      case 0x01u:
+        {
+          typedef std::int8_t T;
+          std::for_each((T*)val_ptr_, ((T*)val_ptr_) + sz, fn);
+        }
+        break;
+      case 0x02u:
+        {
+          typedef std::int16_t T;
+          std::for_each((T*)val_ptr_, ((T*)val_ptr_) + sz, fn); // TODO: handle endianess
+        }
+        break;
+      case 0x03u:
+        {
+          typedef std::int32_t T;
+          std::for_each((T*)val_ptr_, ((T*)val_ptr_) + sz, fn);
+        }
+        break;
+      case 0x04u:
+        {
+          typedef std::int64_t T;
+          std::for_each((T*)val_ptr_, ((T*)val_ptr_) + sz, fn);
+        }
+        break;
+      case 0x05u:
+        {
+          typedef float T;
+          std::for_each((T*)val_ptr_, ((T*)val_ptr_) + sz, fn);
+        }
+        break;
+      default:
+        return false;
       }
 
       return true;
@@ -950,7 +1033,7 @@ namespace savvy
       static void pbwt_sort(InIter in_data, std::size_t in_data_size, OutIter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
 
       template<typename Iter>
-      static void serialize(const typed_value& v, Iter out_it);
+      static void serialize(const typed_value& v, Iter out_it, std::size_t size_divisor);
 
       template<typename Iter>
       static void serialize(const typed_value& v, Iter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
@@ -1420,13 +1503,16 @@ namespace savvy
   }
 
   template <typename Iter>
-  void typed_value::internal::serialize(const typed_value& v, Iter out_it)
+  void typed_value::internal::serialize(const typed_value& v, Iter out_it, std::size_t size_divisor)
   {
+    assert(!v.off_type_ || size_divisor == 1);
     std::uint8_t type_byte =  v.off_type_ ? typed_value::sparse : v.val_type_;
-    type_byte = std::uint8_t(std::min(std::size_t(15), v.size_) << 4u) | type_byte;
+    std::size_t sz = v.size_ / size_divisor;
+    type_byte = std::uint8_t(std::min(std::size_t(15), sz) << 4u) | type_byte;
     *(out_it++) = type_byte;
-    if (v.size_ >= 15u)
-      bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.size_));
+
+    if (sz >= 15u)
+      bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(sz));
 
     if (v.off_type_)
     {

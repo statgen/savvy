@@ -249,9 +249,9 @@ namespace savvy
       std::uint32_t shared_sz, indiv_sz;
 
       //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-      // Serialized shared data
+      // Determine which fields sort
       std::list<std::pair<std::string, typed_value>> extra_info_fields;
-      if (flushed)
+      if (flushed && sort_context_.format_contexts.size())
       {
         extra_info_fields.emplace_back("_PBWT_RESET", typed_value(std::int8_t(1)));
       }
@@ -274,10 +274,13 @@ namespace savvy
           }
         }
       }
+      //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
       serialized_buf_.clear();
       serialized_buf_.reserve(24);
 
+      //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+      // Serialize shared data
       if (!site_info::serialize(r, std::back_inserter(serialized_buf_), dict_, n_samples_, r.format_fields().size(), extra_info_fields, sort_context_.format_contexts.size() ? flushed : false))
       {
         ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
@@ -296,8 +299,8 @@ namespace savvy
 
       //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
       // Serialize individual data
-      if (!variant::serialize(r,
-        std::back_inserter(serialized_buf_), dict_, is_bcf,
+      if (!variant::serialize(r, std::back_inserter(serialized_buf_),
+        dict_, n_samples_, is_bcf, phased_,
         sort_context_, pbwt_format_pointers))
       {
         ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
@@ -358,7 +361,7 @@ namespace savvy
       if (file_format_ != format::vcf)
       {
         if (file_format_ == format::bcf)
-          magic = {'B', 'C', 'F', '\x02', '\x01'};
+          magic = {'B', 'C', 'F', '\x02', '\x02'};
         ofs_.write(magic.data(), magic.size());
         ofs_.write((char *) (&header_block_sz), sizeof(header_block_sz));
       }
@@ -370,18 +373,21 @@ namespace savvy
         {
           int which_dict = it->first == "contig" ? dictionary::contig : dictionary::id;
 
-          dictionary::entry e;
-          e.id = hval.id;
-          e.number = std::atoi(hval.number.c_str()); // TODO: handle special character values.
-          if (hval.type == "Integer")
-            e.type = typed_value::int32;
-          else if (hval.type == "Float")
-            e.type = typed_value::real;
-          else if (hval.type == "String")
-            e.type = typed_value::str;
+          if (dict_.str_to_int[which_dict].find(hval.id) == dict_.str_to_int[which_dict].end())
+          {
+            dictionary::entry e;
+            e.id = hval.id;
+            e.number = std::atoi(hval.number.c_str()); // TODO: handle special character values.
+            if (hval.type == "Integer")
+              e.type = typed_value::int32;
+            else if (hval.type == "Float")
+              e.type = typed_value::real;
+            else if (hval.type == "String")
+              e.type = typed_value::str;
 
-          dict_.entries[which_dict].emplace_back(std::move(e));
-          dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size() - 1;
+            dict_.entries[which_dict].emplace_back(std::move(e));
+            dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size() - 1;
+          }
         }
 
         if (it->first == "INFO")
@@ -395,6 +401,7 @@ namespace savvy
             auto insert_it = sort_context_.format_contexts.insert(std::make_pair(std::string(hval.id), std::move(ctx)));
             sort_context_.field_to_format_contexts.insert(std::make_pair(insert_it.first->second.format, &(insert_it.first->second)));
           }
+          // TODO: set _PBWT_RESET flag.
         }
         else if (it->first == "phasing" && it->second == "phased")
         {

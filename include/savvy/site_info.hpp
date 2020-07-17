@@ -348,7 +348,7 @@ namespace savvy
       void set_format(const std::string& key, const compressed_vector <T>& geno);
     private:
       template <typename OutT>
-      static bool serialize(const variant& v, OutT out_it, const dictionary& dict, bool is_bcf, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers);
+      static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, bool phased_, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers);
       static bool deserialize(variant& v, const dictionary& dict, std::size_t sample_size, bool is_bcf);
       static bool deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size);
     };
@@ -629,10 +629,11 @@ namespace savvy
         {
           std::fprintf(stderr, "Error: INFO key not in header (%s)\n", kvp.first.c_str());
           encode_res = false;
+          return;
         }
 
         bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
-        typed_value::internal::serialize(kvp.second, out_it);
+        typed_value::internal::serialize(kvp.second, out_it, 1);
       };
 
       std::for_each(s.info_.begin(), s.info_.end(), serialize_info_pair);
@@ -716,6 +717,12 @@ namespace savvy
               //fmt_it->second.init(type, sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin()));
               *fmt_it = std::make_pair(std::string(fmt_key), typed_value(type, sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin())));
               indiv_it += sz * type_width;
+
+              if (is_bcf && fmt_key == "GT")
+              {
+                typed_value::bcf_uncode_gt fn; // TODO: save phases when partially phased.
+                fmt_it->second.transform_values(fn);
+              }
               // ------------------------------------------- //
             }
           }
@@ -871,7 +878,7 @@ namespace savvy
     }
 
     template <typename OutT>
-    bool variant::serialize(const variant& v, OutT out_it, const dictionary& dict, bool is_bcf, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers)
+    bool variant::serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, bool phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers)
     {
       // Encode FMT
       for (auto it = v.format_fields_.begin(); it != v.format_fields_.end(); ++it)
@@ -888,9 +895,22 @@ namespace savvy
 
         auto* pbwt_ptr = pbwt_format_pointers[it - v.format_fields_.begin()];
         if (pbwt_ptr)
+        {
           typed_value::internal::serialize(it->second, out_it, pbwt_ptr->sort_map, pbwt_ctx.prev_sort_mapping, pbwt_ctx.counts);
+        }
         else
-          typed_value::internal::serialize(it->second, out_it);
+        {
+          if (is_bcf && it->first == "GT")
+          {
+            typed_value dense_gt;
+            it->second.copy_as_dense(dense_gt);
+            typed_value::bcf_code_gt fn(phased);
+            dense_gt.transform_values(fn);
+            typed_value::internal::serialize(dense_gt, out_it, is_bcf ? sample_size : 1);
+          }
+          else
+            typed_value::internal::serialize(it->second, out_it, is_bcf ? sample_size : 1);
+        }
       }
 
       return true;
