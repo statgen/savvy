@@ -25,6 +25,14 @@
 
 namespace savvy
 {
+  enum class phasing
+  {
+    unknown = 0,
+    none,
+    partial,
+    phased
+  };
+
   class site_info
   {
   public:
@@ -348,9 +356,9 @@ namespace savvy
       void set_format(const std::string& key, const compressed_vector <T>& geno);
     private:
       template <typename OutT>
-      static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, bool phased_, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers);
-      static bool deserialize(variant& v, const dictionary& dict, std::size_t sample_size, bool is_bcf);
-      static bool deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size);
+      static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers);
+      static bool deserialize(variant& v, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased);
+      static bool deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status);
     };
 
     inline
@@ -645,7 +653,7 @@ namespace savvy
 
 
     inline
-    bool variant::deserialize(variant& v, const dictionary& dict, std::size_t sample_size, bool is_bcf)
+    bool variant::deserialize(variant& v, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased)
     {
       if (site_info::deserialize(v, dict))
       {
@@ -720,8 +728,17 @@ namespace savvy
 
               if (is_bcf && fmt_key == "GT")
               {
-                typed_value::bcf_uncode_gt fn; // TODO: save phases when partially phased.
-                fmt_it->second.transform_values(fn);
+                // TODO: save phases when partially phased.
+                if (phased == phasing::unknown || phased == phasing::partial)
+                {
+                  typed_value ph_value(typed_value::int8, (sz / sample_size - 1) * sample_size, nullptr);
+                  fmt_it->second.apply(typed_value::bcf_gt_decoder(), (std::int8_t*)ph_value.val_ptr_, sz / sample_size);
+                  v.format_fields_.insert(fmt_it + 1, std::make_pair("PH", std::move(ph_value)));
+                }
+                else
+                {
+                  fmt_it->second.apply(typed_value::bcf_gt_decoder());
+                }
               }
               // ------------------------------------------- //
             }
@@ -742,7 +759,7 @@ namespace savvy
     }
 
     inline
-    bool variant::deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size)
+    bool variant::deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status)
     {
       v.format_fields_.clear();
       std::vector<std::string> fmt_keys(1);
@@ -817,6 +834,12 @@ namespace savvy
           type = typed_value::int8;
           number = 0;
           gt_field_present = true;
+          assert(v.format_fields_.empty());
+          if (!v.format_fields_.empty())
+          {
+            std::fprintf(stderr, "Error: GT must be first FMT field\n");
+            return false;
+          }
         }
 
         v.format_fields_.emplace_back(*it, typed_value(type, sample_size * number, nullptr));
@@ -826,6 +849,8 @@ namespace savvy
       std::string sample_line; // TODO: use string instead of vector for local_data_
       if (std::getline(is, sample_line, '\n') && sample_line.size())
       {
+        typed_value ph_value;
+        std::size_t ph_stride = 0;
         if (gt_field_present)
         {
           std::size_t max_cnt = 0;
@@ -846,6 +871,11 @@ namespace savvy
 
           strides[0] = (max_cnt + 1);
           v.format_fields_.front().second = typed_value(typed_value::type_code((std::int64_t)v.alts().size()), sample_size * strides[0], nullptr);
+          if (phasing_status == phasing::partial || phasing_status == phasing::unknown)
+          {
+            ph_stride = max_cnt;
+            ph_value = typed_value(typed_value::int8, sample_size * ph_stride, nullptr);
+          }
         }
 
         auto start_pos = sample_line.begin() + 1; // +1 excludes first tab
@@ -857,6 +887,21 @@ namespace savvy
             auto colon_pos = std::find(start_pos, tab_pos, ':');
             *colon_pos = '\0'; // (*sample_line.end()) will always be '\0' so this should be fine.
             v.format_fields_[j].second.deserialize_vcf(i * strides[j], strides[j], &(*start_pos)); // if start_pos is end iterator then it points to null character, so it should be valid to dereference though this id technically undefined behavior.
+            if (j == 0 && ph_value.size())
+            {
+              std::size_t ps_cnt = 0;
+              for (auto it = &(*start_pos); *it != '\0'; ++it)
+              {
+                if (*it == '|')
+                  ph_value.val_ptr_[i * ph_stride + ps_cnt++] = 1;
+                else if (*it == '/')
+                  ph_value.val_ptr_[i * ph_stride + ps_cnt++] = 0;
+              }
+
+              for ( ; ps_cnt < (strides[j] - 1); ++ps_cnt)
+                ph_value.val_ptr_[i * ph_stride + ps_cnt++] = std::int8_t(0x81); // END_OF_VECTOR;
+            }
+
             if (colon_pos != tab_pos)
             {
               start_pos = colon_pos + 1;
@@ -872,17 +917,21 @@ namespace savvy
 
         }
 
+        if (ph_value.size())
+          v.format_fields_.insert(v.format_fields_.begin() + 1, std::make_pair("PH", std::move(ph_value)));
+
         return true;
       }
       return false;
     }
 
     template <typename OutT>
-    bool variant::serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, bool phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers)
+    bool variant::serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers)
     {
       // Encode FMT
       for (auto it = v.format_fields_.begin(); it != v.format_fields_.end(); ++it)
       {
+        if (is_bcf && it->first == "PH") continue;
         auto res = dict.str_to_int[dictionary::id].find(it->first);
         if (res == dict.str_to_int[dictionary::id].end())
         {
@@ -904,12 +953,27 @@ namespace savvy
           {
             typed_value dense_gt;
             it->second.copy_as_dense(dense_gt);
-            typed_value::bcf_code_gt fn(phased);
-            dense_gt.transform_values(fn);
+
+            auto jt = it + 1;
+            for (; jt != v.format_fields().end(); ++jt)
+            {
+              if (jt->first == "PH")
+              {
+                assert(dense_gt.size() % sample_size == 0 && (dense_gt.size() / sample_size - 1) * sample_size == jt->second.size()); // TODO: graceful error
+                dense_gt.apply(typed_value::bcf_gt_encoder(), (std::int8_t*)jt->second.val_ptr_, dense_gt.size() / sample_size);
+                break;
+              }
+            }
+
+            if (jt == v.format_fields().end())
+              dense_gt.apply(typed_value::bcf_gt_encoder(), phased == phasing::phased);
+
             typed_value::internal::serialize(dense_gt, out_it, is_bcf ? sample_size : 1);
           }
           else
+          {
             typed_value::internal::serialize(it->second, out_it, is_bcf ? sample_size : 1);
+          }
         }
       }
 

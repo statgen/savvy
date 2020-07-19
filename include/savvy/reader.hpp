@@ -288,6 +288,7 @@ namespace savvy
       std::vector<std::string> ids_;
       dictionary dict_;
       format file_format_;
+      phasing phasing_;
 
       ::savvy::internal::pbwt_sort_context sort_context_;
 
@@ -461,7 +462,7 @@ namespace savvy
         input_stream_->setstate(input_stream_->rdstate() | std::ios::eofbit);
       else if (!site_info::deserialize_vcf(r, *input_stream_, dict_))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
-      else if (!variant::deserialize_vcf(r, *input_stream_, dict_, ids_.size()))
+      else if (!variant::deserialize_vcf(r, *input_stream_, dict_, ids_.size(), phasing_))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
 
       return *this;
@@ -501,7 +502,7 @@ namespace savvy
           return *this;
         }
 
-        if (!variant::deserialize(r, dict_, this->ids_.size(), file_format_ == format::bcf))
+        if (!variant::deserialize(r, dict_, this->ids_.size(), file_format_ == format::bcf, phasing_))
         {
           std::fprintf(stderr, "Error: Invalid record data\n");
           input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
@@ -690,6 +691,15 @@ namespace savvy
               auto insert_it = sort_context.format_contexts.insert(std::make_pair(std::string(hval.id), std::move(ctx)));
               sort_context.field_to_format_contexts.insert(std::make_pair(insert_it.first->second.format, &(insert_it.first->second)));
             }
+          }
+          else if (key == "phasing")
+          {
+            if (val == "none")
+              phasing_ = phasing::none;
+            else if (val == "partial")
+              phasing_ = phasing::partial;
+            else if (val == "phased" || val == "full")
+              phasing_ = phasing::phased;
           }
 
           headers.emplace_back(std::move(key), std::move(val));

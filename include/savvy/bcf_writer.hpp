@@ -64,6 +64,7 @@ namespace savvy
       dictionary dict_;
       std::size_t n_samples_ = 0;
       std::vector<char> serialized_buf_;
+      phasing phasing_ = phasing::unknown;
 
       // Data members to support indexing
       std::unique_ptr<s1r::writer> index_file_;
@@ -75,14 +76,13 @@ namespace savvy
       std::uint32_t current_block_max_ = 0;
 
       ::savvy::internal::pbwt_sort_context sort_context_;
-      bool phased_ = false;
     private:
       static std::filebuf *create_std_filebuf(const std::string& file_path, std::ios::openmode mode);
 
       static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, format file_format, std::uint8_t compression_level);
 
     public:
-      writer(const std::string& file_path, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids, file::format file_format, std::uint8_t compression_level = 3);
+      writer(const std::string& file_path, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, file::format file_format, std::uint8_t compression_level = 3);
 
       ~writer();
 
@@ -97,10 +97,10 @@ namespace savvy
 
     private:
       writer& write_vcf(const variant& r);
-      void write_header(const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids);
+      void write_header(std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids);
 
       bool serialize_vcf_shared(const site_info& s);
-      bool serialize_vcf_indiv(const variant& v, bool phased);
+      bool serialize_vcf_indiv(const variant& v, phasing phased);
     };
 
 
@@ -131,7 +131,7 @@ namespace savvy
     }
 
     inline
-    writer::writer(const std::string& file_path, const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids, file::format file_format, std::uint8_t compression_level) :
+    writer::writer(const std::string& file_path, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, file::format file_format, std::uint8_t compression_level) :
       file_format_(file_format),
       rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t) this),
       output_buf_(create_out_streambuf(file_path, file_format_, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
@@ -140,6 +140,13 @@ namespace savvy
       file_path_(file_path),
       uuid_(::savvy::detail::gen_uuid(rng_))
     {
+      if (file_format_ == format::sav1)
+      {
+        fprintf(stderr, "Error: Writing SAV v1 format not supported.\n");
+        ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
+        return;
+      }
+
       // TODO: Use mkstemp when shrinkwrap supports FILE*
       if (file_format_ == format::sav2 && file_path_ != "/dev/stdout") // TODO: Check if indexing and zstd is enabled.
       {
@@ -183,7 +190,7 @@ namespace savvy
     inline
     writer& writer::write_vcf(const variant& r)
     {
-      if (!serialize_vcf_shared(r) || !serialize_vcf_indiv(r, phased_))
+      if (!serialize_vcf_shared(r) || !serialize_vcf_indiv(r, phasing_))
         ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
 
       return *this;
@@ -256,6 +263,7 @@ namespace savvy
         extra_info_fields.emplace_back("_PBWT_RESET", typed_value(std::int8_t(1)));
       }
 
+      std::size_t n_fmt = 0;
       std::vector<::savvy::internal::pbwt_sort_format_context*> pbwt_format_pointers;
       pbwt_format_pointers.reserve(r.format_fields().size());
       for (auto it = r.format_fields().begin(); it != r.format_fields().end(); ++it)
@@ -273,6 +281,8 @@ namespace savvy
             }
           }
         }
+        if (file_format_ == format::sav2 || it->first != "PH")
+          ++n_fmt;
       }
       //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
@@ -281,7 +291,7 @@ namespace savvy
 
       //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
       // Serialize shared data
-      if (!site_info::serialize(r, std::back_inserter(serialized_buf_), dict_, n_samples_, r.format_fields().size(), extra_info_fields, sort_context_.format_contexts.size() ? flushed : false))
+      if (!site_info::serialize(r, std::back_inserter(serialized_buf_), dict_, n_samples_, n_fmt, extra_info_fields, sort_context_.format_contexts.size() ? flushed : false))
       {
         ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
         return *this;
@@ -300,7 +310,7 @@ namespace savvy
       //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
       // Serialize individual data
       if (!variant::serialize(r, std::back_inserter(serialized_buf_),
-        dict_, n_samples_, is_bcf, phased_,
+        dict_, n_samples_, is_bcf, phasing_,
         sort_context_, pbwt_format_pointers))
       {
         ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
@@ -336,36 +346,11 @@ namespace savvy
     }
 
     inline
-    void writer::write_header(const std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids)
+    void writer::write_header(std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids)
     {
       std::string magic = {'S', 'A', 'V', '\x02', '\x00'};
 
       std::uint32_t header_block_sz = 0;
-      for (auto it = headers.begin(); it != headers.end(); ++it)
-      {
-        header_block_sz += it->first.size();
-        header_block_sz += it->second.size();
-        header_block_sz += 4;
-      }
-
-      std::string column_names = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
-      header_block_sz += column_names.size();
-
-      for (auto it = ids.begin(); it != ids.end(); ++it)
-      {
-        header_block_sz += 1 + it->size();
-      }
-
-      header_block_sz += 2; //new line and null
-
-      if (file_format_ != format::vcf)
-      {
-        if (file_format_ == format::bcf)
-          magic = {'B', 'C', 'F', '\x02', '\x02'};
-        ofs_.write(magic.data(), magic.size());
-        ofs_.write((char *) (&header_block_sz), sizeof(header_block_sz));
-      }
-
       for (auto it = headers.begin(); it != headers.end(); ++it)
       {
         auto hval = parse_header_value(it->second);
@@ -403,11 +388,57 @@ namespace savvy
           }
           // TODO: set _PBWT_RESET flag.
         }
-        else if (it->first == "phasing" && it->second == "phased")
+        else if (it->first == "phasing")
         {
-          phased_ = true;
+          if (it->second == "none")
+            phasing_ = phasing::none;
+          else if (it->second == "partial")
+            phasing_ = phasing::partial;
+          else if (it->second == "phased" || it->second == "full")
+            phasing_ = phasing::phased;
+        }
+        else if (it->first == "FORMAT")
+        {
+          if (hval.id == "GT")
+          {
+            if (file_format_ == format::sav2)
+            {
+              if (hval.type == "String")
+                it->second = "<ID=GT, Type=Integer, Number=G, Description=\"Genotype\">";
+            }
+            else
+            {
+              if (hval.type != "String")
+                it->second = "<ID=GT, Type=String, Number=1, Description=\"Genotype\">";
+            }
+          }
         }
 
+        header_block_sz += it->first.size();
+        header_block_sz += it->second.size();
+        header_block_sz += 4;
+      }
+
+      std::string column_names = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
+      header_block_sz += column_names.size();
+
+      for (auto it = ids.begin(); it != ids.end(); ++it)
+      {
+        header_block_sz += 1 + it->size();
+      }
+
+      header_block_sz += 2; //new line and null
+
+      if (file_format_ != format::vcf)
+      {
+        if (file_format_ == format::bcf)
+          magic = {'B', 'C', 'F', '\x02', '\x02'};
+        ofs_.write(magic.data(), magic.size());
+        ofs_.write((char *) (&header_block_sz), sizeof(header_block_sz));
+      }
+
+      for (auto it = headers.begin(); it != headers.end(); ++it)
+      {
         ofs_.write("##", 2);
         ofs_.write(it->first.data(), it->first.size());
         ofs_.write("=", 1);
@@ -470,7 +501,7 @@ namespace savvy
       else
       {
         ofs_ << "\t" << s.info_.front().first << "=" << s.info_.front().second;
-        for (auto it = s.info_.begin(); it != s.info_.end(); ++it)
+        for (auto it = s.info_.begin() + 1; it != s.info_.end(); ++it)
         {
           ofs_ << ";" << it->first << "=" << it->second;
         }
@@ -480,22 +511,30 @@ namespace savvy
     }
 
     inline
-    bool writer::serialize_vcf_indiv(const savvy::v2::variant& v, bool phased)
+    bool writer::serialize_vcf_indiv(const savvy::v2::variant& v, phasing phased)
     {
       std::vector<const typed_value*> typed_value_ptrs(v.format_fields_.size());
       std::vector<std::size_t> strides(v.format_fields_.size());
       std::vector<char> delims(v.format_fields_.size());
       std::list<typed_value> dense_copies;
+      std::int8_t* ph_ptr = nullptr;
       for (std::size_t i = 0; i < v.format_fields_.size(); ++i)
       {
         assert(n_samples_); // TODO
+
+        if (v.format_fields_[i].first == "PH")
+        {
+          assert(i == 1); // TODO: return error
+          ph_ptr = (std::int8_t*)v.format_fields_[i].second.val_ptr_;
+          continue;
+        }
 
         ofs_ << (i == 0 ? "\t" : ":") << v.format_fields_[i].first;
 
         strides[i] = (n_samples_ ? v.format_fields_[i].second.size() / n_samples_ : 0);
 
         if (v.format_fields_[i].first == "GT")
-          delims[i] = (phased ? '|' : '/');
+          delims[i] = (phased == phasing::phased ? '|' : '/');
         else
           delims[i] = ',';
 
@@ -512,16 +551,44 @@ namespace savvy
       }
 
 
-      for (std::size_t i = 0; i < n_samples_; ++i)
+      if (ph_ptr)
       {
-        for (std::size_t j = 0; j < v.format_fields_.size(); ++j)
+        std::size_t ph_stride = strides[0] - 1;
+        for (std::size_t i = 0; i < n_samples_; ++i)
         {
-          ofs_.put(j > 0 ? ':' : '\t');
-          for (std::size_t k = 0; k < strides[j]; ++k)
+          ofs_.put('\t');
+          for (std::size_t k = 0; k < strides[0]; ++k)
           {
             if (k > 0)
-              ofs_.put(delims[j]);
-            typed_value_ptrs[j]->serialize_vcf(i * strides[j] + k, ofs_);
+              ofs_.put(ph_ptr[i * ph_stride + k - 1] ? '|' : '/'); // TODO: allow for PH
+            typed_value_ptrs[0]->serialize_vcf(i * strides[0] + k, ofs_);
+          }
+
+          for (std::size_t j = 2; j < v.format_fields_.size(); ++j)
+          {
+            ofs_.put(':');
+            for (std::size_t k = 0; k < strides[j]; ++k)
+            {
+              if (k > 0)
+                ofs_.put(delims[j]);
+              typed_value_ptrs[j]->serialize_vcf(i * strides[j] + k, ofs_);
+            }
+          }
+        }
+      }
+      else
+      {
+        for (std::size_t i = 0; i < n_samples_; ++i)
+        {
+          for (std::size_t j = 0; j < v.format_fields_.size(); ++j)
+          {
+            ofs_.put(j > 0 ? ':' : '\t');
+            for (std::size_t k = 0; k < strides[j]; ++k)
+            {
+              if (k > 0)
+                ofs_.put(delims[j]); // TODO: allow for PH
+              typed_value_ptrs[j]->serialize_vcf(i * strides[j] + k, ofs_);
+            }
           }
         }
       }

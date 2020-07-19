@@ -523,44 +523,121 @@ namespace savvy
       return DestT(in);
     }
 
-    class bcf_code_gt
+
+    template <typename T>
+    void bcf_encode_gt(T* val_ptr, T* val_end_ptr, bool phased)
+    {
+      for ( ; val_ptr != val_end_ptr; ++val_ptr)
+      {
+        if (*val_ptr == std::numeric_limits<T>::min() + 1) return;
+        if (*val_ptr == std::numeric_limits<T>::min())
+          *val_ptr = T(-1);
+        *val_ptr = ((*val_ptr + 1) << 1u) | T(phased); // TODO: restrict values so that they fit (max val for int8_t is 126).
+      }
+    }
+
+
+    template <typename T>
+    void bcf_encode_gt_ph(T* val_ptr, T* val_end_ptr, const std::int8_t* phase, std::size_t stride)
+    {
+      for (std::size_t i = 0; val_ptr != val_end_ptr; ++val_ptr, ++i)
+      {
+        if (*val_ptr != std::numeric_limits<T>::min() + 1)
+        {
+          if (*val_ptr == std::numeric_limits<T>::min())
+            *val_ptr = T(-1);
+          if (i % stride)
+            *val_ptr = ((*val_ptr + 1) << 1u) | T(*phase++);
+          else
+            *val_ptr = ((*val_ptr + 1) << 1u);
+        }
+        ++i;
+      }
+    }
+
+    void bcf_encode_gt_ph(float* val_ptr, float* val_end_ptr, const std::int8_t* phase, std::size_t stride) { }
+
+
+    class bcf_gt_encoder
     {
     public:
-      bcf_code_gt(bool phased) :
-        phased_(phased)
-      {}
-
       template <typename T>
-      void operator()(T& val)
+      void operator()(T* val_ptr, T* val_end_ptr, bool phased)
       {
-        if (val == std::numeric_limits<T>::min() + 1) return;
-        if (val == std::numeric_limits<T>::min())
-          val = T(-1);
-        val = ((val + 1) << 1u) | T(phased_); // TODO: restrict values so that they fit (max val for int8_t is 126).
+        for ( ; val_ptr != val_end_ptr; ++val_ptr)
+        {
+          if (*val_ptr == std::numeric_limits<T>::min() + 1) return;
+          if (*val_ptr == std::numeric_limits<T>::min())
+            *val_ptr = T(-1);
+          *val_ptr = ((*val_ptr + 1) << 1u) | T(phased); // TODO: restrict values so that they fit (max val for int8_t is 126).
+        }
       }
 
-      void operator()(float& val) { return; }
-    private:
-      bool phased_;
+      template <typename T>
+      void operator()(T* val_ptr, T* val_end_ptr, const std::int8_t* phase, std::size_t stride)
+      {
+        for (std::size_t i = 0; val_ptr != val_end_ptr; ++val_ptr,++i)
+        {
+          if (*val_ptr != std::numeric_limits<T>::min() + 1)
+          {
+            if (*val_ptr == std::numeric_limits<T>::min())
+              *val_ptr = T(-1);
+            if (i % stride)
+              *val_ptr = ((*val_ptr + 1) << 1u) | T(*phase++); // TODO: restrict values so that they fit (max val for int8_t is 126).
+            else
+              *val_ptr = ((*val_ptr + 1) << 1u);
+          }
+        }
+      }
+
+      void operator()(float* val_ptr, float* val_end_ptr, bool phased) { return; }
+      void operator()(float* val_ptr, float* val_end_ptr, const std::int8_t* phase, std::size_t stride) { return; }
     };
 
-    class bcf_uncode_gt
+    class bcf_gt_decoder
     {
     public:
-      bcf_uncode_gt()
+      bcf_gt_decoder()
       {}
 
       template <typename T>
-      void operator()(T& val)
+      void operator()(T* valp, T* endp)
       {
-        if (val == std::numeric_limits<T>::min() + 1) return;
-        val = T(unsigned(val) >> 1u) - 1;
-        if (val == -1)
-          val = std::numeric_limits<T>::min();
+        for ( ; valp != endp; ++valp)
+        {
+          if (*valp == std::numeric_limits<T>::min() + 1) return;
+          *valp = T(unsigned(*valp) >> 1u) - 1;
+          if (*valp == -1)
+            *valp = std::numeric_limits<T>::min();
+        }
       }
 
-      void operator()(float& val) { return; }
-    private:
+      template <typename T>
+      void operator()(T* valp, T* endp, std::int8_t* phasep, std::size_t stride)
+      {
+        for (std::size_t i = 0; valp != endp; ++valp,++i)
+        {
+          std::int8_t ph;
+
+          if (*valp == std::numeric_limits<T>::min() + 1)
+          {
+            ph = std::int8_t(0x81);
+          }
+          else
+          {
+            ph = 0x1 & *valp;
+            *valp = T(unsigned(*valp) >> 1u) - 1;
+            if (*valp == -1)
+              *valp = std::numeric_limits<T>::min();
+          }
+
+          if (i % stride)
+            (*phasep++) = ph;
+        }
+      }
+
+      void operator()(float* valp, float* endp) { return; }
+      void operator()(float* valp, float* endp, std::int8_t* ph, std::size_t stride) { return; }
     };
 
     enum class get_status : std::uint8_t
@@ -724,8 +801,37 @@ namespace savvy
       return true;
     }
 
-    template <typename Transform>
-    bool transform_values(Transform& fn)
+    template <typename Fn, typename... Args>
+    bool apply(Fn fn, Args... args)
+    {
+      switch (val_type_)
+      {
+      case 0x01u:
+        fn((std::int8_t*)val_ptr_, ((std::int8_t*)val_ptr_) + (off_ptr_ ? sparse_size_ : size_), args...);
+        break;
+      case 0x02u:
+        fn((std::int16_t*)val_ptr_, ((std::int16_t*)val_ptr_) + (off_ptr_ ? sparse_size_ : size_), args...); // TODO: handle endianess
+        break;
+      case 0x03u:
+        fn((std::int32_t*)val_ptr_, ((std::int32_t*)val_ptr_) + (off_ptr_ ? sparse_size_ : size_), args...);
+        break;
+      case 0x04u:
+        fn((std::int64_t*)val_ptr_, ((std::int64_t*)val_ptr_) + (off_ptr_ ? sparse_size_ : size_), args...);
+        break;
+      case 0x05u:
+        fn((float*)val_ptr_, ((float*)val_ptr_) + (off_ptr_ ? sparse_size_ : size_), args...);
+        break;
+      case 0x07u:
+        fn(val_ptr_, val_ptr_ + (off_ptr_ ? sparse_size_ : size_), args...);
+        break;
+      default:
+        return false;
+      }
+      return true;
+    }
+
+    template <typename Fn>
+    bool foreach_value(Fn& fn)
     {
       std::size_t sz = off_ptr_ ? sparse_size_ : size_;
       switch (val_type_)
@@ -1819,28 +1925,34 @@ namespace savvy
     }
     else
     {
-      switch (v.val_type_)
+      for (std::size_t i = 0; i < v.size_; ++i)
       {
-      case 0x01u:
-        os << static_cast<int>(*((std::int8_t*)v.val_ptr_));
-        break;
-      case 0x02u:
-        os << *((std::int16_t*)v.val_ptr_); // TODO: handle endianess
-        break;
-      case 0x03u:
-        os << *((std::int32_t*)v.val_ptr_);
-        break;
-      case 0x04u:
-        os << *((std::int64_t*)v.val_ptr_);
-        break;
-      case 0x05u:
-        os << *((float*)v.val_ptr_);
-        break;
-      case 0x07u:
-        os.write(v.val_ptr_, v.size_);
-        break;
-      default:
-        os.setstate(os.rdstate() | std::ios::failbit);
+        if (i > 0)
+          os.put(',');
+        switch (v.val_type_)
+        {
+        case 0x01u:
+          os << static_cast<int>(*(((std::int8_t*)v.val_ptr_) + i));
+          break;
+        case 0x02u:
+          os << *(((std::int16_t*)v.val_ptr_) + i); // TODO: handle endianess
+          break;
+        case 0x03u:
+          os << *(((std::int32_t*)v.val_ptr_) + i);
+          break;
+        case 0x04u:
+          os << *(((std::int64_t*)v.val_ptr_) + i);
+          break;
+        case 0x05u:
+          os << *(((float*)v.val_ptr_) + i);
+          break;
+        case 0x07u:
+          os.write(v.val_ptr_, v.size_);
+          i = v.size_;
+          break;
+        default:
+          os.setstate(os.rdstate() | std::ios::failbit);
+        }
       }
     }
 
