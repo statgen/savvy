@@ -17,6 +17,7 @@
 
 
 #include <shrinkwrap/zstd.hpp>
+#include <shrinkwrap/gz.hpp>
 
 #include <cstdlib>
 #include <random>
