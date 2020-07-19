@@ -15,6 +15,7 @@
 #include <iostream>
 #include <cmath>
 #include <array>
+#include <cassert>
 
 namespace savvy
 {
