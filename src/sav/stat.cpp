@@ -8,7 +8,7 @@
 #include "sav/utility.hpp"
 #include "savvy/s1r.hpp"
 #include "savvy/savvy.hpp"
-#include "savvy/sav_reader.hpp"
+#include "savvy/reader.hpp"
 #include "savvy/bcf_writer.hpp"
 
 #include <getopt.h>
@@ -99,10 +99,10 @@ int stat_main(int argc, char** argv)
   bool is_sav2 = false;
   if (is_sav2)
   {
-    savvy::sav2::reader rdr(args.input_path());
-    savvy::sav2::variant rec;
+    savvy::v2::reader rdr(args.input_path());
+    savvy::v2::variant rec;
 
-    while (rdr.read_record(rec))
+    while (rdr.read(rec))
     {
       rec.format_fields().front().second >> geno;
       if (rec.alts().size() > 1)
