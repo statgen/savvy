@@ -16,6 +16,7 @@
 #include <cmath>
 #include <array>
 #include <cassert>
+#include <cstring>
 
 namespace savvy
 {
