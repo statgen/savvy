@@ -30,7 +30,8 @@ namespace savvy
     unknown = 0,
     none,
     partial,
-    phased
+    phased,
+    full = phased
   };
 
   class site_info
@@ -297,7 +298,7 @@ namespace savvy
       {
         auto res = std::find_if(info_.begin(), info_.end(), [&key](const std::pair<std::string, savvy::typed_value>& v) { return v.first == key; });
         if (res != info_.end())
-          return res->second >> dest;
+          return res->second.get(dest);
         return false;
       }
 

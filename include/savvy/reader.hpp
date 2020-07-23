@@ -326,6 +326,13 @@ namespace savvy
       const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
       const std::vector<std::string>& samples() const { return ids_; }
 
+      /**
+       *
+       * @param subset IDs to include if they exist in file.
+       * @return subset context to be used with typed_value::get().
+       */
+      sample_subset make_sample_subset(const std::set<std::string>& subset);
+
       reader& reset_bounds(genomic_region reg);
 
       bool good() const { return this->input_stream_->good(); }
@@ -370,6 +377,28 @@ namespace savvy
 
       if (!read_header(*input_stream_, headers_, ids_, dict_, sort_context_))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+    }
+
+    inline
+    sample_subset reader::make_sample_subset(const std::set<std::string>& subset)
+    {
+      std::vector<std::string> ret;
+      ret.reserve(std::min(subset.size(), ids_.size()));
+
+      std::vector<std::size_t> subset_map(ids_.size(), std::numeric_limits<std::uint64_t>::max());
+
+      std::uint64_t subset_index = 0;
+      for (auto it = ids_.begin(); it != ids_.end(); ++it)
+      {
+        if (subset.find(*it) != subset.end())
+        {
+          subset_map[std::distance(ids_.begin(), it)] = subset_index;
+          ret.push_back(*it);
+          ++subset_index;
+        }
+      }
+
+      return sample_subset{std::move(ret), std::move(subset_map)};
     }
 
     inline
