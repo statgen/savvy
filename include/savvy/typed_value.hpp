@@ -2002,9 +2002,11 @@ namespace savvy
       type_byte = std::uint8_t(v.off_type_ << 4u) | v.val_type_;
       *(out_it++) = type_byte;
       bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.sparse_size_));
-      std::size_t pair_width = (1u << bcf_type_shift[v.off_type_]) + (1u << bcf_type_shift[v.val_type_]);
+      std::size_t off_width = (1u << bcf_type_shift[v.off_type_]);
+      std::size_t val_width = (1u << bcf_type_shift[v.val_type_]);
       assert(v.off_ptr_ == (v.val_ptr_ - (1u << bcf_type_shift[v.off_type_]) * v.sparse_size_));
-      std::copy_n(v.off_ptr_, v.sparse_size_ * pair_width, out_it);
+      std::copy_n(v.off_ptr_, v.sparse_size_ * off_width, out_it);
+      std::copy_n(v.val_ptr_, v.sparse_size_ * val_width, out_it);
     }
     else
     {

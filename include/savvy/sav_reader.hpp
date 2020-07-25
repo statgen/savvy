@@ -17,6 +17,7 @@
 #include "data_format.hpp"
 #include "compressed_vector.hpp"
 #include "utility.hpp"
+#include "sav1.hpp"
 
 #include <cstdint>
 #include <string>
@@ -38,27 +39,6 @@ namespace savvy
 {
   namespace sav
   {
-    namespace detail
-    {
-      template<std::uint8_t BitWidth>
-      struct allele_decoder
-      {
-        static const std::uint8_t denom = std::uint8_t(~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
-        template <typename T>
-        static std::tuple<T, std::uint64_t> decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value);
-      };
-
-      template<std::uint8_t BitWidth>
-      struct allele_encoder
-      {
-        static const std::uint8_t multiplier = std::uint8_t(~(std::uint8_t(0xFF) << BitWidth)) + std::uint8_t(1);
-        template <typename T>
-        static void encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it);
-        template <typename T>
-        static std::int8_t encode(const T& allele);
-      };
-    }
-
 //    namespace detail
 //    {
 //      template <std::uint8_t Exp>

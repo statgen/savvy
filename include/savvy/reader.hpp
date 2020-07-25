@@ -284,7 +284,13 @@ namespace savvy
       std::string file_path_;
       std::unique_ptr<std::streambuf> sbuf_;
       std::unique_ptr<std::istream> input_stream_;
+      std::array<std::uint8_t, 16> uuid_;
       std::vector<std::pair<std::string, std::string>> headers_;
+      std::vector<header_value_details> info_headers_;
+      std::unordered_map<std::string, std::reference_wrapper<header_value_details>> info_headers_map_;
+      std::vector<header_value_details> format_headers_;
+      std::unordered_map<std::string, std::reference_wrapper<header_value_details>> format_headers_map_;
+
       std::vector<std::string> ids_;
       dictionary dict_;
       format file_format_;
@@ -342,10 +348,13 @@ namespace savvy
 
       operator bool() const { return good(); };
     private:
-      bool read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict, ::savvy::internal::pbwt_sort_context& sort_context);
+      void process_header_pair(const std::string& key, const std::string& val);
+      bool read_header();
+      bool read_header_sav1();
 
       reader& read_record(variant& r);
       reader& read_vcf_record(variant& r);
+      reader& read_sav1_record(variant& r);
       reader& read_indexed_record(variant& r);
     };
 
@@ -375,7 +384,7 @@ namespace savvy
 
       input_stream_ = savvy::detail::make_unique<std::istream>(sbuf_.get());
 
-      if (!read_header(*input_stream_, headers_, ids_, dict_, sort_context_))
+      if (!read_header())
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
     }
 
@@ -498,12 +507,27 @@ namespace savvy
     }
 
     inline
+    reader& reader::read_sav1_record(variant& r)
+    {
+      if (input_stream_->peek() < 0)
+        input_stream_->setstate(input_stream_->rdstate() | std::ios::eofbit);
+      else if (!site_info::deserialize_sav1(r, *input_stream_, info_headers_))
+        input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+      else if (!variant::deserialize_sav1(r, *input_stream_, format_headers_, ids_.size(), phasing_))
+        input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+
+      return *this;
+    }
+
+    inline
     reader& reader::read_record(variant& r)
     {
       if (good())
       {
         if (file_format_ == format::vcf)
           return read_vcf_record(r);
+        else if (file_format_ == format::sav1)
+          return read_sav1_record(r);
 
         std::uint32_t shared_sz, indiv_sz;
         if (!input_stream_->read((char*)&shared_sz, sizeof(shared_sz))) // TODO: set to bad if gcount > 0.
@@ -590,10 +614,98 @@ namespace savvy
     }
 
     inline
-    bool reader::read_header(std::istream& ifs, std::vector<std::pair<std::string, std::string>>& headers, std::vector<std::string>& ids, dictionary& dict, ::savvy::internal::pbwt_sort_context& sort_context)
+    bool reader::read_header_sav1()
+    {
+//      std::string version_string(7, '\0');
+//      input_stream_->read(&version_string[0], version_string.size());
+
+      input_stream_->read((char*)uuid_.data(), uuid_.size());
+      bool parse_ploidy = uuid_.front() != 0;
+
+      std::istreambuf_iterator<char> in_it(*input_stream_);
+      std::istreambuf_iterator<char> end;
+
+      std::uint64_t headers_size;
+      if (good() && varint_decode(in_it, end, headers_size) != end)
+      {
+        ++in_it;
+        headers_.reserve(headers_size);
+
+        std::unordered_set<std::string> unique_info_fields;
+
+        while (headers_size && in_it != end)
+        {
+          std::uint64_t key_size;
+          if (varint_decode(in_it, end, key_size) != end)
+          {
+            ++in_it;
+            if (key_size)
+            {
+              std::string key;
+              key.resize(key_size);
+              input_stream_->read(&key[0], key_size);
+
+              std::uint64_t val_size;
+              if (varint_decode(in_it, end, val_size) != end)
+              {
+                ++in_it;
+                if (key_size)
+                {
+                  std::string val;
+                  val.resize(val_size);
+                  input_stream_->read(&val[0], val_size);
+
+                  process_header_pair(key, val);
+                }
+              }
+
+            }
+          }
+          --headers_size;
+        }
+
+        if (format_headers_.empty() || (parse_ploidy && std::atoi(format_headers_.back().number.c_str()) == 0))
+        {
+          return false;
+        }
+
+        if (!headers_size)
+        {
+          std::uint64_t sample_size;
+          if (varint_decode(in_it, end, sample_size) != end)
+          {
+            ++in_it;
+            ids_.reserve(sample_size);
+
+            std::uint64_t id_sz;
+            while (sample_size && varint_decode(in_it, end, id_sz) != end)
+            {
+              ++in_it;
+              ids_.emplace_back();
+              if (id_sz)
+              {
+                ids_.back().resize(id_sz);
+                input_stream_->read(&ids_.back()[0], id_sz);
+              }
+              --sample_size;
+            }
+
+            if (!sample_size)
+              return true;
+          }
+        }
+      }
+
+      input_stream_->peek();
+      return input_stream_->good();
+    }
+
+    inline
+    bool reader::read_header()
     {
       std::uint32_t header_block_sz = std::uint32_t(-1);
 
+      std::istream& ifs(*input_stream_);
       int first_byte = ifs.peek();
       if (first_byte == '#')
       {
@@ -603,7 +715,7 @@ namespace savvy
       {
         std::string magic(5, '\0');
         ifs.read(&magic[0], magic.size());
-        transform(magic.begin(), magic.begin() + 3, magic.begin(), ::toupper);
+        //transform(magic.begin(), magic.begin() + 3, magic.begin(), ::toupper);
         if (magic[0] == 'B')
         {
           file_format_ = format::bcf;
@@ -614,12 +726,12 @@ namespace savvy
           file_format_ = format::sav2;
           ifs.read((char *) &header_block_sz, sizeof(header_block_sz));
         }
-        else if (magic.compare(0, 3, "SAV") == 0)
+        else if (magic.compare(0, 3, "sav") == 0)
         {
           file_format_ = format::sav1;
           std::array<char, 2> discard;
           ifs.read(discard.data(), 2);
-          return false; //read_header_sav1();
+          return read_header_sav1();
         }
         else
         {
@@ -640,13 +752,13 @@ namespace savvy
 
           std::int64_t tab_cnt = std::count(hdr_line.begin(), hdr_line.end(), '\t');
           std::size_t sample_size = tab_cnt - 8;
-          ids.reserve(sample_size);
+          ids_.reserve(sample_size);
 
           while ((tab_pos = hdr_line.find('\t', tab_pos)) != std::string::npos)
           {
             if (tab_cnt < sample_size)
             {
-              ids.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos));
+              ids_.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos));
             }
             last_pos = ++tab_pos;
             --tab_cnt;
@@ -654,9 +766,9 @@ namespace savvy
 
           assert(tab_cnt == 0);
 
-          ids.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos)); // TODO: allow for no samples.
+          ids_.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos)); // TODO: allow for no samples.
 
-          assert(ids.size() == sample_size);
+          assert(ids_.size() == sample_size);
 
           if (header_block_sz - bytes_read < 0)
             break;
@@ -688,55 +800,74 @@ namespace savvy
           }
           std::string val(equal_it + 1, hdr_line.end());
 
-          //std::string hid = parse_header_sub_field(val, "ID");
-          auto hval = parse_header_value(val);
-          if (!hval.id.empty())
-          {
-            int which_dict = key == "contig" ? dictionary::contig : dictionary::id;
-
-            dictionary::entry e;
-            e.id = hval.id;
-            e.number = hval.number; // TODO: handle special character values.
-            if (hval.type == "Integer")
-              e.type = typed_value::int32;
-            else if (hval.type == "Float")
-              e.type = typed_value::real;
-            else if (hval.type == "String")
-              e.type = typed_value::str;
-
-
-            dict.entries[which_dict].emplace_back(std::move(e));
-            dict.str_to_int[which_dict][hval.id] = dict.entries[which_dict].size() - 1;
-          }
-
-          if (key == "INFO")
-          {
-            if (hval.id.substr(0, 10) == "_PBWT_SORT")
-            {
-              ::savvy::internal::pbwt_sort_format_context ctx;
-              ctx.format = parse_header_sub_field(val, "Format");
-              ctx.id = hval.id;
-
-              auto insert_it = sort_context.format_contexts.insert(std::make_pair(std::string(hval.id), std::move(ctx)));
-              sort_context.field_to_format_contexts.insert(std::make_pair(insert_it.first->second.format, &(insert_it.first->second)));
-            }
-          }
-          else if (key == "phasing")
-          {
-            if (val == "none")
-              phasing_ = phasing::none;
-            else if (val == "partial")
-              phasing_ = phasing::partial;
-            else if (val == "phased" || val == "full")
-              phasing_ = phasing::phased;
-          }
-
-          headers.emplace_back(std::move(key), std::move(val));
+          process_header_pair(key, val);
         }
       }
 
       std::fprintf(stderr, "Error: corrupt header\n");
       return false;
+    }
+
+    inline
+    void reader::process_header_pair(const std::string& key, const std::string& val)
+    {
+      auto hval = parse_header_value(val);
+      if (!hval.id.empty())
+      {
+        int which_dict = key == "contig" ? dictionary::contig : dictionary::id;
+
+        dictionary::entry e;
+        e.id = hval.id;
+        e.number = hval.number; // TODO: handle special character values.
+        if (hval.type == "Integer")
+          e.type = typed_value::int32;
+        else if (hval.type == "Float")
+          e.type = typed_value::real;
+        else if (hval.type == "String")
+          e.type = typed_value::str;
+
+
+        dict_.entries[which_dict].emplace_back(std::move(e));
+        dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size() - 1;
+      }
+
+      if (key == "INFO")
+      {
+        if (info_headers_map_.find(hval.id) == info_headers_map_.end())
+        {
+          info_headers_.emplace_back(hval);
+          info_headers_map_.insert(std::make_pair(hval.id, std::ref(info_headers_.back())));
+        }
+
+        if (hval.id.substr(0, 10) == "_PBWT_SORT")
+        {
+          ::savvy::internal::pbwt_sort_format_context ctx;
+          ctx.format = parse_header_sub_field(val, "Format");
+          ctx.id = hval.id;
+
+          auto insert_it = sort_context_.format_contexts.insert(std::make_pair(std::string(hval.id), std::move(ctx)));
+          sort_context_.field_to_format_contexts.insert(std::make_pair(insert_it.first->second.format, &(insert_it.first->second)));
+        }
+      }
+      else if (key == "FORMAT")
+      {
+        if (format_headers_map_.find(hval.id) == format_headers_map_.end())
+        {
+          format_headers_.emplace_back(hval);
+          format_headers_map_.insert(std::make_pair(hval.id, std::ref(info_headers_.back())));
+        }
+      }
+      else if (key == "phasing")
+      {
+        if (val == "none")
+          phasing_ = phasing::none;
+        else if (val == "partial")
+          phasing_ = phasing::partial;
+        else if (val == "phased" || val == "full")
+          phasing_ = phasing::phased;
+      }
+
+      headers_.emplace_back(std::move(key), std::move(val));
     }
     //================================================================//
   }

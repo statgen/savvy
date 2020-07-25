@@ -13,6 +13,8 @@
 #include "dictionary.hpp"
 #include "pbwt.hpp"
 #include "utility.hpp"
+#include "varint.hpp"
+#include "sav1.hpp"
 
 #include <string>
 #include <vector>
@@ -330,6 +332,7 @@ namespace savvy
     protected:
       static bool deserialize(site_info& s, const dictionary& dict);
       static bool deserialize_vcf(site_info& s, std::istream& is, const dictionary& dict);
+      static bool deserialize_sav1(site_info& s, std::istream& is, const std::vector<header_value_details>& info_headers);
 
       template<typename Itr>
       static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint32_t n_fmt, const std::list<std::pair<std::string, typed_value>>& extra_info_fields, bool pbwt_reset);
@@ -360,6 +363,7 @@ namespace savvy
       static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers);
       static bool deserialize(variant& v, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased);
       static bool deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status);
+      static bool deserialize_sav1(variant& v, std::istream& is, const std::vector<header_value_details>& format_headers, std::size_t sample_size, phasing phasing_status);
     };
 
     inline
@@ -574,6 +578,140 @@ namespace savvy
       return true;
     }
 
+    inline
+    bool site_info::deserialize_sav1(savvy::v2::site_info& s, std::istream& is, const std::vector<header_value_details>& info_headers)
+    {
+      if (is.good())
+      {
+        std::istreambuf_iterator<char> in_it(is);
+        std::istreambuf_iterator<char> end_it;
+
+        if (in_it == end_it)
+        {
+          is.setstate(std::ios::eofbit); // No more markers to read.
+          return false; // TODO: EOF his handled in calling function. These setstate calls shouldn't be necessary.
+        }
+        else
+        {
+          std::uint64_t sz;
+          if (varint_decode(in_it, end_it, sz) == end_it)
+          {
+            is.setstate(std::ios::badbit);
+            return false;
+          }
+          else
+          {
+            ++in_it;
+            s.chrom_.resize(sz);
+            if (sz)
+              is.read(&s.chrom_[0], sz);
+
+            std::uint64_t pos;
+            if (varint_decode(in_it, end_it, pos) == end_it)
+            {
+              is.setstate(std::ios::badbit);
+              return false;
+            }
+            else
+            {
+              s.pos_ = std::uint32_t(pos);
+              ++in_it;
+              if (varint_decode(in_it, end_it, sz) == end_it)
+              {
+                is.setstate(std::ios::badbit);
+                return false;
+              }
+              else
+              {
+                ++in_it;
+                s.ref_.resize(sz);
+                if (sz)
+                  is.read(&s.ref_[0], sz);
+
+                if (varint_decode(in_it, end_it, sz) == end_it)
+                {
+                  is.setstate(std::ios::badbit);
+                  return false;
+                }
+                else
+                {
+                  ++in_it;
+                  if (sz)
+                  {
+                    s.alts_.resize(1);
+                    s.alts_.front().resize(sz);
+                    is.read(&s.alts_.front()[0], sz);
+                  }
+
+                  s.info_.reserve(info_headers.size());
+                  std::string prop_val;
+                  for (const header_value_details& hval : info_headers)
+                  {
+                    std::string key = hval.id;
+                    if (varint_decode(in_it, end_it, sz) == end_it)
+                    {
+                      is.setstate(std::ios::badbit);
+                      break;
+                    }
+                    else
+                    {
+                      ++in_it;
+                      if (sz)
+                      {
+                        prop_val.resize(sz);
+                        is.read(&prop_val[0], sz);
+
+                        if (key == "ID")
+                          s.id_ = prop_val;
+                        else if (key == "QUAL")
+                          s.qual_ = prop_val.empty() ? typed_value::missing_value<float>() : std::atof(prop_val.c_str());
+                        else if (key == "FILTER")
+                          s.filters_ = detail::split_string_to_vector(prop_val, ';');
+
+                        if (hval.type == "Flag")
+                        {
+                          if (std::atoi(prop_val.c_str()) == 1)
+                            s.info_.emplace_back(key, typed_value(std::int8_t(1)));
+                        }
+                        else
+                        {
+                          std::uint8_t field_type = 0;
+                          if (hval.type == "Integer")
+                            field_type = typed_value::int32;
+                          else if (hval.type == "Float")
+                            field_type = typed_value::real;
+                          else if (hval.type == "String")
+                            field_type = typed_value::str;
+
+                          if (field_type)
+                          {
+                            char* p = prop_val.size() ? &prop_val[0] : nullptr;
+                            s.info_.emplace_back(key, typed_value(field_type, p, p + prop_val.size()));
+                          }
+                          else
+                          {
+                            return false;
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  if (!is.good())
+                  {
+                    is.setstate(std::ios::badbit);
+                    return false;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return true;
+    }
+
     template <typename Itr>
     bool site_info::serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint32_t n_fmt, const std::list<std::pair<std::string, typed_value>>& extra_info_fields, bool pbwt_reset)
     {
@@ -757,6 +895,86 @@ namespace savvy
 
       std::fprintf(stderr, "Error: Invalid record data\n");
       return false;
+    }
+
+
+    inline
+    bool variant::deserialize_sav1(variant& var, std::istream& is, const std::vector<header_value_details>& format_headers, std::size_t sample_size, phasing phasing_status)
+    {
+      if (format_headers.empty()) return false;
+
+      std::istreambuf_iterator<char> in_it(is);
+      std::istreambuf_iterator<char> end_it;
+
+      std::uint64_t ploidy = std::atoll(format_headers.front().number.c_str());
+
+      if (ploidy == 0) // Old versions stored ploidy for each variant
+      {
+        if (varint_decode(in_it, end_it, ploidy) != end_it)
+          ++in_it;
+      }
+
+      if (in_it == end_it)
+      {
+        is.setstate(std::ios::badbit);
+        return false;
+      }
+
+      std::uint64_t sz;
+      varint_decode(in_it, end_it, sz);
+
+      typed_value v;
+      v.sparse_size_ = sz;
+      v.size_ = sample_size;
+      v.off_type_ = typed_value::int64;  // TODO: typed_value::offset_type_code(sample_size);
+      std::size_t off_width = 1u << bcf_type_shift[v.off_type_];
+
+      if (format_headers.front().id == "GT")
+      {
+        v.val_type_ = typed_value::int8;
+        v.local_data_.resize(sz * ploidy * off_width + sz * ploidy);
+        v.off_ptr_ = v.local_data_.data();
+        v.val_ptr_ = v.local_data_.data() + sz * ploidy * off_width;
+
+
+        std::int64_t* off_ptr = (std::int64_t*)v.off_ptr_;
+        std::int8_t* val_ptr = (std::int8_t*)v.val_ptr_;
+        for (std::size_t i = 0; i < sz && in_it != end_it; ++i,++off_ptr,++val_ptr)
+        {
+          std::int8_t allele;
+          std::uint64_t offset;
+          std::tie(allele, offset) = sav::detail::allele_decoder<1>::decode(++in_it, end_it, typed_value::missing_value<std::int8_t>());
+          *off_ptr = offset;
+          *val_ptr = allele;
+        }
+      }
+      else if (format_headers.front().id == "HDS")
+      {
+        v.val_type_ = typed_value::int8;
+        v.local_data_.resize(sz * ploidy * off_width + sz * ploidy * sizeof(float));
+        v.off_ptr_ = v.local_data_.data();
+        v.val_ptr_ = v.local_data_.data() + sz * ploidy * off_width;
+
+
+        std::int64_t* off_ptr = (std::int64_t*)v.off_ptr_;
+        float* val_ptr = (float*)v.val_ptr_;
+        for (std::size_t i = 0; i < sz && in_it != end_it; ++i,++off_ptr,++val_ptr)
+        {
+          float allele;
+          std::uint64_t offset;
+          std::tie(allele, offset) = sav::detail::allele_decoder<7>::decode(++in_it, end_it, typed_value::missing_value<float>());
+          *off_ptr = offset;
+          *val_ptr = allele;
+        }
+      }
+      else
+      {
+        return false;
+      }
+
+      // TODO: compress offsets.
+
+      return true;
     }
 
     inline
