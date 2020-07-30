@@ -734,8 +734,9 @@ namespace savvy
     }
 
     std::size_t size() const { return size_; }
+    std::size_t non_zero_size() const { return sparse_size_; }
 
-    bool is_sparse() const { return off_ptr_ != nullptr; }
+    bool is_sparse() const { return off_type_ != 0; }
 
     template<typename T>
     typed_value& operator=(const T& v)
@@ -749,6 +750,81 @@ namespace savvy
     }
 
     typed_value& operator=(typed_value&& src);
+    typed_value& operator=(const typed_value& src);
+    //void swap(typed_value& src); // This is not a good idea since the pointers sometims refernce external dta.
+
+    struct set_off_type
+    {
+      template <typename T>
+      void operator()(const T* p, const T* p_end, typed_value& dest)
+      {
+        std:;size_t sz = p_end - p;
+        dest.sparse_size_ = 0;
+        std::size_t offset_max = 0;
+        std::size_t last_off = 0;
+        for (std::size_t i = 0; i < sz; ++i)
+        {
+          if (p[i])
+          {
+            std::size_t off = i - last_off;
+            last_off = i + 1;
+            if (off > offset_max)
+              offset_max = off;
+            ++dest.sparse_size_;
+          }
+        }
+
+        dest.off_type_ = type_code_ignore_missing(static_cast<std::int64_t>(offset_max));
+      }
+    };
+
+    struct fill_sparse_data
+    {
+      template <typename ValT, typename OffT>
+      void operator()(ValT* p, ValT* p_end, OffT* off_p, const char* src_p, std::size_t dense_sz)
+      {
+        const ValT* dense_p = (const ValT*)src_p;
+
+        std::size_t last_off = 0;
+        for (std::size_t i = 0; i < dense_sz; ++i)
+        {
+          if (dense_p[i])
+          {
+            std::size_t off = i - last_off;
+            last_off = i + 1;
+
+            *(off_p++) = off;
+            *(p++) = dense_p[i];
+          }
+        }
+      }
+    };
+
+    bool copy_as_sparse(typed_value& dest) const
+    {
+      if (off_ptr_)
+      {
+        dest = *this;
+      }
+      else if (val_ptr_)
+      {
+
+        capply(set_off_type(), std::ref(dest));
+
+        dest.val_type_ = val_type_;
+        dest.size_ = size_;
+
+        dest.local_data_.resize(dest.sparse_size_ * (1u << bcf_type_shift[dest.off_type_]) + dest.sparse_size_ * (1u << bcf_type_shift[val_type_]));
+        dest.off_ptr_ = dest.local_data_.data();
+        dest.val_ptr_ = dest.local_data_.data() + dest.sparse_size_ * (1u << bcf_type_shift[dest.off_type_]);
+
+
+        dest.apply_sparse(fill_sparse_data(), val_ptr_, size_);
+
+      }
+
+      return true;
+    }
 
     bool copy_as_dense(typed_value& dest) const
     {
@@ -1835,6 +1911,41 @@ namespace savvy
       src.sparse_size_ = 0;
       src.val_ptr_ = nullptr;
       src.off_ptr_ = nullptr;
+    }
+    return *this;
+  }
+
+//  inline
+//  void typed_value::swap(typed_value& other)
+//  {
+//    std::swap(val_type_, other.val_type_);
+//    std::swap(off_type_, other.off_type_);
+//    std::swap(size_, other.size_);
+//    std::swap(sparse_size_, other.sparse_size_);
+//    std::swap(val_ptr_, other.val_ptr_);
+//    std::swap(off_ptr_, other.off_ptr_);
+//    local_data_.swap(other.local_data_);
+//  }
+
+  inline
+  typed_value& typed_value::operator=(const typed_value& src)
+  {
+    if (&src != this)
+    {
+      val_type_ = src.val_type_;
+      off_type_ = src.off_type_;
+      size_ = src.size_;
+      sparse_size_ = src.sparse_size_;
+
+      std::size_t off_width = off_type_ ? 1u << bcf_type_shift[off_type_] : 0;
+      std::size_t val_width = val_type_ ?  1u << bcf_type_shift[val_type_] : 0;
+      std::size_t sz = off_type_ ? sparse_size_ : size_;
+      local_data_.resize(off_width * sz + val_width * sz);
+      off_ptr_ = off_type_ ? local_data_.data() : nullptr;
+      val_ptr_ = val_type_ ? local_data_.data() + off_width * sz : nullptr;
+
+      std::memcpy(off_ptr_, src.off_ptr_, off_width * sz);
+      std::memcpy(val_ptr_, src.val_ptr_, val_width * sz);
     }
     return *this;
   }

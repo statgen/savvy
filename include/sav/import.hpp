@@ -8,5 +8,6 @@
 #define SAVVY_SAV_IMPORT_HPP
 
 int import_main(int argc, char** argv);
+int import_main2(int argc, char** argv);
 
 #endif //SAVVY_SAV_IMPORT_HPP

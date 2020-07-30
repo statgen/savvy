@@ -62,9 +62,9 @@ std::vector<std::string> split_string_to_vector(const char* in, char delim)
   return ret;
 }
 
-std::set<std::string> split_string_to_set(const char* in, char delim)
+std::unordered_set<std::string> split_string_to_set(const char* in, char delim)
 {
-  std::set<std::string> ret;
+  std::unordered_set<std::string> ret;
   const char* d = nullptr;
   std::string token;
   const char* s = in;
@@ -78,9 +78,9 @@ std::set<std::string> split_string_to_set(const char* in, char delim)
   return ret;
 }
 
-std::set<std::string> split_file_to_set(const char* in)
+std::unordered_set<std::string> split_file_to_set(const char* in)
 {
-  std::set<std::string> ret;
+  std::unordered_set<std::string> ret;
 
   std::string s;
   std::ifstream ifs(in);

@@ -354,10 +354,12 @@ namespace savvy
       bool get_format(const std::string& key, T& destination_vector) const;
 
       template<typename T>
-      void set_format(const std::string& key, const std::vector<T>& geno, std::set<std::string> sparse_keys = {"GT", "EC", "DS", "HDS"});
+      void set_format(const std::string& key, const std::vector<T>& geno/*, std::set<std::string> sparse_keys = {"GT", "EC", "DS", "HDS"}*/);
 
       template<typename T>
       void set_format(const std::string& key, const compressed_vector <T>& geno);
+
+      void set_format(const std::string& key, typed_value&& val);
     private:
       template <typename OutT>
       static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers);
@@ -797,7 +799,10 @@ namespace savvy
       if (site_info::deserialize(v, dict))
       {
         auto indiv_it = v.indiv_buf_.begin();
+        v.format_fields_.reserve(v.n_fmt_ + 1);
         v.format_fields_.resize(v.n_fmt_);
+
+        typed_value ph_value;
 
         auto fmt_it = v.format_fields_.begin();
         for (; fmt_it != v.format_fields_.end(); ++fmt_it)
@@ -870,9 +875,8 @@ namespace savvy
                 // TODO: save phases when partially phased.
                 if (phased == phasing::unknown || phased == phasing::partial)
                 {
-                  typed_value ph_value(typed_value::int8, (sz / sample_size - 1) * sample_size, nullptr);
+                  ph_value = typed_value(typed_value::int8, (sz / sample_size - 1) * sample_size, nullptr);
                   fmt_it->second.apply(typed_value::bcf_gt_decoder(), (std::int8_t*)ph_value.val_ptr_, sz / sample_size);
-                  v.format_fields_.insert(fmt_it + 1, std::make_pair("PH", std::move(ph_value)));
                 }
                 else
                 {
@@ -890,7 +894,11 @@ namespace savvy
         }
 
         if (fmt_it == v.format_fields_.end())
+        {
+          if (v.format_fields_.size() && ph_value.size())
+            v.format_fields_.insert(v.format_fields_.begin() + 1, std::make_pair("PH", std::move(ph_value)));
           return true;
+        }
       }
 
       std::fprintf(stderr, "Error: Invalid record data\n");
@@ -1001,7 +1009,7 @@ namespace savvy
         auto fmt_id_it = dict.str_to_int[dictionary::id].find(*it);
         if (fmt_id_it == dict.str_to_int[dictionary::id].end() || fmt_id_it->second >= dict.entries[dictionary::id].size())
         {
-          std::fprintf(stderr, "Error: FMT key not in header: %s\n", it->c_str());
+          std::fprintf(stderr, "Error: FMT key '%s' not in header\n", it->c_str());
           return false;
         }
 
@@ -1139,6 +1147,11 @@ namespace savvy
         if (ph_value.size())
           v.format_fields_.insert(v.format_fields_.begin() + 1, std::make_pair("PH", std::move(ph_value)));
 
+        if (v.format_fields().empty() || !v.format_fields().front().second.val_ptr_)
+        {
+          auto a = 0;
+        }
+
         return true;
       }
       return false;
@@ -1154,7 +1167,7 @@ namespace savvy
         auto res = dict.str_to_int[dictionary::id].find(it->first);
         if (res == dict.str_to_int[dictionary::id].end())
         {
-          std::fprintf(stderr, "Error: FMT key not in header\n");
+          std::fprintf(stderr, "Error: FMT key '%s' not in header\n", it->first.c_str());
           return false;
         }
 
@@ -1209,19 +1222,25 @@ namespace savvy
     }
 
     template <typename T>
-    void variant::set_format(const std::string& key, const std::vector<T>& geno, std::set<std::string> sparse_keys)
+    void variant::set_format(const std::string& key, const std::vector<T>& geno/*, std::set<std::string> sparse_keys*/)
     {
       auto it = format_fields_.begin();
       for ( ; it != format_fields_.end(); ++it)
       {
         if (it->first == key)
         {
+          if (geno.size() == 0)
+          {
+            format_fields_.erase(it);
+            return;
+          }
+
           it->second = geno;
           return;
         }
       }
 
-      if (it == format_fields_.end())
+      if (it == format_fields_.end() && geno.size())
       {
         format_fields_.emplace_back(key, geno);
       }
@@ -1237,14 +1256,45 @@ namespace savvy
       {
         if (it->first == key)
         {
+          if (geno.size() == 0)
+          {
+            format_fields_.erase(it);
+            return;
+          }
+
           it->second = geno;
           return;
         }
       }
 
-      if (it == format_fields_.end())
+      if (it == format_fields_.end() && geno.size())
       {
         format_fields_.emplace_back(key, geno);
+      }
+    }
+
+    inline
+    void variant::set_format(const std::string& key, typed_value&& val)
+    {
+      auto it = format_fields_.begin();
+      for ( ; it != format_fields_.end(); ++it)
+      {
+        if (it->first == key)
+        {
+          if (val.size() == 0)
+          {
+            format_fields_.erase(it);
+            return;
+          }
+
+          it->second = std::move(val);
+          return;
+        }
+      }
+
+      if (it == format_fields_.end() && val.size())
+      {
+        format_fields_.emplace_back(key, std::move(val));
       }
     }
   }

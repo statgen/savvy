@@ -28,8 +28,8 @@ private:
 
 
   std::vector<option> long_options_;
-  std::set<std::string> subset_ids_;
-  std::set<std::string> fields_to_generate_;
+  std::unordered_set<std::string> subset_ids_;
+  std::unordered_set<std::string> fields_to_generate_;
   std::vector<savvy::genomic_region> regions_;
   std::unique_ptr<savvy::slice_bounds> slice_;
   std::vector<std::string> info_fields_;
@@ -84,8 +84,8 @@ public:
   const std::string& index_path() const { return index_path_; }
   const std::string& headers_path() const { return headers_path_; }
   const filter& filter_functor() const { return filter_; }
-  const std::set<std::string>& subset_ids() const { return subset_ids_; }
-  const std::set<std::string>& fields_to_generate() const { return fields_to_generate_; }
+  const std::unordered_set<std::string>& subset_ids() const { return subset_ids_; }
+  const std::unordered_set<std::string>& fields_to_generate() const { return fields_to_generate_; }
   const std::vector<savvy::genomic_region>& regions() const { return regions_; }
   const std::vector<std::string>& info_fields() const { return info_fields_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
@@ -621,7 +621,7 @@ int export_records(savvy::sav::reader& in, const export_prog_args& args, Writer&
     if (args.update_info())
       savvy::update_info_fields(variant, genotypes, args.format());
 
-    set_info(variant, genotypes, args.fields_to_generate(), args.format());
+    set_info(variant, genotypes, {args.fields_to_generate().begin(), args.fields_to_generate().end()}, args.format());
 
     out.write(variant, args.sites_only_is_set() ? Vec() : genotypes);
   }
@@ -642,7 +642,7 @@ int export_records(savvy::sav::indexed_reader& in, const export_prog_args& args,
     if (args.update_info())
       savvy::update_info_fields(variant, genotypes, args.format());
 
-    set_info(variant, genotypes, args.fields_to_generate(), args.format());
+    set_info(variant, genotypes, {args.fields_to_generate().begin(), args.fields_to_generate().end()}, args.format());
 
     out.write(variant, genotypes);
   }
@@ -657,7 +657,7 @@ int export_records(savvy::sav::indexed_reader& in, const export_prog_args& args,
         if (args.update_info())
           savvy::update_info_fields(variant, genotypes, args.format());
 
-        set_info(variant, genotypes, args.fields_to_generate(), args.format());
+        set_info(variant, genotypes, {args.fields_to_generate().begin(), args.fields_to_generate().end()}, args.format());
 
         out.write(variant, genotypes);
       }
@@ -692,7 +692,7 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
   std::vector<std::string> sample_ids(input.samples().size());
   std::copy(input.samples().begin(), input.samples().end(), sample_ids.begin());
   if (args.subset_ids().size())
-    sample_ids = input.subset_samples(args.subset_ids());
+    sample_ids = input.subset_samples({args.subset_ids().begin(), args.subset_ids().end()});
 
   std::vector<std::pair<std::string, std::string>> headers;
   if (args.headers_path().empty())

@@ -250,7 +250,7 @@ private:
 
   static std::tuple<std::unique_ptr<expression>, bool> parse(std::string::iterator& cur, const std::string::iterator& end)
   {
-    using namespace savvy::detail;
+    using namespace ::savvy::detail;
 
     static const std::string selector_delims = "=<>!";
     static const std::string comparison_characters = "=<>!~";
@@ -286,7 +286,7 @@ private:
 
       ++cur;
       auto tmp = parse(cur, end);
-      return std::make_tuple(make_unique<logical_expression>(std::move(std::get<0>(sub_expr)), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp));
+      return std::make_tuple(::savvy::detail::make_unique<logical_expression>(std::move(std::get<0>(sub_expr)), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp));
     }
     else
     {
@@ -328,7 +328,7 @@ private:
       if (!is_valid_operand(right_operand))
         return std::make_tuple(make_unique<boolean_expression>(false), false);
 
-      auto cmpr_expr = make_unique<comparison_expression>(left_operand, comparison, right_operand);
+      auto cmpr_expr = ::savvy::detail::make_unique<comparison_expression>(left_operand, comparison, right_operand);
 
       if (delim == end)
       {
@@ -350,7 +350,7 @@ private:
 
       cur = delim + 1;
       auto tmp = parse(cur, end);
-      return std::make_tuple(make_unique<logical_expression>(std::move(cmpr_expr), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp));
+      return std::make_tuple(::savvy::detail::make_unique<logical_expression>(std::move(cmpr_expr), log_op, std::move(std::get<0>(tmp))), std::get<1>(tmp));
     }
   }
 private:

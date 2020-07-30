@@ -8,9 +8,9 @@
 #include "sav/import.hpp"
 #include "sav/sort.hpp"
 #include "sav/utility.hpp"
-#include "savvy/vcf_reader.hpp"
-#include "savvy/sav_reader.hpp"
+#include "savvy/reader.hpp"
 #include "savvy/savvy.hpp"
+#include "savvy/bcf_writer.hpp"
 
 #include <cstdlib>
 #include <getopt.h>
@@ -22,18 +22,19 @@
 class import_prog_args
 {
 private:
-  static const int default_compression_level = 3;
-  static const int default_block_size = 2048;
-
   std::vector<option> long_options_;
-  std::set<std::string> subset_ids_;
+  std::unordered_set<std::string> subset_ids_;
   std::vector<savvy::genomic_region> regions_;
+  std::unordered_set<std::string> pbwt_fields_;
+  std::unordered_set<std::string> sparse_fields_ = {"GT", "HDS", "EC", "DS"};
   std::string input_path_;
   std::string output_path_;
   std::string index_path_;
+  savvy::phasing phasing_ = savvy::phasing::unknown;
+  double sparse_threshold_ = 1.0;
   int update_info_ = -1;
   int compression_level_ = -1;
-  std::uint16_t block_size_ = default_block_size;
+  std::uint16_t block_size_ = savvy::v2::writer::default_block_size;
   bool help_ = false;
   bool index_ = false;
   savvy::fmt format_ = savvy::fmt::gt;
@@ -50,6 +51,8 @@ public:
         {"help", no_argument, 0, 'h'},
         {"index", no_argument, 0, 'x'},
         {"index-file", required_argument, 0, 'X'},
+        {"phasing", required_argument, 0, '\x01'},
+        {"pbwt-fields", required_argument, 0, '\x01'},
         {"regions", required_argument, 0, 'r'},
         {"regions-file", required_argument, 0, 'R'},
         {"sample-ids", required_argument, 0, 'i'},
@@ -57,6 +60,8 @@ public:
         {"skip-empty-vectors", no_argument, 0, '\x01'},
         {"sort", no_argument, 0, 's'},
         {"sort-point", required_argument, 0, 'S'},
+        {"sparse-fields", required_argument, 0, '\x01'},
+        {"sparse-threshold", required_argument, 0, '\x01'},
         {"update-info", required_argument, 0, '\x01'},
         {0, 0, 0, 0}
       })
@@ -66,7 +71,9 @@ public:
   const std::string& input_path() const { return input_path_; }
   const std::string& output_path() const { return output_path_; }
   const std::string& index_path() const { return index_path_; }
-  const std::set<std::string>& subset_ids() const { return subset_ids_; }
+  const std::unordered_set<std::string>& subset_ids() const { return subset_ids_; }
+  const std::unordered_set<std::string>& pbwt_fields() const { return pbwt_fields_; }
+  const std::unordered_set<std::string>& sparse_fields() const { return sparse_fields_; }
   const std::vector<savvy::genomic_region>& regions() const { return regions_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
@@ -74,6 +81,8 @@ public:
   savvy::bounding_point bounding_point() const { return bounding_point_; }
   const std::unique_ptr<savvy::s1r::sort_point>& sort_type() const { return sort_type_; }
   savvy::vcf::empty_vector_policy empty_vector_policy() const { return empty_vector_policy_; }
+  savvy::phasing phasing() { return phasing_; }
+  double sparse_threshold() { return sparse_threshold_; }
   bool update_info() const { return update_info_ != 0; }
   bool index_is_set() const { return index_; }
   bool help_is_set() const { return help_; }
@@ -82,22 +91,27 @@ public:
   {
     os << "Usage: sav import [opts ...] [in.{vcf,vcf.gz,bcf}] [out.sav]\n";
     os << "\n";
-    os << " -#                        Number (#) of compression level (1-19, default: " << default_compression_level << ")\n";
-    os << " -b, --block-size          Number of markers in compression block (0-65535, default: " << default_block_size << ")\n";
+    os << " -#                        Number (#) of compression level (1-19; default: " << savvy::v2::writer::default_compression_level << ")\n";
+    os << " -b, --block-size          Number of markers in compression block (0-65535; default: " << savvy::v2::writer::default_block_size << ")\n";
     os << " -d, --data-format         Format field to copy (GT or HDS, default: GT)\n";
     os << " -h, --help                Print usage\n";
     os << " -i, --sample-ids          Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file     Path to file containing list of sample IDs to subset\n";
-    os << " -p, --bounding-point      Determines the inclusion policy of indels during region queries (any, all, beg or end, default is beg)\n";
+    os << " -p, --bounding-point      Determines the inclusion policy of indels during region queries (any, all, beg, or end; default is beg)\n";
     os << " -r, --regions             Comma separated list of regions formated as chr[:start-end]\n";
     os << " -R, --regions-file        Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
     os << " -s, --sort                Enables sorting by first position of allele\n";
-    os << " -S, --sort-point          Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
+    os << " -S, --sort-point          Enables sorting and specifies which allele position to sort by (beg, mid, or end)\n";
     os << " -x, --index               Enables indexing\n";
     os << " -X, --index-file          Enables indexing and specifies index output file\n";
     os << "\n";
+    os << "     --phasing             Sets file phasing status if phasing header is not present (none, full, or partial)\n";
+    os << "     --pbwt-fields         Comma separated list of FORMAT fields to make sparse (default: GT,HDS,DS,EC)\n";
     os << "     --skip-empty-vectors  Skips variants that don't contain the request data format (By default, the import fails)\n";
-    os << "     --update-info      Specifies whether AC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
+    os << "     --update-info         Specifies whether AC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
+    os << "     --sparse-fields       Comma separated list of FORMAT fields for which to enable PBWT sorting\n";
+    os << "     --pbwt-threshold      Non-zero frequency threshold for which sparse fields are encoded as sparse vectors (default: 1.0)\n";
+
     os << std::flush;
   }
 
@@ -112,9 +126,39 @@ public:
       {
         case '\x01':
         {
-          if (std::string(long_options_[long_index].name) == "skip-empty-vectors")
+          if (strcmp(long_options_[long_index].name, "skip-empty-vectors") == 0)
           {
             empty_vector_policy_ = savvy::vcf::empty_vector_policy::skip;
+            break;
+          }
+          else if (strcmp(long_options_[long_index].name, "phasing") == 0)
+          {
+            if (strcmp(optarg, "full") == 0)
+              phasing_ = savvy::phasing::full;
+            else if (strcmp(optarg, "none") == 0)
+              phasing_ = savvy::phasing::none;
+            else if (strcmp(optarg, "partial") == 0)
+              phasing_ = savvy::phasing::partial;
+            else
+            {
+              std::cerr << "Invalid --phasing argument (" << optarg << ")\n";
+              return false;
+            }
+            break;
+          }
+          else if (strcmp(long_options_[long_index].name, "pbwt-fields") == 0)
+          {
+            pbwt_fields_ = split_string_to_set(optarg, ',');
+            break;
+          }
+          else if (strcmp(long_options_[long_index].name, "sparse-fields") == 0)
+          {
+            sparse_fields_ = split_string_to_set(optarg, ',');
+            break;
+          }
+          else if (strcmp(long_options_[long_index].name, "sparse-threshold") == 0)
+          {
+            sparse_threshold_ = std::atof(optarg);
             break;
           }
           std::cerr << "Invalid long only index (" << long_index << ")\n";
@@ -290,7 +334,7 @@ public:
     }
 
     if (compression_level_ < 0)
-      compression_level_ = default_compression_level;
+      compression_level_ = savvy::v2::writer::default_compression_level;
     else if (compression_level_ > 19)
       compression_level_ = 19;
 
@@ -361,7 +405,7 @@ int prep_reader_for_import(T& input, const import_prog_args& args)
   std::vector<std::string> sample_ids(input.samples().size());
   std::copy(input.samples().begin(), input.samples().end(), sample_ids.begin());
   if (args.subset_ids().size())
-    sample_ids = input.subset_samples(args.subset_ids());
+    sample_ids = input.subset_samples({args.subset_ids().begin(), args.subset_ids().end()});
 
   if (input.good())
   {
@@ -420,5 +464,100 @@ int import_main(int argc, char** argv)
   {
     savvy::vcf::reader<1> input(args.input_path(), args.format());
     return prep_reader_for_import(input, args);
+  }
+}
+
+int import_main2(int argc, char** argv)
+{
+  import_prog_args args;
+  if (!args.parse(argc, argv))
+  {
+    args.print_usage(std::cerr);
+    return EXIT_FAILURE;
+  }
+
+  if (args.help_is_set())
+  {
+    args.print_usage(std::cout);
+    return EXIT_SUCCESS;
+  }
+
+
+  if (args.regions().size())
+  {
+    fprintf(stderr, "Error: indexed import not yet implemented\n");
+    return EXIT_FAILURE;
+//    savvy::vcf::indexed_reader<1> input(args.input_path(), args.regions().front(), args.bounding_point(), args.format());
+//    return prep_reader_for_import(input, args);
+  }
+  else
+  {
+    savvy::v2::variant var;
+    savvy::typed_value tmp_val;
+    savvy::v2::reader input(args.input_path());
+
+    if (!input)
+    {
+      fprintf(stderr, "Error: could not open file %s\n", args.input_path().c_str());
+      return EXIT_FAILURE;
+    }
+
+    auto hdrs = input.headers();
+
+    if (input.phasing_status() == savvy::phasing::unknown)
+    {
+      if (args.phasing() == savvy::phasing::unknown)
+      {
+        fprintf(stderr, "Error: phasing header not present, so --phasing must be specified\n");
+        return EXIT_FAILURE;
+      }
+
+      std::string status;
+      if (args.phasing() == savvy::phasing::none) status = "none";
+      else if (args.phasing() == savvy::phasing::partial) status = "partial";
+      else status = "full";
+
+      hdrs.emplace_back("phasing", status);
+    }
+
+    if (args.pbwt_fields().size()) // TODO: check if PBWT headers already exist
+    {
+      hdrs.emplace_back("INFO", "<ID=_PBWT_RESET, Type=Flag>");
+      for (const auto& f : args.pbwt_fields())
+        hdrs.emplace_back("INFO", "<ID=_PBWT_SORT_" + f + ", Type=Flag, Format=" + f + ">");
+    }
+
+    if (args.subset_ids().size())
+    {
+      input.make_sample_subset(args.subset_ids());
+    }
+    else
+    {
+      savvy::v2::writer output(args.output_path(), savvy::file::format::sav2, hdrs, input.samples(), args.compression_level());
+      output.set_block_size(args.block_size());
+
+      std::size_t cnt = 0;
+      while (output && input >> var)
+      {
+        for (auto it = var.format_fields().begin(); it != var.format_fields().end(); ++it)
+        {
+          if (args.sparse_fields().find(it->first) != args.sparse_fields().end())
+          {
+            it->second.copy_as_sparse(tmp_val);
+            if (tmp_val.size() && static_cast<double>(tmp_val.non_zero_size()) / tmp_val.size() <= args.sparse_threshold())
+              var.set_format(it->first, std::move(tmp_val));
+          }
+        }
+
+        var.set_format("PH", {});
+
+        output << var;
+        ++cnt;
+      }
+
+      return output.good() && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
   }
 }

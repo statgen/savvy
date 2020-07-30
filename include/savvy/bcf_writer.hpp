@@ -55,6 +55,9 @@ namespace savvy
 
     class writer : public file
     {
+    public:
+      static const int default_compression_level = 3;
+      static const int default_block_size = 2048;
     private:
       format file_format_;
       std::mt19937_64 rng_;
@@ -70,7 +73,7 @@ namespace savvy
       // Data members to support indexing
       std::unique_ptr<s1r::writer> index_file_;
       std::string current_chromosome_;
-      std::size_t block_size_ = 4096;
+      std::size_t block_size_ = default_block_size;
       std::size_t record_count_ = 0;
       std::size_t record_count_in_block_ = 0;
       std::uint32_t current_block_min_ = std::numeric_limits<std::uint32_t>::max();
@@ -83,7 +86,7 @@ namespace savvy
       static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, format file_format, std::uint8_t compression_level);
 
     public:
-      writer(const std::string& file_path, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, file::format file_format, std::uint8_t compression_level = 3);
+      writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level = default_compression_level);
 
       ~writer();
 
@@ -132,7 +135,7 @@ namespace savvy
     }
 
     inline
-    writer::writer(const std::string& file_path, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, file::format file_format, std::uint8_t compression_level) :
+    writer::writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level) :
       file_format_(file_format),
       rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t) this),
       output_buf_(create_out_streambuf(file_path, file_format_, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
@@ -351,11 +354,16 @@ namespace savvy
     {
       std::string magic = {'S', 'A', 'V', '\x02', '\x00'};
 
+      dict_.str_to_int[dictionary::id]["PASS"] = dict_.entries[dictionary::id].size();
+      dict_.entries[dictionary::id].emplace_back(dictionary::entry{"PASS", "", 0});
+
+      bool gt_present{}, ph_present{};
+
       std::uint32_t header_block_sz = 0;
       for (auto it = headers.begin(); it != headers.end(); ++it)
       {
         auto hval = parse_header_value(it->second);
-        if (!hval.id.empty())
+        if (!hval.id.empty() && hval.id != "PASS")
         {
           int which_dict = it->first == "contig" ? dictionary::contig : dictionary::id;
 
@@ -371,8 +379,9 @@ namespace savvy
             else if (hval.type == "String")
               e.type = typed_value::str;
 
+
+            dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size();
             dict_.entries[which_dict].emplace_back(std::move(e));
-            dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size() - 1;
           }
         }
 
@@ -412,12 +421,25 @@ namespace savvy
               if (hval.type != "String")
                 it->second = "<ID=GT, Type=String, Number=1, Description=\"Genotype\">";
             }
+
+            gt_present = true;
+          }
+          else if (hval.id == "PH")
+          {
+            ph_present = true;
           }
         }
 
         header_block_sz += it->first.size();
         header_block_sz += it->second.size();
         header_block_sz += 4;
+      }
+
+      if ((phasing_ == phasing::unknown || phasing_ == phasing::partial) && gt_present && !ph_present) // TODO: potentially make unkkown = none
+      {
+        headers.emplace_back("FORMAT", "<ID=PH, Type=Integer, Number=., Description=\"Genotype phase\">");
+        dict_.str_to_int[dictionary::id]["PH"] = dict_.entries[dictionary::id].size();
+        dict_.entries[dictionary::id].emplace_back(dictionary::entry{"PH", ".", typed_value::int8});
       }
 
       std::string column_names = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";

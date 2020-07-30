@@ -8,7 +8,7 @@
 #include "savvy/reader.hpp"
 #include "savvy/savvy.hpp"
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <getopt.h>
 
 #include <fstream>

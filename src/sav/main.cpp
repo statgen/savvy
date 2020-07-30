@@ -112,6 +112,10 @@ int main(int argc, char** argv)
   {
     return import_main(argc, argv);
   }
+  else if (args.sub_command() == "import2")
+  {
+    return import_main2(argc, argv);
+  }
   else if (args.sub_command() == "index")
   {
     return index_main(argc, argv);

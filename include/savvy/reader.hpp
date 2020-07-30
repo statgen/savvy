@@ -337,11 +337,13 @@ namespace savvy
        * @param subset IDs to include if they exist in file.
        * @return subset context to be used with typed_value::get().
        */
-      sample_subset make_sample_subset(const std::set<std::string>& subset);
+      sample_subset make_sample_subset(const std::unordered_set<std::string>& subset);
 
       reader& reset_bounds(genomic_region reg);
+      phasing phasing_status() { return phasing_; }
 
       bool good() const { return this->input_stream_->good(); }
+      bool bad() const { return this->input_stream_->bad(); }
 
       reader& read(variant& r);
       reader& operator>>(variant& r) { return read(r); }
@@ -366,6 +368,11 @@ namespace savvy
     {
 
       FILE* fp = fopen(file_path.c_str(), "rb");
+      if (!fp)
+      {
+        input_stream_ = savvy::detail::make_unique<std::istream>(nullptr);
+        return;
+      }
 
       int first_byte = fgetc(fp);
       ungetc(first_byte, fp);
@@ -389,7 +396,7 @@ namespace savvy
     }
 
     inline
-    sample_subset reader::make_sample_subset(const std::set<std::string>& subset)
+    sample_subset reader::make_sample_subset(const std::unordered_set<std::string>& subset)
     {
       std::vector<std::string> ret;
       ret.reserve(std::min(subset.size(), ids_.size()));
@@ -826,9 +833,11 @@ namespace savvy
         else if (hval.type == "String")
           e.type = typed_value::str;
 
-
-        dict_.entries[which_dict].emplace_back(std::move(e));
-        dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size() - 1;
+        if (dict_.str_to_int[which_dict].find(hval.id) == dict_.str_to_int[which_dict].end())
+        {
+          dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size();
+          dict_.entries[which_dict].emplace_back(std::move(e));
+        }
       }
 
       if (key == "INFO")
