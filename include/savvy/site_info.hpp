@@ -1217,7 +1217,7 @@ namespace savvy
     {
       auto res = std::find_if(format_fields_.begin(), format_fields_.end(), [&key](const std::pair<std::string, savvy::typed_value>& v) { return v.first == key;});
       if (res != format_fields_.end())
-        return res->second >> destination_vector;
+        return res->second.get(destination_vector);
       return false;
     }
 

@@ -42,6 +42,8 @@ namespace savvy
             ret.number = val;
           else if (key == "Description")
             ret.description = val;
+          else if (key == "IDX")
+            ret.idx = val;
         }
 
         curr_pos = comma_pos + 1;
@@ -62,6 +64,8 @@ namespace savvy
           ret.number = val;
         else if (key == "Description")
           ret.description = val;
+        else if (key == "IDX")
+          ret.idx = val;
       }
     }
 

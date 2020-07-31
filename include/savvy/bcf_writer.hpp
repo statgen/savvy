@@ -365,9 +365,12 @@ namespace savvy
         auto hval = parse_header_value(it->second);
         if (!hval.id.empty() && hval.id != "PASS")
         {
-          int which_dict = it->first == "contig" ? dictionary::contig : dictionary::id;
+          int which_dict = -1;
+          if (it->first == "contig") which_dict = dictionary::contig;
+          else if (it->first == "INFO" || it->first == "FILTER" || it->first == "FORMAT") which_dict = dictionary::id;
+          else if (it->first == "SAMPLE") which_dict = dictionary::sample;
 
-          if (dict_.str_to_int[which_dict].find(hval.id) == dict_.str_to_int[which_dict].end())
+          if (which_dict >= 0 && dict_.str_to_int[which_dict].find(hval.id) == dict_.str_to_int[which_dict].end())
           {
             dictionary::entry e;
             e.id = hval.id;
@@ -438,6 +441,11 @@ namespace savvy
       if ((phasing_ == phasing::unknown || phasing_ == phasing::partial) && gt_present && !ph_present) // TODO: potentially make unkkown = none
       {
         headers.emplace_back("FORMAT", "<ID=PH, Type=Integer, Number=., Description=\"Genotype phase\">");
+
+        header_block_sz += headers.back().first.size();
+        header_block_sz += headers.back().second.size();
+        header_block_sz += 4;
+
         dict_.str_to_int[dictionary::id]["PH"] = dict_.entries[dictionary::id].size();
         dict_.entries[dictionary::id].emplace_back(dictionary::entry{"PH", ".", typed_value::int8});
       }

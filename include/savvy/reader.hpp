@@ -821,20 +821,29 @@ namespace savvy
       auto hval = parse_header_value(val);
       if (!hval.id.empty())
       {
-        int which_dict = key == "contig" ? dictionary::contig : dictionary::id;
+        int which_dict = -1;
+        if (key == "contig") which_dict = dictionary::contig;
+        else if (key == "INFO" || key == "FILTER" || key == "FORMAT") which_dict = dictionary::id;
+        else if (key == "SAMPLE") which_dict = dictionary::sample;
 
-        dictionary::entry e;
-        e.id = hval.id;
-        e.number = hval.number; // TODO: handle special character values.
-        if (hval.type == "Integer")
-          e.type = typed_value::int32;
-        else if (hval.type == "Float")
-          e.type = typed_value::real;
-        else if (hval.type == "String")
-          e.type = typed_value::str;
-
-        if (dict_.str_to_int[which_dict].find(hval.id) == dict_.str_to_int[which_dict].end())
+        if (which_dict >= 0 && dict_.str_to_int[which_dict].find(hval.id) == dict_.str_to_int[which_dict].end())
         {
+          dictionary::entry e;
+          e.id = hval.id;
+          e.number = hval.number; // TODO: handle special character values.
+          if (hval.type == "Integer")
+            e.type = typed_value::int32;
+          else if (hval.type == "Float")
+            e.type = typed_value::real;
+          else if (hval.type == "String")
+            e.type = typed_value::str;
+
+          if (!hval.idx.empty())
+          {
+            std::size_t idx = std::atoi(hval.idx.c_str());
+            dict_.entries[which_dict].resize(idx, {"DELETED", "", 0});
+          }
+
           dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size();
           dict_.entries[which_dict].emplace_back(std::move(e));
         }

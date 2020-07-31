@@ -621,23 +621,29 @@ namespace savvy
       template <typename T>
       void operator()(T* valp, T* endp)
       {
+        const T end_of_vector_val = std::numeric_limits<T>::min() + 1;
+        const T missing_val = std::numeric_limits<T>::min();
+
         for ( ; valp != endp; ++valp)
         {
-          if (*valp == std::numeric_limits<T>::min() + 1) return;
+          if (*valp == end_of_vector_val) return;
           *valp = T(unsigned(*valp) >> 1u) - 1;
           if (*valp == -1)
-            *valp = std::numeric_limits<T>::min();
+            *valp = missing_val;
         }
       }
 
       template <typename T>
       void operator()(T* valp, T* endp, std::int8_t* phasep, std::size_t stride)
       {
+        const T end_of_vector_val = std::numeric_limits<T>::min() + 1;
+        const T missing_val = std::numeric_limits<T>::min();
+
         for (std::size_t i = 0; valp != endp; ++valp,++i)
         {
           std::int8_t ph;
 
-          if (*valp == std::numeric_limits<T>::min() + 1)
+          if (*valp == end_of_vector_val)
           {
             ph = std::int8_t(0x81);
           }
@@ -646,7 +652,7 @@ namespace savvy
             ph = 0x1 & *valp;
             *valp = T(unsigned(*valp) >> 1u) - 1;
             if (*valp == -1)
-              *valp = std::numeric_limits<T>::min();
+              *valp = missing_val;
           }
 
           if (i % stride)
@@ -802,11 +808,11 @@ namespace savvy
 
     bool copy_as_sparse(typed_value& dest) const
     {
-      if (off_ptr_)
+      if (off_type_)
       {
         dest = *this;
       }
-      else if (val_ptr_)
+      else if (val_type_)
       {
 
         capply(set_off_type(), std::ref(dest));
@@ -828,7 +834,7 @@ namespace savvy
 
     bool copy_as_dense(typed_value& dest) const
     {
-      if (off_ptr_)
+      if (off_type_)
       {
         dest.local_data_.resize(0);
         dest.local_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
@@ -864,7 +870,7 @@ namespace savvy
           return false;
         }
       }
-      else if (val_ptr_)
+      else if (val_type_)
       {
         dest.local_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
         switch (val_type_)
@@ -1218,7 +1224,7 @@ namespace savvy
 
       if (val_type_ == 0x07u) return false;
 
-      if (off_ptr_)
+      if (off_type_)
       {
         dest.resize(0);
         dest.resize(size_);
@@ -1238,7 +1244,7 @@ namespace savvy
           return false;
         }
       }
-      else if (val_ptr_)
+      else if (val_type_)
       {
         dest.resize(size_);
         switch (val_type_)
@@ -1331,13 +1337,13 @@ namespace savvy
       if (val_type_ != 0x07u && size_ % subset.mask().size() == 0)
       {
         std::size_t stride = size_ % subset.mask().size();
-        if (off_ptr_)
+        if (off_type_)
         {
           dest.resize(0);
           dest.resize(subset.ids().size() * stride);
           return capply_sparse(subset_samples_functor(), subset.mask(), stride, dest); // TODO: handle endianess
         }
-        else if (val_ptr_)
+        else if (val_type_)
         {
           dest.resize(subset.ids().size() * stride);
           return capply(subset_samples_functor(), subset.mask(), dest); // TODO: handle endianess
@@ -1354,7 +1360,7 @@ namespace savvy
 
       if (val_type_ == 0x07u) return false;
 
-      if (off_ptr_)
+      if (off_type_)
       {
         // TODO: support relative offsets
         dest.resize(0);
@@ -1477,7 +1483,7 @@ namespace savvy
 
         return true;
       }
-      else if (val_ptr_)
+      else if (val_type_)
       {
         //dest.resize(0);
         switch (val_type_)

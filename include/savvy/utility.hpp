@@ -135,6 +135,7 @@ namespace savvy
     std::string type;
     std::string number;
     std::string description;
+    std::string idx;
   };
   header_value_details parse_header_value(std::string header_value);
   std::string parse_header_sub_field(std::string header_value, std::string field_to_parse);

@@ -549,8 +549,6 @@ int import_main2(int argc, char** argv)
           }
         }
 
-        var.set_format("PH", {});
-
         output << var;
         ++cnt;
       }
