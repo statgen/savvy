@@ -257,6 +257,50 @@ int eval_gt(Itr paths_beg, Itr paths_end)
       float avg = std::accumulate(read_times.begin(), read_times.end(), 0.) / read_times.size();
       std::cout << "\t" << avg << "\t" << input_path << "\tsavvy" << std::endl;
     }
+
+    if (savvy::detail::has_extension(input_path, ".sav"))
+    {
+      struct stat st;
+      std::cout << (stat(input_path.c_str(), &st) == 0 ? st.st_size : -1);
+
+      std::vector<std::int64_t> read_times;
+      read_times.reserve(n_iterations);
+      for (std::size_t i = 0; i <= n_iterations; ++i)
+      {
+        auto start = steady_clock::now();
+        savvy::v2::variant var;
+        savvy::v2::reader rdr(input_path);
+        std::size_t cnt = 0;
+        savvy::compressed_vector<int> geno;
+
+        if (i == 0)
+        {
+          std::uint32_t cs = 1;
+          while (rdr.read(var))
+          {
+            var.get_format("GT", geno);
+            cs = adler32(geno.begin(), geno.end(), cs);
+            ++cnt;
+          }
+          std::cout << "\t" << cs;
+        }
+        else
+        {
+
+          while (rdr.read(var))
+          {
+            var.get_format("GT", geno);
+            ++cnt;
+          }
+
+          read_times.emplace_back(duration_cast<milliseconds>(steady_clock::now() - start).count());
+          std::cout << "\t" << read_times.back();
+        }
+      }
+
+      float avg = std::accumulate(read_times.begin(), read_times.end(), 0.) / read_times.size();
+      std::cout << "\t" << avg << "\t" << input_path << "\tsavvy sparse" << std::endl;
+    }
   }
 
   return EXIT_SUCCESS;
