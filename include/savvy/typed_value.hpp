@@ -18,6 +18,7 @@
 #include <array>
 #include <cassert>
 #include <cstring>
+#include <functional>
 
 namespace savvy
 {

@@ -208,7 +208,7 @@ int eval_gt(Itr paths_beg, Itr paths_end)
         free(geno);
       }
 
-      float avg = std::accumulate(read_times.begin(), read_times.end(), 0.) / read_times.size();
+      auto avg = std::accumulate(read_times.begin(), read_times.end(), std::int64_t()) / read_times.size();
       std::cout << "\t" << avg << "\t" << input_path << "\thts" << std::endl;
     }
 //    else if (savvy::detail::has_extension(input_path, ".sav"))
@@ -254,7 +254,7 @@ int eval_gt(Itr paths_beg, Itr paths_end)
         }
       }
 
-      float avg = std::accumulate(read_times.begin(), read_times.end(), 0.) / read_times.size();
+      auto avg = std::accumulate(read_times.begin(), read_times.end(), std::int64_t()) / read_times.size();
       std::cout << "\t" << avg << "\t" << input_path << "\tsavvy" << std::endl;
     }
 
@@ -298,7 +298,7 @@ int eval_gt(Itr paths_beg, Itr paths_end)
         }
       }
 
-      float avg = std::accumulate(read_times.begin(), read_times.end(), 0.) / read_times.size();
+      auto avg = std::accumulate(read_times.begin(), read_times.end(), std::int64_t()) / read_times.size();
       std::cout << "\t" << avg << "\t" << input_path << "\tsavvy sparse" << std::endl;
     }
   }
