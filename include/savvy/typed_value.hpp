@@ -19,6 +19,7 @@
 #include <cassert>
 #include <cstring>
 #include <functional>
+#include <unordered_set>
 
 namespace savvy
 {
@@ -758,7 +759,7 @@ namespace savvy
 
     typed_value& operator=(typed_value&& src);
     typed_value& operator=(const typed_value& src);
-    //void swap(typed_value& src); // This is not a good idea since the pointers sometims refernce external dta.
+    //void swap(typed_value& src); // This is not a good idea since the pointers sometimes reference external data.
 
     struct set_off_type
     {
@@ -902,61 +903,74 @@ namespace savvy
       return true;
     }
 
-//    struct subset_functor
-//    {
-//      template <typename ValT, typename OffT>
-//      void operator()(ValT* val_ptr, ValT* val_end, OffT* off_ptr, const std::vector<std::size_t>& subset_map, std::size_t subset_size, typed_value& parent)
-//      {
-//        std::size_t stride = parent.size_ / subset_map.size();
-//        std::uint8_t max_off_type = offset_type_code(subset_size);
-//        std::uint8_t dest_off_type = parent.off_type_;
-//
-//        if (parent.sparse_size_)
-//        {
-//          std::size_t map_offset = 0;
-//          OffT* off_end = off_ptr + (val_end - val_ptr);
-//          std::size_t new_off = 0;
-//          for (OffT* off_it = off_ptr + 1; max_off_type > dest_off_type && off_it != off_end; ++off_it)
-//          {
-//            map_offset += *(off_it - 1);
-//            if (subset_map[map_offset] == std::numeric_limits<std::size_t>::max())
-//            {
-//              new_off = *(off_it - 1) + *off_it + 1;
-//              dest_off_type = offset_type_code(new_off);
-//            }
-//          }
-//        }
-//
-//      }
-//
-//      template <typename T>
-//      void operator()(T* valp, T* endp, const std::vector<std::size_t>& subset_map, std::size_t stride)
-//      {
-//        for (std::size_t i = 0; i < subset_map.size(); ++i)
-//        {
-//          if (subset_map[i] < std::numeric_limits<std::size_t>::max())
-//          {
-//            for (std::size_t j = 0; j < stride; ++j)
-//              valp[subset_map[i] * stride + j] = valp[i * stride + j];
-//          }
-//        }
-//      }
-//    };
-//
-//    bool subset(const std::vector<std::size_t>& subset_map)
-//    {
-//      if (!size_ || size_ % subset_map.size() != 0)
-//        return false;
-//
-//      std::size_t stride = size_ / subset_map.size();
-//
-//      if (off_ptr_)
-//        return apply_sparse(subset_functor(), subset_map, stride);
-//      else if (val_ptr_)
-//        return apply(subset_functor(), subset_map, stride);
-//
-//      return true;
-//    }
+
+
+    class dense_subset_functor
+    {
+    public:
+      dense_subset_functor(const std::unordered_set<std::string>& subset, const std::vector<std::string>& full_ids)
+      {
+        subset_ids_.reserve(std::min(subset.size(), full_ids.size()));
+        subset_map_.resize(full_ids.size(), std::numeric_limits<std::size_t>::max());
+
+        std::uint64_t subset_index = 0;
+        for (auto it = full_ids.begin(); it != full_ids.end(); ++it)
+        {
+          if (subset.find(*it) != subset.end())
+          {
+            subset_map_[std::distance(full_ids.begin(), it)] = subset_index;
+            subset_ids_.push_back(*it);
+            ++subset_index;
+          }
+        }
+      }
+
+      template <typename T>
+      bool operator()(T* valp, T* endp) const
+      {
+        std::size_t orig_sz = endp - valp;
+        if (!orig_sz || orig_sz % subset_map_.size() != 0)
+          return false;
+
+        if (!subset_ids_.empty())
+        {
+          std::size_t last_dest_idx = subset_ids_.size() - 1;
+
+          std::size_t stride = orig_sz / subset_map_.size();
+          for (std::size_t i = 0; i < subset_map_.size(); ++i)
+          {
+            if (subset_map_[i] < std::numeric_limits<std::size_t>::max())
+            {
+              for (std::size_t j = 0; j < stride; ++j)
+                valp[subset_map_[i] * stride + j] = valp[i * stride + j];
+
+              if (subset_map_[i] == last_dest_idx)
+                break;
+            }
+          }
+        }
+
+        return true;
+      }
+
+      const std::vector<std::string>& id_intersection() const { return subset_ids_; }
+    private:
+      std::vector<std::size_t> subset_map_;
+      std::vector<std::string> subset_ids_;
+    };
+
+    bool copy_as_dense(typed_value& dest, const dense_subset_functor& subset_fn) const
+    {
+      copy_as_dense(dest);
+
+      if (size_ == 0)
+        return true;
+
+      dest.apply(std::cref(subset_fn));
+      dest.size_ = subset_fn.id_intersection().size();
+
+      return true;
+    }
 
     template <typename ValT, typename Fn, typename... Args>
     bool apply_sparse_offsets(Fn fn, Args... args)
@@ -1910,7 +1924,7 @@ namespace savvy
       sparse_size_ = src.sparse_size_;
       val_ptr_ = src.val_ptr_;
       off_ptr_ = src.off_ptr_;
-      local_data_ = std::move(src.local_data_);
+      local_data_ .swap(src.local_data_); // src may be reused, so keep src.local_data_ valid by swapping.
 
       src.val_type_ = 0;
       src.off_type_ = 0;

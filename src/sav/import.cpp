@@ -504,6 +504,7 @@ int import_main2(int argc, char** argv)
 
     auto hdrs = input.headers();
 
+    bool remove_ph = input.phasing_status() != savvy::phasing::partial;
     if (input.phasing_status() == savvy::phasing::unknown)
     {
       if (args.phasing() == savvy::phasing::unknown)
@@ -514,7 +515,7 @@ int import_main2(int argc, char** argv)
 
       std::string status;
       if (args.phasing() == savvy::phasing::none) status = "none";
-      else if (args.phasing() == savvy::phasing::partial) status = "partial";
+      else if (args.phasing() == savvy::phasing::partial) remove_ph = false, status = "partial";
       else status = "full";
 
       hdrs.emplace_back("phasing", status);
@@ -527,35 +528,43 @@ int import_main2(int argc, char** argv)
         hdrs.emplace_back("INFO", "<ID=_PBWT_SORT_" + f + ", Type=Flag, Format=" + f + ">");
     }
 
-    if (args.subset_ids().size())
+    if (input.phasing_status() == savvy::phasing::partial || args.phasing() == savvy::phasing::partial)
     {
-      input.make_sample_subset(args.subset_ids());
+      hdrs.emplace_back("FORMAT","<ID=PH, Type=Integer>");
     }
-    else
-    {
-      savvy::v2::writer output(args.output_path(), savvy::file::format::sav2, hdrs, input.samples(), args.compression_level());
-      output.set_block_size(args.block_size());
 
-      std::size_t cnt = 0;
-      while (output && input >> var)
+    // TODO: make args.subset_ids() a pointer to  allow for subsetting out all samples.
+    auto subset_fn = args.subset_ids().empty() ? nullptr : ::savvy::detail::make_unique<savvy::typed_value::dense_subset_functor>(args.subset_ids(), input.samples());
+
+    savvy::v2::writer output(args.output_path(), savvy::file::format::sav2, hdrs, subset_fn ? subset_fn->id_intersection() : input.samples(), args.compression_level());
+    output.set_block_size(args.block_size());
+
+    std::size_t cnt = 0;
+    while (output && input >> var)
+    {
+      if (remove_ph)
+        var.set_format("PH", {});
+
+      for (auto it = var.format_fields().begin(); it != var.format_fields().end(); ++it)
       {
-        for (auto it = var.format_fields().begin(); it != var.format_fields().end(); ++it)
+        if (subset_fn)
         {
-          if (args.sparse_fields().find(it->first) != args.sparse_fields().end())
-          {
-            it->second.copy_as_sparse(tmp_val);
-            if (tmp_val.size() && static_cast<double>(tmp_val.non_zero_size()) / tmp_val.size() <= args.sparse_threshold())
-              var.set_format(it->first, std::move(tmp_val));
-          }
+          it->second.copy_as_dense(tmp_val, *subset_fn);
+          var.set_format(it->first, std::move(tmp_val));
         }
 
-        output << var;
-        ++cnt;
+        if (args.sparse_fields().find(it->first) != args.sparse_fields().end())
+        {
+          it->second.copy_as_sparse(tmp_val);
+          if (tmp_val.size() && static_cast<double>(tmp_val.non_zero_size()) / tmp_val.size() <= args.sparse_threshold())
+            var.set_format(it->first, std::move(tmp_val)); // typed_value move operator implementation allows for reuse of tmp_val;
+        }
       }
 
-      return output.good() && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
+      output << var;
+      ++cnt;
     }
 
-    return EXIT_SUCCESS;
+    return output.good() && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
   }
 }
