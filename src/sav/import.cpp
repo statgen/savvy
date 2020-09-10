@@ -504,8 +504,11 @@ int import_main2(int argc, char** argv)
 
     auto hdrs = input.headers();
 
+    auto gt_present = std::find_if(input.format_headers().begin(), input.format_headers().end(),
+      [](const savvy::header_value_details& h) { return h.id == "GT"; }) != input.format_headers().end();
+
     bool remove_ph = input.phasing_status() != savvy::phasing::partial;
-    if (input.phasing_status() == savvy::phasing::unknown)
+    if (gt_present && input.phasing_status() == savvy::phasing::unknown)
     {
       if (args.phasing() == savvy::phasing::unknown)
       {

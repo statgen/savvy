@@ -332,6 +332,9 @@ namespace savvy
       const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
       const std::vector<std::string>& samples() const { return ids_; }
 
+      const std::vector<header_value_details>& format_headers() const { return format_headers_; }
+      const std::vector<header_value_details>& info_headers() const { return info_headers_; }
+
       /**
        *
        * @param subset IDs to include if they exist in file.
