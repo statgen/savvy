@@ -382,6 +382,11 @@ namespace savvy
             else if (hval.type == "String")
               e.type = typed_value::str;
 
+            if (!hval.idx.empty())
+            {
+              std::size_t idx = std::atoi(hval.idx.c_str());
+              dict_.entries[which_dict].resize(idx, {"DELETED", "", 0});
+            }
 
             dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size();
             dict_.entries[which_dict].emplace_back(std::move(e));
