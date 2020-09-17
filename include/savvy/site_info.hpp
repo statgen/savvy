@@ -645,6 +645,7 @@ namespace savvy
                     is.read(&s.alts_.front()[0], sz);
                   }
 
+                  s.info_.clear();
                   s.info_.reserve(info_headers.size());
                   std::string prop_val;
                   for (const header_value_details& hval : info_headers)
@@ -941,6 +942,8 @@ namespace savvy
       v.size_ = sample_size * ploidy;
       v.off_type_ = typed_value::int64;  // TODO: typed_value::offset_type_code(sample_size);
       std::size_t off_width = 1u << bcf_type_shift[v.off_type_];
+
+      var.format_fields_.clear();
 
       if (format_headers.front().id == "GT")
       {
