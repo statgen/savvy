@@ -669,30 +669,35 @@ namespace savvy
                           s.qual_ = prop_val.empty() ? typed_value::missing_value<float>() : std::atof(prop_val.c_str());
                         else if (key == "FILTER")
                           s.filters_ = detail::split_string_to_vector(prop_val, ';');
-
-                        if (hval.type == "Flag")
-                        {
-                          if (std::atoi(prop_val.c_str()) == 1)
-                            s.info_.emplace_back(key, typed_value(std::int8_t(1)));
-                        }
                         else
                         {
-                          std::uint8_t field_type = 0;
-                          if (hval.type == "Integer")
-                            field_type = typed_value::int32;
-                          else if (hval.type == "Float")
-                            field_type = typed_value::real;
-                          else if (hval.type == "String")
-                            field_type = typed_value::str;
-
-                          if (field_type)
+                          if (hval.type == "Flag")
                           {
-                            char* p = prop_val.size() ? &prop_val[0] : nullptr;
-                            s.info_.emplace_back(key, typed_value(field_type, p, p + prop_val.size()));
+                            if (std::atoi(prop_val.c_str()) == 1)
+                              s.info_.emplace_back(key, typed_value(std::int8_t(1)));
                           }
                           else
                           {
-                            return false;
+                            std::uint8_t field_type = typed_value::str;
+                            if (hval.type == "Integer")
+                              field_type = typed_value::int32;
+                            else if (hval.type == "Float")
+                              field_type = typed_value::real;
+//                            else if (hval.type == "String")
+//                              field_type = typed_value::str;
+
+                            char* p = prop_val.size() ? &prop_val[0] : nullptr;
+                            s.info_.emplace_back(key, typed_value(field_type, p, p + prop_val.size()));
+
+//                            if (field_type)
+//                            {
+//                              char* p = prop_val.size() ? &prop_val[0] : nullptr;
+//                              s.info_.emplace_back(key, typed_value(field_type, p, p + prop_val.size()));
+//                            }
+//                            else
+//                            {
+//                              return false;
+//                            }
                           }
                         }
                       }
@@ -933,16 +938,16 @@ namespace savvy
 
       typed_value v;
       v.sparse_size_ = sz;
-      v.size_ = sample_size;
+      v.size_ = sample_size * ploidy;
       v.off_type_ = typed_value::int64;  // TODO: typed_value::offset_type_code(sample_size);
       std::size_t off_width = 1u << bcf_type_shift[v.off_type_];
 
       if (format_headers.front().id == "GT")
       {
         v.val_type_ = typed_value::int8;
-        v.local_data_.resize(sz * ploidy * off_width + sz * ploidy);
+        v.local_data_.resize(sz * off_width + sz);
         v.off_ptr_ = v.local_data_.data();
-        v.val_ptr_ = v.local_data_.data() + sz * ploidy * off_width;
+        v.val_ptr_ = v.local_data_.data() + sz * off_width;
 
 
         std::int64_t* off_ptr = (std::int64_t*)v.off_ptr_;
@@ -955,13 +960,15 @@ namespace savvy
           *off_ptr = offset;
           *val_ptr = allele;
         }
+
+        var.format_fields_.emplace_back("GT", std::move(v)); // TODO: reuse existing typed_value object to reduce mallocs.
       }
       else if (format_headers.front().id == "HDS")
       {
-        v.val_type_ = typed_value::int8;
-        v.local_data_.resize(sz * ploidy * off_width + sz * ploidy * sizeof(float));
+        v.val_type_ = typed_value::real;
+        v.local_data_.resize(sz * off_width + sz * sizeof(float));
         v.off_ptr_ = v.local_data_.data();
-        v.val_ptr_ = v.local_data_.data() + sz * ploidy * off_width;
+        v.val_ptr_ = v.local_data_.data() + sz * off_width;
 
 
         std::int64_t* off_ptr = (std::int64_t*)v.off_ptr_;
@@ -974,10 +981,18 @@ namespace savvy
           *off_ptr = offset;
           *val_ptr = allele;
         }
+
+        var.format_fields_.emplace_back("HDS", std::move(v)); // TODO: reuse existing typed_value object to reduce mallocs.
       }
       else
       {
         return false;
+      }
+
+      if (is.get() == std::char_traits<char>::eof())
+      {
+        assert(!"Truncated file");
+        is.setstate(std::ios::badbit);
       }
 
       // TODO: compress offsets.
