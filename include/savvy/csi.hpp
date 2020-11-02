@@ -17,6 +17,8 @@
 class csi_index
 {
 public:
+  bool good() const { return fs_.good(); }
+
   csi_index(const std::string& file_path)
     : fs_(file_path)
   {

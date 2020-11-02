@@ -12,6 +12,7 @@
 #include "vcf_reader.hpp"
 #include "savvy.hpp"
 #include "file.hpp"
+#include "csi.hpp"
 
 #include <shrinkwrap/zstd.hpp>
 #include <shrinkwrap/gz.hpp>
@@ -325,7 +326,27 @@ namespace savvy
         }
       };
 
-      std::unique_ptr<index_data> index_;
+      struct csi_index_data
+      {
+        csi_index file;
+        genomic_region reg;
+        std::list<std::pair<std::uint64_t, std::uint64_t>> intervals;
+        std::size_t interval_off;
+        bounding_point bounding_type;
+
+        csi_index_data(const std::string& file_path, const std::unordered_map<std::string, std::uint32_t>& contig_map, genomic_region bounds, bounding_point bound_type = bounding_point::beg) :
+          file(file_path),
+          reg(bounds),
+          bounding_type(bound_type),
+          interval_off(0)
+        {
+          auto tmp = file.query_intervals(reg.chromosome(), contig_map, reg.from(), reg.to()); // TODO: have this return list instead of vector
+          intervals.assign(tmp.begin(), tmp.end());
+        }
+      };
+
+      std::unique_ptr<index_data> s1r_index_;
+      std::unique_ptr<csi_index_data> csi_index_;
     public:
       reader(const std::string& file_path);
 
@@ -361,6 +382,7 @@ namespace savvy
       reader& read_vcf_record(variant& r);
       reader& read_sav1_record(variant& r);
       reader& read_indexed_record(variant& r);
+      reader& read_csi_indexed_record(variant& r);
     };
 
     //================================================================//
@@ -423,13 +445,35 @@ namespace savvy
     inline
     reader& reader::reset_bounds(genomic_region reg)
     {
-
       input_stream_->clear();
 
-      index_ = ::savvy::detail::make_unique<index_data>(::savvy::detail::file_exists(file_path_ + ".s1r") ? file_path_ + ".s1r" : file_path_, reg);
-      if (!index_->file.good())
+      if (file_format_ == format::sav1 || file_format_ == format::sav2)
       {
-        input_stream_->setstate(input_stream_->rdstate() | std::ios::failbit);
+        s1r_index_ = ::savvy::detail::make_unique<index_data>(::savvy::detail::file_exists(file_path_ + ".s1r") ? file_path_ + ".s1r" : file_path_, reg);
+        if (!s1r_index_->file.good())
+        {
+          input_stream_->setstate(std::ios::failbit); //TODO: error message
+        }
+      }
+      else if (::savvy::detail::file_exists(file_path_ + ".csi"))
+      {
+        csi_index_ = ::savvy::detail::make_unique<csi_index_data>(file_path_ + ".csi", dict_.str_to_int[dictionary::contig], reg);
+        if (!csi_index_->file.good())
+        {
+          input_stream_->setstate(std::ios::failbit); //TODO: error message
+        }
+        else if (csi_index_->intervals.empty())
+        {
+          input_stream_->setstate(std::ios::eofbit);
+        }
+        else
+        {
+          input_stream_->seekg(csi_index_->intervals.front().first);
+        }
+      }
+      else
+      {
+        input_stream_->setstate(std::ios::failbit); //TODO: error message
       }
 
       return *this;
@@ -440,22 +484,22 @@ namespace savvy
     {
       while (this->good())
       {
-        if (index_->total_records_read == index_->max_records_to_read)
+        if (s1r_index_->total_records_read == s1r_index_->max_records_to_read)
         {
           this->input_stream_->setstate(std::ios::eofbit);
           break;
         }
 
-        if (index_->current_offset_in_block >= index_->total_in_block)
+        if (s1r_index_->current_offset_in_block >= s1r_index_->total_in_block)
         {
-          if (index_->iter == index_->query.end())
+          if (s1r_index_->iter == s1r_index_->query.end())
             this->input_stream_->setstate(std::ios::eofbit);
           else
           {
-            index_->total_in_block = std::uint32_t(0x000000000000FFFF & index_->iter->value()) + 1;
-            index_->current_offset_in_block = 0;
-            this->input_stream_->seekg(std::streampos((index_->iter->value() >> 16) & 0x0000FFFFFFFFFFFF));
-            ++(index_->iter);
+            s1r_index_->total_in_block = std::uint32_t(0x000000000000FFFF & s1r_index_->iter->value()) + 1;
+            s1r_index_->current_offset_in_block = 0;
+            this->input_stream_->seekg(std::streampos((s1r_index_->iter->value() >> 16) & 0x0000FFFFFFFFFFFF));
+            ++(s1r_index_->iter);
           }
         }
 
@@ -464,7 +508,7 @@ namespace savvy
 
         if (!this->good())
         {
-          if (index_->current_offset_in_block < index_->total_in_block)
+          if (s1r_index_->current_offset_in_block < s1r_index_->total_in_block)
           {
             assert(!"Truncated block");
             this->input_stream_->setstate(std::ios::badbit);
@@ -472,9 +516,9 @@ namespace savvy
         }
         else
         {
-          ++(index_->current_offset_in_block);
-          ++(index_->total_records_read);
-          if (region_compare(index_->bounding_type, r, index_->reg))
+          ++(s1r_index_->current_offset_in_block);
+          ++(s1r_index_->total_records_read);
+          if (region_compare(s1r_index_->bounding_type, r, s1r_index_->reg))
           {
             //this->read_genotypes(annotations, destination);
             break;
@@ -489,12 +533,59 @@ namespace savvy
     }
 
     inline
+    reader& reader::read_csi_indexed_record(variant& r)
+    {
+      while (input_stream_->good())
+      {
+        if (csi_index_->intervals.empty())
+        {
+          input_stream_->setstate(std::ios::eofbit);
+          break;
+        }
+
+        std::uint64_t current_pos = input_stream_->tellg();
+
+        if (current_pos >> 16 >= csi_index_->intervals.front().second >> 16)
+        {
+          csi_index_->intervals.pop_front();
+          if (csi_index_->intervals.empty())
+          {
+            input_stream_->setstate(std::ios::eofbit);
+            return *this;
+          }
+          else
+          {
+            assert(csi_index_->intervals.front().first >> 16 <= csi_index_->intervals.front().second >> 16);
+            input_stream_->seekg(csi_index_->intervals.front().first);
+          }
+        }
+
+        if (!read_record(r))
+          input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+
+        if (region_compare(csi_index_->bounding_type, r, csi_index_->reg))
+        {
+          //this->read_genotypes(annotations, destination);
+          break;
+        }
+        else
+        {
+          //this->discard_genotypes();
+        }
+      }
+      return *this; //TODO: clear site info before returning if not good
+    }
+
+    inline
     reader& reader::read(variant& r)
     {
       if (good())
       {
-        if (index_)
+        if (s1r_index_)
           return read_indexed_record(r);
+
+        if (csi_index_)
+          return read_csi_indexed_record(r);
 
         if (!read_record(r) && input_stream_->good())
           input_stream_->setstate(std::ios::badbit);
