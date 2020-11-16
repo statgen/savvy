@@ -12,8 +12,8 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        sudo apt install update
-        sudo apt install -y build-essential cmake python-dev python-pip
+        sudo apt update
+        sudo apt install -y build-essential cmake git python-dev python-pip
         sudo pip install cget
         cget install -f ./requirements.txt
         cmake --version
