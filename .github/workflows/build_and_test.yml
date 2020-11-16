@@ -8,10 +8,14 @@ jobs:
   build:
     runs-on: ubuntu-16.04
     steps:
+    - uses: actions/checkout@v2
     - name: build and test
       shell: bash
       run: |
         set -euo pipefail
+        pwd
+        ls -ahl
+        ls -ahl ..
         sudo apt update
         sudo apt install -y build-essential cmake git python-dev python-pip
         sudo pip install cget
