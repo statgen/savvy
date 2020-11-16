@@ -1,0 +1,23 @@
+name: build and run tests
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+    branches: [ develop ]
+jobs:
+  build:
+    runs-on: ubuntu-16.04
+    steps:
+    - name: build and test
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt install update
+        sudo apt install -y build-essential cmake python-dev python-pip
+        sudo pip install cget
+        cget install -f ./requirements.txt
+        cmake --version
+        mkdir build && cd build
+        cmake -DBUILD_TESTS=1 -DCMAKE_TOOLCHAIN_FILE=../cget/cget/cget.cmake ..
+        make all sav
+        make CTEST_OUTPUT_ON_FAILURE=1 test
