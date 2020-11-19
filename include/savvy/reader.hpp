@@ -560,17 +560,23 @@ namespace savvy
           }
         }
 
+        auto pos_before = r.pos();
         if (!read_record(r))
+        {
+          assert(!"Read failed before end of csi block");
           input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+        }
+
+        assert(r.pos() >= pos_before);
 
         if (region_compare(csi_index_->bounding_type, r, csi_index_->reg))
         {
           //this->read_genotypes(annotations, destination);
           break;
         }
-        else
+        else if (r.pos() > csi_index_->reg.to())
         {
-          //this->discard_genotypes();
+          input_stream_->setstate(std::ios::eofbit);
         }
       }
       return *this; //TODO: clear site info before returning if not good
