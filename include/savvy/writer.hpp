@@ -67,7 +67,6 @@ namespace savvy
       std::string file_path_;
       std::ostream ofs_;
       std::array<std::uint8_t, 16> uuid_;
-      dictionary dict_;
       std::size_t n_samples_ = 0;
       std::vector<char> serialized_buf_;
       phasing phasing_ = phasing::unknown;

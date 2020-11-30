@@ -293,7 +293,6 @@ namespace savvy
       std::unordered_map<std::string, std::reference_wrapper<header_value_details>> format_headers_map_;
 
       std::vector<std::string> ids_;
-      dictionary dict_;
       format file_format_;
       phasing phasing_;
 

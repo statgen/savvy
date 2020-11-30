@@ -7,12 +7,14 @@
 #ifndef LIBSAVVY_FILE_HPP
 #define LIBSAVVY_FILE_HPP
 
+#include "dictionary.hpp"
+
 namespace savvy
 {
   class file
   {
-  private:
-
+  protected:
+    dictionary dict_;
   public:
     enum class format
     {
@@ -22,6 +24,7 @@ namespace savvy
       vcf
     };
 
+    const ::savvy::dictionary& dictionary() const { return dict_; }
     virtual ~file() {}
   };
 }
