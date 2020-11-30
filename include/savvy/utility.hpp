@@ -7,6 +7,8 @@
 #ifndef LIBSAVVY_UTILITY_HPP
 #define LIBSAVVY_UTILITY_HPP
 
+#include "portable_endian.hpp"
+
 #include <string>
 #include <functional>
 #include <memory>
@@ -124,6 +126,47 @@ namespace savvy
     inline std::string& trim(std::string& s, const char* d = " \t\n\r\f\v")
     {
       return ltrim(rtrim(s, d), d);
+    }
+
+    inline bool append_skippable_zstd_frame(std::istream& is, std::ostream& os)
+    {
+      is.seekg(0, std::ios::end);
+      std::int64_t index_file_size_64 = is.tellg();
+      is.seekg(0, std::ios::beg);
+
+      if (index_file_size_64 > std::numeric_limits<std::uint32_t >::max() || index_file_size_64 < 0 || !is.good())
+      {
+        // Error: index file too big for skippable zstd frame
+        // Possible solutions:
+        //   linkat(fd,"",destdirfd,"filename",AT_EMPTY_PATH);
+        // or
+        //   struct stat s;
+        //   off_t offset = 0;
+        //   int targetfd = open("target/filename", O_WRONLY | O_CREAT | O_EXCL);
+        //   fstat(fd,&s);
+        //   sendfile(targetfd,fd,&offset, s.st_size);
+        // See https://stackoverflow.com/a/25154505/1034772
+
+        return false;
+      }
+
+      std::uint32_t index_file_size_le = htole32((std::uint32_t)index_file_size_64);
+
+      os.seekp(0, std::ios::end);
+      os.write("\x50\x2A\x4D\x18", 4);
+      os.write((char*)(&index_file_size_le), 4);
+
+      std::vector<char> buf(4096);
+      while (is && os && index_file_size_64 > 0)
+      {
+        std::size_t sz = std::min((std::size_t)index_file_size_64, buf.size());
+        is.read(buf.data(), sz);
+        assert(sz == is.gcount());
+        os.write(buf.data(), sz);
+        index_file_size_64 -= sz;
+      }
+
+      return is.good() && os.good();;
     }
   }
 

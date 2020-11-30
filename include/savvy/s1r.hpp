@@ -697,7 +697,7 @@ namespace savvy
     public:
       writer(const std::string& file_path, const std::array<std::uint8_t, 16>& uuid, std::uint8_t block_size_in_kib = 4 - 1) :
         file_path_(file_path),
-        ofs_(file_path, std::ios::binary),
+        ofs_(file_path, std::ios::in | std::ios::out | std::ios::trunc | std::ios::binary),
         uuid_(uuid)
       {
         this->block_size_ = 1024u * (std::uint32_t(block_size_in_kib) + 1);
@@ -706,6 +706,12 @@ namespace savvy
       }
 
       ~writer()
+      {
+        if (ofs_)
+          write_footer();
+      }
+
+      void write_footer()
       {
         if (chromosomes_.size())
         {
@@ -741,6 +747,14 @@ namespace savvy
         ofs_.write(footer_block.data(), footer_block.size());
       }
 
+      std::fstream close()
+      {
+        write_footer();
+        ofs_.flush();
+        std::fstream ret;
+        ofs_.swap(ret);
+        return ret;
+      }
 
       writer& write(const std::string& chrom, const entry& e)
       {
@@ -790,16 +804,15 @@ namespace savvy
         std::vector<entry> current_leaf_node(detail::entries_per_leaf_node(block_size_));
         tree_base::tree_position current_leaf_position(tree.tree_height() - 1, 0, 0);
 
-        std::ifstream ifs(file_path_, std::ios::binary);
+        auto get_pos = ofs_.tellp() - std::streamoff(block_size_ * num_leaf_nodes);
 
-
-        ifs.seekg(ofs_.tellp() - std::streamoff(block_size_ * num_leaf_nodes));
-
-        for (std::size_t i = 0; i < num_leaf_nodes && ifs.good(); ++i)
+        for (std::size_t i = 0; i < num_leaf_nodes && ofs_.good(); ++i)
         {
           bool last_leaf_node = (i + 1) == num_leaf_nodes;
 
-          ifs.read((char*)current_leaf_node.data(), block_size_);
+          ofs_.seekg(get_pos);
+          ofs_.read((char*)current_leaf_node.data(), block_size_);
+          get_pos = ofs_.tellg();
 
           std::uint32_t node_range_min = (std::uint32_t)-1;
           std::uint32_t node_range_max = 0;
@@ -825,7 +838,7 @@ namespace savvy
             if (rit->second.entry_offset + 1 == rit->first.size() || last_leaf_node)
             {
               ofs_.seekp(tree.calculate_file_position(rit->second));
-              ofs_.write((char*)(rit->first.data()), block_size_);
+              ofs_.write((char*)(rit->first.data()), block_size_).flush();
 
               node_range_min = (std::uint32_t)-1;
               node_range_max = 0;
@@ -847,9 +860,6 @@ namespace savvy
           }
 
         }
-
-        if (!ifs.good())
-          ofs_.setstate(std::ios::badbit);
       }
 
 
@@ -1000,7 +1010,7 @@ namespace savvy
       }
     private:
       std::string file_path_;
-      std::ofstream ofs_;
+      std::fstream ofs_;
       const std::array<std::uint8_t, 16> uuid_;
       std::uint32_t block_size_;
       std::vector<entry> current_leaf_node_;

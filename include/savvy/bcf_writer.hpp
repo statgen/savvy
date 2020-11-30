@@ -7,6 +7,8 @@
 #ifndef LIBSAVVY_BCF_WRITER_HPP
 #define LIBSAVVY_BCF_WRITER_HPP
 
+#include <unistd.h>
+
 #include "file.hpp"
 #include "typed_value.hpp"
 #include "utility.hpp"
@@ -152,9 +154,20 @@ namespace savvy
       }
 
       // TODO: Use mkstemp when shrinkwrap supports FILE*
-      if (file_format_ == format::sav2 && file_path_ != "/dev/stdout") // TODO: Check if indexing and zstd is enabled.
+      if (file_format_ == format::sav2) // TODO: Check if indexing and zstd is enabled.
       {
-        index_file_ = ::savvy::detail::make_unique<s1r::writer>(file_path + ".s1r", uuid_);
+        std::string idx_path = "/tmp/tmpfileXXXXXX";
+        int tmp_fd = mkstemp(&idx_path[0]);
+        if (!tmp_fd)
+        {
+          std::cerr << "Error: could not open temp file for s1r index (" << idx_path << ")" << std::endl;
+        }
+        else
+        {
+          index_file_ = ::savvy::detail::make_unique<s1r::writer>(idx_path, uuid_);
+          std::remove(idx_path.c_str());
+          ::close(tmp_fd);
+        }
       }
 
       write_header(headers, ids);
@@ -181,6 +194,13 @@ namespace savvy
 
           s1r::entry e(current_block_min_, current_block_max_, (file_pos << 16) | std::uint16_t(record_count_in_block_ - 1));
           index_file_->write(current_chromosome_, e);
+        }
+
+        auto idx_fs = index_file_->close();
+        if (!::savvy::detail::append_skippable_zstd_frame(idx_fs, ofs_))
+        {
+          // TODO: Use linkat or send file (see https://stackoverflow.com/a/25154505/1034772)
+          std::cerr << "Error: index file too big for skippable zstd frame" << std::endl;
         }
       }
     }
