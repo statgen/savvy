@@ -5,7 +5,7 @@
  */
 
 #include "savvy/reader.hpp"
-#include "savvy/bcf_writer.hpp"
+#include "savvy/writer.hpp"
 
 #include <htslib/vcf.h>
 

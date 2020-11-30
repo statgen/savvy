@@ -9,7 +9,7 @@
 #include "savvy/s1r.hpp"
 #include "savvy/savvy.hpp"
 #include "savvy/reader.hpp"
-#include "savvy/bcf_writer.hpp"
+#include "savvy/writer.hpp"
 
 #include <getopt.h>
 

@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include "savvy/bcf_writer.hpp"
+#include "savvy/writer.hpp"
 //#include "allele_status.hpp"
 //#include "cvcf_reader.hpp"
 //#include "m3vcf_reader.hpp"
