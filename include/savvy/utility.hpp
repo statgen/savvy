@@ -152,7 +152,6 @@ namespace savvy
 
       std::uint32_t index_file_size_le = htole32((std::uint32_t)index_file_size_64);
 
-      os.seekp(0, std::ios::end);
       os.write("\x50\x2A\x4D\x18", 4);
       os.write((char*)(&index_file_size_le), 4);
 

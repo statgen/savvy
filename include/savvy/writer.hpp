@@ -195,10 +195,12 @@ namespace savvy
           index_file_->write(current_chromosome_, e);
         }
 
+        ofs_.flush();
+
         auto idx_fs = index_file_->close();
         if (!::savvy::detail::append_skippable_zstd_frame(idx_fs, ofs_))
         {
-          // TODO: Use linkat or send file (see https://stackoverflow.com/a/25154505/1034772)
+          ofs_.setstate(ofs_.rdstate() | std::ios::badbit); // TODO: Use linkat or send file (see https://stackoverflow.com/a/25154505/1034772)
           std::cerr << "Error: index file too big for skippable zstd frame" << std::endl;
         }
       }
