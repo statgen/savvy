@@ -469,7 +469,7 @@ namespace savvy
 
         std::uint8_t block_size_byte = 0;
         std::uint64_t block_count = 0;
-        std::streampos index_file_offset = 0;
+        index_file_offset_= 0;
 
         input_file_.seekg(0, std::ios::end);
         std::int64_t total_file_size = input_file_.tellg();
@@ -547,16 +547,17 @@ namespace savvy
               block_count += 1;
             }
 
-            index_file_offset = total_file_size - (block_count * block_size + footer.size() + tree_details_size);
+            index_file_offset_ = total_file_size - (block_count * block_size + footer.size() + tree_details_size);
+            size_on_disk_ = block_count * block_size + footer.size() + tree_details_size;
             assert(total_file_size - (block_count * block_size + footer.size() + tree_details_size) >= 0ll);
 
             trees_.reserve(tree_details_array.size());
             for (auto it = tree_details_array.begin(); it != tree_details_array.end(); ++it)
-              trees_.emplace_back(input_file_, index_file_offset, block_size_byte, it->block_offset, it->name, it->entry_count);
+              trees_.emplace_back(input_file_, index_file_offset_, block_size_byte, it->block_offset, it->name, it->entry_count);
           }
         }
 
-        trees_.emplace_back(input_file_, index_file_offset, block_size_byte, block_count, "", 0); // empty tree (end marker).
+        trees_.emplace_back(input_file_, index_file_offset_, block_size_byte, block_count, "", 0); // empty tree (end marker).
 
 
 //        std::uint8_t block_size_exponent;
@@ -600,10 +601,14 @@ namespace savvy
       class query;
       query create_query(genomic_region reg);
       query create_query(std::vector<genomic_region> regs);
+      std::streampos file_offset() const { return index_file_offset_; }
+      std::streampos size_on_disk() const { return size_on_disk_; }
     private:
       std::string file_path_;
       std::ifstream input_file_;
       std::vector<tree_reader> trees_;
+      std::streampos index_file_offset_ = 0;
+      std::size_t size_on_disk_ = 0;
     };
 
     class reader::query
@@ -707,7 +712,7 @@ namespace savvy
 
       ~writer()
       {
-        if (ofs_)
+        if (ofs_.is_open())
           write_footer();
       }
 
@@ -749,9 +754,17 @@ namespace savvy
 
       std::fstream close()
       {
-        write_footer();
-        ofs_.flush();
+        if (ofs_.is_open())
+        {
+          write_footer();
+          ofs_.flush();
+        }
+
         std::fstream ret;
+        if (ret)
+        {
+           auto a = 0;
+        }
         ofs_.swap(ret);
         return ret;
       }

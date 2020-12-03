@@ -6,7 +6,8 @@
 
 #include "sav/concat.hpp"
 #include "sav/utility.hpp"
-#include "savvy/sav_reader.hpp"
+#include "savvy/reader.hpp"
+#include "savvy/writer.hpp"
 
 
 #include <fstream>
@@ -27,6 +28,7 @@ public:
     long_options_(
       {
         {"help", no_argument, 0, 'h'},
+        {"out", required_argument, 0, 'o'},
         {0, 0, 0, 0}
       })
   {
@@ -44,6 +46,7 @@ public:
     os << "Usage: sav concat [opts ...] <first.sav> <second.sav> [addl_files.sav ...] \n";
     os << "\n";
     os << " -h, --help             Print usage\n";
+    os << " -o, --out              Output file (default: /dev/stdout)\n";
     os << std::flush;
   }
 
@@ -51,7 +54,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "h", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "ho:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -59,6 +62,9 @@ public:
       case 'h':
         help_ = true;
         return true;
+      case 'o':
+        output_path_ = optarg ? optarg : "";
+        break;
       default:
         return false;
       }
@@ -103,60 +109,69 @@ int concat_main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
 
-  std::size_t ploidy = 0;
+  savvy::dictionary dict;
   std::vector<std::string> samples;
   savvy::fmt data_format;
 
-  std::vector<std::pair<std::string,std::string>> merged_headers;
-  std::set<std::string> info_fields;
-  std::set<std::string> unique_headers;
+  std::vector<std::pair<std::string,std::string>> headers;
+  //std::vector<std::pair<std::string,std::string>> merged_headers;
+  //std::set<std::string> info_fields;
+  //std::set<std::string> unique_headers;
 
   std::vector<std::size_t> variant_offsets;
   variant_offsets.reserve(args.input_paths().size());
 
   for (auto it = args.input_paths().begin(); it != args.input_paths().end(); ++it)
   {
-    savvy::sav::reader sav_reader(*it);
+    savvy::v2::reader sav_reader(*it);
 
     if (!sav_reader)
     {
-      std::cerr << "Could not open input SAV file (" << (*it) << ")\n";
+      std::cerr << "Error: could not open input SAV file (" << (*it) << ")\n";
+      return EXIT_FAILURE;
+    }
+
+    if (sav_reader.file_format() != savvy::file::format::sav2)
+    {
+      std::cerr << "Error: " << (*it) << " is not a SAV v2 file\n";
       return EXIT_FAILURE;
     }
 
     if (it == args.input_paths().begin())
     {
-      ploidy = sav_reader.ploidy();
+      dict = sav_reader.dictionary();
+      headers = sav_reader.headers();
       samples = sav_reader.samples();
-      data_format = sav_reader.data_format();
     }
-
-    if (ploidy != sav_reader.ploidy())
+    else
     {
-      std::cerr << "Files do not have the same ploidy\n";
-      return EXIT_FAILURE;
-    }
-
-    if (samples.size() != sav_reader.samples().size())
-    {
-      std::cerr << "Files do not have the same sameple size\n";
-      return EXIT_FAILURE;
-    }
-
-    for (auto it = sav_reader.headers().begin(); it != sav_reader.headers().end(); ++it)
-    {
-      if ((it->first != "INFO" || info_fields.insert(savvy::parse_header_sub_field(it->second, "ID")).second) && unique_headers.insert(it->first + "=" + it->second).second)
+      if (dict != sav_reader.dictionary())
       {
-        merged_headers.push_back(*it);
+        std::cerr << "Header dictionaries incompatible\n";
+        return EXIT_FAILURE;
+      }
+
+      if (samples.size() != sav_reader.samples().size())
+      {
+        std::cerr << "Files do not have the same sameple size\n";
+        return EXIT_FAILURE;
       }
     }
+
+    // TODO: Add --merge-headers option.
+//    for (auto it = sav_reader.headers().begin(); it != sav_reader.headers().end(); ++it)
+//    {
+//      if ((it->first != "INFO" || info_fields.insert(savvy::parse_header_sub_field(it->second, "ID")).second) && unique_headers.insert(it->first + "=" + it->second).second)
+//      {
+//        merged_headers.push_back(*it);
+//      }
+//    }
 
     variant_offsets.push_back(sav_reader.tellg());
   }
 
   {
-    savvy::sav::writer header_writer(args.output_path(), samples.begin(), samples.end(), merged_headers.begin(), merged_headers.end(), data_format);
-    header_writer.write_header(ploidy);
+    savvy::v2::writer header_writer( args.output_path(), savvy::file::format::sav2, headers, samples, savvy::v2::writer::default_compression_level, false);
   }
 
 
@@ -172,16 +187,49 @@ int concat_main(int argc, char **argv)
   {
     std::ifstream ifs(*it, std::ios::binary);
     ifs.seekg(variant_offsets[it - args.input_paths().begin()]);
+
     if (!ifs)
     {
       std::cerr << "Could not open input SAV file (" << (*it) << ")\n";
       return EXIT_FAILURE;
     }
 
-    while (ifs)
+    savvy::s1r::reader idx(*it); // TODO: implement s1r concatenator
+
+    std::int64_t idx_off = idx.file_offset();
+    assert(idx_off == 0 || idx_off >= 8);
+
+    std::int64_t bytes_to_read = (idx_off ? idx_off - 8 : 0) - ifs.tellg(); // If index doesn't exist at end of file, then idx.file_offset() is equal to 0.
+
+    while (ifs && bytes_to_read > 0)
     {
-      std::size_t sz = ifs.read(buf.data(), buf.size()).gcount();
+      std::size_t sz = ifs.read(buf.data(), std::min<std::size_t>(bytes_to_read, buf.size())).gcount();
       ofs.write(buf.data(), sz);
+      bytes_to_read -= sz;
+      assert(bytes_to_read >= 0);
+    }
+
+    if (idx_off)
+    {
+      // Test that next bytes in file are a skippable frame
+      std::string h(4, '\0');
+      ifs.read(&h[0], 4);
+      if (h != "\x50\x2A\x4D\x18")
+      {
+        std::cerr << "Error: boundary not at skippable frame, so " << (*it) << " is likely corrupted\n";
+        return EXIT_FAILURE;
+      }
+
+      // Test that size of index matches size of skippable frame
+      std::uint32_t index_file_size_le = 0;
+      ifs.read((char*)&index_file_size_le, 4);
+      if (le32toh(index_file_size_le) != idx.size_on_disk())
+      {
+        std::cerr << "Error: skippable frame size does not match index size, so " << (*it) << " is likely corrupted\n";
+        return EXIT_FAILURE;
+      }
+
+      // TODO: use this test in reader class when hitting the end of file
     }
   }
 

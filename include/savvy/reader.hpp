@@ -355,6 +355,8 @@ namespace savvy
       const std::vector<header_value_details>& format_headers() const { return format_headers_; }
       const std::vector<header_value_details>& info_headers() const { return info_headers_; }
 
+      file::format file_format() const { return file_format_; }
+
       /**
        *
        * @param subset IDs to include if they exist in file.
@@ -372,6 +374,7 @@ namespace savvy
       reader& operator>>(variant& r) { return read(r); }
 
       operator bool() const { return good(); };
+      std::streampos tellg() { return this->input_stream_->tellg(); }
     private:
       void process_header_pair(const std::string& key, const std::string& val);
       bool read_header();

@@ -87,7 +87,7 @@ namespace savvy
       static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, format file_format, std::uint8_t compression_level);
 
     public:
-      writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level = default_compression_level);
+      writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level = default_compression_level, bool create_index = true);
 
       ~writer();
 
@@ -136,7 +136,7 @@ namespace savvy
     }
 
     inline
-    writer::writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level) :
+    writer::writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level, bool create_index) :
       file_format_(file_format),
       rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t) this),
       output_buf_(create_out_streambuf(file_path, file_format_, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
@@ -153,7 +153,7 @@ namespace savvy
       }
 
       // TODO: Use mkstemp when shrinkwrap supports FILE*
-      if (file_format_ == format::sav2) // TODO: Check if indexing and zstd is enabled.
+      if (file_format_ == format::sav2 && create_index) // TODO: Check if zstd is enabled.
       {
         std::string idx_path = "/tmp/tmpfileXXXXXX";
         int tmp_fd = mkstemp(&idx_path[0]);
@@ -196,9 +196,10 @@ namespace savvy
         }
 
         ofs_.flush();
-
         auto idx_fs = index_file_->close();
-        if (!::savvy::detail::append_skippable_zstd_frame(idx_fs, ofs_))
+        std::fstream ofs(file_path_, std::ios::out | std::ios::binary | std::ios::app); // TODO: THIS SEEMS DANGEROUS. Store FILE* when creating zstd stream and use instead of opening new descriptor.
+        std::int64_t p = ofs.tellp();
+        if (!::savvy::detail::append_skippable_zstd_frame(idx_fs, ofs))
         {
           ofs_.setstate(ofs_.rdstate() | std::ios::badbit); // TODO: Use linkat or send file (see https://stackoverflow.com/a/25154505/1034772)
           std::cerr << "Error: index file too big for skippable zstd frame" << std::endl;
