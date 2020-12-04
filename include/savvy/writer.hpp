@@ -100,6 +100,7 @@ namespace savvy
       writer& write(const variant& r);
       writer& operator<<(const variant& v) { return write(v); }
 
+      const std::array<std::uint8_t, 16>& uuid() const { return uuid_; }
     private:
       writer& write_vcf(const variant& r);
       void write_header(std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids);

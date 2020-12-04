@@ -170,10 +170,30 @@ int concat_main(int argc, char **argv)
     variant_offsets.push_back(sav_reader.tellg());
   }
 
+  std::array<std::uint8_t, 16> uuid;
+
   {
     savvy::v2::writer header_writer( args.output_path(), savvy::file::format::sav2, headers, samples, savvy::v2::writer::default_compression_level, false);
+    uuid = header_writer.uuid();
   }
 
+  std::unique_ptr<savvy::s1r::writer> output_index;
+  bool create_index = true;
+  if (create_index)
+  {
+    std::string idx_path = "/tmp/tmpfileXXXXXX";
+    int tmp_fd = mkstemp(&idx_path[0]);
+    if (!tmp_fd)
+    {
+      std::cerr << "Error: could not open temp file for s1r index (" << idx_path << ")" << std::endl;
+    }
+    else
+    {
+      output_index = ::savvy::detail::make_unique<savvy::s1r::writer>(idx_path, uuid);
+      std::remove(idx_path.c_str());
+      ::close(tmp_fd);
+    }
+  }
 
   std::ofstream ofs(args.output_path(), std::ios::binary | std::ios::app);
   if (!ofs)
@@ -183,18 +203,38 @@ int concat_main(int argc, char **argv)
   }
 
   std::vector<char> buf(4096);
-  for (auto it = args.input_paths().begin(); it != args.input_paths().end(); ++it)
+  for (auto ft = args.input_paths().begin(); ft != args.input_paths().end(); ++ft)
   {
-    std::ifstream ifs(*it, std::ios::binary);
-    ifs.seekg(variant_offsets[it - args.input_paths().begin()]);
+    std::ifstream ifs(*ft, std::ios::binary);
+    ifs.seekg(variant_offsets[ft - args.input_paths().begin()]);
 
     if (!ifs)
     {
-      std::cerr << "Could not open input SAV file (" << (*it) << ")\n";
+      std::cerr << "Could not open input SAV file (" << (*ft) << ")\n";
       return EXIT_FAILURE;
     }
 
-    savvy::s1r::reader idx(*it); // TODO: implement s1r concatenator
+    auto delta = ifs.tellg() - ofs.tellp();
+    savvy::s1r::reader idx(*ft);
+    if (output_index && idx.good())
+    {
+      std::size_t cnt = 0;
+      for (auto it = idx.trees_begin(); it != idx.trees_end(); ++it)
+      {
+        for (auto jt = it->leaf_begin(); jt != it->leaf_end(); ++jt)
+        {
+          std::uint64_t old_file_pos = jt->value() >> 16u;
+          std::uint64_t record_cnt = jt->value() & 0xFFFF;
+          if (cnt == 0)
+          {
+            assert(old_file_pos == ifs.tellg());
+          }
+          std::uint64_t new_file_pos = old_file_pos + delta;
+          output_index->write(it->name(), ::savvy::s1r::entry(jt->region_start(), jt->region_end(), (new_file_pos << 16u) | record_cnt));
+          ++cnt;
+        }
+      }
+    }
 
     std::int64_t idx_off = idx.file_offset();
     assert(idx_off == 0 || idx_off >= 8);
@@ -216,7 +256,7 @@ int concat_main(int argc, char **argv)
       ifs.read(&h[0], 4);
       if (h != "\x50\x2A\x4D\x18")
       {
-        std::cerr << "Error: boundary not at skippable frame, so " << (*it) << " is likely corrupted\n";
+        std::cerr << "Error: boundary not at skippable frame, so " << (*ft) << " is likely corrupted\n";
         return EXIT_FAILURE;
       }
 
@@ -225,11 +265,31 @@ int concat_main(int argc, char **argv)
       ifs.read((char*)&index_file_size_le, 4);
       if (le32toh(index_file_size_le) != idx.size_on_disk())
       {
-        std::cerr << "Error: skippable frame size does not match index size, so " << (*it) << " is likely corrupted\n";
+        std::cerr << "Error: skippable frame size does not match index size, so " << (*ft) << " is likely corrupted\n";
         return EXIT_FAILURE;
       }
 
       // TODO: use this test in reader class when hitting the end of file
+    }
+  }
+
+
+  if (output_index)
+  {
+    std::fstream s1r_fs = output_index->close();
+    if (!savvy::detail::append_skippable_zstd_frame(s1r_fs, ofs))
+    {
+      // TODO: Use linkat or send file (see https://stackoverflow.com/a/25154505/1034772)
+      std::cerr << "Error: index file too big for skippable zstd frame" << std::endl;
+      // Possible solutions:
+      //   linkat(fd,"",destdirfd,"filename",AT_EMPTY_PATH);
+      // or
+      //   struct stat s;
+      //   off_t offset = 0;
+      //   int targetfd = open("target/filename", O_WRONLY | O_CREAT | O_EXCL);
+      //   fstat(fd,&s);
+      //   sendfile(targetfd,fd,&offset, s.st_size);
+      return EXIT_FAILURE;
     }
   }
 

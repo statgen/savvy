@@ -223,6 +223,73 @@ namespace savvy
     class tree_reader : public tree_base
     {
     public:
+      class leaf_iterator
+      {
+      private:
+        tree_reader* reader_;
+        std::istream* ifs_;
+        std::vector<entry> leaf_node_;
+        tree_position position_;
+      public:
+        typedef leaf_iterator self_type;
+        typedef std::ptrdiff_t difference_type;
+        typedef entry value_type;
+        typedef const value_type& reference;
+        typedef const value_type* pointer;
+        typedef std::bidirectional_iterator_tag iterator_category;
+
+        leaf_iterator(tree_reader& rdr, std::istream& ifs, std::size_t i) :
+          reader_(&rdr),
+          ifs_(&ifs),
+          leaf_node_(reader_->entries_per_leaf_node()),
+          position_(reader_->tree_height() - 1, i / reader_->entries_per_leaf_node(), i % reader_->entries_per_leaf_node())
+        {
+          assert(position_.node_offset * reader_->entries_per_leaf_node() < reader_->entry_count());
+          if (i < reader_->entry_count())
+          {
+            ifs_->seekg(reader_->calculate_file_position(position_));
+            ifs_->read((char*)leaf_node_.data(), reader_->bucket_size());
+          }
+        }
+
+        self_type& operator++()
+        {
+          position_.entry_offset += 1;
+          if (position_.entry_offset >= reader_->entries_per_leaf_node())
+          {
+            position_.node_offset += 1;
+            position_.entry_offset = 0;
+
+            assert(position_.node_offset * reader_->entries_per_leaf_node() < reader_->entry_count());
+            ifs_->seekg(reader_->calculate_file_position(position_));
+            ifs_->read((char*)leaf_node_.data(), reader_->bucket_size());
+          }
+          return *this;
+        }
+
+        self_type operator++(int)
+        {
+          self_type r = *this;
+          ++(*this);
+          return r;
+        }
+
+        reference operator*() { return leaf_node_[position_.entry_offset]; }
+        pointer operator->() { return &(leaf_node_[position_.entry_offset]); }
+        bool operator==(const self_type& other) { return position_ == other.position_; }
+        bool operator!=(const self_type& other) { return position_ != other.position_; }
+      };
+
+      leaf_iterator leaf_begin()
+      {
+        return leaf_iterator(*this, ifs_, 0);
+      }
+
+      leaf_iterator leaf_end()
+      {
+        return leaf_iterator(*this, ifs_, entry_count());
+      }
+
       class query
       {
       public:
@@ -761,10 +828,6 @@ namespace savvy
         }
 
         std::fstream ret;
-        if (ret)
-        {
-           auto a = 0;
-        }
         ofs_.swap(ret);
         return ret;
       }
