@@ -61,15 +61,12 @@ namespace savvy
       static const int default_compression_level = 3;
       static const int default_block_size = 2048;
     private:
-      format file_format_;
       std::mt19937_64 rng_;
       std::unique_ptr<std::streambuf> output_buf_;
       std::string file_path_;
       std::ostream ofs_;
-      std::array<std::uint8_t, 16> uuid_;
       std::size_t n_samples_ = 0;
       std::vector<char> serialized_buf_;
-      phasing phasing_ = phasing::unknown;
 
       // Data members to support indexing
       std::unique_ptr<s1r::writer> index_file_;
@@ -79,8 +76,6 @@ namespace savvy
       std::size_t record_count_in_block_ = 0;
       std::uint32_t current_block_min_ = std::numeric_limits<std::uint32_t>::max();
       std::uint32_t current_block_max_ = 0;
-
-      ::savvy::internal::pbwt_sort_context sort_context_;
     private:
       static std::filebuf *create_std_filebuf(const std::string& file_path, std::ios::openmode mode);
 
@@ -99,8 +94,6 @@ namespace savvy
 
       writer& write(const variant& r);
       writer& operator<<(const variant& v) { return write(v); }
-
-      const std::array<std::uint8_t, 16>& uuid() const { return uuid_; }
     private:
       writer& write_vcf(const variant& r);
       void write_header(std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids);
@@ -138,14 +131,15 @@ namespace savvy
 
     inline
     writer::writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level, bool create_index) :
-      file_format_(file_format),
       rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t) this),
-      output_buf_(create_out_streambuf(file_path, file_format_, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
+      output_buf_(create_out_streambuf(file_path, file_format, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
       ofs_(output_buf_.get()),
       //samples_(samples_beg, samples_end),
-      file_path_(file_path),
-      uuid_(::savvy::detail::gen_uuid(rng_))
+      file_path_(file_path)
     {
+      file_format_ = file_format;
+      uuid_ = ::savvy::detail::gen_uuid(rng_);
+
       if (file_format_ == format::sav1)
       {
         fprintf(stderr, "Error: Writing SAV v1 format not supported.\n");
@@ -385,60 +379,11 @@ namespace savvy
       std::uint32_t header_block_sz = 0;
       for (auto it = headers.begin(); it != headers.end(); ++it)
       {
-        auto hval = parse_header_value(it->second);
-        if (!hval.id.empty() && hval.id != "PASS")
-        {
-          int which_dict = -1;
-          if (it->first == "contig") which_dict = dictionary::contig;
-          else if (it->first == "INFO" || it->first == "FILTER" || it->first == "FORMAT") which_dict = dictionary::id;
-          else if (it->first == "SAMPLE") which_dict = dictionary::sample;
+        std::string key = it->first;
+        std::string val = it->second;
 
-          if (which_dict >= 0 && dict_.str_to_int[which_dict].find(hval.id) == dict_.str_to_int[which_dict].end())
-          {
-            dictionary::entry e;
-            e.id = hval.id;
-            e.number = std::atoi(hval.number.c_str()); // TODO: handle special character values.
-            if (hval.type == "Integer")
-              e.type = typed_value::int32;
-            else if (hval.type == "Float")
-              e.type = typed_value::real;
-            else if (hval.type == "String")
-              e.type = typed_value::str;
-
-            if (!hval.idx.empty())
-            {
-              std::size_t idx = std::atoi(hval.idx.c_str());
-              dict_.entries[which_dict].resize(idx, {"DELETED", "", 0});
-            }
-
-            dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size();
-            dict_.entries[which_dict].emplace_back(std::move(e));
-          }
-        }
-
-        if (it->first == "INFO")
-        {
-          if (hval.id.substr(0, 10) == "_PBWT_SORT")
-          {
-            ::savvy::internal::pbwt_sort_format_context ctx;
-            ctx.format = parse_header_sub_field(it->second, "Format");
-            ctx.id = hval.id;
-
-            auto insert_it = sort_context_.format_contexts.insert(std::make_pair(std::string(hval.id), std::move(ctx)));
-            sort_context_.field_to_format_contexts.insert(std::make_pair(insert_it.first->second.format, &(insert_it.first->second)));
-          }
-          // TODO: set _PBWT_RESET flag.
-        }
-        else if (it->first == "phasing")
-        {
-          if (it->second == "none")
-            phasing_ = phasing::none;
-          else if (it->second == "partial")
-            phasing_ = phasing::partial;
-          else if (it->second == "phased" || it->second == "full")
-            phasing_ = phasing::phased;
-        }
-        else if (it->first == "FORMAT")
+        auto hval = parse_header_value(val);
+        if (it->first == "FORMAT")
         {
           if (hval.id == "GT")
           {
@@ -460,6 +405,8 @@ namespace savvy
             ph_present = true;
           }
         }
+
+        process_header_pair(it->first, it->second);
 
         header_block_sz += it->first.size();
         header_block_sz += it->second.size();
@@ -559,10 +506,18 @@ namespace savvy
       }
       else
       {
-        ofs_ << "\t" << s.info_.front().first << "=" << s.info_.front().second;
+        auto hdr_detail_it = info_headers_map_.find(s.info_.front().first);
+        if (hdr_detail_it != info_headers_map_.end() && hdr_detail_it->second.get().type == "Flag")
+          ofs_ << "\t" << s.info_.front().first;
+        else
+          ofs_ << "\t" << s.info_.front().first << "=" << s.info_.front().second;
         for (auto it = s.info_.begin() + 1; it != s.info_.end(); ++it)
         {
-          ofs_ << ";" << it->first << "=" << it->second;
+          auto hdr_detail_it = info_headers_map_.find(it->first);
+          if (hdr_detail_it != info_headers_map_.end() && hdr_detail_it->second.get().type == "Flag")
+            ofs_ << ";" << it->first;
+          else
+            ofs_ << ";" << it->first << "=" << it->second;
         }
       }
 
