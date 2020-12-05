@@ -618,9 +618,7 @@ namespace savvy
           ofs_.put('\t');
           for (std::size_t k = 0; k < strides[0]; ++k)
           {
-            if (k > 0)
-              ofs_.put(ph_ptr[i * ph_stride + k - 1] ? '|' : '/'); // TODO: allow for PH
-            typed_value_ptrs[0]->serialize_vcf(i * strides[0] + k, ofs_);
+            typed_value_ptrs[0]->serialize_vcf(i * strides[0] + k, ofs_, k > 0 ? (ph_ptr[i * ph_stride + k - 1] ? '|' : '/') : '\0'); // TODO: allow for PH
           }
 
           for (std::size_t j = 2; j < v.format_fields_.size(); ++j)
@@ -628,9 +626,7 @@ namespace savvy
             ofs_.put(':');
             for (std::size_t k = 0; k < strides[j]; ++k)
             {
-              if (k > 0)
-                ofs_.put(delims[j]);
-              typed_value_ptrs[j]->serialize_vcf(i * strides[j] + k, ofs_);
+              typed_value_ptrs[j]->serialize_vcf(i * strides[j] + k, ofs_, k > 0 ? delims[j] : '\0');
             }
           }
         }
@@ -644,9 +640,7 @@ namespace savvy
             ofs_.put(j > 0 ? ':' : '\t');
             for (std::size_t k = 0; k < strides[j]; ++k)
             {
-              if (k > 0)
-                ofs_.put(delims[j]); // TODO: allow for PH
-              typed_value_ptrs[j]->serialize_vcf(i * strides[j] + k, ofs_);
+              typed_value_ptrs[j]->serialize_vcf(i * strides[j] + k, ofs_, k > 0 ? delims[j] : '\0'); // TODO: allow for PH
             }
           }
         }

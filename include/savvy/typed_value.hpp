@@ -836,11 +836,14 @@ namespace savvy
 
     bool copy_as_dense(typed_value& dest) const
     {
+      dest.local_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
+
+      dest.val_type_ = val_type_;
+      dest.size_ = size_;
+      dest.val_ptr_ = dest.local_data_.data();
+
       if (off_type_)
       {
-        dest.local_data_.resize(0);
-        dest.local_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
-
         switch (val_type_)
         {
         case 0x01u:
@@ -874,7 +877,6 @@ namespace savvy
       }
       else if (val_type_)
       {
-        dest.local_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
         switch (val_type_)
         {
         case 0x01u:
@@ -895,9 +897,6 @@ namespace savvy
         default:
           return false;
         }
-        dest.val_type_ = val_type_;
-        dest.size_ = size_;
-        dest.val_ptr_ = dest.local_data_.data();
       }
 
       return true;
@@ -1571,27 +1570,67 @@ namespace savvy
       local_data_.clear();
     }
 
-    void serialize_vcf(std::size_t idx, std::ostream& os) const
+    void serialize_vcf(std::size_t idx, std::ostream& os, char delim) const
     {
       assert(!off_ptr_ && idx < size_);
 
       switch (val_type_)
       {
       case 0x01u:
-        os << static_cast<int>(((std::int8_t*)val_ptr_)[idx]);
+      {
+        auto v = ((std::int8_t*)val_ptr_)[idx];
+        if (is_end_of_vector(v))
+          break;
+        if (delim)
+          os.put(delim);
+        if (is_missing(v)) os << '.';
+        else os << static_cast<int>(v);
         break;
+      }
       case 0x02u:
-        os << ((std::int16_t*)val_ptr_)[idx]; // TODO: handle endianess
+      {
+        auto v = ((std::int16_t*)val_ptr_)[idx];
+        if (is_end_of_vector(v))
+          break;
+        if (delim)
+          os.put(delim);
+        if (is_missing(v)) os << '.';
+        else os << v; // TODO: handle endianess
         break;
+      }
       case 0x03u:
-        os << ((std::int32_t*)val_ptr_)[idx];
+      {
+        auto v = ((std::int32_t*)val_ptr_)[idx];
+        if (is_end_of_vector(v))
+          break;
+        if (delim)
+          os.put(delim);
+        if (is_missing(v)) os << '.';
+        else os << v;
         break;
+      }
       case 0x04u:
-        os << ((std::int64_t*)val_ptr_)[idx];
+      {
+        auto v = ((std::int64_t*)val_ptr_)[idx];
+        if (is_end_of_vector(v))
+          break;
+        if (delim)
+          os.put(delim);
+        if (is_missing(v)) os << '.';
+        else os << v;
         break;
+      }
       case 0x05u:
-        os << ((float*)val_ptr_)[idx];
+      {
+        auto v = ((float*)val_ptr_)[idx];
+        if (is_end_of_vector(v))
+          break;
+        if (delim)
+          os.put(delim);
+        if (is_missing(v)) os << '.';
+        else os << v;
         break;
+      }
       default:
         os.setstate(os.rdstate() | std::ios::failbit);
       }

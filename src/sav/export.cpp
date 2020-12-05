@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include <cmath>
+
 #include "sav/export.hpp"
 #include "sav/sort.hpp"
 #include "sav/utility.hpp"
@@ -13,7 +13,10 @@
 #include "savvy/vcf_reader.hpp"
 #include "savvy/sav_reader.hpp"
 #include "savvy/savvy.hpp"
+#include "savvy/writer.hpp"
+#include "savvy/reader.hpp"
 
+#include <cmath>
 #include <set>
 #include <fstream>
 #include <ctime>
@@ -800,7 +803,7 @@ int prep_reader_for_export(T& input, const export_prog_args& args)
   }
 }
 
-int export_main(int argc, char** argv)
+int export_main_old(int argc, char** argv)
 {
   export_prog_args args;
   if (!args.parse(argc, argv))
@@ -831,4 +834,51 @@ int export_main(int argc, char** argv)
     savvy::sav::reader input(args.input_path(), args.format());
     return prep_reader_for_export(input, args);
   }
+}
+
+int export_main(int argc, char** argv)
+{
+  export_prog_args args;
+  if (!args.parse(argc, argv))
+  {
+    args.print_usage(std::cerr);
+    return EXIT_FAILURE;
+  }
+
+  if (args.help_is_set())
+  {
+    args.print_usage(std::cout);
+    return EXIT_SUCCESS;
+  }
+
+  savvy::v2::reader rdr(args.input_path());
+
+  if (args.regions().size())
+  {
+    rdr.reset_bounds(args.regions().front());
+    //savvy::sav::indexed_reader input(args.input_path(), args.regions().front(), args.bounding_point(), args.format());
+    //return prep_reader_for_export(input, args);
+  }
+  else if (args.slice())
+  {
+    //savvy::sav::indexed_reader input(args.input_path(), {""}, args.bounding_point(), args.format());
+    //input.reset_bounds(*args.slice());
+    //return prep_reader_for_export(input, args);
+  }
+
+  auto fmt = savvy::file::format::vcf;
+  if (args.file_format() == "sav")
+    fmt = savvy::file::format::sav2;
+  else if (args.file_format() == "bcf")
+    fmt = savvy::file::format::bcf;
+
+  savvy::v2::writer wrt(args.output_path(), fmt, rdr.headers(), rdr.samples());
+
+  savvy::v2::variant r;
+  while (rdr.read(r))
+  {
+    wrt.write(r);
+  }
+
+  return wrt.good() && !rdr.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
