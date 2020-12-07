@@ -872,7 +872,12 @@ int export_main(int argc, char** argv)
   else if (args.file_format() == "bcf")
     fmt = savvy::file::format::bcf;
 
-  savvy::v2::writer wrt(args.output_path(), fmt, rdr.headers(), rdr.samples());
+  std::vector<std::string> sample_ids(rdr.samples().size());
+  std::copy(rdr.samples().begin(), rdr.samples().end(), sample_ids.begin());
+  if (args.subset_ids().size())
+    sample_ids = rdr.subset_samples({args.subset_ids().begin(), args.subset_ids().end()});
+
+  savvy::v2::writer wrt(args.output_path(), fmt, rdr.headers(), sample_ids);
 
   savvy::v2::variant r;
   while (rdr.read(r))

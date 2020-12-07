@@ -288,6 +288,9 @@ namespace savvy
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> ids_;
 
+      std::vector<std::size_t> subset_map_;
+      std::size_t subset_size_;
+
       // Random access
       struct index_data
       {
@@ -340,17 +343,24 @@ namespace savvy
       reader(const std::string& file_path);
 
       const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
-      const std::vector<std::string>& samples() const { return ids_; }
+      const std::vector<std::string>& samples() const { return ids_; } // TODO: return subset when applicable.
 
       const std::vector<header_value_details>& format_headers() const { return format_headers_; }
       const std::vector<header_value_details>& info_headers() const { return info_headers_; }
 
+//      /**
+//       *
+//       * @param subset IDs to include if they exist in file.
+//       * @return subset context to be used with typed_value::get().
+//       */
+//      sample_subset make_sample_subset(const std::unordered_set<std::string>& subset);
+
       /**
        *
        * @param subset IDs to include if they exist in file.
-       * @return subset context to be used with typed_value::get().
+       * @return Ordered vector of file IDs that overlap subset.
        */
-      sample_subset make_sample_subset(const std::unordered_set<std::string>& subset);
+      std::vector<std::string> subset_samples(const std::unordered_set<std::string>& subset);
 
       reader& reset_bounds(genomic_region reg);
       phasing phasing_status() { return phasing_; }
@@ -410,26 +420,50 @@ namespace savvy
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
     }
 
+//    inline
+//    sample_subset reader::make_sample_subset(const std::unordered_set<std::string>& subset)
+//    {
+//      std::vector<std::string> ret;
+//      ret.reserve(std::min(subset.size(), ids_.size()));
+//
+//      std::vector<std::size_t> subset_map(ids_.size(), std::numeric_limits<std::uint64_t>::max());
+//
+//      std::uint64_t subset_index = 0;
+//      for (auto it = ids_.begin(); it != ids_.end(); ++it)
+//      {
+//        if (subset.find(*it) != subset.end())
+//        {
+//          subset_map[std::distance(ids_.begin(), it)] = subset_index;
+//          ret.push_back(*it);
+//          ++subset_index;
+//        }
+//      }
+//
+//      return sample_subset{std::move(ret), std::move(subset_map)};
+//    }
+
     inline
-    sample_subset reader::make_sample_subset(const std::unordered_set<std::string>& subset)
+    std::vector<std::string> reader::subset_samples(const std::unordered_set<std::string>& subset)
     {
       std::vector<std::string> ret;
       ret.reserve(std::min(subset.size(), ids_.size()));
 
-      std::vector<std::size_t> subset_map(ids_.size(), std::numeric_limits<std::uint64_t>::max());
-
+      subset_map_.clear();
+      subset_map_.resize(ids_.size(), std::numeric_limits<std::uint64_t>::max());
       std::uint64_t subset_index = 0;
       for (auto it = ids_.begin(); it != ids_.end(); ++it)
       {
         if (subset.find(*it) != subset.end())
         {
-          subset_map[std::distance(ids_.begin(), it)] = subset_index;
+          subset_map_[std::distance(ids_.begin(), it)] = subset_index;
           ret.push_back(*it);
           ++subset_index;
         }
       }
 
-      return sample_subset{std::move(ret), std::move(subset_map)};
+      subset_size_ = subset_index;
+
+      return ret;
     }
 
     inline
@@ -621,90 +655,106 @@ namespace savvy
     {
       if (good())
       {
+
         if (file_format_ == format::vcf)
-          return read_vcf_record(r);
+          read_vcf_record(r);
         else if (file_format_ == format::sav1)
-          return read_sav1_record(r);
-
-        std::uint32_t shared_sz, indiv_sz;
-        if (!input_stream_->read((char*)&shared_sz, sizeof(shared_sz))) // TODO: set to bad if gcount > 0.
+          read_sav1_record(r);
+        else
         {
-          return *this;
-        }
-
-        if (!input_stream_->read((char*)&indiv_sz, sizeof(indiv_sz)))
-        {
-          std::fprintf(stderr, "Error: Invalid record data\n");
-          input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
-          return *this;
-        }
-
-        // TODO: endianess
-
-        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        // Read and parse shared and individual data
-        r.shared_data_.resize(shared_sz);
-        r.indiv_buf_.resize(indiv_sz);
-        if (!input_stream_->read(r.shared_data_.data(), r.shared_data_.size()) || !input_stream_->read(r.indiv_buf_.data(), r.indiv_buf_.size()))
-        {
-          std::fprintf(stderr, "Error: Invalid record data\n");
-          input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
-          return *this;
-        }
-
-        if (!variant::deserialize(r, dict_, this->ids_.size(), file_format_ == format::bcf, phasing_))
-        {
-          std::fprintf(stderr, "Error: Invalid record data\n");
-          input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
-          return *this;
-        }
-        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-
-        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        // Handle semantic INFO fields
-        int pbwt_reset{}; r.get_info("_PBWT_RESET", pbwt_reset);
-        if (pbwt_reset)
-          sort_context_.reset();
-
-        std::vector<::savvy::internal::pbwt_sort_format_context*> pbwt_format_pointers;
-        pbwt_format_pointers.reserve(r.format_fields_.size());
-        for (auto it = r.info().begin(); it != r.info().end(); )
-        {
-          if (it->first.substr(0, 10) == "_PBWT_SORT")
+          std::uint32_t shared_sz, indiv_sz;
+          if (!input_stream_->read((char*)&shared_sz, sizeof(shared_sz))) // TODO: set to bad if gcount > 0.
           {
-            auto f = sort_context_.format_contexts.find(it->first);
-            if (f != sort_context_.format_contexts.end())
+            return *this;
+          }
+
+          if (!input_stream_->read((char*)&indiv_sz, sizeof(indiv_sz)))
+          {
+            std::fprintf(stderr, "Error: Invalid record data\n");
+            input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+            return *this;
+          }
+
+          // TODO: endianess
+
+          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+          // Read and parse shared and individual data
+          r.shared_data_.resize(shared_sz);
+          r.indiv_buf_.resize(indiv_sz);
+          if (!input_stream_->read(r.shared_data_.data(), r.shared_data_.size()) || !input_stream_->read(r.indiv_buf_.data(), r.indiv_buf_.size()))
+          {
+            std::fprintf(stderr, "Error: Invalid record data\n");
+            input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+            return *this;
+          }
+
+          if (!variant::deserialize(r, dict_, this->ids_.size(), file_format_ == format::bcf, phasing_))
+          {
+            std::fprintf(stderr, "Error: Invalid record data\n");
+            input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+            return *this;
+          }
+          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
+          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+          // Handle semantic INFO fields
+          int pbwt_reset{}; r.get_info("_PBWT_RESET", pbwt_reset);
+          if (pbwt_reset)
+            sort_context_.reset();
+
+          std::vector<::savvy::internal::pbwt_sort_format_context*> pbwt_format_pointers;
+          pbwt_format_pointers.reserve(r.format_fields_.size());
+          for (auto it = r.info().begin(); it != r.info().end(); )
+          {
+            if (it->first.substr(0, 10) == "_PBWT_SORT")
             {
-              pbwt_format_pointers.emplace_back(&(f->second));
-              it = r.remove_info(it);
-              continue;
+              auto f = sort_context_.format_contexts.find(it->first);
+              if (f != sort_context_.format_contexts.end())
+              {
+                pbwt_format_pointers.emplace_back(&(f->second));
+                it = r.remove_info(it);
+                continue;
+              }
+            }
+            ++it;
+          }
+          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
+
+          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+          // Unsort FMT fields
+          for (auto fmt_it = r.format_fields_.begin(); fmt_it != r.format_fields_.end(); ++fmt_it)
+          {
+            for (auto pt = pbwt_format_pointers.begin(); pt != pbwt_format_pointers.end(); )
+            {
+              if ((*pt)->format == fmt_it->first)
+              {
+                typed_value::internal::pbwt_unsort(fmt_it->second, (*pt)->sort_map, sort_context_.prev_sort_mapping, sort_context_.counts);
+                pt = pbwt_format_pointers.erase(pt);
+                break;
+              }
+              else
+              {
+                ++pt;
+              }
             }
           }
-          ++it;
+          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         }
-        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-
-        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        // Unsort FMT fields
-        for (auto fmt_it = r.format_fields_.begin(); fmt_it != r.format_fields_.end(); ++fmt_it)
+        if (good())
         {
-          for (auto pt = pbwt_format_pointers.begin(); pt != pbwt_format_pointers.end(); )
+          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+          // Apply sample subset
+          if (subset_size_ != ids_.size())
           {
-            if ((*pt)->format == fmt_it->first)
+            for (auto it = r.format_fields_.begin(); it != r.format_fields_.end(); ++it)
             {
-              typed_value::internal::pbwt_unsort(fmt_it->second, (*pt)->sort_map, sort_context_.prev_sort_mapping, sort_context_.counts);
-              pt = pbwt_format_pointers.erase(pt);
-              break;
-            }
-            else
-            {
-              ++pt;
+              it->second.subset(subset_map_, subset_size_);
             }
           }
+          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         }
-        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-
       }
 
       return *this;

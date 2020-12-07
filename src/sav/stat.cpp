@@ -102,13 +102,9 @@ int stat_main(int argc, char** argv)
     savvy::v2::reader rdr(args.input_path());
     savvy::v2::variant rec;
 
-    savvy::sample_subset subset({}, {});
-    std::vector<std::int8_t> dense_geno;
-
     while (rdr.read(rec))
     {
       rec.format_fields().front().second.get(geno);
-      rec.format_fields().front().second.get(dense_geno, subset);
       if (rec.alts().size() > 1)
         ++multi_allelic;
       variant_cnt += rec.alts().size();

@@ -979,16 +979,16 @@ namespace savvy
       switch (off_type_)
       {
       case 0x01u:
-        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint8_t*)off_ptr_, args...);
+        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint8_t*)off_ptr_, std::forward<Args>(args)...);
         break;
       case 0x02u:
-        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint16_t*)off_ptr_, args...); // TODO: handle endianess
+        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint16_t*)off_ptr_, std::forward<Args>(args)...); // TODO: handle endianess
         break;
       case 0x03u:
-        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint32_t*)off_ptr_, args...);
+        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint32_t*)off_ptr_, std::forward<Args>(args)...);
         break;
       case 0x04u:
-        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint64_t*)off_ptr_, args...);
+        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint64_t*)off_ptr_, std::forward<Args>(args)...);
         break;
       default:
         return false;
@@ -1026,16 +1026,16 @@ namespace savvy
       switch (off_type_)
       {
       case 0x01u:
-        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint8_t*)off_ptr_, args...);
+        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint8_t*)off_ptr_, std::forward<Args>(args)...);
         break;
       case 0x02u:
-        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint16_t*)off_ptr_, args...); // TODO: handle endianess
+        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint16_t*)off_ptr_, std::forward<Args>(args)...); // TODO: handle endianess
         break;
       case 0x03u:
-        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint32_t*)off_ptr_, args...);
+        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint32_t*)off_ptr_, std::forward<Args>(args)...);
         break;
       case 0x04u:
-        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint64_t*)off_ptr_, args...);
+        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint64_t*)off_ptr_, std::forward<Args>(args)...);
         break;
       default:
         return false;
@@ -1073,22 +1073,22 @@ namespace savvy
       switch (val_type_)
       {
       case 0x01u:
-        fn((std::int8_t*)val_ptr_, ((std::int8_t*)val_ptr_) + sz, args...);
+        fn((std::int8_t*)val_ptr_, ((std::int8_t*)val_ptr_) + sz, std::forward<Args>(args)...);
         break;
       case 0x02u:
-        fn((std::int16_t*)val_ptr_, ((std::int16_t*)val_ptr_) + sz, args...); // TODO: handle endianess
+        fn((std::int16_t*)val_ptr_, ((std::int16_t*)val_ptr_) + sz, std::forward<Args>(args)...); // TODO: handle endianess
         break;
       case 0x03u:
-        fn((std::int32_t*)val_ptr_, ((std::int32_t*)val_ptr_) + sz, args...);
+        fn((std::int32_t*)val_ptr_, ((std::int32_t*)val_ptr_) + sz, std::forward<Args>(args)...);
         break;
       case 0x04u:
-        fn((std::int64_t*)val_ptr_, ((std::int64_t*)val_ptr_) + sz, args...);
+        fn((std::int64_t*)val_ptr_, ((std::int64_t*)val_ptr_) + sz, std::forward<Args>(args)...);
         break;
       case 0x05u:
-        fn((float*)val_ptr_, ((float*)val_ptr_) + sz, args...);
+        fn((float*)val_ptr_, ((float*)val_ptr_) + sz, std::forward<Args>(args)...);
         break;
       case 0x07u:
-        fn(val_ptr_, val_ptr_ + sz, args...);
+        fn(val_ptr_, val_ptr_ + sz, std::forward<Args>(args)...);
         break;
       default:
         return false;
@@ -1104,22 +1104,22 @@ namespace savvy
       switch (val_type_)
       {
       case 0x01u:
-        fn((const std::int8_t*)val_ptr_, ((const std::int8_t*)val_ptr_) + sz, args...);
+        fn((const std::int8_t*)val_ptr_, ((const std::int8_t*)val_ptr_) + sz, std::forward<Args>(args)...);
         break;
       case 0x02u:
-        fn((const std::int16_t*)val_ptr_, ((const std::int16_t*)val_ptr_) + sz, args...); // TODO: handle endianess
+        fn((const std::int16_t*)val_ptr_, ((const std::int16_t*)val_ptr_) + sz, std::forward<Args>(args)...); // TODO: handle endianess
         break;
       case 0x03u:
-        fn((const std::int32_t*)val_ptr_, ((const std::int32_t*)val_ptr_) + sz, args...);
+        fn((const std::int32_t*)val_ptr_, ((const std::int32_t*)val_ptr_) + sz, std::forward<Args>(args)...);
         break;
       case 0x04u:
-        fn((const std::int64_t*)val_ptr_, ((const std::int64_t*)val_ptr_) + sz, args...);
+        fn((const std::int64_t*)val_ptr_, ((const std::int64_t*)val_ptr_) + sz, std::forward<Args>(args)...);
         break;
       case 0x05u:
-        fn((const float*)val_ptr_, ((const float*)val_ptr_) + sz, args...);
+        fn((const float*)val_ptr_, ((const float*)val_ptr_) + sz, std::forward<Args>(args)...);
         break;
       case 0x07u:
-        fn((const char*)val_ptr_, ((const char*)val_ptr_) + sz, args...);
+        fn((const char*)val_ptr_, ((const char*)val_ptr_) + sz, std::forward<Args>(args)...);
         break;
       default:
         return false;
@@ -1341,7 +1341,7 @@ namespace savvy
         }
       }
     };
-
+#if 0
     template<typename T>
     bool get(std::vector<T>& dest, const sample_subset& subset) const
     {
@@ -1365,6 +1365,7 @@ namespace savvy
       }
       return false;
     }
+#endif
 
     template<typename T>
     bool get(savvy::compressed_vector<T>& dest) const
@@ -1568,6 +1569,119 @@ namespace savvy
       off_type_ = 0;
       val_type_ = 0;
       local_data_.clear();
+    }
+
+    struct subset_shift_tpl
+    {
+      template <typename T>
+      void operator()(T* valp, T* endp, const std::vector<std::size_t>& subset_map)
+      {
+        std::size_t sz = endp - valp;
+        std::size_t stride = sz / subset_map.size();
+
+        std::size_t i = 0;
+        for ( ; i < subset_map.size() && i == subset_map[i]; ++i) {}
+
+        for ( ; i < subset_map.size(); ++i)
+        {
+          if (subset_map[i] < std::numeric_limits<std::size_t>::max())
+          {
+            assert(subset_map[i] < i);
+            for (std::size_t j = 0; j < stride; ++j)
+            {
+              valp[subset_map[i] * stride + j] = valp[i * stride + j];
+            }
+          }
+        }
+      }
+    };
+
+    struct subset_shift_sparse_tpl
+    {
+      template <typename T, typename T2>
+      void operator()(T* valp, T* endp, T2* offp, const std::vector<std::size_t>& subset_map, std::size_t sz, std::size_t& sparse_size)
+      {
+        std::size_t sp_sz = endp - valp;
+        std::size_t stride = sz / subset_map.size();
+
+        std::size_t surplus = 0;
+
+        auto dest_valp = valp;
+        auto dest_offp = offp;
+
+        std::size_t last_offset_new = 0;
+        std::size_t total_offset_old = 0;
+        for (std::size_t i = 0; i < sp_sz; ++i,++total_offset_old)
+        {
+          total_offset_old += offp[i];
+          if (subset_map[total_offset_old / stride] != std::numeric_limits<std::size_t>::max())
+          {
+            std::size_t new_off = subset_map[total_offset_old / stride] * stride + (total_offset_old % stride);
+            assert(new_off - last_offset_new < subset_map.size() * stride);
+            *(dest_offp++) = new_off - last_offset_new;
+            *(dest_valp++) = valp[i];
+            last_offset_new = new_off + 1;
+          }
+        }
+
+        sparse_size = dest_valp - valp;
+      }
+    };
+
+
+    bool subset(const std::vector<std::size_t>& subset_mask, std::size_t subset_size)
+    {
+      if (val_type_ == 0x07u)
+      {
+        // TODO: print error message
+        return false;
+      }
+
+      if (size_ < subset_mask.size())
+      {
+        // TODO: print error message
+        return false;
+      }
+
+      if (size_ % subset_mask.size())
+      {
+        // TODO: print error message
+        return false;
+      }
+
+      bool ret = false;
+
+      std::size_t stride = size_ / subset_mask.size();
+
+      if (off_type_)
+      {
+        local_data_.resize(sizeof(std::uint64_t) * sparse_size_);
+        switch (off_type_)
+        {
+        case 0x01u:
+          std::copy((std::uint8_t*)off_ptr_, ((std::uint8_t*)off_ptr_) + sparse_size_, (std::uint64_t*)local_data_.data());
+          break;
+        case 0x02u:
+          std::copy((std::uint16_t*)off_ptr_, ((std::uint16_t*)off_ptr_) + sparse_size_, (std::uint64_t*)local_data_.data());
+          break;
+        case 0x03u:
+          std::copy((std::uint32_t*)off_ptr_, ((std::uint32_t*)off_ptr_) + sparse_size_, (std::uint64_t*)local_data_.data());
+          break;
+//        case 0x04u:
+//          DO NOTHING
+//          break;
+        }
+        ret = apply_sparse(subset_shift_sparse_tpl(), subset_mask, size_, std::ref(sparse_size_));
+      }
+      else if (val_type_)
+      {
+        //dest.resize(subset.ids().size() * stride);
+
+        ret = apply(subset_shift_tpl(), subset_mask); // TODO: handle endianess
+      }
+
+      size_ = subset_size * stride;
+      return ret;
     }
 
     void serialize_vcf(std::size_t idx, std::ostream& os, char delim) const
@@ -1926,7 +2040,7 @@ namespace savvy
     sparse_size_ = 0;
     val_ptr_ = data_ptr;
     off_ptr_ = nullptr;
-    //local_data_.clear();
+    local_data_.clear();
   }
 
   inline
@@ -1949,7 +2063,7 @@ namespace savvy
     sparse_size_ = sp_sz;
     val_ptr_ = data_ptr + sp_sz * (1u << bcf_type_shift[off_type]);
     off_ptr_ = data_ptr;
-    //local_data_.clear();
+    local_data_.clear();
   }
 
   inline
