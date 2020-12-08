@@ -363,6 +363,7 @@ namespace savvy
       std::vector<std::string> subset_samples(const std::unordered_set<std::string>& subset);
 
       reader& reset_bounds(genomic_region reg);
+      reader& reset_bounds(slice_bounds reg);
       phasing phasing_status() { return phasing_; }
 
       bool good() const { return this->input_stream_->good(); }
@@ -493,6 +494,68 @@ namespace savvy
         else
         {
           input_stream_->seekg(csi_index_->intervals.front().first);
+        }
+      }
+      else
+      {
+        input_stream_->setstate(std::ios::failbit); //TODO: error message
+      }
+
+      return *this;
+    }
+
+    inline
+    reader& reader::reset_bounds(slice_bounds reg)
+    {
+      if (file_format_ == format::sav1 || file_format_ == format::sav2)
+      {
+        reset_bounds(genomic_region(reg.chromosome()));
+
+        if (s1r_index_ && s1r_index_->file.good())
+        {
+          auto discard_skip = [this](std::uint32_t num)
+          {
+            savvy::v2::variant tmp_var;
+            while (num > 0 && s1r_index_->current_offset_in_block < s1r_index_->total_in_block && good())
+            {
+              if (!read_record(tmp_var))
+                input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+
+              ++(s1r_index_->current_offset_in_block);
+              --num;
+            }
+            return num;
+          };
+
+          std::size_t num_variants_to_skip = reg.from();
+          s1r_index_->max_records_to_read = reg.to() > reg.from() ? reg.to() - reg.from() : 0;
+    //        if (num_variants_to_skip < total_in_block_ - current_offset_in_block_)
+    //        {
+    //          discard_skip(num_variants_to_skip);
+    //        }
+    //        else
+          {
+    //          num_variants_to_skip -= (total_in_block_ - current_offset_in_block_);
+            while (s1r_index_->iter != s1r_index_->query.end())
+            {
+              s1r_index_->total_in_block = std::uint32_t(0x000000000000FFFF & s1r_index_->iter->value()) + 1;
+
+              if (num_variants_to_skip < s1r_index_->total_in_block)
+              {
+                s1r_index_->current_offset_in_block = 0;
+                this->input_stream_->seekg(std::streampos((s1r_index_->iter->value() >> 16) & 0x0000FFFFFFFFFFFF));
+                ++(s1r_index_->iter);
+                discard_skip(num_variants_to_skip);
+                return *this;
+              }
+
+              num_variants_to_skip -= s1r_index_->total_in_block;
+              ++(s1r_index_->iter);
+            }
+
+            // Skipped past end of index.
+            this->input_stream_->setstate(std::ios::failbit);
+          }
         }
       }
       else

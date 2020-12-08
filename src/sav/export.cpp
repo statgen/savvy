@@ -852,18 +852,27 @@ int export_main(int argc, char** argv)
   }
 
   savvy::v2::reader rdr(args.input_path());
+  if (!rdr)
+  {
+    std::cerr << "Error: failed to open input file" << std::endl;
+    return EXIT_FAILURE;
+  }
 
   if (args.regions().size())
   {
-    rdr.reset_bounds(args.regions().front());
-    //savvy::sav::indexed_reader input(args.input_path(), args.regions().front(), args.bounding_point(), args.format());
-    //return prep_reader_for_export(input, args);
+    if (rdr.reset_bounds(args.regions().front()).bad())
+    {
+      std::cerr << "Error: failed to load index for genomic region query" << std::endl;
+      return EXIT_FAILURE;
+    }
   }
   else if (args.slice())
   {
-    //savvy::sav::indexed_reader input(args.input_path(), {""}, args.bounding_point(), args.format());
-    //input.reset_bounds(*args.slice());
-    //return prep_reader_for_export(input, args);
+    if (rdr.reset_bounds(*args.slice()).bad())
+    {
+      std::cerr << "Error: failed to load index for slice query" << std::endl;
+      return EXIT_FAILURE;
+    }
   }
 
   auto fmt = savvy::file::format::vcf;
@@ -882,7 +891,10 @@ int export_main(int argc, char** argv)
   savvy::v2::variant r;
   while (rdr.read(r))
   {
-    wrt.write(r);
+    if (true) //args.filter_functor()(r))
+    {
+      wrt.write(r);
+    }
   }
 
   return wrt.good() && !rdr.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
