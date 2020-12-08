@@ -214,7 +214,7 @@ int concat_main(int argc, char **argv)
       return EXIT_FAILURE;
     }
 
-    auto delta = ifs.tellg() - ofs.tellp();
+    auto delta = ofs.tellp() - ifs.tellg();
     savvy::s1r::reader idx(*ft);
     if (output_index && idx.good())
     {
