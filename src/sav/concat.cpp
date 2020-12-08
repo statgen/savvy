@@ -173,7 +173,7 @@ int concat_main(int argc, char **argv)
   std::array<std::uint8_t, 16> uuid;
 
   {
-    savvy::v2::writer header_writer( args.output_path(), savvy::file::format::sav2, headers, samples, savvy::v2::writer::default_compression_level, false);
+    savvy::v2::writer header_writer( args.output_path(), savvy::file::format::sav2, headers, samples, savvy::v2::writer::default_compression_level, "/dev/null");
     uuid = header_writer.uuid();
   }
 

@@ -59,11 +59,12 @@ namespace savvy
     {
     public:
       static const int default_compression_level = 3;
-      static const int default_block_size = 2048;
+      static const int default_block_size = 4096;
     private:
       std::mt19937_64 rng_;
       std::unique_ptr<std::streambuf> output_buf_;
       std::string file_path_;
+      std::string index_path_;
       std::ostream ofs_;
       std::size_t n_samples_ = 0;
       std::vector<char> serialized_buf_;
@@ -82,7 +83,7 @@ namespace savvy
       static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, format file_format, std::uint8_t compression_level);
 
     public:
-      writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level = default_compression_level, bool create_index = true);
+      writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level = default_compression_level, std::string custom_index_path = "");
 
       ~writer();
 
@@ -130,12 +131,13 @@ namespace savvy
     }
 
     inline
-    writer::writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level, bool create_index) :
+    writer::writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level, std::string custom_index_path) :
       rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t) this),
       output_buf_(create_out_streambuf(file_path, file_format, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
       ofs_(output_buf_.get()),
       //samples_(samples_beg, samples_end),
-      file_path_(file_path)
+      file_path_(file_path),
+      index_path_(custom_index_path)
     {
       file_format_ = file_format;
       uuid_ = ::savvy::detail::gen_uuid(rng_);
@@ -148,19 +150,26 @@ namespace savvy
       }
 
       // TODO: Use mkstemp when shrinkwrap supports FILE*
-      if (file_format_ == format::sav2 && create_index) // TODO: Check if zstd is enabled.
+      if (file_format_ == format::sav2 && index_path_ != "/dev/null") // TODO: Check if zstd is enabled.
       {
-        std::string idx_path = "/tmp/tmpfileXXXXXX";
-        int tmp_fd = mkstemp(&idx_path[0]);
-        if (!tmp_fd)
+        if (index_path_.size())
         {
-          std::cerr << "Error: could not open temp file for s1r index (" << idx_path << ")" << std::endl;
+          index_file_ = ::savvy::detail::make_unique<s1r::writer>(index_path_, uuid_);
         }
         else
         {
-          index_file_ = ::savvy::detail::make_unique<s1r::writer>(idx_path, uuid_);
-          std::remove(idx_path.c_str());
-          ::close(tmp_fd);
+          std::string tmp_idx_path = "/tmp/tmpfileXXXXXX";
+          int tmp_fd = mkstemp(&tmp_idx_path[0]);
+          if (!tmp_fd)
+          {
+            std::cerr << "Error: could not open temp file for s1r index (" << tmp_idx_path << ")" << std::endl;
+          }
+          else
+          {
+            index_file_ = ::savvy::detail::make_unique<s1r::writer>(tmp_idx_path, uuid_);
+            std::remove(tmp_idx_path.c_str());
+            ::close(tmp_fd);
+          }
         }
       }
 
@@ -192,12 +201,16 @@ namespace savvy
 
         ofs_.flush();
         auto idx_fs = index_file_->close();
-        std::fstream ofs(file_path_, std::ios::out | std::ios::binary | std::ios::app); // TODO: THIS SEEMS DANGEROUS. Store FILE* when creating zstd stream and use instead of opening new descriptor.
-        std::int64_t p = ofs.tellp();
-        if (!::savvy::detail::append_skippable_zstd_frame(idx_fs, ofs))
+
+        if (index_path_.empty()) // append if custom index path was not provided
         {
-          ofs_.setstate(ofs_.rdstate() | std::ios::badbit); // TODO: Use linkat or send file (see https://stackoverflow.com/a/25154505/1034772)
-          std::cerr << "Error: index file too big for skippable zstd frame" << std::endl;
+          std::fstream ofs(file_path_, std::ios::out | std::ios::binary | std::ios::app); // TODO: THIS SEEMS DANGEROUS. Store FILE* when creating zstd stream and use instead of opening new descriptor.
+          std::int64_t p = ofs.tellp();
+          if (!::savvy::detail::append_skippable_zstd_frame(idx_fs, ofs))
+          {
+            ofs_.setstate(ofs_.rdstate() | std::ios::badbit); // TODO: Use linkat or send file (see https://stackoverflow.com/a/25154505/1034772)
+            std::cerr << "Error: index file too big for skippable zstd frame" << std::endl;
+          }
         }
       }
     }
@@ -226,7 +239,7 @@ namespace savvy
       bool is_bcf = file_format_ == format::bcf; // TODO: ...
       bool flushed = false;
 
-      if (block_size_ != 0 && (block_size_ <= record_count_in_block_ || r.chrom() != current_chromosome_)) // TODO: this needs to be fixed to support variable block size
+      if (block_size_ != 0 && file_format_ == format::sav2 && (block_size_ <= record_count_in_block_ || r.chrom() != current_chromosome_)) // TODO: this needs to be fixed to support variable block size
       {
         if (index_file_ && record_count_in_block_)
         {

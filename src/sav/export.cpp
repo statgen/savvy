@@ -886,7 +886,8 @@ int export_main(int argc, char** argv)
   if (args.subset_ids().size())
     sample_ids = rdr.subset_samples({args.subset_ids().begin(), args.subset_ids().end()});
 
-  savvy::v2::writer wrt(args.output_path(), fmt, rdr.headers(), sample_ids);
+  savvy::v2::writer wrt(args.output_path(), fmt, rdr.headers(), sample_ids, args.compression_level(), args.index_path());
+  wrt.set_block_size(args.block_size());
 
   savvy::v2::variant r;
   while (rdr.read(r))
