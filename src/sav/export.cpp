@@ -621,7 +621,7 @@ int export_records(savvy::sav::reader& in, const export_prog_args& args, Writer&
 
   //auto fn = gen_filter_predicate(in, args);
 
-  while (in.read_if(std::ref(args.query_expression_functor()), variant, genotypes))
+  while (in.read(/*_if(std::ref(args.query_expression_functor()),*/ variant, genotypes))
   {
     if (args.update_info())
       savvy::update_info_fields(variant, genotypes, args.format());
@@ -642,7 +642,7 @@ int export_records(savvy::sav::indexed_reader& in, const export_prog_args& args,
 
   //auto fn = gen_filter_predicate(in, args);
 
-  while (in.read_if(std::ref(args.query_expression_functor()), variant, genotypes))
+  while (in.read(/*_if(std::ref(args.query_expression_functor()),*/ variant, genotypes))
   {
     if (args.update_info())
       savvy::update_info_fields(variant, genotypes, args.format());
@@ -657,7 +657,7 @@ int export_records(savvy::sav::indexed_reader& in, const export_prog_args& args,
     for (auto it = args.regions().begin() + 1; it != args.regions().end(); ++it)
     {
       in.reset_bounds(*it);
-      while (in.read_if(std::ref(args.query_expression_functor()), variant, genotypes))
+      while (in.read(/*_if(std::ref(args.query_expression_functor()),*/ variant, genotypes))
       {
         if (args.update_info())
           savvy::update_info_fields(variant, genotypes, args.format());
@@ -894,7 +894,7 @@ int export_main(int argc, char** argv)
   savvy::v2::variant r;
   while (rdr.read(r))
   {
-    if (true) //args.filter_functor()(r))
+    if (args.query_expression_functor()(r))
     {
       wrt.write(r);
     }

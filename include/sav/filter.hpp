@@ -28,7 +28,7 @@ public:
     }
   }
 
-  bool operator()(const savvy::site_info& site) const
+  bool operator()(const savvy::v2::site_info& site) const
   {
     return (*expression_tree_)(site);
   }
@@ -71,7 +71,7 @@ private:
   class expression
   {
   public:
-    virtual bool operator()(const savvy::site_info& site) const = 0;
+    virtual bool operator()(const savvy::v2::site_info& site) const = 0;
     virtual ~expression(){}
   };
 
@@ -83,7 +83,7 @@ private:
     {
     }
 
-    bool operator()(const savvy::site_info& site) const
+    bool operator()(const savvy::v2::site_info& site) const
     {
       return val_;
     }
@@ -105,15 +105,24 @@ private:
     {
     }
 
-    static std::pair<std::string::const_iterator, std::string::const_iterator> get_value_from_operand(const std::string& operand, const savvy::site_info& site)
+    static std::string get_value_from_operand(const std::string& operand, const savvy::v2::site_info& site)
     {
       if (operand.empty())
         return {operand.cend(), operand.cend()};
 
       if (!is_string_delim(operand.front()) && !isdigit(operand.front()) && operand.front() != '+' && operand.front() != '-')
       {
-        const std::string& tmp = site.prop(operand);
-        return {tmp.cbegin(), tmp.cend()};
+        auto res = std::find_if(site.info().begin(), site.info().end(), [&operand](const std::pair<std::string, savvy::typed_value>& v) { return v.first == operand; });
+        if (res != site.info().end())
+        {
+          std::stringstream ss;
+          ss << res->second;
+          return ss.str();
+        }
+        return "";
+
+        //const std::string& tmp = site.prop(operand);
+        //return {tmp.cbegin(), tmp.cend()};
       }
 
       auto beg = operand.begin();
@@ -127,18 +136,27 @@ private:
       return {beg, end};
     }
 
-    bool operator()(const savvy::site_info& site) const
+    bool operator()(const savvy::v2::site_info& site) const
     {
-      auto left_range = get_value_from_operand(left, site);
-      auto right_range = get_value_from_operand(right, site);
-      std::size_t left_sz = std::distance(left_range.first, left_range.second);
-      std::size_t right_sz = std::distance(right_range.first, right_range.second);
+//      auto left_range = get_value_from_operand(left, site);
+//      auto right_range = get_value_from_operand(right, site);
+//      std::size_t left_sz = std::distance(left_range.first, left_range.second);
+//      std::size_t right_sz = std::distance(right_range.first, right_range.second);
+//
+//      if (comparison == cmpr::equals) return  left_sz == right_sz && std::equal(left_range.first, left_range.second, right_range.first);
+//      if (comparison == cmpr::not_equals) return left_sz != right_sz || !std::equal(left_range.first, left_range.second, right_range.first);
+//
+//      double numeric_left = std::atof(std::string(left_range.first, left_range.second).c_str());
+//      double numeric_right = std::atof(std::string(right_range.first, right_range.second).c_str());
 
-      if (comparison == cmpr::equals) return  left_sz == right_sz && std::equal(left_range.first, left_range.second, right_range.first);
-      if (comparison == cmpr::not_equals) return left_sz != right_sz || !std::equal(left_range.first, left_range.second, right_range.first);
+      auto left_str = get_value_from_operand(left, site);
+      auto right_str = get_value_from_operand(right, site);
 
-      double numeric_left = std::atof(std::string(left_range.first, left_range.second).c_str());
-      double numeric_right = std::atof(std::string(right_range.first, right_range.second).c_str());
+      if (comparison == cmpr::equals) return  left_str == right_str;
+      if (comparison == cmpr::not_equals) return left_str != right_str;
+
+      double numeric_left = std::atof(left_str.c_str());
+      double numeric_right = std::atof(right_str.c_str());
 
       if (comparison == cmpr::less_than ) return numeric_left < numeric_right;
       if (comparison == cmpr::greater_than ) return numeric_left > numeric_right;
@@ -168,7 +186,7 @@ private:
     {
     }
 
-    bool operator()(const savvy::site_info& site) const
+    bool operator()(const savvy::v2::site_info& site) const
     {
       if (op == logical::op_or)
         return (*left)(site) || (*right)(site);
