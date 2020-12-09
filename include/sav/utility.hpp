@@ -14,6 +14,7 @@
 #include <unordered_set>
 
 savvy::genomic_region string_to_region(const std::string& s);
+std::string join_vector_to_string(const std::vector<std::string>& vec, std::string delim);
 std::vector<std::string> split_string_to_vector(const char* in, char delim);
 std::unordered_set<std::string> split_string_to_set(const char* in, char delim);
 std::unordered_set<std::string> split_file_to_set(const char* in);

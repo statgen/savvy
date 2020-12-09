@@ -46,6 +46,18 @@ savvy::genomic_region string_to_region(const std::string& s)
 
 }
 
+std::string join_vector_to_string(const std::vector<std::string>& vec, std::string delim)
+{
+  std::string ret;
+  for (auto it = vec.begin(); it != vec.end(); ++it)
+  {
+    if (it != vec.begin())
+      ret += delim;
+    ret += *it;
+  }
+  return ret;
+}
+
 std::vector<std::string> split_string_to_vector(const char* in, char delim)
 {
   std::vector<std::string> ret;

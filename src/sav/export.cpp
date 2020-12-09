@@ -16,6 +16,7 @@
 #include "savvy/writer.hpp"
 #include "savvy/reader.hpp"
 
+#include <regex>
 #include <cmath>
 #include <set>
 #include <fstream>
@@ -36,7 +37,7 @@ private:
   std::vector<savvy::genomic_region> regions_;
   std::unique_ptr<savvy::slice_bounds> slice_;
   std::vector<std::string> info_fields_;
-  filter query_;
+  filter filter_;
   std::string input_path_;
   std::string output_path_;
   std::string index_path_;
@@ -66,7 +67,6 @@ public:
         {"index-file", required_argument, 0, 'X'},
         {"info-fields", required_argument, 0, 'm'},
         {"output-format", required_argument, 0, 'O'},
-        {"query", required_argument, 0, 'q'},
         {"regions", required_argument, 0, 'r'},
         {"regions-file", required_argument, 0, 'R'},
         {"sample-ids", required_argument, 0, 'i'},
@@ -87,7 +87,7 @@ public:
   const std::string& file_format() const { return file_format_; }
   const std::string& index_path() const { return index_path_; }
   const std::string& headers_path() const { return headers_path_; }
-  const filter& query_expression_functor() const { return query_; }
+  const filter& filter_functor() const { return filter_; }
   const std::unordered_set<std::string>& subset_ids() const { return subset_ids_; }
   const std::unordered_set<std::string>& fields_to_generate() const { return fields_to_generate_; }
   const std::vector<savvy::genomic_region>& regions() const { return regions_; }
@@ -111,7 +111,7 @@ public:
     os << " -b, --block-size       Number of markers in SAV compression block (0-65535, default: " << default_block_size << ")\n";
     os << " -c, --slice            Range formatted as begin:end (non-inclusive end) that specifies a subset of record offsets within file\n";
     os << " -d, --data-format      Format field to export (GT, DS, HDS or GP, default: GT)\n";
-    os << " -f, --filter           Regular expression for including variants based on FILTER field (eg, -e '/PASS/')\n";
+    os << " -f, --filter           Filter expression for including variants based on FILTER, QUAL, and INFO fields (eg, -f 'AC>=10;AF>0.01')\n";
     os << " -g, --generate-info    Generate info fields specified as a comma separated list (AC,AN,AF,MAF,SPARSE_OFFSETS_<FMT>,SPARSE_VALUES_<FMT>)\n";
     os << " -h, --help             Print usage\n";
     os << " -i, --sample-ids       Comma separated list of sample IDs to subset\n";
@@ -119,7 +119,6 @@ public:
     //os << " -m, --info-fields      Comma separated list of INFO (metadata) fields to include with each variant (default: exports all info fields)\n";
     os << " -O, --output-format    Output file format (vcf, vcf.gz or sav, default: vcf)\n";
     os << " -p, --bounding-point   Determines the inclusion policy of indels during region queries (any, all, beg or end, default: beg)\n";
-    os << " -q, --query            Query expression for including variants based on INFO fields (eg, -e 'AC>=10;AF>0.01')\n";
     os << " -r, --regions          Comma separated list of genomic regions formatted as chr[:start-end]\n";
     os << " -R, --regions-file     Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
     os << " -s, --sort             Enables sorting by first position of allele\n";
@@ -137,7 +136,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:c:d:f:hi:I:m:O:p:q:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:c:d:f:hi:I:m:O:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -240,6 +239,17 @@ public:
           }
           break;
         }
+        case 'f':
+        {
+          std::string str_opt_arg(optarg ? optarg : "");
+          filter_ = str_opt_arg;
+          if (!filter_)
+          {
+            std::cerr << "Invalid filter expression (" << str_opt_arg << ")\n";
+            return false;
+          }
+          break;
+        }
         case 'h':
           help_ = true;
           return true;
@@ -294,17 +304,6 @@ public:
           else
           {
             std::cerr << "Invalid format field value (" << str_opt_arg << ")\n";
-            return false;
-          }
-          break;
-        }
-        case 'q':
-        {
-          std::string str_opt_arg(optarg ? optarg : "");
-          query_ = str_opt_arg;
-          if (!query_)
-          {
-            std::cerr << "Invalid query expression (" << str_opt_arg << ")\n";
             return false;
           }
           break;
@@ -894,7 +893,7 @@ int export_main(int argc, char** argv)
   savvy::v2::variant r;
   while (rdr.read(r))
   {
-    if (args.query_expression_functor()(r))
+    if (args.filter_functor()(r))
     {
       wrt.write(r);
     }

@@ -14,6 +14,7 @@
 #include <list>
 #include <tuple>
 #include <algorithm>
+#include <regex>
 
 class filter
 {
@@ -65,7 +66,9 @@ private:
     greater_than,
     greater_than_equals,
     less_than,
-    less_than_equals
+    less_than_equals,
+    regex_match,
+    regex_not_match
   };
 
   class expression
@@ -112,6 +115,16 @@ private:
 
       if (!is_string_delim(operand.front()) && !isdigit(operand.front()) && operand.front() != '+' && operand.front() != '-')
       {
+        if (operand == "FILTER")
+          return join_vector_to_string(site.filters(), ";");
+
+        if (operand == "QUAL")
+        {
+          std::stringstream ss;
+          ss << site.qual();
+          return ss.str();
+        }
+
         auto res = std::find_if(site.info().begin(), site.info().end(), [&operand](const std::pair<std::string, savvy::typed_value>& v) { return v.first == operand; });
         if (res != site.info().end())
         {
@@ -155,13 +168,19 @@ private:
       if (comparison == cmpr::equals) return  left_str == right_str;
       if (comparison == cmpr::not_equals) return left_str != right_str;
 
+      if (comparison == cmpr::regex_match || comparison == cmpr::regex_not_match)
+      {
+        bool match = std::regex_search(left_str, std::regex(right_str));
+        return comparison == cmpr::regex_match ? match : !match;
+      }
+
       double numeric_left = std::atof(left_str.c_str());
       double numeric_right = std::atof(right_str.c_str());
 
       if (comparison == cmpr::less_than ) return numeric_left < numeric_right;
       if (comparison == cmpr::greater_than ) return numeric_left > numeric_right;
-      if (comparison ==  cmpr::less_than_equals ) return numeric_left <= numeric_right;
-      if (comparison ==  cmpr::greater_than_equals ) return numeric_left >= numeric_right;
+      if (comparison == cmpr::less_than_equals ) return numeric_left <= numeric_right;
+      if (comparison == cmpr::greater_than_equals ) return numeric_left >= numeric_right;
 
       return false;
     }
@@ -197,12 +216,16 @@ private:
 
   static cmpr parse_comparison(const std::string& cmpr_str)
   {
+    //if (cmpr_str == "=")  return cmpr::equals;
     if (cmpr_str == "==") return cmpr::equals;
     if (cmpr_str == "!=") return cmpr::not_equals;
     if (cmpr_str == "<")  return cmpr::less_than;
     if (cmpr_str == ">")  return cmpr::greater_than;
     if (cmpr_str == "<=") return cmpr::less_than_equals;
     if (cmpr_str == ">=") return cmpr::greater_than_equals;
+    //if (cmpr_str == "~")  return cmpr::regex_match;
+    if (cmpr_str == "=~")  return cmpr::regex_match;
+    if (cmpr_str == "!~") return cmpr::regex_not_match;
     return cmpr::invalid;
   }
 
@@ -272,7 +295,7 @@ private:
 
     static const std::string selector_delims = "=<>!";
     static const std::string comparison_characters = "=<>!~";
-    static const std::string argument_delims = ");,&|";
+    static const std::string argument_delims = ")&|"; //");,&|";
 
     while (cur != end && std::isspace(*cur))
       ++cur;
@@ -295,9 +318,9 @@ private:
         return sub_expr;
 
       logical log_op;
-      if (*cur == '&' || *cur == ';')
+      if (*cur == '&') // || *cur == ';')
         log_op = logical::op_and;
-      else if (*cur == '|' || *cur == ',')
+      else if (*cur == '|') // || *cur == ',')
         log_op = logical::op_or;
       else
         return std::make_tuple(make_unique<boolean_expression>(false), false);
@@ -361,9 +384,9 @@ private:
       }
 
       logical log_op;
-      if (*delim == '&' || *delim == ';')
+      if (*delim == '&') // || *delim == ';')
         log_op = logical::op_and;
-      else if (*delim == '|' || *delim == ',')
+      else if (*delim == '|') // || *delim == ',')
         log_op = logical::op_or;
 
       cur = delim + 1;
