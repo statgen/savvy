@@ -26,8 +26,8 @@
 class export_prog_args
 {
 private:
-  static const int default_compression_level = 3;
-  static const int default_block_size = 2048;
+  static const int default_compression_level = savvy::v2::writer::default_compression_level;
+  static const int default_block_size = savvy::v2::writer::default_block_size;
 
 
   std::vector<option> long_options_;
@@ -36,7 +36,7 @@ private:
   std::vector<savvy::genomic_region> regions_;
   std::unique_ptr<savvy::slice_bounds> slice_;
   std::vector<std::string> info_fields_;
-  filter filter_;
+  filter query_;
   std::string input_path_;
   std::string output_path_;
   std::string index_path_;
@@ -58,14 +58,15 @@ public:
         {"block-size", required_argument, 0, 'b'},
         {"bounding-point", required_argument, 0, 'p'},
         {"data-format", required_argument, 0, 'd'},
-        {"file-format", required_argument, 0, 'f'},
-        {"filter", required_argument, 0, 'e'},
+        {"filter", required_argument, 0, 'f'},
         {"generate-info", required_argument, 0, '\x01'},
         {"headers", required_argument, 0, '\x01'},
         {"help", no_argument, 0, 'h'},
         {"index", no_argument, 0, 'x'},
         {"index-file", required_argument, 0, 'X'},
         {"info-fields", required_argument, 0, 'm'},
+        {"output-format", required_argument, 0, 'O'},
+        {"query", required_argument, 0, 'q'},
         {"regions", required_argument, 0, 'r'},
         {"regions-file", required_argument, 0, 'R'},
         {"sample-ids", required_argument, 0, 'i'},
@@ -86,7 +87,7 @@ public:
   const std::string& file_format() const { return file_format_; }
   const std::string& index_path() const { return index_path_; }
   const std::string& headers_path() const { return headers_path_; }
-  const filter& filter_functor() const { return filter_; }
+  const filter& query_expression_functor() const { return query_; }
   const std::unordered_set<std::string>& subset_ids() const { return subset_ids_; }
   const std::unordered_set<std::string>& fields_to_generate() const { return fields_to_generate_; }
   const std::vector<savvy::genomic_region>& regions() const { return regions_; }
@@ -110,23 +111,24 @@ public:
     os << " -b, --block-size       Number of markers in SAV compression block (0-65535, default: " << default_block_size << ")\n";
     os << " -c, --slice            Range formatted as begin:end (non-inclusive end) that specifies a subset of record offsets within file\n";
     os << " -d, --data-format      Format field to export (GT, DS, HDS or GP, default: GT)\n";
-    os << " -e, --filter           Expression for filtering based on info fields (eg, -e 'AC>=10;AF>0.01') # (IN DEVELOPMENT) More complex expressions in the works\n";
-    os << " -f, --file-format      File format (vcf, vcf.gz or sav, default: vcf)\n";
+    os << " -f, --filter           Regular expression for including variants based on FILTER field (eg, -e '/PASS/')\n";
     os << " -g, --generate-info    Generate info fields specified as a comma separated list (AC,AN,AF,MAF,SPARSE_OFFSETS_<FMT>,SPARSE_VALUES_<FMT>)\n";
     os << " -h, --help             Print usage\n";
     os << " -i, --sample-ids       Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file  Path to file containing list of sample IDs to subset\n";
-    os << " -m, --info-fields      Comma separated list of INFO (metadata) fields to include with each variant (default: exports all info fields)\n";
+    //os << " -m, --info-fields      Comma separated list of INFO (metadata) fields to include with each variant (default: exports all info fields)\n";
+    os << " -O, --output-format    Output file format (vcf, vcf.gz or sav, default: vcf)\n";
     os << " -p, --bounding-point   Determines the inclusion policy of indels during region queries (any, all, beg or end, default: beg)\n";
+    os << " -q, --query            Query expression for including variants based on INFO fields (eg, -e 'AC>=10;AF>0.01')\n";
     os << " -r, --regions          Comma separated list of genomic regions formatted as chr[:start-end]\n";
     os << " -R, --regions-file     Path to file containing list of regions formatted as chr<tab>start<tab>end\n";
     os << " -s, --sort             Enables sorting by first position of allele\n";
     os << " -S, --sort-point       Enables sorting and specifies which allele position to sort by (beg, mid or end)\n";
-    os << " -x, --index            Enables indexing (SAV output only)\n";
-    os << " -X, --index-file       Enables indexing and specifies index output file (SAV output only)\n";
+    //os << " -x, --index            Enables indexing (SAV output only)\n";
+    os << " -X, --index-file       Specifies index output file (SAV output only)\n";
     os << "\n";
-    os << "     --headers          Path to headers file that is either formatted as VCF headers or tab-delimited key value pairs\n";
-    os << "     --sites-only       Exclude individual level data.\n";
+    //os << "     --headers          Path to headers file that is either formatted as VCF headers or tab-delimited key value pairs\n";
+    //os << "     --sites-only       Exclude individual level data.\n";
     //os << "     --update-info      Specifies whether AC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
     os << std::flush;
   }
@@ -135,7 +137,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:c:d:e:f:hi:I:m:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:c:d:f:hi:I:m:O:p:q:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -238,31 +240,6 @@ public:
           }
           break;
         }
-        case 'e':
-        {
-          std::string str_opt_arg(optarg ? optarg : "");
-          filter_ = str_opt_arg;
-          if (!filter_)
-          {
-            std::cerr << "Invalid filter expression (" << str_opt_arg << ")\n";
-            return false;
-          }
-          break;
-        }
-        case 'f':
-        {
-          std::string str_opt_arg(optarg ? optarg : "");
-          if (str_opt_arg == "sav" || str_opt_arg == "vcf" || str_opt_arg == "vcf.gz")
-          {
-            file_format_ = str_opt_arg;
-          }
-          else
-          {
-            std::cerr << "Invalid file format value (" << str_opt_arg << ")\n";
-            return false;
-          }
-          break;
-        }
         case 'h':
           help_ = true;
           return true;
@@ -281,6 +258,20 @@ public:
         case 'm':
           info_fields_ = split_string_to_vector(optarg ? optarg : "", ',');
           break;
+        case 'O':
+        {
+          std::string str_opt_arg(optarg ? optarg : "");
+          if (str_opt_arg == "sav" || str_opt_arg == "vcf" || str_opt_arg == "vcf.gz")
+          {
+            file_format_ = str_opt_arg;
+          }
+          else
+          {
+            std::cerr << "Invalid file format value (" << str_opt_arg << ")\n";
+            return false;
+          }
+          break;
+        }
         case 'p':
         {
           std::string str_opt_arg(optarg ? optarg : "");
@@ -303,6 +294,17 @@ public:
           else
           {
             std::cerr << "Invalid format field value (" << str_opt_arg << ")\n";
+            return false;
+          }
+          break;
+        }
+        case 'q':
+        {
+          std::string str_opt_arg(optarg ? optarg : "");
+          query_ = str_opt_arg;
+          if (!query_)
+          {
+            std::cerr << "Invalid query expression (" << str_opt_arg << ")\n";
             return false;
           }
           break;
@@ -619,7 +621,7 @@ int export_records(savvy::sav::reader& in, const export_prog_args& args, Writer&
 
   //auto fn = gen_filter_predicate(in, args);
 
-  while (in.read_if(std::ref(args.filter_functor()), variant, genotypes))
+  while (in.read_if(std::ref(args.query_expression_functor()), variant, genotypes))
   {
     if (args.update_info())
       savvy::update_info_fields(variant, genotypes, args.format());
@@ -640,7 +642,7 @@ int export_records(savvy::sav::indexed_reader& in, const export_prog_args& args,
 
   //auto fn = gen_filter_predicate(in, args);
 
-  while (in.read_if(std::ref(args.filter_functor()), variant, genotypes))
+  while (in.read_if(std::ref(args.query_expression_functor()), variant, genotypes))
   {
     if (args.update_info())
       savvy::update_info_fields(variant, genotypes, args.format());
@@ -655,7 +657,7 @@ int export_records(savvy::sav::indexed_reader& in, const export_prog_args& args,
     for (auto it = args.regions().begin() + 1; it != args.regions().end(); ++it)
     {
       in.reset_bounds(*it);
-      while (in.read_if(std::ref(args.filter_functor()), variant, genotypes))
+      while (in.read_if(std::ref(args.query_expression_functor()), variant, genotypes))
       {
         if (args.update_info())
           savvy::update_info_fields(variant, genotypes, args.format());
@@ -860,7 +862,7 @@ int export_main(int argc, char** argv)
 
   if (args.regions().size())
   {
-    if (rdr.reset_bounds(args.regions().front()).bad())
+    if (rdr.reset_bounds(args.regions().front(), args.bounding_point()).bad())
     {
       std::cerr << "Error: failed to load index for genomic region query" << std::endl;
       return EXIT_FAILURE;

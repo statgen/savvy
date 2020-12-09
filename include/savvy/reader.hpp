@@ -362,7 +362,7 @@ namespace savvy
        */
       std::vector<std::string> subset_samples(const std::unordered_set<std::string>& subset);
 
-      reader& reset_bounds(genomic_region reg);
+      reader& reset_bounds(genomic_region reg, bounding_point bp = bounding_point::beg);
       reader& reset_bounds(slice_bounds reg);
       phasing phasing_status() { return phasing_; }
 
@@ -468,13 +468,14 @@ namespace savvy
     }
 
     inline
-    reader& reader::reset_bounds(genomic_region reg)
+    reader& reader::reset_bounds(genomic_region reg, bounding_point bp)
     {
       input_stream_->clear();
 
       if (file_format_ == format::sav1 || file_format_ == format::sav2)
       {
-        s1r_index_ = ::savvy::detail::make_unique<index_data>(::savvy::detail::file_exists(file_path_ + ".s1r") ? file_path_ + ".s1r" : file_path_, reg);
+        // TODO: First check whether index is appended, than check file_path_ + ".s1r"
+        s1r_index_ = ::savvy::detail::make_unique<index_data>(::savvy::detail::file_exists(file_path_ + ".s1r") ? file_path_ + ".s1r" : file_path_, reg, bp);
         if (!s1r_index_->file.good())
         {
           input_stream_->setstate(std::ios::failbit); //TODO: error message
@@ -482,7 +483,7 @@ namespace savvy
       }
       else if (::savvy::detail::file_exists(file_path_ + ".csi"))
       {
-        csi_index_ = ::savvy::detail::make_unique<csi_index_data>(file_path_ + ".csi", dict_.str_to_int[dictionary::contig], reg);
+        csi_index_ = ::savvy::detail::make_unique<csi_index_data>(file_path_ + ".csi", dict_.str_to_int[dictionary::contig], reg, bp);
         if (!csi_index_->file.good())
         {
           input_stream_->setstate(std::ios::failbit); //TODO: error message
