@@ -5,7 +5,7 @@
  */
 
 #include "sav/head.hpp"
-#include "savvy/sav_reader.hpp"
+#include "savvy/reader.hpp"
 
 
 #include <iostream>
@@ -16,6 +16,7 @@ class head_prog_args
 private:
   std::vector<option> long_options_;
   std::string input_path_;
+  std::string output_format_ = "tsv";
   bool print_sample_ids_ = false;
   bool help_ = false;
 public:
@@ -24,12 +25,14 @@ public:
       {
         {"help", no_argument, 0, 'h'},
         {"sample-ids", no_argument, 0, 'i'},
+        {"output-format", required_argument, 0, 'O'},
         {0, 0, 0, 0}
       })
   {
   }
 
   const std::string& input_path() const { return input_path_; }
+  const std::string& output_format() const { return output_format_; }
   bool print_sample_ids() const { return print_sample_ids_; }
 
   bool help_is_set() const { return help_; }
@@ -38,8 +41,9 @@ public:
   {
     os << "Usage: sav head [opts ...] <in.sav> \n";
     os << "\n";
-    os << " -h, --help        Print usage\n";
-    os << " -i, --sample-ids  Print samples ids instead of headers.\n";
+    os << " -h, --help           Print usage\n";
+    os << " -i, --sample-ids     Print samples ids instead of headers\n";
+    os << " -O, --output-format  Specifies output format for header lines (vcf or tsv; default: tsv)\n";
     os << std::flush;
   }
 
@@ -47,7 +51,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "hi", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "hiO:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -58,6 +62,9 @@ public:
       case 'h':
         help_ = true;
         return true;
+      case 'O':
+        output_format_ = optarg ? optarg : "";
+        break;
       default:
         return false;
       }
@@ -104,7 +111,7 @@ int head_main(int argc, char** argv)
 
 
 
-  savvy::sav::reader sav_reader(args.input_path());
+  savvy::v2::reader sav_reader(args.input_path());
 
 
   if (!sav_reader)
@@ -120,8 +127,16 @@ int head_main(int argc, char** argv)
     }
     else
     {
-      for (auto it = sav_reader.headers().begin(); it != sav_reader.headers().end(); ++it)
-        std::cout << it->first << "\t" << it->second << "\n";
+      if (args.output_format() == "vcf")
+      {
+        for (auto it = sav_reader.headers().begin(); it != sav_reader.headers().end(); ++it)
+          std::cout << "##" << it->first << "=" << it->second << "\n";
+      }
+      else
+      {
+        for (auto it = sav_reader.headers().begin(); it != sav_reader.headers().end(); ++it)
+          std::cout <<  it->first << "\t" << it->second << "\n";
+      }
     }
   }
 
