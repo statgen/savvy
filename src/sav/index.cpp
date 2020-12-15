@@ -6,7 +6,7 @@
 
 #include "sav/index.hpp"
 #include "sav/utility.hpp"
-#include "savvy/sav_reader.hpp"
+#include "savvy/reader.hpp"
 
 #include <set>
 #include <fstream>
@@ -20,25 +20,29 @@ private:
 
   std::vector<option> long_options_;
   std::string input_path_;
+  std::string index_path_;
   bool help_ = false;
 public:
   index_prog_args() :
     long_options_(
       {
         {"help", no_argument, 0, 'h'},
+        {"output", required_argument, 0, 'o'},
         {0, 0, 0, 0}
       })
   {
   }
 
   const std::string& input_path() const { return input_path_; }
+  const std::string& index_path() const { return index_path_; }
   bool help_is_set() const { return help_; }
 
   void print_usage(std::ostream& os)
   {
     os << "Usage: sav index [opts ...] <in.sav> \n";
     os << "\n";
-    os << " -h, --help  Print usage\n";
+    os << " -h, --help    Print usage\n";
+    os << " -o, --output  Output path (default: appends index to SAV file)\n";
     os << std::flush;
   }
 
@@ -46,7 +50,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "h", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "ho:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -54,6 +58,9 @@ public:
         case 'h':
           help_ = true;
           return true;
+      case 'o':
+        index_path_ = optarg ? optarg : "";
+        break;
         default:
           return false;
       }
@@ -118,13 +125,27 @@ bool create_index(const std::string& input_file_path, std::string output_file_pa
 //  if (output_file_path.empty())
 //    output_file_path = input_file_path + ".s1r";
 
-  savvy::sav::reader r(input_file_path, savvy::fmt::gt); // TODO: make zero if possible.
+  savvy::v2::reader r(input_file_path);
+  if (!r.good())
+  {
+    std::cerr << "Error: failed to open input file (" << input_file_path << ")" << std::endl;
+    return EXIT_FAILURE;
+  }
+
   std::int64_t start_pos = r.tellg();
 
+  bool append_index = output_file_path.empty();
 
   int tmp_fd = 0;
   if (output_file_path.empty())
   {
+    savvy::s1r::reader idx_rdr(output_file_path);
+    if (idx_rdr.size_on_disk())
+    {
+      std::cerr << "Error: index already exists at end of SAV file" << std::endl; // TODO: add force option that will override appended index and truncate file to new size if needed.
+      return false;
+    }
+
     output_file_path = "/tmp/tmpfileXXXXXX";
     tmp_fd = mkstemp(&output_file_path[0]);
     if (!tmp_fd)
@@ -135,18 +156,18 @@ bool create_index(const std::string& input_file_path, std::string output_file_pa
   }
 
   savvy::s1r::writer idx(output_file_path, r.uuid());
-  std::remove(output_file_path.c_str());
+  if (append_index)
+    std::remove(output_file_path.c_str());
 
   std::uint32_t min = std::numeric_limits<std::uint32_t>::max();
   std::uint32_t max = 0;
   std::map<std::string, std::vector<savvy::s1r::entry>> index_data;
 
-  savvy::site_info variant;
-  savvy::compressed_vector<float> variant_data;
+  savvy::v2::variant variant;
 
   std::size_t records_in_block = 0;
   std::string current_chromosome;
-  while (r.read(variant, variant_data) && start_pos >= 0)
+  while (r.read(variant) && start_pos >= 0)
   {
     if (records_in_block > 0 && variant.chromosome() != current_chromosome)
     {
@@ -162,7 +183,10 @@ bool create_index(const std::string& input_file_path, std::string output_file_pa
     ++records_in_block;
     current_chromosome = variant.chromosome();
     min = std::min(min, std::uint32_t(variant.position()));
-    max = std::max(max, std::uint32_t(variant.position() + std::max(variant.ref().size(), variant.alt().size()) - 1));
+    std::size_t variant_size = variant.ref().size();
+    for (auto it = variant.alts().begin(); it != variant.alts().end(); ++it)
+      variant_size = std::max(variant_size, it->size());
+    max = std::max(max, std::uint32_t(variant.position() + variant_size - 1));
 
     std::int64_t end_pos = r.tellg();
     if (start_pos != end_pos) // zstd frame frame boundary
@@ -196,7 +220,7 @@ bool create_index(const std::string& input_file_path, std::string output_file_pa
   else
   {
     ret = idx.good() && !r.bad();
-    if (ret)
+    if (ret && append_index)
     {
       std::fstream sav_fs(input_file_path, std::ios::in | std::ios::end | std::ios::binary | std::ios::app);
       sav_fs.seekp(0, std::ios::end);
@@ -242,9 +266,7 @@ int index_main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  std::string index_file_path = ""; // TODO: allow for index path to be specified.
-
-  if (!create_index(args.input_path(), index_file_path))
+  if (!create_index(args.input_path(), args.index_path()))
     return EXIT_FAILURE;
   return EXIT_SUCCESS; //append_index(args.input_path(), index_file_path) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
