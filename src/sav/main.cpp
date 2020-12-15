@@ -100,21 +100,13 @@ int main(int argc, char** argv)
   {
     return concat_main(argc, argv);
   }
-  else if (args.sub_command() == "export")
+  else if (args.sub_command() == "export" || args.sub_command() == "import")
   {
     return export_main(argc, argv);
   }
   else if (args.sub_command() == "head")
   {
     return head_main(argc, argv);
-  }
-  else if (args.sub_command() == "import")
-  {
-    return import_main(argc, argv);
-  }
-  else if (args.sub_command() == "import2")
-  {
-    return import_main2(argc, argv);
   }
   else if (args.sub_command() == "index")
   {
@@ -127,6 +119,10 @@ int main(int argc, char** argv)
   else if (args.sub_command() == "rehead")
   {
     return rehead_main(argc, argv);
+  }
+  else if (args.sub_command() == "sort")
+  {
+    return sort_main(argc, argv);
   }
   else if (args.sub_command() == "stat")
   {

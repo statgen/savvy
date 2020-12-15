@@ -68,6 +68,7 @@ namespace savvy
       std::ostream ofs_;
       std::size_t n_samples_ = 0;
       std::vector<char> serialized_buf_;
+      std::unordered_set<std::string> pbwt_fields_;
 
       // Data members to support indexing
       std::unique_ptr<s1r::writer> index_file_;
@@ -88,6 +89,7 @@ namespace savvy
       ~writer();
 
       void set_block_size(std::uint16_t bs);
+      void set_pbwt(const std::unordered_set<std::string>& pbwt_fields);
 
       bool good() const { return ofs_.good(); }
       operator bool() const { return ofs_.good(); }
@@ -222,6 +224,12 @@ namespace savvy
     }
 
     inline
+    void writer::set_pbwt(const std::unordered_set<std::string>& pbwt_fields)
+    {
+      pbwt_fields_ = pbwt_fields;
+    }
+
+    inline
     writer& writer::write_vcf(const variant& r)
     {
       if (!serialize_vcf_shared(r) || !serialize_vcf_indiv(r, phasing_))
@@ -252,7 +260,7 @@ namespace savvy
 
           if (file_pos > 0x0000FFFFFFFFFFFF) // Max file size: 256 TiB
           {
-            assert(!"File size to large to be indexed!");
+            assert(!"File size too large to be indexed!");
             ofs_.setstate(std::ios::badbit);
           }
 

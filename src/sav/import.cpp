@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-
+#if 0
 #include <cmath>
 #include "sav/import.hpp"
 #include "sav/sort.hpp"
@@ -106,11 +106,11 @@ public:
     os << " -X, --index-file          Enables indexing and specifies index output file\n";
     os << "\n";
     os << "     --phasing             Sets file phasing status if phasing header is not present (none, full, or partial)\n";
-    os << "     --pbwt-fields         Comma separated list of FORMAT fields to make sparse (default: GT,HDS,DS,EC)\n";
+    os << "     --pbwt-fields         Comma separated list of FORMAT fields for which to enable PBWT sorting\n";
     os << "     --skip-empty-vectors  Skips variants that don't contain the request data format (By default, the import fails)\n";
+    os << "     --sparse-fields       Comma separated list of FORMAT fields to make sparse (default: GT,HDS,DS,EC)\n";
+    os << "     --sparse-threshold    Non-zero frequency threshold for which sparse fields are encoded as sparse vectors (default: 1.0)\n";
     os << "     --update-info         Specifies whether AC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
-    os << "     --sparse-fields       Comma separated list of FORMAT fields for which to enable PBWT sorting\n";
-    os << "     --pbwt-threshold      Non-zero frequency threshold for which sparse fields are encoded as sparse vectors (default: 1.0)\n";
 
     os << std::flush;
   }
@@ -427,7 +427,7 @@ int prep_reader_for_import(T& input, const import_prog_args& args)
     {
       if (args.sort_type())
       {
-        return (sort_and_write_records<std::vector<float>, less_than_comparator>((*args.sort_type()), input, args.format(), args.regions(), output, args.format(), args.update_info()) && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE);
+        //return (sort_and_write_records<std::vector<float>, less_than_comparator>((*args.sort_type()), input, args.format(), args.regions(), output, args.format(), args.update_info()) && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE);
       }
       else
       {
@@ -562,6 +562,11 @@ int import_main2(int argc, char** argv)
           if (tmp_val.size() && static_cast<double>(tmp_val.non_zero_size()) / tmp_val.size() <= args.sparse_threshold())
             var.set_format(it->first, std::move(tmp_val)); // typed_value move operator implementation allows for reuse of tmp_val;
         }
+        else if (it->second.is_sparse())
+        {
+          it->second.copy_as_dense(tmp_val);
+          var.set_format(it->first, std::move(tmp_val));
+        }
       }
 
       output << var;
@@ -571,3 +576,4 @@ int import_main2(int argc, char** argv)
     return output.good() && !input.bad() ? EXIT_SUCCESS : EXIT_FAILURE;
   }
 }
+#endif

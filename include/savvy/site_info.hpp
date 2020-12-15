@@ -268,12 +268,15 @@ namespace savvy
         std::vector<std::pair<std::string, typed_value>> info = {});
 
       const std::string& chrom() const { return chrom_; }
+      const std::string& chromosome() const { return chrom_; }
 
       const std::string& id() const { return id_; }
 
       std::uint32_t pos() const { return pos_; }
+      std::uint32_t position() const { return pos_; }
 
       float qual() const { return qual_; }
+      float quality() const { return qual_; }
 
       const std::string& ref() const { return ref_; }
 
@@ -1219,6 +1222,12 @@ namespace savvy
               dense_gt.apply(typed_value::bcf_gt_encoder(), phased == phasing::phased);
 
             typed_value::internal::serialize(dense_gt, out_it, is_bcf ? sample_size : 1);
+          }
+          else if (is_bcf && it->second.is_sparse())
+          {
+            typed_value dense_val;
+            it->second.copy_as_dense(dense_val);
+            typed_value::internal::serialize(dense_val, out_it, is_bcf ? sample_size : 1);
           }
           else
           {

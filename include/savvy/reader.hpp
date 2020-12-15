@@ -980,6 +980,7 @@ namespace savvy
           ids_.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos)); // TODO: allow for no samples.
 
           assert(ids_.size() == sample_size);
+          subset_size_ = sample_size;
 
           if (header_block_sz - bytes_read < 0)
             break;

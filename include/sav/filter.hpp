@@ -9,6 +9,7 @@
 
 #include "savvy/site_info.hpp"
 #include "savvy/utility.hpp"
+#include "sav/utility.hpp"
 
 #include <string>
 #include <list>
