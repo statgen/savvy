@@ -94,35 +94,19 @@ int stat_main(int argc, char** argv)
   }
 
   std::size_t multi_allelic{}, record_cnt{}, variant_cnt{};
-  savvy::compressed_vector<float> geno;
 
-  bool is_sav2 = false;
-  if (is_sav2)
+
+  savvy::v2::reader rdr(args.input_path());
+  savvy::v2::variant rec;
+
+  while (rdr.read(rec))
   {
-    savvy::v2::reader rdr(args.input_path());
-    savvy::v2::variant rec;
-
-    while (rdr.read(rec))
-    {
-      rec.format_fields().front().second.get(geno);
-      if (rec.alts().size() > 1)
-        ++multi_allelic;
-      variant_cnt += rec.alts().size();
-      ++record_cnt;
-    }
+    if (rec.alts().size() > 1)
+      ++multi_allelic;
+    variant_cnt += std::max<std::size_t>(1, rec.alts().size());
+    ++record_cnt;
   }
-  else
-  {
-    savvy::sav::reader rdr(args.input_path(), savvy::fmt::hds);
-    savvy::site_info site;
 
-    while (rdr.read(site, geno))
-    {
-      variant_cnt += 1;
-      ++record_cnt;
-    }
-
-  }
 
   std::cout << record_cnt << "\t" << variant_cnt << "\t" << multi_allelic << "\n";
 
@@ -239,7 +223,7 @@ int stat_index_main(int argc, char** argv)
   }
   std::cout << std::endl;
 
-  std::cout << "marker count";
+  std::cout << "record count";
   for (auto it = stats.begin(); it != stats.end(); ++it)
   {
     std::cout << "\t" << it->record_count;
