@@ -83,6 +83,12 @@ public:
       return false;
     }
 
+    if (input_path_ == "/dev/stdin" || input_path_ == "/dev/fd/0")
+    {
+      std::cerr << "Input SAV file cannot be stdin\n";
+      return false;
+    }
+
     return true;
   }
 };
