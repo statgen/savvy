@@ -170,11 +170,13 @@ int concat_main(int argc, char **argv)
     variant_offsets.push_back(sav_reader.tellg());
   }
 
+  std::int64_t output_pos;
   std::array<std::uint8_t, 16> uuid;
 
   {
     savvy::v2::writer header_writer( args.output_path(), savvy::file::format::sav2, headers, samples, savvy::v2::writer::default_compression_level, "/dev/null");
     uuid = header_writer.uuid();
+    output_pos = header_writer.tellp();
   }
 
   std::unique_ptr<savvy::s1r::writer> output_index;
@@ -214,7 +216,7 @@ int concat_main(int argc, char **argv)
       return EXIT_FAILURE;
     }
 
-    auto delta = ofs.tellp() - ifs.tellg();
+    auto delta = output_pos - ifs.tellg();
     savvy::s1r::reader idx(*ft);
     if (output_index && idx.good())
     {
@@ -246,6 +248,7 @@ int concat_main(int argc, char **argv)
       std::size_t sz = ifs.read(buf.data(), std::min<std::size_t>(bytes_to_read, buf.size())).gcount();
       ofs.write(buf.data(), sz);
       bytes_to_read -= sz;
+      output_pos += sz;
       assert(bytes_to_read >= 0);
     }
 
