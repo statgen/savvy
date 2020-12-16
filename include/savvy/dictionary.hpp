@@ -31,11 +31,18 @@ namespace savvy
     static const std::uint8_t sample = 2;
     std::array<std::unordered_map<std::string, std::uint32_t>, 3> str_to_int;
     std::array<std::vector<entry>, 3> entries;
+
+    bool can_be(const dictionary& target) const;
   };
 
   inline bool operator==(const dictionary::entry& lhs, const dictionary::entry& rhs)
   {
     return lhs.id == rhs.id && lhs.number == rhs.number && lhs.type == rhs.type;
+  }
+
+  inline bool operator!=(const dictionary::entry& lhs, const dictionary::entry& rhs)
+  {
+    return lhs.id != rhs.id || lhs.number != rhs.number || lhs.type != rhs.type;
   }
 
   inline bool operator==(const dictionary& lhs, const dictionary& rhs)
@@ -56,6 +63,22 @@ namespace savvy
         return true;
     }
     return false;
+  }
+
+  inline bool dictionary::can_be(const dictionary& target) const
+  {
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+      if (entries[i].size() > target.entries[i].size())
+        return false;
+
+      for (std::size_t j = 0; j < entries[i].size(); ++j)
+      {
+        if (entries[i][j] != target.entries[i][j])
+          return false;
+      }
+    }
+    return true;
   }
 }
 

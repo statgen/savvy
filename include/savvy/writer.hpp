@@ -97,6 +97,8 @@ namespace savvy
 
       writer& write(const variant& r);
       writer& operator<<(const variant& v) { return write(v); }
+
+      std::streampos tellp() { return ofs_.tellp(); }
     private:
       writer& write_vcf(const variant& r);
       void write_header(std::vector<std::pair<std::string, std::string>>& headers, const std::vector<std::string>& ids);
@@ -176,6 +178,7 @@ namespace savvy
       }
 
       write_header(headers, ids);
+      ofs_.flush();
     }
 
     inline
