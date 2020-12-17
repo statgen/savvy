@@ -284,7 +284,7 @@ int rehead_main(int argc, char **argv)
         std::uint64_t record_cnt = jt->value() & 0xFFFF;
         if (cnt == 0)
         {
-          assert(old_file_pos == ifs.tellg());
+          assert(old_file_pos == variants_pos);
         }
         std::uint64_t new_file_pos = old_file_pos + delta;
         output_index->write(it->name(), ::savvy::s1r::entry(jt->region_start(), jt->region_end(), (new_file_pos << 16u) | record_cnt));
