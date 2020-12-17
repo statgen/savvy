@@ -228,7 +228,7 @@ bool create_index(const std::string& input_file_path, std::string output_file_pa
     ret = idx.good() && !r.bad();
     if (ret && append_index)
     {
-      std::fstream sav_fs(input_file_path, std::ios::in | std::ios::end | std::ios::binary | std::ios::app);
+      std::fstream sav_fs(input_file_path, std::ios::in | std::ios::out | std::ios::binary | std::ios::app);
       sav_fs.seekp(0, std::ios::end);
       // TODO: Check if index already exists and replace. Use std::filesystem::resize_file (c++17) to shrink file when needed.
 

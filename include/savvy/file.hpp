@@ -8,6 +8,9 @@
 #define LIBSAVVY_FILE_HPP
 
 #include "dictionary.hpp"
+#include "utility.hpp"
+#include "pbwt.hpp"
+#include "site_info.hpp"
 
 namespace savvy
 {
@@ -22,7 +25,7 @@ namespace savvy
       vcf
     };
   protected:
-    dictionary dict_;
+    ::savvy::dictionary dict_;
     std::array<std::uint8_t, 16> uuid_;
     std::vector<header_value_details> info_headers_;
     std::unordered_map<std::string, std::reference_wrapper<header_value_details>> info_headers_map_;

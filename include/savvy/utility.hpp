@@ -19,6 +19,7 @@
 #include <sstream>
 #include <cstring>
 #include <algorithm>
+#include <cassert>
 
 namespace savvy
 {
