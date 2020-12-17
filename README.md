@@ -1,3 +1,5 @@
+This branch contains version 2.0 progress. The latest stable release can be found in the [releases](https://github.com/statgen/savvy/releases) section.
+
 # Savvy Library
 Interface to various variant calling formats.
 
@@ -14,67 +16,51 @@ target_link_libraries(prog savvy hts z zstd)
 
 ## Read Variants from File 
 ```c++
-savvy::reader f("chr1.sav", savvy::fmt::gt);
-savvy::variant<std::vector<float>> var;
-
+savvy::reader f("chr1.sav");
+savvy::variant var;
+std::vector<int> geno;
+  
 while (f >> var)
 {
   var.position();
   var.chromosome();
   var.ref();
   var.alt();
-  for (const float& allele : var.data())
+  
+  var.get_format("GT", geno);
+  for (const int& allele : geno)
   {
     ...
   }
 }
 ```
 
-## Indexed Files
+## Random Access
 ```c++
-savvy::indexed_reader f("chr1.sav", {"X", 100000, 199999}, savvy::fmt::gt);
-savvy::variant<std::vector<float>> var;
+savvy::indexed_reader f("chr1.sav");
+savvy::variant var;
 
-while (f >> v)
+f.reset_bounds({"X", 60001, 2699520});
+while (f >> var)
 {
   ...
 }
 
-f.reset_bounds({"X", 200000, 299999});
-while (f >> v)
+f.reset_bounds({"X", 154931044, 155260560});
+while (f >> var)
 {
   ...
-}
-```
-
-## Read annotations and genotypes separately.
-```c++
-savvy::reader f("chr1.sav", savvy::fmt::gt);
-savvy::site_info anno;
-std::vector<float> alleles;
-
-while (f.read(anno, alleles))
-{
-  anno.position();
-  anno.chromosome();
-  anno.ref();
-  anno.alt();
-  for (const float& allele : alleles)
-  {
-    ...
-  }
 }
 ```
 
 ## Subsetting Samples
 ```c++
-savvy::reader f("chr1.sav", savvy::fmt::gt);
+savvy::reader f("chr1.sav");
 std::vector<std::string> requested = {"ID001","ID002","ID003"};
 std::vector<std::string> intersect = f.subset_samples({requested.begin(), requested.end()});
 
-savvy::site_info anno;
-std::vector<float> alleles;
-while (f.read(anno, alleles))
+savvy::variant var;
+while (f.read(var))
 {
   ...
 }
@@ -92,47 +78,6 @@ savvy::reader f("chr1.sav", savvy::fmt::ds);
 f.read(anno, std_vector);
 f.read(anno, savvy_sparse_vector);
 f.read(anno, ublas_sparse_vector);
-```
-
-## Read Predicates
-Reading genotypes can be bypassed when using a read predicate.
-```c++
-savvy::indexed_reader< f("chr1.sav", savvy::fmt::gt);
-savvy::site_info anno;
-savvy::compressed_vector<float> gt;
-
-// Read only if allele frequency is less than 0.1.
-while (f.read_if([](const site_info& v) { return std::stof(v.prop("AF")) < 0.1; }, anno, gt))
-{
-  ...
-}
-```
-```c++
-savvy::indexed_reader f("chr1.sav", savvy::fmt::gt);
-savvy::anno;
-std::vector<float> buf;
-
-{
-  struct 
-  {
-    bool operator()(const site_info& v)
-    {
-      ++variant_count;
-      if (v.ref().size() == v.alt().size())
-        ++snp_count;
-      genotype_count += std::stoi(v.prop("NS"));
-      return false;
-    }
-    
-    std::size_t variant_count = 0;
-    std::size_t genotype_count = 0;
-    std::size_t snp_count = 0;
-  } file_statistics;
-  
-  while (f.read_if(file_statistics, anno, buf)) { }
-  
-  // Consume file statisicts ...
-}
 ```
 
 ## Simple Linear Regression Example
@@ -156,12 +101,13 @@ auto lin_reg = [](const std::vector<float>& x, const std::vector<float>& y)
 };
 
 savvy::reader f("chr1.sav", savvy::fmt::ac);
-savvy::site_info anno;
+savvy::variant var;
 std::vector<float> geno;
 std::vector<float> pheno(f.sample_size());
 
-while (f.read(anno, geno))
+while (f.read(var))
 {
+  var.get_format("GT", geno);
   auto [ m, b, r2 ] = lin_reg(geno, pheno);
   // ...
 }
@@ -192,40 +138,30 @@ while (f.read(anno, geno))
 
 ## Multiple Data Vectors
 ```c++
-savvy::vcf::reader<2> f("chr1.bcf", savvy::fmt::ac, savvy::fmt::ds);
-savvy::site_info anno;
-std::vector<float> genotypes;
+savvy::reader f("chr1.sav");
+savvy::variant var;
+std::vector<int> genotypes;
 std::vector<float> dosages;
-while (f.read(anno, genotypes, dosages))
+while (f.read(var))
 {
-  anno.position();
-  anno.chromosome();
-  anno.ref();
-  anno.alt();
+  var.position();
+  var.chromosome();
+  var.ref();
+  var.alt();
   
-  for (const float& gt : genotypes)
+  var.get_format("GT", genotypes);
+  for (const int& gt : genotypes)
   {
     ...
   }
   
+  var.get_format("DS", dosages);
   for (const float& ds : dosages)
   {
     ...
   }
 }
 ```
-
-## C++ 17 Class Template Argument Deduction
-C++ 17 supports class template argument deduction, which means that template arguments can be deduced by constructor arguments. Compilers that do not support this must specify the number of data vectors to read as a template argument to the reader.
-```c++
-// With C++ 17
-savvy::vcf::reader f("chr1.bcf", savvy::fmt::gt);
-savvy::vcf::reader f("chr1.bcf", savvy::fmt::gt, savvy::fmt::gl);
-
-// Without C++ 17
-savvy::vcf::reader<1> f("chr1.bcf", savvy::fmt::gt);
-savvy::vcf::reader<2> f("chr1.bcf", savvy::fmt::gt, savvy::fmt::gl);
-``` 
 
 # SAV Command Line Interface
 File manipulation for SAV format.
@@ -235,9 +171,9 @@ File manipulation for SAV format.
 sav import --sort --index file.bcf file.sav
 ```
 
-## Merge
+## Concatenate
 ```shell
-sav merge file1.sav file2.sav > merged.sav
+sav concat file1.sav file2.sav > concat.sav
 ```
 
 ## Export
