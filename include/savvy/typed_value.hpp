@@ -476,7 +476,7 @@ namespace savvy
     static const std::uint8_t real = 5;
     static const std::uint8_t real64 = 6;
     static const std::uint8_t str = 7;
-    static const std::uint8_t sparse = 8;
+    static const std::uint8_t sparse = 0;
 
 //    template<typename T>
 //    static T missing_value()
@@ -2364,7 +2364,7 @@ namespace savvy
   template <typename Iter>
   void typed_value::internal::serialize(const typed_value& v, Iter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts)
   {
-    std::uint8_t type_byte =  v.off_type_ ? typed_value::sparse : v.val_type_;
+    std::uint8_t type_byte =  v.off_type_ ? typed_value::sparse : (0x08u | v.val_type_); // sparse with PBWT not currently supported.
     type_byte = std::uint8_t(std::min(std::size_t(15), v.size_) << 4u) | type_byte;
     *(out_it++) = type_byte;
     if (v.size_ >= 15u)

@@ -333,12 +333,12 @@ namespace savvy
         }
       }
     protected:
-      static bool deserialize(site_info& s, const dictionary& dict);
+      static bool deserialize(site_info& s, const dictionary& dict, std::uint32_t& n_sample);
       static bool deserialize_vcf(site_info& s, std::istream& is, const dictionary& dict);
       static bool deserialize_sav1(site_info& s, std::istream& is, const std::vector<header_value_details>& info_headers);
 
       template<typename Itr>
-      static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint32_t n_fmt, const std::list<std::pair<std::string, typed_value>>& extra_info_fields, bool pbwt_reset);
+      static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint32_t n_fmt);
     };
 
     class variant : public site_info
@@ -365,8 +365,8 @@ namespace savvy
       void set_format(const std::string& key, typed_value&& val);
     private:
       template <typename OutT>
-      static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers);
-      static bool deserialize(variant& v, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased);
+      static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_map*>& pbwt_format_pointers);
+      static bool deserialize(variant& v, const dictionary& dict, internal::pbwt_sort_context& pbwt_context, std::size_t sample_size, bool is_bcf, phasing phased);
       static bool deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status);
       static bool deserialize_sav1(variant& v, std::istream& is, const std::vector<header_value_details>& format_headers, std::size_t sample_size, phasing phasing_status);
     };
@@ -394,7 +394,7 @@ namespace savvy
     }
 
     inline
-    bool site_info::deserialize(site_info& s, const dictionary& dict)
+    bool site_info::deserialize(site_info& s, const dictionary& dict, std::uint32_t& n_sample)
     {
       union u
       {
@@ -425,7 +425,7 @@ namespace savvy
 
         tmp_uint = static_cast<std::uint32_t>(buf[5].i);
         s.n_fmt_ = tmp_uint >> 24u;
-        //std::size_t n_sample = 0xFFFFFFu & tmp_uint;
+        n_sample = 0xFFFFFFu & tmp_uint;
 
         auto shared_it = s.shared_data_.begin() + buf.size() * 4;
 
@@ -724,7 +724,7 @@ namespace savvy
     }
 
     template <typename Itr>
-    bool site_info::serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint32_t n_fmt, const std::list<std::pair<std::string, typed_value>>& extra_info_fields, bool pbwt_reset)
+    bool site_info::serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint32_t n_fmt)
     {
       union u
       {
@@ -745,9 +745,7 @@ namespace savvy
       buf[2].i = static_cast<std::int32_t>(s.chrom_.size());
       buf[3].f = s.qual_;
 
-      std::size_t extra_info_cnt = (int)pbwt_reset;
-
-      std::uint32_t tmp_uint = (std::uint32_t(s.alts_.size() + 1) << 16u) | (0xFFFFu & std::uint32_t(s.info_.size() + extra_info_fields.size())); // TODO: append pbwt info flags.
+      std::uint32_t tmp_uint = (std::uint32_t(s.alts_.size() + 1) << 16u) | (0xFFFFu & std::uint32_t(s.info_.size())); // TODO: append pbwt info flags.
       buf[4].i = static_cast<std::int32_t>(tmp_uint);
 
       assert(n_fmt <= 255); // TODO: make error
@@ -796,17 +794,22 @@ namespace savvy
 
       std::for_each(s.info_.begin(), s.info_.end(), serialize_info_pair);
 
-      std::for_each(extra_info_fields.begin(), extra_info_fields.end(), serialize_info_pair);
+      //std::for_each(extra_info_fields.begin(), extra_info_fields.end(), serialize_info_pair);
 
       return encode_res;
     }
 
 
     inline
-    bool variant::deserialize(variant& v, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased)
+    bool variant::deserialize(variant& v, const dictionary& dict, internal::pbwt_sort_context& pbwt_context, std::size_t sample_size, bool is_bcf, phasing phased)
     {
-      if (site_info::deserialize(v, dict))
+      std::uint32_t shared_n_sample = 0;
+      if (site_info::deserialize(v, dict, shared_n_sample))
       {
+        bool pbwt_reset = !is_bcf && 0x800000u & shared_n_sample;
+        if (pbwt_reset)
+          pbwt_context.reset();
+
         auto indiv_it = v.indiv_buf_.begin();
         v.format_fields_.reserve(v.n_fmt_ + 1);
         v.format_fields_.resize(v.n_fmt_);
@@ -833,7 +836,8 @@ namespace savvy
             // ------------------------------------------- //
             // TODO: potentially move this to static method since it's similar to INFO parsing.
             std::uint8_t type_byte = *(indiv_it++);
-            std::uint8_t type = 0x0Fu & type_byte;
+            std::uint8_t type = 0x07u & type_byte;
+            bool pbwt_enabled = 0x08u & type_byte;
 
             std::size_t sz = type_byte >> 4u; // TODO: support BCF vector size.
             if (sz == 15u)
@@ -891,6 +895,12 @@ namespace savvy
                 {
                   fmt_it->second.apply(typed_value::bcf_gt_decoder());
                 }
+              }
+
+              if (pbwt_enabled && !is_bcf)
+              {
+                auto& format_pbwt_ctx = pbwt_context.format_contexts[fmt_key][sz];
+                typed_value::internal::pbwt_unsort(fmt_it->second, format_pbwt_ctx, pbwt_context.prev_sort_mapping, pbwt_context.counts);
               }
               // ------------------------------------------- //
             }
@@ -1179,7 +1189,7 @@ namespace savvy
     }
 
     template <typename OutT>
-    bool variant::serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_format_context*>& pbwt_format_pointers)
+    bool variant::serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_map*>& pbwt_format_pointers)
     {
       // Encode FMT
       for (auto it = v.format_fields_.begin(); it != v.format_fields_.end(); ++it)
@@ -1198,7 +1208,7 @@ namespace savvy
         auto* pbwt_ptr = pbwt_format_pointers[it - v.format_fields_.begin()];
         if (pbwt_ptr)
         {
-          typed_value::internal::serialize(it->second, out_it, pbwt_ptr->sort_map, pbwt_ctx.prev_sort_mapping, pbwt_ctx.counts);
+          typed_value::internal::serialize(it->second, out_it, *pbwt_ptr, pbwt_ctx.prev_sort_mapping, pbwt_ctx.counts);
         }
         else
         {

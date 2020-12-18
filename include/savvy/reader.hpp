@@ -754,56 +754,11 @@ namespace savvy
             return *this;
           }
 
-          if (!variant::deserialize(r, dict_, this->ids_.size(), file_format_ == format::bcf, phasing_))
+          if (!variant::deserialize(r, dict_, sort_context_, this->ids_.size(), file_format_ == format::bcf, phasing_))
           {
             std::fprintf(stderr, "Error: Invalid record data\n");
             input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
             return *this;
-          }
-          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-
-          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-          // Handle semantic INFO fields
-          int pbwt_reset{}; r.get_info("_PBWT_RESET", pbwt_reset);
-          if (pbwt_reset)
-            sort_context_.reset();
-
-          std::vector<::savvy::internal::pbwt_sort_format_context*> pbwt_format_pointers;
-          pbwt_format_pointers.reserve(r.format_fields_.size());
-          for (auto it = r.info().begin(); it != r.info().end(); )
-          {
-            if (it->first.substr(0, 10) == "_PBWT_SORT")
-            {
-              auto f = sort_context_.format_contexts.find(it->first);
-              if (f != sort_context_.format_contexts.end())
-              {
-                pbwt_format_pointers.emplace_back(&(f->second));
-                it = r.remove_info(it);
-                continue;
-              }
-            }
-            ++it;
-          }
-          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-
-
-          //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-          // Unsort FMT fields
-          for (auto fmt_it = r.format_fields_.begin(); fmt_it != r.format_fields_.end(); ++fmt_it)
-          {
-            for (auto pt = pbwt_format_pointers.begin(); pt != pbwt_format_pointers.end(); )
-            {
-              if ((*pt)->format == fmt_it->first)
-              {
-                typed_value::internal::pbwt_unsort(fmt_it->second, (*pt)->sort_map, sort_context_.prev_sort_mapping, sort_context_.counts);
-                pt = pbwt_format_pointers.erase(pt);
-                break;
-              }
-              else
-              {
-                ++pt;
-              }
-            }
           }
           //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         }

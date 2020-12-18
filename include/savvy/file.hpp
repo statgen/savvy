@@ -84,16 +84,6 @@ namespace savvy
         info_headers_.emplace_back(hval);
         info_headers_map_.insert(std::make_pair(hval.id, std::ref(info_headers_.back())));
       }
-
-      if (hval.id.substr(0, 10) == "_PBWT_SORT")
-      {
-        ::savvy::internal::pbwt_sort_format_context ctx;
-        ctx.format = parse_header_sub_field(val, "Format");
-        ctx.id = hval.id;
-
-        auto insert_it = sort_context_.format_contexts.insert(std::make_pair(std::string(hval.id), std::move(ctx)));
-        sort_context_.field_to_format_contexts.insert(std::make_pair(insert_it.first->second.format, &(insert_it.first->second)));
-      }
     }
     else if (key == "FORMAT")
     {

@@ -229,7 +229,9 @@ namespace savvy
     inline
     void writer::set_pbwt(const std::unordered_set<std::string>& pbwt_fields)
     {
-      pbwt_fields_ = pbwt_fields;
+      if (file_format() == file::format::sav2)
+        pbwt_fields_ = pbwt_fields;
+      // TODO: potentially set failbit if not sav2.
     }
 
     inline
@@ -302,30 +304,17 @@ namespace savvy
 
       //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
       // Determine which fields sort
-      std::list<std::pair<std::string, typed_value>> extra_info_fields;
-      if (flushed && sort_context_.format_contexts.size())
-      {
-        extra_info_fields.emplace_back("_PBWT_RESET", typed_value(std::int8_t(1)));
-      }
-
       std::size_t n_fmt = 0;
-      std::vector<::savvy::internal::pbwt_sort_format_context*> pbwt_format_pointers;
+      std::vector<::savvy::internal::pbwt_sort_map*> pbwt_format_pointers;
       pbwt_format_pointers.reserve(r.format_fields().size());
       for (auto it = r.format_fields().begin(); it != r.format_fields().end(); ++it)
       {
         pbwt_format_pointers.emplace_back(nullptr);
-        if (!it->second.is_sparse())
+        if (!it->second.is_sparse() && pbwt_fields_.find(it->first) != pbwt_fields_.end())
         {
-          auto f = sort_context_.field_to_format_contexts.find(it->first);
-          if (f != sort_context_.field_to_format_contexts.end())
-          {
-            if (f->second->sort_map.size() == it->second.size() || f->second->sort_map.empty())
-            {
-              pbwt_format_pointers.back() = f->second;
-              extra_info_fields.emplace_back(f->second->id, typed_value(std::int8_t(1)));
-            }
-          }
+          pbwt_format_pointers.back() = &sort_context_.format_contexts[it->first][it->second.size()];
         }
+
         if (file_format_ == format::sav2 || it->first != "PH")
           ++n_fmt;
       }
@@ -336,7 +325,7 @@ namespace savvy
 
       //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
       // Serialize shared data
-      if (!site_info::serialize(r, std::back_inserter(serialized_buf_), dict_, n_samples_, n_fmt, extra_info_fields, sort_context_.format_contexts.size() ? flushed : false))
+      if (!site_info::serialize(r, std::back_inserter(serialized_buf_), dict_, is_bcf ? n_samples_ : (flushed ? 0x800000u : 0u), n_fmt))
       {
         ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
         return *this;
