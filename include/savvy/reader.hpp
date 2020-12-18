@@ -916,6 +916,9 @@ namespace savvy
     {
       std::uint32_t header_block_sz = std::uint32_t(-1);
 
+      dict_.str_to_int[dictionary::id]["PASS"] = dict_.entries[dictionary::id].size();
+      dict_.entries[dictionary::id].emplace_back(dictionary::entry{"PASS", "", 0});
+
       std::istream& ifs(*input_stream_);
       int first_byte = ifs.peek();
       if (first_byte == '#')
