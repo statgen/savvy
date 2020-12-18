@@ -25,10 +25,13 @@ while (f >> var)
   var.position();
   var.chromosome();
   var.ref();
-  var.alt();
+  var.alts();
+
+  int ac;
+  var.get_info("AC", ac);
   
   var.get_format("GT", geno);
-  for (const int& allele : geno)
+  for (int allele : geno)
   {
     ...
   }
@@ -66,76 +69,6 @@ while (f.read(var))
 }
 ```
 
-## 3rd-party Vectors
-The reader classes utilize generic programming to efficiently support 3rd-party linear algebra libraries. 
-```c++
-savvy::site_info anno;
-std::vector<float> std_vector;
-savvy::compressed_vector<double> savvy_sparse_vector;
-boost::numeric::ublas::compressed_vector<float> ublas_sparse_vector;
-
-savvy::reader f("chr1.sav", savvy::fmt::ds);
-f.read(anno, std_vector);
-f.read(anno, savvy_sparse_vector);
-f.read(anno, ublas_sparse_vector);
-```
-
-## Simple Linear Regression Example
-```c++
-auto lin_reg = [](const std::vector<float>& x, const std::vector<float>& y)
-{
-  const std::size_t n = x.size();
-  const float s_x     = std::accumulate(x.begin(), x.end(), 0.0f);
-  const float s_y     = std::accumulate(y.begin(), y.end(), 0.0f);
-  const float s_xx    = std::inner_product(x.begin(), x.end(), x.begin(), 0.0f);
-  const float s_xy    = std::inner_product(x.begin(), x.end(), y.begin(), 0.0f);
-  const float m       = (n * s_xy - s_x * s_y) / (n * s_xx - s_x * s_x);
-  const float b       = (s_y - m * s_x) / n;
-  auto fx             = [m,b](float x) { return m * x + b; };
-  float se_line       = 0.0f; for (std::size_t i = 0; i < n; ++i) se_line += std::pow(y[i] - fx(x[i]), 2);
-  const float y_mean  = s_y / n;
-  float se_y_mean     = 0.0f; for (std::size_t i = 0; i < n; ++i) se_y_mean += std::pow(y[i] - y_mean, 2);
-  const float r2      = 1 - se_line / se_y_mean;
-
-  return std::make_tuple(m, b, r2); // slope, y-intercept, r-squared
-};
-
-savvy::reader f("chr1.sav", savvy::fmt::ac);
-savvy::variant var;
-std::vector<float> geno;
-std::vector<float> pheno(f.sample_size());
-
-while (f.read(var))
-{
-  var.get_format("GT", geno);
-  auto [ m, b, r2 ] = lin_reg(geno, pheno);
-  // ...
-}
-```
-
-## Armadillo Example
-```c++
-auto arma_lin_reg = [](const arma::Col<float>& x, const arma::Col<float>& y)
-{
-  float m = arma::as_scalar(arma::cov(x, y) / arma::cov(x, x));
-  float b = arma::as_scalar(arma::mean(y) - m * arma::mean(x));
-  float r2 = arma::as_scalar(arma::square(arma::cor(x, y)));
-
-  return std::make_tuple(m, b, r2); // slope, y-intercept, r-squared
-};
-
-savvy::reader f("chr1.sav", savvy::fmt::gt);
-savvy::site_info anno;
-savvy::armadillo::dense_vector<float> geno;
-arma::Col<float> pheno(f.sample_size() * 2);
-
-while (f.read(anno, geno))
-{
-  auto [ m, b, r2 ] = arma_lin_reg(geno, pheno);
-  // ...
-}
-```
-
 ## Multiple Data Vectors
 ```c++
 savvy::reader f("chr1.sav");
@@ -143,20 +76,15 @@ savvy::variant var;
 std::vector<int> genotypes;
 std::vector<float> dosages;
 while (f.read(var))
-{
-  var.position();
-  var.chromosome();
-  var.ref();
-  var.alt();
-  
+{  
   var.get_format("GT", genotypes);
-  for (const int& gt : genotypes)
+  for (int gt : genotypes)
   {
     ...
   }
   
   var.get_format("DS", dosages);
-  for (const float& ds : dosages)
+  for (float ds : dosages)
   {
     ...
   }
