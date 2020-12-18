@@ -16,6 +16,7 @@
 
 #include <shrinkwrap/zstd.hpp>
 #include <shrinkwrap/gz.hpp>
+#include <shrinkwrap/stdio.hpp>
 
 #include <cstdlib>
 #include <string>
@@ -412,7 +413,8 @@ namespace savvy
         sbuf_ = ::savvy::detail::make_unique<::shrinkwrap::zstd::ibuf>(fp);
         break;
       default:
-        throw std::runtime_error("uncompressed files not yet supported.");
+        sbuf_ = ::savvy::detail::make_unique<::shrinkwrap::stdio::filebuf>(fp);
+        break;
       }
 
       input_stream_ = savvy::detail::make_unique<std::istream>(sbuf_.get());
