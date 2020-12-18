@@ -99,8 +99,7 @@ public:
         {"sites-only", no_argument, 0, '\x02'},
         {"update-info", required_argument, 0, '\x01'},
         {0, 0, 0, 0}
-      }),
-    file_format_("vcf")
+      })
   {
   }
 
@@ -169,8 +168,6 @@ public:
   bool parse(int argc, char** argv)
   {
     sub_command_ =  argv[0];
-    if (sub_command_ == "import")
-      file_format_ = "sav";
 
     int long_index = 0;
     int opt = 0;
@@ -339,7 +336,7 @@ public:
       case 'O':
       {
         std::string str_opt_arg(optarg ? optarg : "");
-        if (str_opt_arg == "sav" || str_opt_arg == "vcf" || str_opt_arg == "vcf.gz")
+        if (str_opt_arg == "sav" || str_opt_arg == "bcf" || str_opt_arg == "vcf" || str_opt_arg == "vcf.gz")
         {
           file_format_ = str_opt_arg;
         }
@@ -463,20 +460,33 @@ public:
       input_path_ = argv[optind];
       output_path_ = argv[optind + 1];
 
-      if (index_ && index_path_.empty())
-        index_path_ = output_path_ + ".s1r";
+//      if (index_ && index_path_.empty())
+//        index_path_ = output_path_ + ".s1r";
 
-      if (::savvy::detail::has_extension(output_path_, ".sav"))
-        file_format_ = "sav";
-      else if (::savvy::detail::has_extension(output_path_, ".vcf"))
-        file_format_ = "vcf";
-      else if (::savvy::detail::has_extension(output_path_, ".vcf.gz"))
-        file_format_ = "vcf.gz";
+      if (file_format_.empty())
+      {
+        if (::savvy::detail::has_extension(output_path_, ".sav"))
+          file_format_ = "sav";
+        else if (::savvy::detail::has_extension(output_path_, ".bcf"))
+          file_format_ = "bcf";
+        else if (::savvy::detail::has_extension(output_path_, ".vcf"))
+          file_format_ = "vcf";
+        else if (::savvy::detail::has_extension(output_path_, ".vcf.gz"))
+          file_format_ = "vcf.gz";
+      }
     }
     else
     {
       std::cerr << "Too many arguments\n";
       return false;
+    }
+
+    if (file_format_.empty())
+    {
+      if (sub_command_ == "import")
+        file_format_ = "sav";
+      else
+        file_format_ = "vcf";
     }
 
     if (regions_.size() && slice_)
@@ -491,17 +501,24 @@ public:
     }
 
     if (compression_level_ < 0)
-      compression_level_ = default_compression_level;
-    else if (compression_level_ > 19)
-      compression_level_ = 19;
-
-    if (info_fields_.size() && file_format_ == "sav")
     {
-      info_fields_.reserve(info_fields_.size() + 3);
-      info_fields_.emplace_back("ID");
-      info_fields_.emplace_back("QUAL");
-      info_fields_.emplace_back("FILTER");
+      if (file_format_ == "vcf")
+        compression_level_ = 0;
+      else
+        compression_level_ = default_compression_level;
     }
+    else if (compression_level_ > 19)
+    {
+      compression_level_ = 19;
+    }
+
+//    if (info_fields_.size() && file_format_ == "sav")
+//    {
+//      info_fields_.reserve(info_fields_.size() + 3);
+//      info_fields_.emplace_back("ID");
+//      info_fields_.emplace_back("QUAL");
+//      info_fields_.emplace_back("FILTER");
+//    }
 
     if (sites_only_ && file_format_ != "vcf" && file_format_ != "vcf.gz")
     {
@@ -948,9 +965,9 @@ int export_main(int argc, char** argv)
   }
 
   auto fmt = savvy::file::format::vcf;
-  if (args.file_format() == "sav" || args.file_format() == "usav")
+  if (args.file_format() == "sav" || args.file_format() == "sav")
     fmt = savvy::file::format::sav2;
-  else if (args.file_format() == "bcf" || args.file_format() == "ubcf")
+  else if (args.file_format() == "bcf" || args.file_format() == "bcf")
     fmt = savvy::file::format::bcf;
 
   std::vector<std::pair<std::string, std::string>> hdrs = rdr.headers();
@@ -1013,7 +1030,7 @@ int export_main(int argc, char** argv)
   for (auto it = hdrs.begin(); it != hdrs.end(); )
   {
     std::string header_id = savvy::parse_header_sub_field(it->second, "ID");
-    if ((remove_ph && it->first == "FORMAT" && header_id == "PH") ||
+    if (((remove_ph || args.file_format() != "sav") && it->first == "FORMAT" && header_id == "PH") ||
       (it->first == "INFO"  && rdr.file_format() == savvy::file::format::sav1 && (header_id == "ID" || header_id == "QUAL" || header_id == "FILTER")) ||
       (it->first == "INFO" && args.info_fields().size() && std::find(args.info_fields().begin(), args.info_fields().end(), header_id) == args.info_fields().end()))
     {

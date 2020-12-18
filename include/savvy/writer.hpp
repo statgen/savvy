@@ -437,7 +437,7 @@ namespace savvy
         header_block_sz += 4;
       }
 
-      if ((phasing_ == phasing::unknown || phasing_ == phasing::partial) && gt_present && !ph_present) // TODO: potentially make unkkown = none
+      if ((phasing_ == phasing::unknown || phasing_ == phasing::partial) && gt_present && !ph_present && file_format_ == format::sav2) // TODO: potentially make unkkown = none
       {
         headers.emplace_back("FORMAT", "<ID=PH, Type=Integer, Number=., Description=\"Genotype phase\">");
 
