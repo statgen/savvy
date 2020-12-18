@@ -953,47 +953,68 @@ int export_main(int argc, char** argv)
   else if (args.file_format() == "bcf" || args.file_format() == "ubcf")
     fmt = savvy::file::format::bcf;
 
-  std::vector<std::pair<std::string, std::string>> hdrs;
-  if (args.headers_path().empty())
-    hdrs = rdr.headers();
-  else
+  std::vector<std::pair<std::string, std::string>> hdrs = rdr.headers();
+//  std::vector<std::pair<std::string, std::string>> hdrs;
+//  if (args.headers_path().empty())
+//    hdrs = rdr.headers();
+//  else
+//  {
+//    std::ifstream headers_ifs(args.headers_path(), std::ios::binary);
+//    if (!headers_ifs)
+//    {
+//      std::cerr << "Could not open headers file (" << args.headers_path() << ")\n";
+//      return EXIT_FAILURE;
+//    }
+//
+//    std::string line;
+//    while (std::getline(headers_ifs, line))
+//    {
+//      if (line.size())
+//      {
+//        line.erase(0, line.find_first_not_of('#'));
+//        auto delim = line.find_first_of("=\t");
+//        std::string key = line.substr(0, delim);
+//        std::string value;
+//        if (delim != std::string::npos)
+//          value = line.substr(delim + 1);
+//        if (std::min(key.size(), value.size()) == 0)
+//        {
+//          std::cerr << "Invalid header in " << args.headers_path() << "\n";
+//          return EXIT_FAILURE;
+//        }
+//        if (hdrs.capacity() == hdrs.size())
+//          hdrs.reserve((std::size_t) hdrs.size() * 1.5f);
+//        hdrs.emplace_back(std::move(key), std::move(value));
+//      }
+//    }
+//  }
+
+  auto gt_present = std::find_if(rdr.format_headers().begin(), rdr.format_headers().end(),
+    [](const savvy::header_value_details& h) { return h.id == "GT"; }) != rdr.format_headers().end();
+
+  bool remove_ph = rdr.phasing_status() != savvy::phasing::partial;
+  if (gt_present && rdr.phasing_status() == savvy::phasing::unknown)
   {
-    std::ifstream headers_ifs(args.headers_path(), std::ios::binary);
-    if (!headers_ifs)
+    if (args.phasing() == savvy::phasing::unknown)
     {
-      std::cerr << "Could not open headers file (" << args.headers_path() << ")\n";
+      fprintf(stderr, "Error: phasing header not present, so --phasing must be specified\n");
       return EXIT_FAILURE;
     }
 
-    std::string line;
-    while (std::getline(headers_ifs, line))
-    {
-      if (line.size())
-      {
-        line.erase(0, line.find_first_not_of('#'));
-        auto delim = line.find_first_of("=\t");
-        std::string key = line.substr(0, delim);
-        std::string value;
-        if (delim != std::string::npos)
-          value = line.substr(delim + 1);
-        if (std::min(key.size(), value.size()) == 0)
-        {
-          std::cerr << "Invalid header in " << args.headers_path() << "\n";
-          return EXIT_FAILURE;
-        }
-        if (hdrs.capacity() == hdrs.size())
-          hdrs.reserve((std::size_t) hdrs.size() * 1.5f);
-        hdrs.emplace_back(std::move(key), std::move(value));
-      }
-    }
+    std::string status;
+    if (args.phasing() == savvy::phasing::none) status = "none";
+    else if (args.phasing() == savvy::phasing::partial) remove_ph = false, status = "partial";
+    else status = "full";
+
+    hdrs.emplace_back("phasing", status);
   }
 
   std::set<std::string> info_fields_already_included;
   for (auto it = hdrs.begin(); it != hdrs.end(); )
   {
     std::string header_id = savvy::parse_header_sub_field(it->second, "ID");
-    if ((it->first == "FORMAT") ||
-      (it->first == "INFO"  && args.file_format() != "sav" && (header_id == "ID" || header_id == "QUAL" || header_id == "FILTER")) ||
+    if ((remove_ph && it->first == "FORMAT" && header_id == "PH") ||
+      (it->first == "INFO"  && rdr.file_format() == savvy::file::format::sav1 && (header_id == "ID" || header_id == "QUAL" || header_id == "FILTER")) ||
       (it->first == "INFO" && args.info_fields().size() && std::find(args.info_fields().begin(), args.info_fields().end(), header_id) == args.info_fields().end()))
     {
       it = hdrs.erase(it);
@@ -1022,26 +1043,6 @@ int export_main(int argc, char** argv)
   {
     if (info_fields_already_included.find(*it) == info_fields_already_included.end())
       hdrs.emplace_back("INFO", "<ID=" + (*it) + ">");
-  }
-
-  auto gt_present = std::find_if(rdr.format_headers().begin(), rdr.format_headers().end(),
-    [](const savvy::header_value_details& h) { return h.id == "GT"; }) != rdr.format_headers().end();
-
-  bool remove_ph = rdr.phasing_status() != savvy::phasing::partial;
-  if (gt_present && rdr.phasing_status() == savvy::phasing::unknown)
-  {
-    if (args.phasing() == savvy::phasing::unknown)
-    {
-      fprintf(stderr, "Error: phasing header not present, so --phasing must be specified\n");
-      return EXIT_FAILURE;
-    }
-
-    std::string status;
-    if (args.phasing() == savvy::phasing::none) status = "none";
-    else if (args.phasing() == savvy::phasing::partial) remove_ph = false, status = "partial";
-    else status = "full";
-
-    hdrs.emplace_back("phasing", status);
   }
 
   std::vector<std::string> sample_ids(rdr.samples().size());
