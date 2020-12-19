@@ -1571,6 +1571,111 @@ namespace savvy
       local_data_.clear();
     }
 
+    struct thin_types_fn
+    {
+      template <typename T>
+      void operator()(T* valp, T* endp, typed_value* self)
+      {
+        std::uint8_t old_val_type = type_code<T>();
+        std::uint8_t new_val_type = old_val_type;
+        if (std::is_integral<T>::value && sizeof(T) > 1)
+        {
+          const T eov_val = end_of_vector_value<T>();
+          T min_val = 0; //end_of_vector_value<T>() + 1;
+          T max_val = 0; //std::numeric_limits<std::int8_t>::max();
+          for (T* it = valp; it != endp; ++it)
+          {
+            if (*it > max_val)
+              max_val = *it;
+            else if (*it < min_val && *it > eov_val)
+              min_val = *it;
+          }
+
+          new_val_type = typed_value::type_code(std::max<T>(max_val, -min_val));
+        }
+
+        assert(new_val_type <= old_val_type);
+
+        if (new_val_type != old_val_type)
+        {
+          switch (new_val_type)
+          {
+          case 0x01u:
+            std::transform(valp, endp, (std::int8_t*)valp, reserved_transformation<std::int8_t, T>);
+            break;
+          case 0x02u:
+            std::transform(valp, endp, (std::int16_t*)valp, reserved_transformation<std::int16_t, T>); // TODO: handle endianess
+            break;
+          case 0x03u:
+            std::transform(valp, endp, (std::int32_t*)valp, reserved_transformation<std::int32_t, T>);
+            break;
+          default:
+            assert(!"This should never happen");
+            break;
+          }
+          self->val_type_ = new_val_type;
+        }
+      }
+
+      template <typename ValT, typename OffT>
+      void operator()(ValT* vp, ValT* ep, OffT* offp, typed_value* self)
+      {
+        assert(vp <= ep);
+        std::size_t sp_sz = ep - vp;
+        OffT* off_endp = offp + sp_sz;
+
+        std::uint8_t old_off_type = type_code<typename std::make_signed<OffT>::type>();
+        std::uint8_t new_off_type = old_off_type;
+        if (sizeof(OffT) > 1)
+        {
+          OffT max_val = 0; //std::numeric_limits<std::int8_t>::max();
+          for (OffT* it = offp; it != off_endp; ++it)
+          {
+            if (*it > max_val)
+              max_val = *it;
+          }
+
+          new_off_type = type_code_ignore_missing(static_cast<typename std::make_signed<OffT>::type>(max_val));
+        }
+
+        assert(new_off_type <= old_off_type);
+
+        if (new_off_type < old_off_type)
+        {
+          switch (new_off_type)
+          {
+          case 0x01u:
+            std::copy(offp, off_endp, (std::uint8_t*)offp);
+            break;
+          case 0x02u:
+            std::copy(offp, off_endp, (std::uint16_t*)offp); // TODO: handle endianess
+            break;
+          case 0x03u:
+            std::copy(offp, off_endp, (std::uint32_t*)offp);
+            break;
+          default:
+            assert(!"This should never happen");
+            break;
+          }
+          self->off_type_ = new_off_type;
+        }
+
+        operator()(vp, ep, self);
+      }
+    };
+
+    void minimize()
+    {
+      if (off_ptr_)
+      {
+        apply_sparse(thin_types_fn(), this);
+      }
+      else if (val_ptr_)
+      {
+        apply(thin_types_fn(), this);
+      }
+    }
+
     struct subset_shift_tpl
     {
       template <typename T>
@@ -1954,6 +2059,7 @@ namespace savvy
     return type;
   }
 
+  template <> inline char typed_value::missing_value<char>() { assert(!"This should not be called for string types"); return '.'; }
   template <> inline std::int8_t typed_value::missing_value<std::int8_t>() { return 0x80; }
   template <> inline std::int16_t typed_value::missing_value<std::int16_t>() { return 0x8000; }
   template <> inline std::int32_t typed_value::missing_value<std::int32_t>() { return 0x80000000; }
@@ -1981,6 +2087,7 @@ namespace savvy
     return ret.f;
   }
 
+  template <> inline char typed_value::end_of_vector_value<char>() { assert(!"This should not be called for string types"); return '\0'; }
   template <> inline std::int8_t typed_value::end_of_vector_value<std::int8_t>() { return 0x81; }
   template <> inline std::int16_t typed_value::end_of_vector_value<std::int16_t>() { return 0x8001; }
   template <> inline std::int32_t typed_value::end_of_vector_value<std::int32_t>() { return 0x80000001; }
