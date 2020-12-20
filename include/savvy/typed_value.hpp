@@ -9,6 +9,8 @@
 
 #include "compressed_vector.hpp"
 #include "sample_subset.hpp"
+#include "portable_endian.hpp"
+#include "endianness.hpp"
 
 #include <cstdint>
 #include <type_traits>
@@ -73,7 +75,7 @@ namespace savvy
             char *tmp_p = (char *)&tmp;
             *(tmp_p) = *(it++);
             *(tmp_p + 1) = *(it++);
-            dest = tmp;
+            dest = le16toh(tmp);
             return it;
           }
           case 4u:
@@ -84,7 +86,7 @@ namespace savvy
             *(tmp_p + 1) = *(it++);
             *(tmp_p + 2) = *(it++);
             *(tmp_p + 3) = *(it++);
-            dest = tmp;
+            dest = le32toh(tmp);
             return it;
           }
           case 8u:
@@ -99,7 +101,7 @@ namespace savvy
             *(tmp_p + 5) = *(it++);
             *(tmp_p + 6) = *(it++);
             *(tmp_p + 7) = *(it++);
-            dest = tmp;
+            dest = le64toh(tmp);
             return it;
           }
           }
@@ -189,7 +191,7 @@ namespace savvy
     typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, bool>::type
     serialize_typed_int_exact(OutT out_it, const T& val)
     {
-      T v = static_cast<T>(val);
+      T v = endianness::is_big() ? endianness::swap(val) : val; //static_cast<T>(val);
       std::uint8_t type;
       if (std::is_same<T, std::int8_t>::value)
         type = 0x01;
@@ -236,8 +238,9 @@ namespace savvy
       else
         return false;
 
-      char* p_end = ((char*)&val) + sizeof(T);
-      for (char* p = (char*)&val; p != p_end; ++p)
+      T le_val = endianness::is_big() ? endianness::swap(val) : val;
+      char* p_end = ((char*)&le_val) + sizeof(T);
+      for (char* p = (char*)&le_val; p != p_end; ++p)
       {
         *(out_it++) = *p;
       }
@@ -278,13 +281,14 @@ namespace savvy
         return false;
       }
 
+      T le_val = endianness::is_big() ? endianness::swap(val) : val;
       os.write((char*)&type_byte, 1);
-      os.write((char*)&val, sizeof(val));
+      os.write((char*)&le_val, sizeof(le_val));
       return true;
     }
 
     template <typename OutT>
-    bool serialize_type_and_size(OutT out_it, std::uint8_t type, std::size_t size)
+    bool serialize_type_and_size(OutT out_it, std::uint8_t type, std::size_t size) // TODO: review this function
     {
       if (size < 15)
       {
@@ -337,7 +341,24 @@ namespace savvy
           throw std::runtime_error("string too big");
       }
 
-      std::copy_n((char*)vec.data(), sizeof(T) * vec.size(), out_it);
+
+
+      if (endianness::is_big() && sizeof(T) > 1)
+      {
+        for (auto it = vec.begin(); it != vec.end(); ++it)
+        {
+          T le_val = endianness::swap(*it);
+          char* p_end = ((char*)&le_val) + sizeof(T);
+          for (char* p = (char*)&le_val; p != p_end; ++p)
+          {
+            *(out_it++) = *p;
+          }
+        }
+      }
+      else
+      {
+        std::copy_n((char*)vec.data(), sizeof(T) * vec.size(), out_it);
+      }
     }
 
     template <typename T>
@@ -378,7 +399,20 @@ namespace savvy
           throw std::runtime_error("vector too big");
       }
 
-      os.write((char*)vec.data(), std::int32_t(sizeof(T) * vec.size()));
+
+
+      if (endianness::is_big() && sizeof(T) > 1)
+      {
+        for (auto it = vec.begin(); it != vec.end(); ++it)
+        {
+          T le_val = endianness::swap(*it);
+          os.write((char*)&le_val, sizeof(T));
+        }
+      }
+      else
+      {
+        os.write((char*)vec.data(), std::int32_t(sizeof(T) * vec.size()));
+      }
     }
 
     template <typename OutT>
@@ -766,7 +800,7 @@ namespace savvy
       template <typename T>
       void operator()(const T* p, const T* p_end, typed_value& dest)
       {
-        std:;size_t sz = p_end - p;
+        std::size_t sz = p_end - p;
         dest.sparse_size_ = 0;
         std::size_t offset_max = 0;
         std::size_t last_off = 0;
@@ -817,7 +851,7 @@ namespace savvy
       else if (val_type_)
       {
 
-        capply(set_off_type(), std::ref(dest));
+        capply_dense(set_off_type(), std::ref(dest));
 
         dest.val_type_ = val_type_;
         dest.size_ = size_;
@@ -965,7 +999,7 @@ namespace savvy
       if (size_ == 0)
         return true;
 
-      dest.apply(std::cref(subset_fn));
+      dest.apply_dense(std::cref(subset_fn));
       dest.size_ = subset_fn.id_intersection().size();
 
       return true;
@@ -1066,7 +1100,7 @@ namespace savvy
     }
 
     template <typename Fn, typename... Args>
-    bool apply(Fn fn, Args... args)
+    bool apply_dense(Fn fn, Args... args)
     {
       std::size_t sz = off_ptr_ ? sparse_size_ : size_;
 
@@ -1097,7 +1131,7 @@ namespace savvy
     }
 
     template <typename Fn, typename... Args>
-    bool capply(Fn fn, Args... args) const
+    bool capply_dense(Fn fn, Args... args) const
     {
       std::size_t sz = off_ptr_ ? sparse_size_ : size_;
 
@@ -1125,6 +1159,24 @@ namespace savvy
         return false;
       }
       return true;
+    }
+
+    template <typename Fn, typename... Args>
+    bool apply(Fn fn, Args... args)
+    {
+      if (off_ptr_)
+        return apply_sparse(std::forward<Fn>(fn), std::forward<Args>(args)...);
+      else
+        return apply_dense(std::forward<Fn>(fn), std::forward<Args>(args)...);
+    }
+
+    template <typename Fn, typename... Args>
+    bool capply(Fn fn, Args... args) const
+    {
+      if (off_ptr_)
+        return capply_sparse(std::forward<Fn>(fn), std::forward<Args>(args)...);
+      else
+        return capply_dense(std::forward<Fn>(fn), std::forward<Args>(args)...);
     }
 
     template <typename Fn>
@@ -1596,7 +1648,7 @@ namespace savvy
 
         assert(new_val_type <= old_val_type);
 
-        if (new_val_type != old_val_type)
+        if (new_val_type < old_val_type)
         {
           switch (new_val_type)
           {
@@ -1672,7 +1724,7 @@ namespace savvy
       }
       else if (val_ptr_)
       {
-        apply(thin_types_fn(), this);
+        apply_dense(thin_types_fn(), this);
       }
     }
 
@@ -1782,7 +1834,7 @@ namespace savvy
       {
         //dest.resize(subset.ids().size() * stride);
 
-        ret = apply(subset_shift_tpl(), subset_mask); // TODO: handle endianess
+        ret =apply_dense(subset_shift_tpl(), subset_mask); // TODO: handle endianess
       }
 
       size_ = subset_size * stride;
@@ -2389,21 +2441,48 @@ namespace savvy
     if (sz >= 15u)
       bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(sz));
 
+    sz = v.size_;
+
     if (v.off_type_)
     {
+      sz = v.sparse_size_;
       type_byte = std::uint8_t(v.off_type_ << 4u) | v.val_type_;
       *(out_it++) = type_byte;
-      bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.sparse_size_));
+      bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(sz));
       std::size_t off_width = (1u << bcf_type_shift[v.off_type_]);
-      std::size_t val_width = (1u << bcf_type_shift[v.val_type_]);
-      assert(v.off_ptr_ == (v.val_ptr_ - (1u << bcf_type_shift[v.off_type_]) * v.sparse_size_));
-      std::copy_n(v.off_ptr_, v.sparse_size_ * off_width, out_it);
-      std::copy_n(v.val_ptr_, v.sparse_size_ * val_width, out_it);
+      if (endianness::is_big() && off_width > 1)
+      {
+        // TODO: this is a slow approach, but big-endian systems should be rare.
+        char* ip_end = v.off_ptr_ + sz * off_width;
+        for (char* ip = v.off_ptr_; ip < ip_end; ip+=off_width)
+        {
+          for (char* jp = ip + off_width - 1; jp >= ip; --jp)
+            *(out_it++) = *jp;
+        }
+      }
+      else
+      {
+        std::copy_n(v.off_ptr_, sz * off_width, out_it);
+      }
+    }
+
+
+    std::size_t val_width = (1u << bcf_type_shift[v.val_type_]);
+    if (endianness::is_big() && val_width > 1)
+    {
+      // TODO: this is a slow approach, but big-endian systems should be rare.
+      char* ip_end = v.val_ptr_ + sz * val_width;
+      for (char* ip = v.val_ptr_; ip < ip_end; ip+=val_width)
+      {
+        for (char* jp = ip + val_width - 1; jp >= ip; --jp)
+          *(out_it++) = *jp;
+      }
     }
     else
     {
-      std::copy_n(v.val_ptr_, v.size_ * (1u << bcf_type_shift[v.val_type_]), out_it);
+      std::copy_n(v.val_ptr_, sz * val_width, out_it);
     }
+
   }
 
   template<typename InIter, typename OutIter>
@@ -2457,13 +2536,23 @@ namespace savvy
     }
     else //std::is_same<val_t, std::int16_t>::value
     {
-      for (int i = 0; i < prev_sort_mapping.size(); ++i)
+      if (endianness::is_big())
       {
-        char* v_ptr = (char*)(&in_data[prev_sort_mapping[i]]);
-        std::array<char, 2> bytes;
-        std::memcpy(bytes.data(), v_ptr, 2); // TODO: handle endianess
-        *(out_it++) = bytes[0];
-        *(out_it++) = bytes[1];
+        for (int i = 0; i < prev_sort_mapping.size(); ++i)
+        {
+          char* v_ptr = (char*)(&in_data[prev_sort_mapping[i]]);
+          *(out_it++) = v_ptr[1];
+          *(out_it++) = v_ptr[0];
+        }
+      }
+      else
+      {
+        for (int i = 0; i < prev_sort_mapping.size(); ++i)
+        {
+          char* v_ptr = (char*)(&in_data[prev_sort_mapping[i]]);
+          *(out_it++) = v_ptr[0];
+          *(out_it++) = v_ptr[1];
+        }
       }
     }
   }
@@ -2483,9 +2572,32 @@ namespace savvy
       type_byte = std::uint8_t(v.off_type_ << 4u) | v.val_type_;
       *(out_it++) = type_byte;
       bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.sparse_size_));
-      std::size_t pair_width = (1u << bcf_type_shift[v.off_type_]) + (1u << bcf_type_shift[v.val_type_]);
-      assert(v.off_ptr_ == (v.val_ptr_ - (1u << bcf_type_shift[v.off_type_]) * v.sparse_size_));
-      std::copy_n(v.off_ptr_, v.sparse_size_ * pair_width, out_it);
+      //std::size_t pair_width = (1u << bcf_type_shift[v.off_type_]) + (1u << bcf_type_shift[v.val_type_]);
+      std::size_t off_width = (1u << bcf_type_shift[v.off_type_]);
+      std::size_t val_width = (1u << bcf_type_shift[v.val_type_]);
+
+      if (endianness::is_big() && off_width > 1)
+      {
+        // TODO: this is a slow approach, but big-endian systems should be rare.
+        char* ip_end = v.off_ptr_ + v.sparse_size_ * off_width;
+        for (char* ip = v.off_ptr_; ip < ip_end; ip+=off_width)
+        {
+          for (char* jp = ip + off_width - 1; jp >= ip; --jp)
+            *(out_it++) = *jp;
+        }
+
+        ip_end = v.val_ptr_ + v.sparse_size_ * val_width;
+        for (char* ip = v.val_ptr_; ip < ip_end; ip+=val_width)
+        {
+          for (char* jp = ip + val_width - 1; jp >= ip; --jp)
+            *(out_it++) = *jp;
+        }
+      }
+      else
+      {
+        std::copy_n(v.off_ptr_, v.sparse_size_ * off_width, out_it);
+        std::copy_n(v.val_ptr_, v.sparse_size_ * val_width, out_it);
+      }
     }
     else
     {

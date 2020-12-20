@@ -210,7 +210,6 @@ namespace savvy
         if (index_path_.empty()) // append if custom index path was not provided
         {
           std::fstream ofs(file_path_, std::ios::out | std::ios::binary | std::ios::app); // TODO: THIS SEEMS DANGEROUS. Store FILE* when creating zstd stream and use instead of opening new descriptor.
-          std::int64_t p = ofs.tellp();
           if (!::savvy::detail::append_skippable_zstd_frame(idx_fs, ofs))
           {
             ofs_.setstate(ofs_.rdstate() | std::ios::badbit); // TODO: Use linkat or send file (see https://stackoverflow.com/a/25154505/1034772)
@@ -362,6 +361,11 @@ namespace savvy
       indiv_sz = serialized_buf_.size() - shared_sz;
       //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
+      if (endianness::is_big())
+      {
+        shared_sz = endianness::swap(shared_sz);
+        indiv_sz = endianness::swap(indiv_sz);
+      }
 
       ofs_.write((char *) &shared_sz, sizeof(shared_sz));
       ofs_.write((char *) &indiv_sz, sizeof(indiv_sz));

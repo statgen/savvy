@@ -393,6 +393,25 @@ namespace savvy
 
     }
 
+    struct endian_swapper_fn
+    {
+      template <typename T>
+      void operator()(T* valp, T* endp)
+      {
+        if (sizeof(T) > 1)
+          std::transform(valp, endp, valp, endianness::swap<T>);
+      }
+
+      template <typename ValT, typename OffT>
+      void operator()(ValT* valp, ValT* endp, OffT* offp)
+      {
+        if (sizeof(OffT) > 1)
+          std::transform(offp, offp + (endp - valp), offp, endianness::swap<OffT>);
+        if (sizeof(ValT) > 1)
+          std::transform(valp, endp, valp, endianness::swap<ValT>);
+      }
+    };
+
     inline
     bool site_info::deserialize(site_info& s, const dictionary& dict, std::uint32_t& n_sample)
     {
@@ -406,6 +425,12 @@ namespace savvy
 
       if (std::copy_n(s.shared_data_.data(), buf.size() * 4, (char*)buf.data()))
       {
+        if (endianness::is_big())
+        {
+          for (auto it = buf.begin(); it != buf.end(); ++it)
+            it->i = endianness::swap(it->i); // TODO: n_allele << 16 | n_info is treated as two 16-bit integers in htslib. Need to figure out what is correct.
+        }
+
         std::int32_t tmp_int = buf[0].i;
 
         if (dict.entries[dictionary::contig].size() <= tmp_int)
@@ -489,6 +514,11 @@ namespace savvy
               break;
 
             *info_it = std::make_pair(std::move(info_key), typed_value(type_byte & 0x0Fu, sz, sz * type_width ? &(*shared_it) : nullptr));
+            if (endianness::is_big() && sz * type_width)
+            {
+              info_it->second.apply(endian_swapper_fn());
+            }
+
             shared_it += sz * type_width;
             // ------------------------------------------- //
 
@@ -752,6 +782,12 @@ namespace savvy
       tmp_uint = (n_fmt << 24u) | (0xFFFFFFu & n_sample);
       buf[5].i = static_cast<std::int32_t>(tmp_uint);
 
+      if (endianness::is_big())
+      {
+        for (auto it = buf.begin(); it != buf.end(); ++it)
+          it->i = endianness::swap(it->i); // TODO: n_allele << 16 | n_info is treated as two 16-bit integers in htslib. Need to figure out what is correct.
+      }
+
       std::copy_n((char*)buf.data(), buf.size() * sizeof(u), out_it);
 
       // Encode REF/ALTS
@@ -883,17 +919,22 @@ namespace savvy
               *fmt_it = std::make_pair(std::string(fmt_key), typed_value(type, sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin())));
               indiv_it += sz * type_width;
 
+              if (endianness::is_big() && sz * type_width)
+              {
+                fmt_it->second.apply(endian_swapper_fn());
+              }
+
               if (is_bcf && fmt_key == "GT")
               {
                 // TODO: save phases when partially phased.
                 if (phased == phasing::unknown || phased == phasing::partial)
                 {
                   ph_value = typed_value(typed_value::int8, (sz / sample_size - 1) * sample_size, nullptr);
-                  fmt_it->second.apply(typed_value::bcf_gt_decoder(), (std::int8_t*)ph_value.val_ptr_, sz / sample_size);
+                  fmt_it->second.apply_dense(typed_value::bcf_gt_decoder(), (std::int8_t*) ph_value.val_ptr_, sz / sample_size);
                 }
                 else
                 {
-                  fmt_it->second.apply(typed_value::bcf_gt_decoder());
+                  fmt_it->second.apply_dense(typed_value::bcf_gt_decoder());
                 }
               }
 
@@ -1223,13 +1264,13 @@ namespace savvy
               if (jt->first == "PH")
               {
                 assert(dense_gt.size() % sample_size == 0 && (dense_gt.size() / sample_size - 1) * sample_size == jt->second.size()); // TODO: graceful error
-                dense_gt.apply(typed_value::bcf_gt_encoder(), (std::int8_t*)jt->second.val_ptr_, dense_gt.size() / sample_size);
+                dense_gt.apply_dense(typed_value::bcf_gt_encoder(), (std::int8_t*) jt->second.val_ptr_, dense_gt.size() / sample_size);
                 break;
               }
             }
 
             if (jt == v.format_fields().end())
-              dense_gt.apply(typed_value::bcf_gt_encoder(), phased == phasing::phased);
+              dense_gt.apply_dense(typed_value::bcf_gt_encoder(), phased == phasing::phased);
 
             typed_value::internal::serialize(dense_gt, out_it, is_bcf ? sample_size : 1);
           }

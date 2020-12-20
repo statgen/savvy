@@ -699,6 +699,15 @@ namespace savvy
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
       else if (!variant::deserialize_vcf(r, *input_stream_, dict_, ids_.size(), phasing_))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+      else
+      {
+        // TODO: Set not_minimized flag and move minimize routine to writer.
+        for (auto it = r.info_.begin(); it != r.info_.end(); ++it)
+          it->second.minimize();
+
+        for (auto it = r.format_fields_.begin(); it != r.format_fields_.end(); ++it)
+          it->second.minimize();
+      }
 
       return *this;
     }
@@ -712,6 +721,15 @@ namespace savvy
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
       else if (!variant::deserialize_sav1(r, *input_stream_, format_headers_, ids_.size(), phasing_))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+      else
+      {
+        // TODO: Set not_minimized flag and move minimize routine to writer.
+        for (auto it = r.info_.begin(); it != r.info_.end(); ++it)
+          it->second.minimize();
+
+        for (auto it = r.format_fields_.begin(); it != r.format_fields_.end(); ++it)
+          it->second.minimize();
+      }
 
       return *this;
     }
@@ -741,7 +759,11 @@ namespace savvy
             return *this;
           }
 
-          // TODO: endianess
+          if (endianness::is_big())
+          {
+            shared_sz = endianness::swap(shared_sz);
+            indiv_sz = endianness::swap(indiv_sz);
+          }
 
           //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
           // Read and parse shared and individual data
@@ -772,6 +794,7 @@ namespace savvy
             for (auto it = r.format_fields_.begin(); it != r.format_fields_.end(); ++it)
             {
               it->second.subset(subset_map_, subset_size_);
+              it->second.minimize(); // TODO: Set not_minimized flag and move minimize routine to writer.
             }
           }
           //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
