@@ -514,7 +514,7 @@ namespace savvy
       {
         ofs_ << "\t" << s.filters_.front();
         for (auto it = s.filters_.begin() + 1; it != s.filters_.end(); ++it)
-          ofs_ << "," << *it;
+          ofs_ << ";" << *it;
       }
 
       if (s.info_.empty())

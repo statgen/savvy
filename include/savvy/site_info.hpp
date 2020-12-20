@@ -559,7 +559,7 @@ namespace savvy
       if (s.filters_.front() == ".")
         s.filters_.clear();
       else
-        s.filters_ = detail::split_string_to_vector(s.filters_.front(), ',');
+        s.filters_ = detail::split_string_to_vector(s.filters_.front(), ';');
 
       std::string info_line;
       if (is >> info_line)
