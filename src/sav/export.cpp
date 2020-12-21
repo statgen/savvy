@@ -1024,6 +1024,8 @@ int export_main(int argc, char** argv)
     else status = "full";
 
     hdrs.emplace_back("phasing", status);
+
+    rdr.phasing_status(args.phasing());
   }
 
   std::set<std::string> info_fields_already_included;

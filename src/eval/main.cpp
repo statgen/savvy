@@ -129,6 +129,11 @@ int eval_gt(Itr paths_beg, Itr paths_end)
 
   std::size_t n_iterations = 3;
 
+  std::cout << "file_size\tchecksum\tn_records";
+  for (std::size_t i = 1; i <= n_iterations; ++i)
+    std::cout << "\titer" << i;
+  std::cout << "\titer_avg\tfile_path\teval_type\n";
+
   for (auto it = paths_beg; it != paths_end; ++it)
   {
     std::string input_path = *it;
@@ -172,7 +177,7 @@ int eval_gt(Itr paths_beg, Itr paths_end)
             cs = adler32(geno, geno + geno_sz, cs);
             ++cnt;
           }
-          std::cout << "\t" << cs;
+          std::cout << "\t" << cs << "\t" << cnt;
         }
         else
         {
@@ -226,6 +231,7 @@ int eval_gt(Itr paths_beg, Itr paths_end)
         auto start = steady_clock::now();
         savvy::v2::variant var;
         savvy::v2::reader rdr(input_path);
+        rdr.phasing_status(savvy::phasing::none);
         std::size_t cnt = 0;
         std::vector<int> geno;
 
@@ -238,7 +244,7 @@ int eval_gt(Itr paths_beg, Itr paths_end)
             cs = adler32(geno.begin(), geno.end(), cs);
             ++cnt;
           }
-          std::cout << "\t" << cs;
+          std::cout << "\t" << cs << "\t" << cnt;
         }
         else
         {
@@ -282,7 +288,7 @@ int eval_gt(Itr paths_beg, Itr paths_end)
             cs = adler32(geno.begin(), geno.end(), cs);
             ++cnt;
           }
-          std::cout << "\t" << cs;
+          std::cout << "\t" << cs << "\t" << cnt;
         }
         else
         {

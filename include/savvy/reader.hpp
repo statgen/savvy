@@ -366,6 +366,7 @@ namespace savvy
       reader& reset_bounds(genomic_region reg, bounding_point bp = bounding_point::beg);
       reader& reset_bounds(slice_bounds reg);
       phasing phasing_status() { return phasing_; }
+      void phasing_status(phasing val) { phasing_ = val; };
 
       bool good() const { return this->input_stream_->good(); }
       bool bad() const { return this->input_stream_->bad(); }
