@@ -189,6 +189,8 @@ namespace savvy
         return detail::leftmost_coordinate_within_region::compare(var, reg);
       case bounding_point::end:
         return detail::rightmost_coordinate_within_region::compare(var, reg);
+      default:
+        return false;
       }
     }
   }

@@ -16,6 +16,7 @@ namespace savvy
       case bounding_point::all:   return detail::all_coordinates_within_region::compare(var, reg);
       case bounding_point::beg:  return detail::leftmost_coordinate_within_region::compare(var, reg);
       case bounding_point::end: return detail::rightmost_coordinate_within_region::compare(var, reg);
+      default: return false;
     }
   }
 }
