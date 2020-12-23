@@ -24,13 +24,14 @@ integer is the array size. The highest 4 bits of a Flag type equals 0 and in thi
 made about the lower 4 bits. The table below gives the atomic types and their missing values:
 
 
-| Bit 0–**2** | C type  | Missing value | Description                         |
-|------------:|:--------|:--------------|:------------------------------------|
-|           1 | int8_t  | 0x80          | signed 8-bit integer                |
-|           2 | int16_t | 0x8000        | signed 16-bit integer               |
-|           3 | int32_t | 0x80000000    | signed 32-bit integer               |
-|           5 | float   | 0x7F800001    | IEEE 32-bit floating pointer number |
-|           7 | char    | ‘\0’          | character                           |
+| Bit 0–**2**| C type    | Missing value        | Description                          |
+|-----------:|:----------|:---------------------|:-------------------------------------|
+|         1  |  int8_t   |  0x80                |  signed 8-bit integer                |
+|         2  |  int16_t  |  0x8000              |  signed 16-bit integer               |
+|         3  |  int32_t  |  0x80000000          |  signed 32-bit integer               |
+|       **4**|**int64_t**|**0x8000000000000000**|**signed 64-bit integer**             |
+|         5  |  float    |  0x7F800001          |  IEEE 32-bit floating pointer number |
+|         7  |  char     |  ‘\0’                |  character                           |
 
 A **SAV2** file is **zstd** compressed and all multi-byte value are little endian.
 
