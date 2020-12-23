@@ -69,26 +69,35 @@ while (f.read(var))
 }
 ```
 
-## Multiple Data Vectors
+## Copying files
 ```c++
-savvy::reader f("chr1.sav");
+#include <savvy/reader.hpp>
+#include <savvy/writer.hpp>
+
+savvy::reader in("in.sav");
+savvy::writer out("out.bcf", savvy::fmt::bcf, in.headers(), in.samples());
 savvy::variant var;
-std::vector<int> genotypes;
-std::vector<float> dosages;
-while (f.read(var))
-{  
-  var.get_format("GT", genotypes);
-  for (int gt : genotypes)
-  {
-    ...
-  }
-  
-  var.get_format("DS", dosages);
-  for (float ds : dosages)
-  {
-    ...
-  }
-}
+while (in >> var)
+  out << var;
+```
+
+## Creating New Files
+```c++
+#include <savvy/writer.hpp>
+
+std::vector<std::string> sample_ids = {"ID1", "ID2", "ID3"};
+std::vector<std::pair<std::string, std::string>> headers = {};
+
+savvy::writer out("out.sav", savvy::fmt::sav2, headers, sample_ids);
+
+std::vector<int8_t> geno = {0,0,1,0,0,1};
+
+savvy::variant var("chr1", 10000000, "A", {"AC"}); // chrom, pos, ref, alts
+var.set_info("AC", std::accumulate(geno.begin(), geno.end(), 0));
+var.set_info("AN", geno.size());
+var.set_format("GT", geno);
+
+out.write(var);
 ```
 
 # SAV Command Line Interface
@@ -108,6 +117,13 @@ sav concat file1.sav file2.sav > concat.sav
 ```shell
 sav export --regions chr1,chr2:10000-20000 --sample-ids ID1,ID2,ID3 file.sav > file.vcf
 ```
+
+## Parameter Trade-offs
+| Action | Pro | Con |
+|:-------|:----|:----|
+|Increasing block size|Smaller file size (especially with pbwt)|Reduces precision of random access|
+|Increasing compression level|Smaller file size|Slower compression speed (decompression not affected)|
+|Enabling PBWT|Smaller file size when used with some fields|Slower compression and decompression|
 
 ## Slice Queries
 In addition to querying genomic regions, S1R indexes can be used to quickly subset records by their offset within a file.
