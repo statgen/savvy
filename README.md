@@ -1,7 +1,9 @@
 This branch contains version 2.0 progress. The latest stable release can be found in the [releases](https://github.com/statgen/savvy/releases) section.
 
 # Savvy Library
-Interface to various variant calling formats.
+Savvy is the official C++ interface for the [SAV file format](sav_spec_v2.md) and offers seamless support for BCF and VCF files.
+
+Since the release of version 2.0, savvy no longer supports writing of SAV 1.x files, but will continue to support reading of existing 1.x files.  
 
 ## Installing
 The easiest way to install savvy and its dependencies is to use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget).
@@ -69,7 +71,7 @@ while (f.read(var))
 }
 ```
 
-## Copying files
+## Copying Files
 ```c++
 #include <savvy/reader.hpp>
 #include <savvy/writer.hpp>
@@ -86,7 +88,15 @@ while (in >> var)
 #include <savvy/writer.hpp>
 
 std::vector<std::string> sample_ids = {"ID1", "ID2", "ID3"};
-std::vector<std::pair<std::string, std::string>> headers = {};
+
+std::vector<std::pair<std::string, std::string>> headers = {
+  {"fileformat", "VCFv4.2"},
+  {"FILTER", "<ID=PASS,Description=\"All filters passed\">"},
+  {"contig", "<ID=chr1,length=248956422>"},
+  {"INFO",   "<ID=AC,Number=A,Type=Integer,Description=\"Alternate Allele Counts\">"},
+  {"INFO",   "<ID=AN,Number=1,Type=Integer,Description=\"Total Number Allele Counts\">"},
+  {"FORMAT", "<ID=GT,Type=Integer,Description=\"Genotype\">"} 
+};
 
 savvy::writer out("out.sav", savvy::fmt::sav2, headers, sample_ids);
 
@@ -118,13 +128,6 @@ sav concat file1.sav file2.sav > concat.sav
 sav export --regions chr1,chr2:10000-20000 --sample-ids ID1,ID2,ID3 file.sav > file.vcf
 ```
 
-## Parameter Trade-offs
-| Action | Pro | Con |
-|:-------|:----|:----|
-|Increasing block size|Smaller file size (especially with pbwt)|Reduces precision of random access|
-|Increasing compression level|Smaller file size|Slower compression speed (decompression not affected)|
-|Enabling PBWT|Smaller file size when used with some fields|Slower compression and decompression|
-
 ## Slice Queries
 In addition to querying genomic regions, S1R indexes can be used to quickly subset records by their offset within a file.
 ```shell
@@ -134,6 +137,13 @@ sav export --slice 0:1000 file.sav > file.vcf
 # export second 1,000 records (1,000-1,999)
 sav export --slice 1000:2000 file.sav > file.vcf
 ```
+
+## Parameter Trade-offs
+| Action | Pro | Con |
+|:-------|:----|:----|
+|Increasing block size|Smaller file size (especially with pbwt)|Reduces precision of random access|
+|Increasing compression level|Smaller file size|Slower compression speed (decompression not affected)|
+|Enabling PBWT|Smaller file size when used with some fields|Slower compression and decompression|
 
 # Packaging
 ```shell
