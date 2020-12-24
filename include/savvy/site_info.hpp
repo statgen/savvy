@@ -335,7 +335,7 @@ namespace savvy
     protected:
       static bool deserialize(site_info& s, const dictionary& dict, std::uint32_t& n_sample);
       static bool deserialize_vcf(site_info& s, std::istream& is, const dictionary& dict);
-      static bool deserialize_sav1(site_info& s, std::istream& is, const std::vector<header_value_details>& info_headers);
+      static bool deserialize_sav1(site_info& s, std::istream& is, const std::list<header_value_details>& info_headers);
 
       template<typename Itr>
       static bool serialize(const site_info& s, Itr out_it, const dictionary& dict, std::uint32_t n_sample, std::uint32_t n_fmt);
@@ -368,7 +368,7 @@ namespace savvy
       static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_map*>& pbwt_format_pointers);
       static bool deserialize(variant& v, const dictionary& dict, internal::pbwt_sort_context& pbwt_context, std::size_t sample_size, bool is_bcf, phasing phased);
       static bool deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status);
-      static bool deserialize_sav1(variant& v, std::istream& is, const std::vector<header_value_details>& format_headers, std::size_t sample_size, phasing phasing_status);
+      static bool deserialize_sav1(variant& v, std::istream& is, const std::list<header_value_details>& format_headers, std::size_t sample_size, phasing phasing_status);
     };
 
     inline
@@ -614,7 +614,7 @@ namespace savvy
     }
 
     inline
-    bool site_info::deserialize_sav1(savvy::v2::site_info& s, std::istream& is, const std::vector<header_value_details>& info_headers)
+    bool site_info::deserialize_sav1(savvy::v2::site_info& s, std::istream& is, const std::list<header_value_details>& info_headers)
     {
       if (is.good())
       {
@@ -967,7 +967,7 @@ namespace savvy
 
 
     inline
-    bool variant::deserialize_sav1(variant& var, std::istream& is, const std::vector<header_value_details>& format_headers, std::size_t sample_size, phasing phasing_status)
+    bool variant::deserialize_sav1(variant& var, std::istream& is, const std::list<header_value_details>& format_headers, std::size_t sample_size, phasing phasing_status)
     {
       if (format_headers.empty()) return false;
 

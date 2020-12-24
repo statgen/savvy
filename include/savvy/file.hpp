@@ -12,6 +12,8 @@
 #include "pbwt.hpp"
 #include "site_info.hpp"
 
+#include <list>
+
 namespace savvy
 {
   class file
@@ -27,9 +29,9 @@ namespace savvy
   protected:
     ::savvy::dictionary dict_;
     std::array<std::uint8_t, 16> uuid_;
-    std::vector<header_value_details> info_headers_;
+    std::list<header_value_details> info_headers_;
     std::unordered_map<std::string, std::reference_wrapper<header_value_details>> info_headers_map_;
-    std::vector<header_value_details> format_headers_;
+    std::list<header_value_details> format_headers_;
     std::unordered_map<std::string, std::reference_wrapper<header_value_details>> format_headers_map_;
     ::savvy::internal::pbwt_sort_context sort_context_;
     phasing phasing_ = phasing::unknown;
@@ -90,7 +92,7 @@ namespace savvy
       if (format_headers_map_.find(hval.id) == format_headers_map_.end())
       {
         format_headers_.emplace_back(hval);
-        format_headers_map_.insert(std::make_pair(hval.id, std::ref(info_headers_.back())));
+        format_headers_map_.insert(std::make_pair(hval.id, std::ref(format_headers_.back())));
       }
     }
     else if (key == "phasing")

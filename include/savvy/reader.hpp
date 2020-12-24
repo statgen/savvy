@@ -346,8 +346,8 @@ namespace savvy
       const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
       const std::vector<std::string>& samples() const { return ids_; } // TODO: return subset when applicable.
 
-      const std::vector<header_value_details>& format_headers() const { return format_headers_; }
-      const std::vector<header_value_details>& info_headers() const { return info_headers_; }
+      const std::list<header_value_details>& format_headers() const { return format_headers_; }
+      const std::list<header_value_details>& info_headers() const { return info_headers_; }
 
 //      /**
 //       *
