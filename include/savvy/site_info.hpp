@@ -678,6 +678,9 @@ namespace savvy
                     is.read(&s.alts_.front()[0], sz);
                   }
 
+                  s.id_.clear();
+                  s.filters_.clear();
+                  s.qual_ = typed_value::missing_value<float>();
                   s.info_.clear();
                   s.info_.reserve(info_headers.size());
                   std::string prop_val;
