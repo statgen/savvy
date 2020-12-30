@@ -848,6 +848,7 @@ namespace savvy
                   input_stream_->read(&val[0], val_size);
 
                   process_header_pair(key, val);
+                  headers_.emplace_back(std::move(key), std::move(val));
                 }
               }
 
@@ -868,6 +869,7 @@ namespace savvy
           {
             ++in_it;
             ids_.reserve(sample_size);
+            subset_size_ = sample_size;
 
             std::uint64_t id_sz;
             while (sample_size && varint_decode(in_it, end, id_sz) != end)
