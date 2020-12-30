@@ -700,7 +700,7 @@ namespace savvy
                         if (key == "ID")
                           s.id_ = prop_val;
                         else if (key == "QUAL")
-                          s.qual_ = prop_val.empty() ? typed_value::missing_value<float>() : std::atof(prop_val.c_str());
+                          s.qual_ = prop_val.empty() || prop_val == "." ? typed_value::missing_value<float>() : std::atof(prop_val.c_str());
                         else if (key == "FILTER")
                           s.filters_ = detail::split_string_to_vector(prop_val, ';');
                         else
