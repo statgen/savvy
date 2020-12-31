@@ -584,7 +584,10 @@ namespace savvy
         if (s1r_index_->current_offset_in_block >= s1r_index_->total_in_block)
         {
           if (s1r_index_->iter == s1r_index_->query.end())
+          {
             this->input_stream_->setstate(std::ios::eofbit);
+            break;
+          }
           else
           {
             s1r_index_->total_in_block = std::uint32_t(0x000000000000FFFF & s1r_index_->iter->value()) + 1;
