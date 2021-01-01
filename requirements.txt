@@ -1,2 +1,2 @@
-jonathonl/shrinkwrap@cdf1e8c3d53603bd62f9e3eef8438aa739d73693
+jonathonl/shrinkwrap@2c159878963ec5f9b903c3a936f75d798d0cfd20
 htslib,https://github.com/samtools/htslib/releases/download/1.6/htslib-1.6.tar.bz2 --hash md5:d6fd14e208aca7e08cbe9072233d0af9 -DCMAKE_VERBOSE_MAKEFILE=1 --cmake dep/htslib.cmake

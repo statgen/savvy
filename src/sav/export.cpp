@@ -426,6 +426,7 @@ public:
       case 'X':
         index_ = true;
         index_path_ = optarg;
+        break;
       default:
         return false;
       }
