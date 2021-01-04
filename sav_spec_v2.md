@@ -55,28 +55,28 @@ organized as ‘(allele+1)<<1|phased’ where allele is set to -1 if the allele 
 bits are all 0). The vector is padded with missing values if the GT having fewer ploidy.
 
 
-|Field | Description | Type | Value|
-|------|-------------|------|------|
-|magic | BCF2 magic string | char[5] | **SAV**\2\1 |
-|l_text | Length of the header text, including any NULL padding | uint32 t | |
-|text | NULL-terminated plain VCF header text | char[l text] | |
-|*List of VCF records (until the end of the BGZF section)*|
-|l_shared| Data length from CHROM to the end of INFO | uint32_t | |
-|l_indiv | Data length of FORMAT and individual genotype fields | uint32_t | |
-|CHROM | Reference sequence ID | int32_t | |
-|POS | 0-based leftmost coordinate | int32_t| |
-|rlen | Length of reference sequence | int32_t | |
-|QUAL | Variant quality; 0x7F800001 for a missing value | float | |
-|n_allele_info | n_allele<<16\|n_info | uint32_t | |
-|n_fmt_sample | n_fmt<<24\|n_sample | uint32_t | |
-|ID| Variant identifier |typed str| |
-|*List of alleles in the REF and ALT fields (n=n allele)*|
-|allele| A reference or alternate allele | typed str | |
-|FILTER| List of filters; filters are defined in the dictionary |typed vec| |
-|*List of key-value pairs in the INFO field (n=n info)*|
-|info key | Info key, defined in the dictionary |typed int| |
-|info value| Value |typed val| |
-|*List of FORMATs and sample information (n=n fmt)*|
-|fmt key| Format key, defined in the dictionary | typed int| |
-|fmt type| Typing byte of each individual value, possibly followed by a typed int for the vector length | uint8_t+ | |
-|fmt value | Array of values. The information of each individual is concatenated in the vector. Every value is of the same fmt type. Variable-length vectors are padded with missing values; a string is stored as a vector of char. | (by fmt_type) | |
+| Field | Description | Type | Value |
+|-------|-------------|------|-------|
+| magic | **SAV**2 magic string | char[5] | **SAV**\2\1 |
+| l_text | Length of the header text, including any NULL padding | uint32_t | |
+| text | NULL-terminated plain VCF header text | char[l_text] | |
+| *List of VCF records (until the end of the BGZF section)* |
+| l_shared | Data length from CHROM to the end of INFO | uint32_t | |
+| l_indiv | Data length of FORMAT and individual genotype fields | uint32_t | |
+| CHROM | Reference sequence ID | int32_t | |
+| POS | 0-based leftmost coordinate | int32_t | |
+| rlen | Length of reference sequence | int32_t | |
+| QUAL | Variant quality; 0x7F800001 for a missing value | float | |
+| n_allele_info | n_allele<<16\|n_info | uint32_t | |
+| n_fmt_flags | n_fmt<<24\|**flags** | uint32_t | |
+| ID | Variant identifier | typed str | |
+| *List of alleles in the REF and ALT fields (n=n allele)* |
+| allele | A reference or alternate allele | typed str | |
+| FILTER | List of filters; filters are defined in the dictionary | typed vec | |
+| *List of key-value pairs in the INFO field (n=n info)* |
+| info_key | Info key, defined in the dictionary | typed int | |
+| info_value| Value | typed val | |
+| *List of FORMATs and sample information (n=n fmt)* |
+| fmt_key | Format key, defined in the dictionary | typed int | |
+| fmt_type | Typing byte of each individual value, possibly followed by a typed int for the vector length | uint8_t+ | |
+| fmt_value | Array of values. The information of each individual is concatenated in the vector. Every value is of the same fmt type. Variable-length vectors are padded with missing values; a string is stored as a vector of char. | (by fmt_type) | |
