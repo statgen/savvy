@@ -1,5 +1,5 @@
 
-# SAV v2 Specification
+# SAV 2.0 Specification
 
 Version 2 of the SAV file format extends the BCF file format at http://samtools.github.io/hts-specs/VCFv4.3.pdf (starting at page 27). The differences between BCF2 and SAV2 are as follows:
 * The magic string starts with SAV instead of BCF.
@@ -7,7 +7,7 @@ Version 2 of the SAV file format extends the BCF file format at http://samtools.
 * A type byte with the fourth bit set indicates that PBWT is enabled for the vector.
 * The sample size is not redundantly stored in each record. The most significant bit of the space used to store sample size in BCF records in used to indicate a PBWT reset. The rest of the bits are reserved.
 * Files are compressed with blocked zstd instead of blocked gzip.
-* Files use S1R indexing instead of CSI, which are appended to the end of the file instead of stored as a separate file.
+* Files use [S1R indices](./s1r_spec.md) instead of CSI, which are appended to the end of the SAV file instead of stored as a separate file.
  
 
 The following reference is adapted from http://samtools.github.io/hts-specs/BCFv2_qref.pdf. The differences from the BCF quick reference are bolded.  
@@ -55,33 +55,28 @@ organized as ‘(allele+1)<<1|phased’ where allele is set to -1 if the allele 
 bits are all 0). The vector is padded with missing values if the GT having fewer ploidy.
 
 
-|Field | Description | Type | Value
-magic BCF2 magic string char[5] **SAV**\2\1
-l text Length of the header text, including any NULL padding uint32 t
-text NULL-terminated plain VCF header text char[l text]
-List of VCF records (until the end of the BGZF section)
-l shared Data length from CHROM to the end of INFO uint32 t
-l indiv Data length of FORMAT and individual genotype fields uint32 t
-CHROM Reference sequence ID int32 t
-POS 0-based leftmost coordinate int32 t
-rlen Length of reference sequence int32 t
-QUAL Variant quality; 0x7F800001 for a missing value float
-n allele info n allele<<16|n info uint32 t
-n fmt sample n fmt<<24|n sample uint32 t
-ID Variant identifier typed str
-List of alleles in the REF and ALT fields (n=n allele)
-allele A reference or alternate allele typed str
-FILTER List of filters; filters are defined in the dictionary typed vec
-List of key-value pairs in the INFO field (n=n info)
-info key Info key, defined in the dictionary typed int
-info value Value typed val
-List of FORMATs and sample information (n=n fmt)
-fmt key Format key, defined in the dictionary typed int
-fmt type Typing byte of each individual value, possibly followed by
-a typed int for the vector length
-uint8 t+
-fmt value Array of values. The information of each individual is
-concatenated in the vector. Every value is of the same
-fmt type. Variable-length vectors are padded with missing
-values; a string is stored as a vector of char.
-(by fmt type)
+|Field | Description | Type | Value|
+|------|-------------|------|------|
+|magic | BCF2 magic string | char[5] | **SAV**\2\1 |
+|l_text | Length of the header text, including any NULL padding | uint32 t | |
+|text | NULL-terminated plain VCF header text | char[l text] | |
+|*List of VCF records (until the end of the BGZF section)*|
+|l_shared| Data length from CHROM to the end of INFO | uint32_t | |
+|l_indiv | Data length of FORMAT and individual genotype fields | uint32_t | |
+|CHROM | Reference sequence ID | int32_t | |
+|POS | 0-based leftmost coordinate | int32_t| |
+|rlen | Length of reference sequence | int32_t | |
+|QUAL | Variant quality; 0x7F800001 for a missing value | float | |
+|n_allele_info | n_allele<<16\|n_info | uint32_t | |
+|n_fmt_sample | n_fmt<<24\|n_sample | uint32_t | |
+|ID| Variant identifier |typed str| |
+|*List of alleles in the REF and ALT fields (n=n allele)*|
+|allele| A reference or alternate allele | typed str | |
+|FILTER| List of filters; filters are defined in the dictionary |typed vec| |
+|*List of key-value pairs in the INFO field (n=n info)*|
+|info key | Info key, defined in the dictionary |typed int| |
+|info value| Value |typed val| |
+|*List of FORMATs and sample information (n=n fmt)*|
+|fmt key| Format key, defined in the dictionary | typed int| |
+|fmt type| Typing byte of each individual value, possibly followed by a typed int for the vector length | uint8_t+ | |
+|fmt value | Array of values. The information of each individual is concatenated in the vector. Every value is of the same fmt type. Variable-length vectors are padded with missing values; a string is stored as a vector of char. | (by fmt_type) | |
