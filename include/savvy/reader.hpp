@@ -824,7 +824,8 @@ namespace savvy
       if (good() && varint_decode(in_it, end, headers_size) != end)
       {
         ++in_it;
-        headers_.reserve(headers_size);
+        headers_.reserve(1 + headers_size);
+        headers_.emplace_back("fileformat","VCFv4.2");
 
         std::unordered_set<std::string> unique_info_fields;
 
