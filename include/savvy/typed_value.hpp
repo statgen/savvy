@@ -548,6 +548,9 @@ namespace savvy
     inline static T end_of_vector_value();
 
     template<typename T>
+    inline static T max_reserved_value();
+
+    template<typename T>
     static typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, bool>::type
     is_missing(const T& v);
 
@@ -556,7 +559,10 @@ namespace savvy
     is_missing(const T& v);
 
     template<typename T>
-    inline static bool is_end_of_vector(const T& v);
+    static bool is_end_of_vector(const T& v);
+
+    template<typename T>
+    static bool is_special_value(const T& v);
 
     template<typename T>
     static typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type
@@ -2045,6 +2051,31 @@ namespace savvy
   }
 
   template<typename T>
+  inline bool typed_value::is_special_value(const T& v)
+  {
+    static_assert(std::is_signed<T>::value && std::is_integral<T>::value, "Only supports signed integers or floats");
+    return v <= max_reserved_value<T>();
+  }
+
+  template<>
+  inline bool typed_value::is_special_value(const float& v)
+  {
+    return std::isnan(v);
+  }
+
+  template<>
+  inline bool typed_value::is_special_value(const double& v)
+  {
+    return std::isnan(v);
+  }
+
+  template<>
+  inline bool typed_value::is_special_value(const char& v)
+  {
+    return false;
+  }
+
+  template<typename T>
   typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type typed_value::type_code()
   {
     if (std::is_same<T, std::int8_t>::value)
@@ -2167,13 +2198,22 @@ namespace savvy
     return ret.f;
   }
 
+  template <> inline char typed_value::max_reserved_value<char>() { assert(!"This should not be called for string types"); return '\0'; }
+  template <> inline std::int8_t typed_value::max_reserved_value<std::int8_t>() { return 0x87; }
+  template <> inline std::int16_t typed_value::max_reserved_value<std::int16_t>() { return 0x8007; }
+  template <> inline std::int32_t typed_value::max_reserved_value<std::int32_t>() { return 0x80000007; }
+  template <> inline std::int64_t typed_value::max_reserved_value<std::int64_t>() { return 0x8000000000000007; }
+
   template <typename DestT, typename SrcT>
   DestT typed_value::reserved_transformation(SrcT in)
   {
-    if (is_missing(in))
-      return missing_value<DestT>();
-    if (is_end_of_vector(in))
-      return end_of_vector_value<DestT>();
+    if (is_special_value(in))
+    {
+      if (is_end_of_vector(in))
+        return end_of_vector_value<DestT>();
+      else
+        return missing_value<DestT>();
+    }
     return DestT(in);
   }
 
@@ -2637,7 +2677,7 @@ namespace savvy
       vtype max_val = 0;
       for (auto it = vec.begin(); it != vec.end(); ++it)
       {
-        if (!is_missing(*it)) // TODO: handle vector_end use is_reserved()
+        if (!is_special_value(*it))
         {
           if (*it > max_val)
             max_val = *it;
@@ -2718,7 +2758,7 @@ namespace savvy
       vtype max_val = 0;
       for (auto it = vec.begin(); it != vec.end(); ++it)
       {
-        if (!is_missing(*it)) // TODO: handle vector_end use is_reserved()
+        if (!is_special_value(*it))
         {
           if (*it > max_val)
             max_val = *it;
