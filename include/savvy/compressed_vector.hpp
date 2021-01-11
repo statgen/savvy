@@ -149,7 +149,6 @@ namespace savvy
       std::size_t sp_sz = val_end - val_it;
       values_.resize(sp_sz);
       offsets_.resize(sp_sz);
-      std::copy_n(val_it, sp_sz, values_.begin());
       std::transform(val_it, val_end, values_.begin(), t_fn);
       std::copy_n(off_it, sp_sz, offsets_.begin());
     }
