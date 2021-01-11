@@ -654,14 +654,14 @@ namespace savvy
           }
         }
 
-        auto pos_before = r.pos();
+        //auto pos_before = r.pos();
         if (!read_record(r))
         {
           assert(!"Read failed before end of csi block");
           input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
         }
 
-        assert(r.pos() >= pos_before);
+        //assert(r.pos() >= pos_before);
 
         if (region_compare(csi_index_->bounding_type, r, csi_index_->reg))
         {

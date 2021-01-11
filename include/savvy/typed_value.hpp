@@ -583,6 +583,23 @@ namespace savvy
     template<typename DestT, typename SrcT>
     static DestT reserved_transformation(SrcT in);
 
+    template <typename DestT>
+    struct reserved_transformation_functor
+    {
+      template <typename InT>
+      DestT operator()(const InT& in)
+      {
+        if (is_special_value(in))
+        {
+          if (is_end_of_vector(in))
+            return end_of_vector_value<DestT>();
+          else
+            return missing_value<DestT>();
+        }
+        return DestT(in);
+      }
+    };
+
 
     template <typename T>
     void bcf_encode_gt(T* val_ptr, T* val_end_ptr, bool phased)
@@ -1303,15 +1320,15 @@ namespace savvy
         switch (val_type_)
         {
         case 0x01u:
-          return copy_sparse1<std::int8_t>(dest);
+          return copy_sparse1<std::int8_t>(dest.data());
         case 0x02u:
-          return copy_sparse1<std::int16_t>(dest); // TODO: handle endianess
+          return copy_sparse1<std::int16_t>(dest.data()); // TODO: handle endianess
         case 0x03u:
-          return copy_sparse1<std::int32_t>(dest);
+          return copy_sparse1<std::int32_t>(dest.data());
         case 0x04u:
-          return copy_sparse1<std::int64_t>(dest);
+          return copy_sparse1<std::int64_t>(dest.data());
         case 0x05u:
-          return copy_sparse1<float>(dest);
+          return copy_sparse1<float>(dest.data());
         default:
           return false;
         }
@@ -1322,20 +1339,35 @@ namespace savvy
         switch (val_type_)
         {
         case 0x01u:
-          std::copy_n((std::int8_t*)val_ptr_, size_, dest.data());
+        {
+          auto p = (std::int8_t*)val_ptr_;
+          std::transform(p, p + size_, dest.data(), reserved_transformation<T, std::int8_t>);
           break;
+        }
         case 0x02u:
-          std::copy_n((std::int16_t*)val_ptr_, size_, dest.data()); // TODO: handle endianess
+        {
+          auto p = (std::int16_t*)val_ptr_;
+          std::transform(p, p + size_, dest.data(), reserved_transformation<T, std::int16_t>);
           break;
+        }
         case 0x03u:
-          std::copy_n((std::int32_t*)val_ptr_, size_, dest.data());
+        {
+          auto p = (std::int32_t*)val_ptr_;
+          std::transform(p, p + size_, dest.data(), reserved_transformation<T, std::int32_t>);
           break;
+        }
         case 0x04u:
-          std::copy_n((std::int64_t*)val_ptr_, size_, dest.data());
+        {
+          auto p = (std::int64_t*)val_ptr_;
+          std::transform(p, p + size_, dest.data(), reserved_transformation<T, std::int64_t>);
           break;
+        }
         case 0x05u:
-          std::copy_n((float*)val_ptr_, size_, dest.data());
+        {
+          auto p = (float*)val_ptr_;
+          std::transform(p, p + size_, dest.data(), reserved_transformation<T, float>);
           break;
+        }
         default:
           return false;
         }
@@ -1435,7 +1467,6 @@ namespace savvy
 
       if (off_type_)
       {
-        // TODO: support relative offsets
         dest.resize(0);
 
         switch (val_type_)
@@ -1446,16 +1477,16 @@ namespace savvy
           switch (off_type_)
           {
           case 0x01u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           case 0x02u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_);
-            break; // TODO: handle endianess
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            break;
           case 0x03u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           case 0x04u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           default:
             return false;
@@ -1468,38 +1499,38 @@ namespace savvy
           switch (off_type_)
           {
           case 0x01u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           case 0x02u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_);
-            break; // TODO: handle endianess
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            break;
           case 0x03u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           case 0x04u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           default:
             return false;
           }
           break;
-        }// TODO: handle endianess
+        }
         case 0x03u:
         {
           auto *vp = (std::int32_t *) val_ptr_;
           switch (off_type_)
           {
           case 0x01u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           case 0x02u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_);
-            break; // TODO: handle endianess
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            break;
           case 0x03u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_), reserved_transformation_functor<T>();
             break;
           case 0x04u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           default:
             return false;
@@ -1512,16 +1543,16 @@ namespace savvy
           switch (off_type_)
           {
           case 0x01u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           case 0x02u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_);
-            break; // TODO: handle endianess
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            break;
           case 0x03u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           case 0x04u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           default:
             return false;
@@ -1534,16 +1565,16 @@ namespace savvy
           switch (off_type_)
           {
           case 0x01u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           case 0x02u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_);
-            break; // TODO: handle endianess
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            break;
           case 0x03u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           case 0x04u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_);
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_, reserved_transformation_functor<T>());
             break;
           default:
             return false;
@@ -1564,31 +1595,31 @@ namespace savvy
         case 0x01u:
         {
           auto *p = (std::int8_t *) val_ptr_;
-          dest.assign(p, p + size_);
+          dest.assign(p, p + size_, reserved_transformation_functor<T>());
           break;
         }
         case 0x02u:
         {
           auto *p = (std::int16_t *) val_ptr_;
-          dest.assign(p, p + size_);
+          dest.assign(p, p + size_, reserved_transformation_functor<T>());
           break;
         }// TODO: handle endianess
         case 0x03u:
         {
           auto *p = (std::int32_t *) val_ptr_;
-          dest.assign(p, p + size_);
+          dest.assign(p, p + size_, reserved_transformation_functor<T>());
           break;
         }
         case 0x04u:
         {
           auto *p = (std::int64_t *) val_ptr_;
-          dest.assign(p, p + size_);
+          dest.assign(p, p + size_, reserved_transformation_functor<T>());
           break;
         }
         case 0x05u:
         {
           auto *p = (float *) val_ptr_;
-          dest.assign(p, p + size_);
+          dest.assign(p, p + size_, reserved_transformation_functor<T>());
           break;
         }
         default:
@@ -1916,19 +1947,19 @@ namespace savvy
     void deserialize_vcf(std::size_t idx, std::size_t length, char* str);
 
     template<typename ValT, typename OffT, typename DestT>
-    void copy_sparse2(DestT& dest) const
+    void copy_sparse2(DestT* dest) const
     {
       std::size_t total_offset = 0;
       for (std::size_t i = 0; i < sparse_size_; ++i)
       {
         int tmp_off = ((const OffT *) off_ptr_)[i];
         total_offset += tmp_off;
-        dest[total_offset++] = ((const ValT *) val_ptr_)[i];
+        dest[total_offset++] = reserved_transformation<DestT, ValT>(((const ValT *) val_ptr_)[i]);;
       }
     }
 
     template<typename ValT, typename DestT>
-    bool copy_sparse1(DestT& dest) const
+    bool copy_sparse1(DestT* dest) const
     {
       switch (off_type_)
       {

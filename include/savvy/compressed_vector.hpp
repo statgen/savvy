@@ -115,8 +115,14 @@ namespace savvy
       assign(val_it, val_end, off_it, sz);
     }
 
-    template <typename ValT>
-    void assign(ValT val_it, ValT val_end)
+    struct noop_functor
+    {
+      template <typename InT>
+      T operator()(const InT& in) const { return T(in); }
+    };
+
+    template <typename ValT, typename Transform = noop_functor>
+    void assign(ValT val_it, ValT val_end, Transform t_fn = Transform())
     {
       size_ = val_end - val_it;
       values_.clear();
@@ -128,14 +134,14 @@ namespace savvy
         //typename std::iterator_traits<ValT>::value_type tmp = *it;
         if (*it)
         {
-          values_.emplace_back(*it);
+          values_.emplace_back(t_fn(*it));
           offsets_.emplace_back(it - val_it);
         }
       }
     }
 
-    template <typename ValT, typename OffT>
-    void assign(ValT val_it, ValT val_end, OffT off_it, std::size_t sz)
+    template <typename ValT, typename OffT, typename Transform = noop_functor>
+    void assign(ValT val_it, ValT val_end, OffT off_it, std::size_t sz, Transform t_fn = Transform())
     {
       size_ = sz;
       values_.clear();
@@ -144,6 +150,7 @@ namespace savvy
       values_.resize(sp_sz);
       offsets_.resize(sp_sz);
       std::copy_n(val_it, sp_sz, values_.begin());
+      std::transform(val_it, val_end, values_.begin(), t_fn);
       std::copy_n(off_it, sp_sz, offsets_.begin());
     }
 
