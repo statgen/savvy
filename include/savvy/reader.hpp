@@ -639,7 +639,7 @@ namespace savvy
 
         std::uint64_t current_pos = input_stream_->tellg();
 
-        if (current_pos >> 16 >= csi_index_->intervals.front().second >> 16)
+        if (current_pos >= csi_index_->intervals.front().second)
         {
           csi_index_->intervals.pop_front();
           if (csi_index_->intervals.empty())
@@ -649,7 +649,7 @@ namespace savvy
           }
           else
           {
-            assert(csi_index_->intervals.front().first >> 16 <= csi_index_->intervals.front().second >> 16);
+            assert(csi_index_->intervals.front().first <= csi_index_->intervals.front().second);
             input_stream_->seekg(csi_index_->intervals.front().first);
           }
         }

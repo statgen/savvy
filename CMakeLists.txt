@@ -109,8 +109,8 @@ if (BUILD_EVAL)
     add_executable(sav-eval src/eval/main.cpp)
     target_link_libraries(sav-eval savvy)
 
-    add_executable(columnar-eval src/eval/columnar_main.cpp)
-    target_link_libraries(columnar-eval savvy)
+#    add_executable(columnar-eval src/eval/columnar_main.cpp)
+#    target_link_libraries(columnar-eval savvy)
 endif()
 
 if(BUILD_SLR_EXAMPLES)
