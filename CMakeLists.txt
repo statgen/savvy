@@ -92,9 +92,9 @@ if(BUILD_TESTS)
     enable_testing()
 
     add_definitions(-DSAVVYT_VCF_FILE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file.vcf\"
-                    -DSAVVYT_SAV_FILE_HARD=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file_hard.sav\"
-                    -DSAVVYT_SAV_FILE_DOSE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file_dose.sav\"
-                    -DSAVVYT_MARKER_COUNT_HARD=28
+                    -DSAVVYT_SAV_FILE_HARD=\"test_file_hard.sav\"
+                    -DSAVVYT_SAV_FILE_DOSE=\"test_file_dose.sav\"
+                    -DSAVVYT_MARKER_COUNT_HARD=24
                     -DSAVVYT_MARKER_COUNT_DOSE=20)
 
     add_executable(savvy-test src/test/main.cpp src/test/test_class.cpp include/test/test_class.hpp)
@@ -102,7 +102,7 @@ if(BUILD_TESTS)
 
     add_test(convert_file_test savvy-test convert-file)
     add_test(subset_test savvy-test subset)
-    add_test(varint_test savvy-test varint)
+    add_test(random_access_test savvy-test random-access)
 endif()
 
 if (BUILD_EVAL)
