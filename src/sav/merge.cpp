@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#ifdef NEEDS_PORT_TO_SAV_V2
 #include <cmath>
 #include "sav/merge.hpp"
 #include "savvy/reader.hpp"
@@ -383,6 +384,7 @@ int merge_main(int argc, char** argv)
 
   return output.good() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
+#endif
 
 #ifdef MERGE_OLD
 int merge_main(int argc, char** argv)

@@ -10,8 +10,6 @@
 #include "sav/utility.hpp"
 #include "sav/filter.hpp"
 
-#include "savvy/vcf_reader.hpp"
-#include "savvy/sav_reader.hpp"
 #include "savvy/savvy.hpp"
 #include "savvy/writer.hpp"
 #include "savvy/reader.hpp"
@@ -23,11 +21,6 @@
 #include <ctime>
 #include <getopt.h>
 #include <sys/stat.h>
-
-#include "savvy/reader.hpp"
-#include "savvy/writer.hpp"
-#include "sav/filter.hpp"
-#include "sav/utility.hpp"
 
 #include <getopt.h>
 #include <sys/stat.h>
@@ -654,7 +647,7 @@ std::string create_sparse_values_string(const savvy::compressed_vector<T>& genot
   return ret.str();
 }
 
-
+#if 0
 template <typename Vec>
 void set_info(savvy::site_info& variant, const Vec& genotypes, const std::set<std::string>& fields_to_generate, savvy::fmt format)
 {
@@ -696,6 +689,7 @@ void set_info(savvy::site_info& variant, const Vec& genotypes, const std::set<st
     }
   }
 }
+#endif
 
 //template <typename T>
 //int prep_reader_for_export(T& input, const export_prog_args& args)

@@ -195,7 +195,7 @@ int stat_index_main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  std::vector<savvy::sav::index_statistics> stats = savvy::sav::stat_index(args.input_path());
+  std::vector<savvy::s1r::index_statistics> stats = savvy::s1r::stat_index(args.input_path());
 
   if (stats.empty())
   {

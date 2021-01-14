@@ -468,24 +468,6 @@ private:
     return seed;
   }
 
-  template <typename T>
-  static void print_variant(const T&prop_fields, const savvy::site_info& anno, const std::vector<float>& data)
-  {
-    std::cout << anno.position();
-    for (const auto& prop_key : prop_fields)
-    {
-      std::string prop_val = anno.prop(prop_key);
-      if (prop_key == "AF")
-        prop_val = prop_val.substr(0, std::min((std::size_t)3, prop_val.size()));
-
-      std::cout << "\t" << prop_val;
-    }
-
-    for (auto gt = data.begin(); gt != data.end(); ++gt)
-      std::cout << (unsigned short)savvy::sav::detail::allele_encoder<7>::encode(*gt);
-    std::cout << std::endl;
-  }
-
   template <typename ReaderType>
   static std::size_t get_checksum(ReaderType& reader, const std::string& fmt_field)
   {

@@ -1100,6 +1100,53 @@ namespace savvy
 //    }
 
 
+    inline std::vector<std::string> query_chromosomes(const std::string& file_path)
+    {
+      reader index(file_path + ".s1r");
+      return index.tree_names();
+    }
+
+    struct index_statistics
+    {
+      std::string contig;
+      std::size_t tree_height = 0;
+      std::size_t block_count = 0;
+      std::size_t record_count = 0;
+      std::size_t min_position = std::numeric_limits<std::size_t>::max();
+      std::size_t max_position = 0;
+    };
+
+    inline std::vector<index_statistics> stat_index(const std::string& file_path)
+    {
+      std::vector<index_statistics> ret;
+
+      savvy::s1r::reader index_file(file_path);
+
+      if (index_file.good())
+      {
+        ret.resize(index_file.tree_names().size());
+        auto s = ret.begin();
+        for (auto it = index_file.trees_begin(); it != index_file.trees_end(); ++it,++s)
+        {
+          s->contig = it->name();
+          s->block_count = it->entry_count();
+          s->tree_height = it->tree_height();
+
+          auto q = it->create_query(0, std::numeric_limits<std::uint64_t>::max());
+          for (auto e = q.begin(); e != q.end(); ++e)
+          {
+            s->record_count += std::uint32_t(0x000000000000FFFF & e->value()) + 1;
+            if (s->min_position > e->region_start())
+              s->min_position = e->region_start();
+            if (s->max_position < e->region_end())
+              s->max_position = e->region_end();
+          }
+        }
+      }
+
+      return ret;
+    }
+
     inline reader::query reader::create_query(genomic_region reg)
     {
       query ret(input_file_, trees_, reg);

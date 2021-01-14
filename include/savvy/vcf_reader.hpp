@@ -6,7 +6,7 @@
 
 #ifndef LIBSAVVY_VCF_READER_HPP
 #define LIBSAVVY_VCF_READER_HPP
-
+#if 0
 #include "allele_status.hpp"
 #include "site_info.hpp"
 #include "region.hpp"
@@ -1576,5 +1576,5 @@ namespace savvy
 // 'operator+' should be declared prior to the call site or in namespace
 //inline savvy::vcf::marker::const_iterator operator+(const savvy::vcf::marker::const_iterator& a, savvy::vcf::marker::const_iterator::difference_type n);
 //inline savvy::vcf::marker::const_iterator operator+(savvy::vcf::marker::const_iterator::difference_type n, const savvy::vcf::marker::const_iterator& a);
-
+#endif
 #endif //LIBSAVVY_VCF_READER_HPP

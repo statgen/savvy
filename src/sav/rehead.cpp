@@ -6,14 +6,12 @@
 
 #include "sav/rehead.hpp"
 #include "sav/utility.hpp"
-#include "savvy/sav_reader.hpp"
-
+#include "savvy/reader.hpp"
+#include "savvy/writer.hpp"
 
 #include <fstream>
 #include <getopt.h>
 #include <vector>
-#include <savvy/reader.hpp>
-#include <savvy/writer.hpp>
 
 class rehead_prog_args
 {

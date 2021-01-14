@@ -46,8 +46,9 @@ public:
     os << " head:        Prints SAV headers or samples IDs\n";
     os << " import:      Imports VCF or BCF into SAV\n";
     os << " index:       Indexes SAV file\n";
-    os << " merge:       Merges multiple files into one\n";
+    //os << " merge:       Merges multiple files into one\n";
     os << " rehead:      Replaces headers without recompressing variant blocks.\n";
+    os << " stat:        Gathers statistics on SAV file\n";
     os << " stat-index:  Gathers statistics on s1r index\n";
     os << "\n";
     os << "Options:\n";
@@ -112,10 +113,10 @@ int main(int argc, char** argv)
   {
     return index_main(argc, argv);
   }
-  else if (args.sub_command() == "merge")
-  {
-    return merge_main(argc, argv);
-  }
+//  else if (args.sub_command() == "merge") // TODO
+//  {
+//    return merge_main(argc, argv);
+//  }
   else if (args.sub_command() == "rehead")
   {
     return rehead_main(argc, argv);

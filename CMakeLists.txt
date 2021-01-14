@@ -31,28 +31,28 @@ find_package(Threads)
 
 add_definitions(-DSAVVY_VERSION="${PROJECT_VERSION}")
 
-add_library(savvy
-        include/savvy/allele_status.hpp
-        include/savvy/armadillo_vector.hpp
-        include/savvy/compressed_vector.hpp
-        include/savvy/data_format.hpp
-        include/savvy/eigen3_vector.hpp
-        include/savvy/portable_endian.hpp
-        src/savvy/reader.cpp include/savvy/reader.hpp
-        src/savvy/region.cpp include/savvy/region.hpp
-        include/savvy/s1r.hpp
-        src/savvy/sav_reader.cpp include/savvy/sav_reader.hpp
-        src/savvy/savvy.cpp include/savvy/savvy.hpp
-        src/savvy/site_info.cpp include/savvy/site_info.hpp
-        include/savvy/ublas_vector.hpp
-        src/savvy/utility.cpp include/savvy/utility.hpp
-        include/savvy/variant_group_iterator.hpp
-        include/savvy/variant_iterator.hpp
-        src/savvy/varint.cpp include/savvy/varint.hpp
-        src/savvy/vcf_reader.cpp include/savvy/vcf_reader.hpp)
+add_library(savvy INTERFACE)
+#        include/savvy/allele_status.hpp
+#        include/savvy/armadillo_vector.hpp
+#        include/savvy/compressed_vector.hpp
+#        include/savvy/data_format.hpp
+#        include/savvy/eigen3_vector.hpp
+#        include/savvy/portable_endian.hpp
+#        include/savvy/reader.hpp #src/savvy/reader.cpp include/savvy/reader.hpp
+#        include/savvy/region.hpp #src/savvy/region.cpp include/savvy/region.hpp
+#        include/savvy/s1r.hpp
+#        include/savvy/sav_reader.hpp #src/savvy/sav_reader.cpp include/savvy/sav_reader.hpp
+#        include/savvy/savvy.hpp #src/savvy/savvy.cpp include/savvy/savvy.hpp
+#        include/savvy/site_info.hpp #src/savvy/site_info.cpp include/savvy/site_info.hpp
+#        include/savvy/ublas_vector.hpp
+#        include/savvy/utility.hpp #src/savvy/utility.cpp include/savvy/utility.hpp
+#        include/savvy/variant_group_iterator.hpp
+#        include/savvy/variant_iterator.hpp
+#        include/savvy/varint.hpp #src/savvy/varint.cpp include/savvy/varint.hpp
+#        include/savvy/vcf_reader.hpp) #src/savvy/vcf_reader.cpp include/savvy/vcf_reader.hpp)
 
-target_link_libraries(savvy ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
-target_include_directories(savvy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
+target_link_libraries(savvy INTERFACE ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
+target_include_directories(savvy INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 add_executable(sav
         src/sav/main.cpp

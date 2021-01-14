@@ -6,7 +6,7 @@
 
 #ifndef SAVVY_SAV_MERGE_HPP
 #define SAVVY_SAV_MERGE_HPP
-
+#ifdef NEEDS_PORT_TO_SAV_V2
 int merge_main(int argc, char** argv);
-
+#endif
 #endif //SAVVY_SAV_MERGE_HPP

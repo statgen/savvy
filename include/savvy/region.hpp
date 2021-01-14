@@ -92,44 +92,6 @@ namespace savvy
     return ret;
   }
 
-  namespace detail
-  {
-    struct any_coordinate_within_region
-    {
-      static bool compare(const site_info& var, const genomic_region& reg)
-      {
-        return (var.position() <= reg.to() && (var.position() + std::max(var.ref().size(), var.alt().size()) - 1) >= reg.from() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
-      }
-    };
-
-    struct all_coordinates_within_region
-    {
-      static bool compare(const site_info& var, const genomic_region& reg)
-      {
-        return (var.position() >= reg.from() && (var.position() + std::max(var.ref().size(), var.alt().size()) - 1) <= reg.to() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
-      }
-    };
-
-    struct leftmost_coordinate_within_region
-    {
-      static bool compare(const site_info& var, const genomic_region& reg)
-      {
-        return (var.position() >= reg.from() && var.position() <= reg.to() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
-      }
-    };
-
-    struct rightmost_coordinate_within_region
-    {
-      static bool compare(const site_info& var, const genomic_region& reg)
-      {
-        std::uint64_t right = (var.position() + std::max(var.ref().size(), var.alt().size()) - 1);
-        return (right >= reg.from() && right <= reg.to() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
-      }
-    };
-  }
-
-  bool region_compare(bounding_point bounding_type, const site_info& var, const genomic_region& reg);
-
   namespace v2
   {
     namespace detail
@@ -194,6 +156,46 @@ namespace savvy
       }
     }
   }
+
+#if 0
+  namespace detail
+  {
+    struct any_coordinate_within_region
+    {
+      static bool compare(const site_info& var, const genomic_region& reg)
+      {
+        return (var.position() <= reg.to() && (var.position() + std::max(var.ref().size(), var.alt().size()) - 1) >= reg.from() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
+      }
+    };
+
+    struct all_coordinates_within_region
+    {
+      static bool compare(const site_info& var, const genomic_region& reg)
+      {
+        return (var.position() >= reg.from() && (var.position() + std::max(var.ref().size(), var.alt().size()) - 1) <= reg.to() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
+      }
+    };
+
+    struct leftmost_coordinate_within_region
+    {
+      static bool compare(const site_info& var, const genomic_region& reg)
+      {
+        return (var.position() >= reg.from() && var.position() <= reg.to() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
+      }
+    };
+
+    struct rightmost_coordinate_within_region
+    {
+      static bool compare(const site_info& var, const genomic_region& reg)
+      {
+        std::uint64_t right = (var.position() + std::max(var.ref().size(), var.alt().size()) - 1);
+        return (right >= reg.from() && right <= reg.to() && (var.chromosome() == reg.chromosome() || reg.chromosome().empty()));
+      }
+    };
+  }
+
+  bool region_compare(bounding_point bounding_type, const site_info& var, const genomic_region& reg);
+#endif
 }
 
 #endif //LIBSAVVY_REGION_HPP
