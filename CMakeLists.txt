@@ -22,7 +22,7 @@ endif()
 #if (NOT BUILD_SHARED_LIBS)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".a;${CMAKE_FIND_LIBRARY_SUFFIXES}") # Prefer libz.a when both are available
 #endif()
-find_library(HTS_LIBRARY hts)
+
 find_library(ZLIB_LIBRARY z)
 find_library(ZSTD_LIBRARY zstd)
 find_package(Threads)
@@ -84,7 +84,7 @@ add_custom_target(manuals
                   COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_head.1" "${CMAKE_BINARY_DIR}/sav head"
                   COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_import.1" "${CMAKE_BINARY_DIR}/sav import"
                   COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_index.1" "${CMAKE_BINARY_DIR}/sav index"
-                  COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_merge.1" "${CMAKE_BINARY_DIR}/sav merge"
+                  #COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_merge.1" "${CMAKE_BINARY_DIR}/sav merge"
                   COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_rehead.1" "${CMAKE_BINARY_DIR}/sav rehead"
                   COMMAND help2man --version-string "v${PROJECT_VERSION}" --output "${CMAKE_BINARY_DIR}/sav_stat-index.1" "${CMAKE_BINARY_DIR}/sav stat-index")
 
@@ -106,8 +106,12 @@ if(BUILD_TESTS)
 endif()
 
 if (BUILD_EVAL)
+    find_library(HTS_LIBRARY hts)
+    if (NOT HTS_LIBRARY)
+        message(FATAL_ERROR "Error: missing htslib. Run the following from base directory of repo\ncget install https://github.com/samtools/htslib/releases/download/1.6/htslib-1.6.tar.bz2 -DCMAKE_VERBOSE_MAKEFILE=1 --cmake dep/htslib.cmake")
+    endif()
     add_executable(sav-eval src/eval/main.cpp)
-    target_link_libraries(sav-eval savvy)
+    target_link_libraries(sav-eval savvy hts)
 
 #    add_executable(columnar-eval src/eval/columnar_main.cpp)
 #    target_link_libraries(columnar-eval savvy)

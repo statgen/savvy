@@ -19,6 +19,7 @@ jobs:
         sudo apt update
         sudo apt install -y build-essential cmake git python-dev python-pip
         sudo pip install cget
+        cget ignore xz
         cget install -f ./requirements.txt
         cmake --version
         mkdir build && cd build

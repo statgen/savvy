@@ -12,55 +12,56 @@ out_dir=$2
 
 export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
+cget ignore xz
 cget install -f ${src_dir}/requirements.txt --prefix /cget
 unset CFLAGS
 unset CXXFLAGS
 
 
-# libsavvy.so old abi
-mkdir build-api-cxx3-abi
-cd build-api-cxx3-abi
-cmake \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_TOOLCHAIN_FILE=/cget/cget/cget.cmake \
-  -DBUILD_SHARED_LIBS=ON \
-  -DCMAKE_CXX_FLAGS="-static-libstdc++" \
-  -DUSE_CXX3_ABI=ON \
-  -DCPACK_SYSTEM_NAME=Linux-CXX3-ABI \
-  -DCPACK_GENERATOR="STGZ;DEB;RPM" \
-  -DCPACK_PACKAGE_CONTACT="csg-devel@umich.edu" \
-  -DCPACK_ARCHIVE_COMPONENT_INSTALL=ON \
-  -DCPACK_DEB_COMPONENT_INSTALL=ON \
-  -DCPACK_RPM_COMPONENT_INSTALL=ON \
-  -DCPACK_COMPONENTS_ALL=api \
-  ${src_dir}
-
-make savvy
-make package
-cp savvy-*.{sh,deb,rpm} ${out_dir}/
-cd ..
-
-
-# libsavvy.so new abi
-mkdir build-api-cxx11-abi
-cd build-api-cxx11-abi
-cmake \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_TOOLCHAIN_FILE=/cget/cget/cget.cmake \
-  -DBUILD_SHARED_LIBS=ON \
-  -DCMAKE_CXX_FLAGS="-static-libstdc++" \
-  -DCPACK_GENERATOR="STGZ;DEB;RPM" \
-  -DCPACK_PACKAGE_CONTACT="csg-devel@umich.edu" \
-  -DCPACK_ARCHIVE_COMPONENT_INSTALL=ON \
-  -DCPACK_DEB_COMPONENT_INSTALL=ON \
-  -DCPACK_RPM_COMPONENT_INSTALL=ON \
-  -DCPACK_COMPONENTS_ALL=api \
-  ${src_dir}
-
-make savvy
-make package
-cp savvy-*.{sh,deb,rpm} ${out_dir}/
-cd ..
+## libsavvy.so old abi
+#mkdir build-api-cxx3-abi
+#cd build-api-cxx3-abi
+#cmake \
+#  -DCMAKE_BUILD_TYPE=Release \
+#  -DCMAKE_TOOLCHAIN_FILE=/cget/cget/cget.cmake \
+#  -DBUILD_SHARED_LIBS=ON \
+#  -DCMAKE_CXX_FLAGS="-static-libstdc++" \
+#  -DUSE_CXX3_ABI=ON \
+#  -DCPACK_SYSTEM_NAME=Linux-CXX3-ABI \
+#  -DCPACK_GENERATOR="STGZ;DEB;RPM" \
+#  -DCPACK_PACKAGE_CONTACT="csg-devel@umich.edu" \
+#  -DCPACK_ARCHIVE_COMPONENT_INSTALL=ON \
+#  -DCPACK_DEB_COMPONENT_INSTALL=ON \
+#  -DCPACK_RPM_COMPONENT_INSTALL=ON \
+#  -DCPACK_COMPONENTS_ALL=api \
+#  ${src_dir}
+#
+##make savvy
+#make package
+#cp savvy-*.{sh,deb,rpm} ${out_dir}/
+#cd ..
+#
+#
+## libsavvy.so new abi
+#mkdir build-api-cxx11-abi
+#cd build-api-cxx11-abi
+#cmake \
+#  -DCMAKE_BUILD_TYPE=Release \
+#  -DCMAKE_TOOLCHAIN_FILE=/cget/cget/cget.cmake \
+#  -DBUILD_SHARED_LIBS=ON \
+#  -DCMAKE_CXX_FLAGS="-static-libstdc++" \
+#  -DCPACK_GENERATOR="STGZ;DEB;RPM" \
+#  -DCPACK_PACKAGE_CONTACT="csg-devel@umich.edu" \
+#  -DCPACK_ARCHIVE_COMPONENT_INSTALL=ON \
+#  -DCPACK_DEB_COMPONENT_INSTALL=ON \
+#  -DCPACK_RPM_COMPONENT_INSTALL=ON \
+#  -DCPACK_COMPONENTS_ALL=api \
+#  ${src_dir}
+#
+##make savvy
+#make package
+#cp savvy-*.{sh,deb,rpm} ${out_dir}/
+#cd ..
 
 
 # sav cli statically linked
@@ -69,6 +70,7 @@ cd build-cli
 cmake \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_TOOLCHAIN_FILE=/cget/cget/cget.cmake \
+  -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
   -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
   -DCPACK_GENERATOR="STGZ;DEB;RPM" \
   -DCPACK_PACKAGE_CONTACT="csg-devel@umich.edu" \

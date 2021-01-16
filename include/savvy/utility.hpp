@@ -161,11 +161,6 @@ namespace savvy
     }
   }
 
-  inline std::string savvy_version()
-  {
-    return std::string(SAVVY_VERSION);
-  }
-
   struct header_value_details
   {
     std::string id;
