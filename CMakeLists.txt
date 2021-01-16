@@ -51,7 +51,7 @@ add_library(savvy INTERFACE)
 #        include/savvy/varint.hpp #src/savvy/varint.cpp include/savvy/varint.hpp
 #        include/savvy/vcf_reader.hpp) #src/savvy/vcf_reader.cpp include/savvy/vcf_reader.hpp)
 
-target_link_libraries(savvy INTERFACE ${HTS_LIBRARY} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(savvy INTERFACE ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(savvy INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 add_executable(sav
@@ -111,7 +111,7 @@ if (BUILD_EVAL)
         message(FATAL_ERROR "Error: missing htslib. Run the following from base directory of repo\ncget install https://github.com/samtools/htslib/releases/download/1.6/htslib-1.6.tar.bz2 -DCMAKE_VERBOSE_MAKEFILE=1 --cmake dep/htslib.cmake")
     endif()
     add_executable(sav-eval src/eval/main.cpp)
-    target_link_libraries(sav-eval savvy hts)
+    target_link_libraries(sav-eval savvy ${HTS_LIBRARY})
 
 #    add_executable(columnar-eval src/eval/columnar_main.cpp)
 #    target_link_libraries(columnar-eval savvy)

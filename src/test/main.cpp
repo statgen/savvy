@@ -27,9 +27,6 @@
 #include <utility>
 #include <sys/stat.h>
 
-#include <htslib/synced_bcf_reader.h>
-#include <htslib/tbx.h>
-#include <htslib/hts.h>
 
 //bool has_extension(const std::string& fullString, const std::string& ext)
 //{
