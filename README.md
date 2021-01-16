@@ -10,10 +10,14 @@ The easiest way to install savvy and its dependencies is to use [cget](http://cg
 ```bash
 cget install --prefix <install_prefix> statgen/savvy
 ```
+
+## Including in Projects
 CMakeLists.txt:
 ```cmake
+# Configure with cmake option: -DCMAKE_TOOLCHAIN_FILE=<install_prefix>/cget/cget.cmake
+find_package(savvy REQUIRED)
 add_executable(prog main.cpp)
-target_link_libraries(prog savvy hts z zstd)
+target_link_libraries(prog savvy)
 ```
 
 ## Read Variants from File 
