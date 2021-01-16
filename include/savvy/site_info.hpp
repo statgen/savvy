@@ -37,8 +37,8 @@ namespace savvy
   };
 
 
-  namespace v2
-  {
+  //namespace v2
+  //{
     class site_info
     {
       friend class reader;
@@ -411,7 +411,7 @@ namespace savvy
     }
 
     inline
-    bool site_info::deserialize_sav1(savvy::v2::site_info& s, std::istream& is, const std::list<header_value_details>& info_headers)
+    bool site_info::deserialize_sav1(savvy::site_info& s, std::istream& is, const std::list<header_value_details>& info_headers)
     {
       if (is.good())
       {
@@ -1175,7 +1175,7 @@ namespace savvy
         format_fields_.emplace_back(key, std::move(val));
       }
     }
-  }
+  //}
 
 #if 0
   class site_info

@@ -229,8 +229,8 @@ int eval_gt(Itr paths_beg, Itr paths_end)
       for (std::size_t i = 0; i <= n_iterations; ++i)
       {
         auto start = steady_clock::now();
-        savvy::v2::variant var;
-        savvy::v2::reader rdr(input_path);
+        savvy::variant var;
+        savvy::reader rdr(input_path);
         rdr.phasing_status(savvy::phasing::none);
         std::size_t cnt = 0;
         std::vector<int> geno;
@@ -274,8 +274,8 @@ int eval_gt(Itr paths_beg, Itr paths_end)
       for (std::size_t i = 0; i <= n_iterations; ++i)
       {
         auto start = steady_clock::now();
-        savvy::v2::variant var;
-        savvy::v2::reader rdr(input_path);
+        savvy::variant var;
+        savvy::reader rdr(input_path);
         std::size_t cnt = 0;
         savvy::compressed_vector<int> geno;
 
@@ -353,7 +353,7 @@ int eval_gt(Itr paths_beg, Itr paths_end)
 //  }
 //}
 
-savvy::v2::site_info get_site_info(std::size_t allele_index, bcf_hdr_t* hdr, bcf1_t* rec)
+savvy::site_info get_site_info(std::size_t allele_index, bcf_hdr_t* hdr, bcf1_t* rec)
 {
   bcf_unpack(rec, BCF_UN_ALL);
   std::size_t n_info = rec->n_info;
@@ -416,7 +416,7 @@ savvy::v2::site_info get_site_info(std::size_t allele_index, bcf_hdr_t* hdr, bcf
     }
   }
 
-  return savvy::v2::site_info(
+  return savvy::site_info(
     std::string(bcf_hdr_id2name(hdr, rec->rid)),
     static_cast<std::uint64_t>(rec->pos + 1),
     std::string(rec->d.allele[0]),

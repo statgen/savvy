@@ -131,7 +131,7 @@ bool create_index(const std::string& input_file_path, std::string output_file_pa
 //  if (output_file_path.empty())
 //    output_file_path = input_file_path + ".s1r";
 
-  savvy::v2::reader r(input_file_path);
+  savvy::reader r(input_file_path);
   if (!r.good())
   {
     std::cerr << "Error: failed to open input file (" << input_file_path << ")" << std::endl;
@@ -169,7 +169,7 @@ bool create_index(const std::string& input_file_path, std::string output_file_pa
   std::uint32_t max = 0;
   std::map<std::string, std::vector<savvy::s1r::entry>> index_data;
 
-  savvy::v2::variant variant;
+  savvy::variant variant;
 
   std::size_t records_in_block = 0;
   std::string current_chromosome;

@@ -490,18 +490,18 @@ namespace savvy
     }
   }
 
-  namespace v2
-  {
+  //namespace v2
+  //{
     class reader;
     class writer;
     class variant;
-  }
+  //}
 
   class typed_value
   {
-    friend class v2::reader;
-    friend class v2::writer;
-    friend class v2::variant;
+    friend class reader;
+    friend class writer;
+    friend class variant;
   public:
     static const std::uint8_t int8 = 1;
     static const std::uint8_t int16 = 2;

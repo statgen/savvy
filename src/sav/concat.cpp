@@ -123,7 +123,7 @@ int concat_main(int argc, char **argv)
 
   for (auto it = args.input_paths().begin(); it != args.input_paths().end(); ++it)
   {
-    savvy::v2::reader sav_reader(*it);
+    savvy::reader sav_reader(*it);
 
     if (!sav_reader)
     {
@@ -174,7 +174,7 @@ int concat_main(int argc, char **argv)
   std::array<std::uint8_t, 16> uuid;
 
   {
-    savvy::v2::writer header_writer( args.output_path(), savvy::file::format::sav2, headers, samples, savvy::v2::writer::default_compression_level, "/dev/null");
+    savvy::writer header_writer( args.output_path(), savvy::file::format::sav2, headers, samples, savvy::writer::default_compression_level, "/dev/null");
     uuid = header_writer.uuid();
     output_pos = header_writer.tellp();
   }

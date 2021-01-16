@@ -92,8 +92,8 @@ namespace savvy
     return ret;
   }
 
-  namespace v2
-  {
+  //namespace v2
+  //{
     namespace detail
     {
       struct any_coordinate_within_region
@@ -155,7 +155,7 @@ namespace savvy
         return false;
       }
     }
-  }
+  //}
 
 #if 0
   namespace detail

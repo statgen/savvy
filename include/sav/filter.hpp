@@ -30,7 +30,7 @@ public:
     }
   }
 
-  bool operator()(const savvy::v2::site_info& site) const
+  bool operator()(const savvy::site_info& site) const
   {
     return (*expression_tree_)(site);
   }
@@ -75,7 +75,7 @@ private:
   class expression
   {
   public:
-    virtual bool operator()(const savvy::v2::site_info& site) const = 0;
+    virtual bool operator()(const savvy::site_info& site) const = 0;
     virtual ~expression(){}
   };
 
@@ -87,7 +87,7 @@ private:
     {
     }
 
-    bool operator()(const savvy::v2::site_info& site) const
+    bool operator()(const savvy::site_info& site) const
     {
       return val_;
     }
@@ -109,7 +109,7 @@ private:
     {
     }
 
-    static std::string get_value_from_operand(const std::string& operand, const savvy::v2::site_info& site)
+    static std::string get_value_from_operand(const std::string& operand, const savvy::site_info& site)
     {
       if (operand.empty())
         return {operand.cend(), operand.cend()};
@@ -150,7 +150,7 @@ private:
       return {beg, end};
     }
 
-    bool operator()(const savvy::v2::site_info& site) const
+    bool operator()(const savvy::site_info& site) const
     {
 //      auto left_range = get_value_from_operand(left, site);
 //      auto right_range = get_value_from_operand(right, site);
@@ -206,7 +206,7 @@ private:
     {
     }
 
-    bool operator()(const savvy::v2::site_info& site) const
+    bool operator()(const savvy::site_info& site) const
     {
       if (op == logical::op_or)
         return (*left)(site) || (*right)(site);

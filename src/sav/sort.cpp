@@ -18,7 +18,7 @@ less_than_comparator::less_than_comparator(savvy::s1r::sort_point type, std::uno
 {
 }
 
-bool less_than_comparator::operator()(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const
+bool less_than_comparator::operator()(const savvy::site_info& a, const savvy::site_info& b) const
 {
   switch (sort_type_)
   {
@@ -47,14 +47,14 @@ bool less_than_comparator::contig_compare(const std::string& a, const std::strin
   }
 }
 
-bool less_than_comparator::left(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const
+bool less_than_comparator::left(const savvy::site_info& a, const savvy::site_info& b) const
 {
   if (a.chromosome() == b.chromosome())
     return a.position() < b.position();
   return contig_compare(a.chromosome(), b.chromosome());
 }
 
-bool less_than_comparator::right(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const
+bool less_than_comparator::right(const savvy::site_info& a, const savvy::site_info& b) const
 {
   if (a.chromosome() == b.chromosome())
   {
@@ -71,7 +71,7 @@ bool less_than_comparator::right(const savvy::v2::site_info& a, const savvy::v2:
   return contig_compare(a.chromosome(), b.chromosome());
 }
 
-bool less_than_comparator::mid(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const
+bool less_than_comparator::mid(const savvy::site_info& a, const savvy::site_info& b) const
 {
   if (a.chromosome() == b.chromosome())
   {
@@ -100,7 +100,7 @@ greater_than_comparator::greater_than_comparator(savvy::s1r::sort_point type, st
 {
 }
 
-bool greater_than_comparator::operator()(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const
+bool greater_than_comparator::operator()(const savvy::site_info& a, const savvy::site_info& b) const
 {
   switch (sort_type_)
   {
@@ -129,14 +129,14 @@ bool greater_than_comparator::contig_compare(const std::string& a, const std::st
   }
 }
 
-bool greater_than_comparator::left(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const
+bool greater_than_comparator::left(const savvy::site_info& a, const savvy::site_info& b) const
 {
   if (a.chromosome() == b.chromosome())
     return a.position() > b.position();
   return contig_compare(a.chromosome(), b.chromosome());
 }
 
-bool greater_than_comparator::right(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const
+bool greater_than_comparator::right(const savvy::site_info& a, const savvy::site_info& b) const
 {
   if (a.chromosome() == b.chromosome())
   {
@@ -153,7 +153,7 @@ bool greater_than_comparator::right(const savvy::v2::site_info& a, const savvy::
   return contig_compare(a.chromosome(), b.chromosome());
 }
 
-bool greater_than_comparator::mid(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const
+bool greater_than_comparator::mid(const savvy::site_info& a, const savvy::site_info& b) const
 {
   if (a.chromosome() == b.chromosome())
   {
@@ -308,17 +308,17 @@ public:
 };
 
 template <typename SiteCompare>
-int run(savvy::v2::reader& in, savvy::v2::writer& out, const SiteCompare& compare_fn)
+int run(savvy::reader& in, savvy::writer& out, const SiteCompare& compare_fn)
 {
   random_string_generator str_gen;
   const std::size_t temp_file_size = 8192;
   std::deque<std::string> temp_file_paths;
-  std::deque<savvy::v2::writer> temp_writers;
-  std::deque<savvy::v2::reader> temp_readers;
+  std::deque<savvy::writer> temp_writers;
+  std::deque<savvy::reader> temp_readers;
 
 
-  std::vector<savvy::v2::variant> in_mem_variants(temp_file_size);
-  std::vector<std::reference_wrapper<savvy::v2::variant>> in_mem_variant_refs(in_mem_variants.begin(), in_mem_variants.end());
+  std::vector<savvy::variant> in_mem_variants(temp_file_size);
+  std::vector<std::reference_wrapper<savvy::variant>> in_mem_variant_refs(in_mem_variants.begin(), in_mem_variants.end());
 
   std::size_t read_counter = temp_file_size;
   while (read_counter == temp_file_size)
@@ -363,7 +363,7 @@ int run(savvy::v2::reader& in, savvy::v2::writer& out, const SiteCompare& compar
     std::remove(it->c_str());
   }
 
-  std::vector<savvy::v2::variant> write_variants(temp_readers.size());
+  std::vector<savvy::variant> write_variants(temp_readers.size());
   std::size_t i = 0;
   for (auto it = temp_readers.begin(); it != temp_readers.end(); ++it)
   {
@@ -426,14 +426,14 @@ int sort_main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  savvy::v2::reader rdr(args.input_path());
+  savvy::reader rdr(args.input_path());
   if (!rdr)
   {
     std::cerr << "Error: failed to open input file" << std::endl;
     return EXIT_FAILURE;
   }
 
-  savvy::v2::writer wtr(args.output_path(), savvy::file::format::sav2, rdr.headers(), rdr.samples());
+  savvy::writer wtr(args.output_path(), savvy::file::format::sav2, rdr.headers(), rdr.samples());
 
   std::unordered_map<std::string, std::size_t> contig_order_map;
   contig_order_map.reserve(rdr.headers().size()); // std::count_if(in.headers().begin(), in.headers().end(), [](const std::pair<std::string,std::string>& e) { return e.first == "contig"; }));

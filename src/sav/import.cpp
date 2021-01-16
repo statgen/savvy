@@ -34,7 +34,7 @@ private:
   double sparse_threshold_ = 1.0;
   int update_info_ = -1;
   int compression_level_ = -1;
-  std::uint16_t block_size_ = savvy::v2::writer::default_block_size;
+  std::uint16_t block_size_ = savvy::writer::default_block_size;
   bool help_ = false;
   bool index_ = false;
   savvy::fmt format_ = savvy::fmt::gt;
@@ -91,8 +91,8 @@ public:
   {
     os << "Usage: sav import [opts ...] [in.{vcf,vcf.gz,bcf}] [out.sav]\n";
     os << "\n";
-    os << " -#                        Number (#) of compression level (1-19; default: " << savvy::v2::writer::default_compression_level << ")\n";
-    os << " -b, --block-size          Number of markers in compression block (0-65535; default: " << savvy::v2::writer::default_block_size << ")\n";
+    os << " -#                        Number (#) of compression level (1-19; default: " << savvy::writer::default_compression_level << ")\n";
+    os << " -b, --block-size          Number of markers in compression block (0-65535; default: " << savvy::writer::default_block_size << ")\n";
     os << " -d, --data-format         Format field to copy (GT or HDS, default: GT)\n";
     os << " -h, --help                Print usage\n";
     os << " -i, --sample-ids          Comma separated list of sample IDs to subset\n";
@@ -334,7 +334,7 @@ public:
     }
 
     if (compression_level_ < 0)
-      compression_level_ = savvy::v2::writer::default_compression_level;
+      compression_level_ = savvy::writer::default_compression_level;
     else if (compression_level_ > 19)
       compression_level_ = 19;
 
@@ -492,9 +492,9 @@ int import_main2(int argc, char** argv)
   }
   else
   {
-    savvy::v2::variant var;
+    savvy::variant var;
     savvy::typed_value tmp_val;
-    savvy::v2::reader input(args.input_path());
+    savvy::reader input(args.input_path());
 
     if (!input)
     {
@@ -539,7 +539,7 @@ int import_main2(int argc, char** argv)
     // TODO: make args.subset_ids() a pointer to  allow for subsetting out all samples.
     auto subset_fn = args.subset_ids().empty() ? nullptr : ::savvy::detail::make_unique<savvy::typed_value::dense_subset_functor>(args.subset_ids(), input.samples());
 
-    savvy::v2::writer output(args.output_path(), savvy::file::format::sav2, hdrs, subset_fn ? subset_fn->id_intersection() : input.samples(), args.compression_level());
+    savvy::writer output(args.output_path(), savvy::file::format::sav2, hdrs, subset_fn ? subset_fn->id_intersection() : input.samples(), args.compression_level());
     output.set_block_size(args.block_size());
 
     std::size_t cnt = 0;

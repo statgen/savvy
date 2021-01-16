@@ -111,7 +111,7 @@ int head_main(int argc, char** argv)
 
 
 
-  savvy::v2::reader sav_reader(args.input_path());
+  savvy::reader sav_reader(args.input_path());
 
 
   if (!sav_reader)

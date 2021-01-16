@@ -20,12 +20,12 @@ class less_than_comparator
 {
 public:
   less_than_comparator(savvy::s1r::sort_point type, std::unordered_map<std::string, std::size_t> contig_order_map);
-  bool operator()(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const;
+  bool operator()(const savvy::site_info& a, const savvy::site_info& b) const;
 private:
   bool contig_compare(const std::string& a, const std::string& b) const;
-  bool left(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const;
-  bool right(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const;
-  bool mid(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const;
+  bool left(const savvy::site_info& a, const savvy::site_info& b) const;
+  bool right(const savvy::site_info& a, const savvy::site_info& b) const;
+  bool mid(const savvy::site_info& a, const savvy::site_info& b) const;
 private:
   std::unordered_map<std::string, std::size_t> contig_order_map_;
   savvy::s1r::sort_point sort_type_;
@@ -35,12 +35,12 @@ class greater_than_comparator
 {
 public:
   greater_than_comparator(savvy::s1r::sort_point type, std::unordered_map<std::string, std::size_t> contig_order_map);
-  bool operator()(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const;
+  bool operator()(const savvy::site_info& a, const savvy::site_info& b) const;
 private:
   bool contig_compare(const std::string& a, const std::string& b) const;
-  bool left(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const;
-  bool right(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const;
-  bool mid(const savvy::v2::site_info& a, const savvy::v2::site_info& b) const;
+  bool left(const savvy::site_info& a, const savvy::site_info& b) const;
+  bool right(const savvy::site_info& a, const savvy::site_info& b) const;
+  bool mid(const savvy::site_info& a, const savvy::site_info& b) const;
 private:
   std::unordered_map<std::string, std::size_t> contig_order_map_;
   savvy::s1r::sort_point sort_type_;

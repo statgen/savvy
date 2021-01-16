@@ -33,8 +33,8 @@
 class export_prog_args
 {
 private:
-  static const int default_compression_level = savvy::v2::writer::default_compression_level;
-  static const int default_block_size = savvy::v2::writer::default_block_size;
+  static const int default_compression_level = savvy::writer::default_compression_level;
+  static const int default_block_size = savvy::writer::default_block_size;
 
 
   std::vector<option> long_options_;
@@ -811,7 +811,7 @@ void set_info(savvy::site_info& variant, const Vec& genotypes, const std::set<st
 //  }
 //}
 
-void update_standard_info_fields(savvy::v2::variant& var)
+void update_standard_info_fields(savvy::variant& var)
 {
   std::vector<std::int64_t> allele_counts(var.alts().size());
   std::vector<float> allele_freqs(var.alts().size());
@@ -880,9 +880,9 @@ void update_standard_info_fields(savvy::v2::variant& var)
   }
 }
 
-void export_records(savvy::v2::reader& rdr, savvy::v2::writer& wrt, const export_prog_args& args, bool remove_ph)
+void export_records(savvy::reader& rdr, savvy::writer& wrt, const export_prog_args& args, bool remove_ph)
 {
-  savvy::v2::variant var;
+  savvy::variant var;
   savvy::typed_value tmp_val;
   while (rdr.read(var))
   {
@@ -935,7 +935,7 @@ int export_main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  savvy::v2::reader rdr(args.input_path());
+  savvy::reader rdr(args.input_path());
   if (!rdr)
   {
     std::cerr << "Error: failed to open input file" << std::endl;
@@ -1064,7 +1064,7 @@ int export_main(int argc, char** argv)
   if (args.subset_ids().size())
     sample_ids = rdr.subset_samples({args.subset_ids().begin(), args.subset_ids().end()});
 
-  savvy::v2::writer wrt(args.output_path(), fmt, hdrs, sample_ids, args.compression_level(), args.index_path());
+  savvy::writer wrt(args.output_path(), fmt, hdrs, sample_ids, args.compression_level(), args.index_path());
   wrt.set_block_size(args.block_size());
   wrt.set_pbwt(args.pbwt_fields());
 

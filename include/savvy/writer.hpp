@@ -37,8 +37,8 @@
 
 namespace savvy
 {
-  namespace v2
-  {
+  //namespace v2
+  //{
 //    template <typename DestT, typename InT, typename OutT>
 //    void compress_sparse_offsets(InT in, InT in_end, OutT out, std::size_t stride)
 //    {
@@ -542,7 +542,7 @@ namespace savvy
     }
 
     inline
-    bool writer::serialize_vcf_indiv(const savvy::v2::variant& v, phasing phased)
+    bool writer::serialize_vcf_indiv(const savvy::variant& v, phasing phased)
     {
       std::vector<const typed_value*> typed_value_ptrs(v.format_fields_.size());
       std::vector<std::size_t> strides(v.format_fields_.size());
@@ -773,7 +773,7 @@ namespace savvy
 //          throw std::runtime_error("Unsupported FORMAT type!");
 //      }
 //    }
-  }
+  //}
 }
 
 #endif // LIBSAVVY_BCF_WRITER_HPP

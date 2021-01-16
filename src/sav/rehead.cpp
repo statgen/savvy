@@ -130,7 +130,7 @@ int rehead_main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
 
-  savvy::v2::reader sav_reader(args.input_path());
+  savvy::reader sav_reader(args.input_path());
 
   if (!sav_reader)
   {
@@ -172,7 +172,7 @@ int rehead_main(int argc, char **argv)
       }
     }
 
-    savvy::v2::writer test("/dev/null", savvy::file::format::sav2, headers, sav_reader.samples());
+    savvy::writer test("/dev/null", savvy::file::format::sav2, headers, sav_reader.samples());
     if (!sav_reader.dictionary().can_be(test.dictionary()))
     {
       std::cerr << "New header dictionary incompatible with original header dictionary\n";
@@ -215,7 +215,7 @@ int rehead_main(int argc, char **argv)
     return  EXIT_FAILURE;
   }
 
-  savvy::v2::writer sav_writer(args.output_path(), savvy::file::format::sav2, headers, sample_ids);
+  savvy::writer sav_writer(args.output_path(), savvy::file::format::sav2, headers, sample_ids);
   if (!sav_writer)
   {
     std::cerr << "Failed writing header to file (" << args.output_path() << ")" << std::endl;

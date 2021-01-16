@@ -473,7 +473,7 @@ private:
   {
     std::size_t ret = 0;
 
-    savvy::v2::variant var;
+    savvy::variant var;
     std::vector<float> data;
 
     //auto prop_fields = reader.info_fields();
@@ -525,9 +525,9 @@ file_checksum_test<T1, T2> make_file_checksum_test(T1& a, T2& b, const std::stri
 
 void run_file_checksum_test(const std::string f1, const std::string f2, const std::string& fmt)
 {
-  savvy::v2::reader input_file_reader1(f1);
+  savvy::reader input_file_reader1(f1);
   //input_file_reader1.set_policy(savvy::vcf::empty_vector_policy::skip);
-  savvy::v2::reader input_file_reader2(f2);
+  savvy::reader input_file_reader2(f2);
   auto t = make_file_checksum_test(input_file_reader1, input_file_reader2, fmt);
   std::cout << "Starting checksum test ..." << std::endl;
   auto timed_call = time_procedure(t);
@@ -540,9 +540,9 @@ void run_file_checksum_test(const std::string f1, const std::string f2, const st
 void convert_file_test(const std::string& fmt_field)
 {
   {
-    savvy::v2::reader input(SAVVYT_VCF_FILE);
+    savvy::reader input(SAVVYT_VCF_FILE);
 
-    savvy::v2::variant var;
+    savvy::variant var;
     savvy::compressed_vector<float> data;
 
     auto file_info = input.headers();
@@ -550,7 +550,7 @@ void convert_file_test(const std::string& fmt_field)
     file_info.insert(file_info.begin(), {"INFO", "<ID=FILTER,Description=\"Variant filter\">"});
     file_info.insert(file_info.begin(), {"INFO", "<ID=QUAL,Description=\"Variant quality\">"});
     file_info.insert(file_info.begin(), {"INFO", "<ID=ID,Description=\"Variant ID\">"});
-    savvy::v2::writer output(fmt_field == "HDS" ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD, savvy::file::format::sav2, file_info, input.samples());
+    savvy::writer output(fmt_field == "HDS" ? SAVVYT_SAV_FILE_DOSE : SAVVYT_SAV_FILE_HARD, savvy::file::format::sav2, file_info, input.samples());
 
     std::size_t cnt = 0;
     while (input.read(var))
@@ -611,12 +611,12 @@ void convert_file_test(const std::string& fmt_field)
 
 void sav_random_access_test(const std::string& fmt_field)
 {
-  savvy::v2::reader rdr(fmt_field == "GT" ? SAVVYT_SAV_FILE_HARD : SAVVYT_SAV_FILE_DOSE);
+  savvy::reader rdr(fmt_field == "GT" ? SAVVYT_SAV_FILE_HARD : SAVVYT_SAV_FILE_DOSE);
   assert(rdr.good());
   rdr.reset_bounds({"20", 1234600, 2234567});
   assert(rdr.good());
 
-  savvy::v2::variant anno;
+  savvy::variant anno;
   std::vector<float> buf;
 
   assert(rdr.read(anno));
@@ -697,7 +697,7 @@ void sav_random_access_test(const std::string& fmt_field)
 
 void generic_reader_test(const std::string& path, const std::string& fmt_field, std::size_t expected_markers)
 {
-  savvy::v2::reader rdr(path);
+  savvy::reader rdr(path);
   assert(rdr.good());
 
   std::vector<std::string> subset = {"NA00003","NA00005", "FAKE_ID"};
@@ -705,7 +705,7 @@ void generic_reader_test(const std::string& path, const std::string& fmt_field, 
   assert(intersect.size() == 2);
 
   std::size_t stride = 2;
-  savvy::v2::variant i;
+  savvy::variant i;
   std::vector<float> d;
   std::size_t cnt{};
   while (rdr.read(i))
@@ -727,7 +727,7 @@ void subset_test(const std::string& path, const std::string& fmt_field)
   auto intersect = rdr.subset_samples({subset.begin(), subset.end()});
   assert(intersect.size() == 2);
 
-  savvy::v2::variant i;
+  savvy::variant i;
   std::vector<float> d;
   std::size_t cnt{};
   while (rdr.read(i))
@@ -786,8 +786,8 @@ int main(int argc, char** argv)
   {
     if (!file_exists(SAVVYT_SAV_FILE_HARD)) convert_file_test("GT");
 
-    subset_test<savvy::v2::reader>(SAVVYT_VCF_FILE, "GT");
-    subset_test<savvy::v2::reader>(SAVVYT_SAV_FILE_HARD, "GT");
+    subset_test<savvy::reader>(SAVVYT_VCF_FILE, "GT");
+    subset_test<savvy::reader>(SAVVYT_SAV_FILE_HARD, "GT");
   }
   else if (cmd == "varint")
   {

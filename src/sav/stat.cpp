@@ -96,8 +96,8 @@ int stat_main(int argc, char** argv)
   std::size_t multi_allelic{}, record_cnt{}, variant_cnt{};
 
 
-  savvy::v2::reader rdr(args.input_path());
-  savvy::v2::variant rec;
+  savvy::reader rdr(args.input_path());
+  savvy::variant rec;
 
   while (rdr.read(rec))
   {

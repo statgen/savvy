@@ -24,8 +24,8 @@
 
 namespace savvy
 {
-  namespace v2
-  {
+  //namespace v2
+  //{
     class reader : public file
     {
     private:
@@ -265,7 +265,7 @@ namespace savvy
         {
           auto discard_skip = [this](std::uint32_t num)
           {
-            savvy::v2::variant tmp_var;
+            savvy::variant tmp_var;
             while (num > 0 && s1r_index_->current_offset_in_block < s1r_index_->total_in_block && good())
             {
               if (!read_record(tmp_var))
@@ -830,7 +830,7 @@ namespace savvy
 //      headers_.emplace_back(std::move(key), std::move(val));
 //    }
     //================================================================//
-  }
+  //}
 
 #if 0
   //################################################################//
