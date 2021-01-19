@@ -60,7 +60,7 @@ namespace savvy
 
       site_info(std::string chrom, std::uint32_t pos, std::string ref, std::vector<std::string> alts,
         std::string id = "",
-        float qual = std::numeric_limits<float>::quiet_NaN(), // bcf_missing_value = 0x7F800001
+        float qual = typed_value::missing_value<float>(), // std::numeric_limits<float>::quiet_NaN(), // bcf_missing_value = 0x7F800001
         std::vector<std::string> filters = {},
         std::vector<std::pair<std::string, typed_value>> info = {});
 

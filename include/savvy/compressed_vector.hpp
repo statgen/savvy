@@ -22,6 +22,9 @@ namespace savvy
 
     class iterator
     {
+      //template<class, class> friend class compressed_vector;
+      friend compressed_vector;
+      friend class const_iterator;
     public:
       typedef iterator self_type;
       typedef std::ptrdiff_t difference_type;
@@ -58,12 +61,13 @@ namespace savvy
       bool operator!=(const self_type& rhs) const { return (cur_ != rhs.cur_); }
     private:
       compressed_vector* vec_;
-      const value_type*const beg_;
+      value_type* beg_;
       value_type* cur_;
     };
 
     class const_iterator
     {
+      friend compressed_vector;
     public:
       typedef const_iterator self_type;
       typedef std::ptrdiff_t difference_type;
@@ -79,6 +83,43 @@ namespace savvy
         cur_(beg_ + off)
       {
 
+      }
+
+      const_iterator(const const_iterator& other) :
+        vec_(other.vec_),
+        beg_(other.beg_),
+        cur_(other.cur_)
+      {
+
+      }
+
+      const_iterator(const iterator& other) :
+        vec_(other.vec_),
+        beg_(other.beg_),
+        cur_(other.cur_)
+      {
+
+      }
+
+      const_iterator& operator=(const const_iterator& other)
+      {
+        if (this != &other)
+        {
+          vec_ = other.vec_;
+          beg_ = other.beg_;
+          cur_ = other.cur_;
+        }
+
+        return *this;
+      }
+
+      const_iterator& operator=(const iterator& other)
+      {
+        vec_ = other.vec_;
+        beg_ = other.beg_;
+        cur_ = other.cur_;
+
+        return *this;
       }
 
       std::size_t offset() const
@@ -164,7 +205,7 @@ namespace savvy
 
     value_type& operator[](std::size_t pos)
     {
-      if (offsets_.size() && offsets_.back() < pos)
+      if (offsets_.empty() || offsets_.back() < pos)
       {
         offsets_.emplace_back(pos);
         values_.emplace_back();
@@ -198,6 +239,38 @@ namespace savvy
 //        return const_value_type;
 //      return values_[it - offsets_.begin()];
 //    }
+
+    iterator erase(const_iterator pos)
+    {
+      assert(pos != cend());
+      std::size_t diff = pos.cur_ - pos.beg_;
+
+      values_.erase(values_.begin() + diff);
+      offsets_.erase(offsets_.begin() + diff);
+      --size_;
+      return iterator{*this, diff};
+    }
+
+    iterator zero(const_iterator pos)
+    {
+      std::size_t idx = pos.cur_ - pos.beg_;
+
+      values_.erase(values_.begin() + idx);
+      offsets_.erase(offsets_.begin() + idx);
+
+      return iterator{*this, idx};
+    }
+
+    iterator zero(const_iterator pos, const_iterator end)
+    {
+      std::size_t idx = pos.cur_ - pos.beg_;
+      std::size_t end_idx = idx + (end.cur_ - pos.cur_);
+
+      values_.erase(values_.begin() + idx, values_.begin() + end_idx);
+      offsets_.erase(offsets_.begin() + idx, offsets_.begin() + end_idx);
+
+      return iterator{*this, idx};
+    }
 
     void resize(std::size_t sz, value_type val = value_type())
     {
@@ -309,6 +382,38 @@ namespace savvy
     const value_type* const value_data() const { return values_.data(); }
     std::size_t size() const { return size_; }
     std::size_t non_zero_size() const { return values_.size(); }
+
+    static void stride_reduce(savvy::compressed_vector<T>& vec, std::size_t stride)
+    {
+      if (stride <= 1)
+        return;
+
+      std::size_t non_zero_size = vec.values_.size();
+
+      if (non_zero_size)
+      {
+        std::size_t dest_idx = 0;
+        vec.offsets_[dest_idx] = vec.offsets_[0] / stride;
+
+        for (std::size_t i = 1; i < non_zero_size; ++i)
+        {
+          if (vec.offsets_[dest_idx] == vec.offsets_[i] / stride)
+          {
+            vec.values_[dest_idx] = vec.values_[dest_idx] + vec.values_[i];
+          }
+          else
+          {
+            ++dest_idx;
+            vec.offsets_[dest_idx] = vec.offsets_[i] / stride;
+            vec.values_[dest_idx] = vec.values_[i];
+          }
+        }
+
+        vec.offsets_.resize(dest_idx + 1);
+        vec.values_.resize(dest_idx + 1);
+        vec.size_ = vec.size_ / stride;
+      }
+    }
   private:
     std::vector<value_type> values_;
     std::vector<std::size_t> offsets_;

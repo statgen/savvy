@@ -8,6 +8,7 @@
 #define LIBSAVVY_UTILITY_HPP
 
 #include "portable_endian.hpp"
+#include "compressed_vector.hpp"
 
 #include <sys/stat.h>
 #include <string>
@@ -24,6 +25,35 @@
 
 namespace savvy
 {
+  template <typename T>
+  void stride_reduce(std::vector<T>& vec, std::size_t stride)
+  {
+    if (stride <= 1)
+      return;
+
+    const std::size_t sz = vec.size();
+
+    for (std::size_t i = 0; i < sz; )
+    {
+      auto dest_idx = i / stride;
+      vec[dest_idx] = vec[i++];
+
+      const std::size_t local_end = i + stride;
+      for ( ; i < local_end; ++i)
+      {
+        vec[dest_idx] += vec[i];
+      }
+    }
+
+    vec.resize(sz / stride);
+  }
+
+  template <typename T>
+  void stride_reduce(savvy::compressed_vector<T>& vec, std::size_t stride)
+  {
+    savvy::compressed_vector<T>::stride_reduce(vec, stride);
+  }
+
   namespace detail
   {
     inline

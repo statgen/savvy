@@ -798,6 +798,11 @@ namespace savvy
       operator=(std::move(src));
     }
 
+    typed_value(const typed_value& src)
+    {
+      operator=(src);
+    }
+
     std::size_t size() const { return size_; }
     std::size_t non_zero_size() const { return sparse_size_; }
 
