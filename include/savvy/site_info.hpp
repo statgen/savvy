@@ -340,13 +340,19 @@ namespace savvy
     {
       s.alts_.resize(1);
       s.filters_.resize(1);
+      std::string qual_str;
       is >> s.chrom_
         >> s.pos_
         >> s.id_
         >> s.ref_
         >> s.alts_.front()
-        >> s.qual_
+        >> qual_str
         >> s.filters_.front();
+
+      if (qual_str == ".")
+        s.qual_ = typed_value::missing_value<float>();
+      else
+        s.qual_ = std::atof(qual_str.c_str());
 
       if (s.alts_.front() == ".")
         s.alts_.clear();
