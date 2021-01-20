@@ -406,8 +406,6 @@ int run(savvy::reader& in, savvy::writer& out, const SiteCompare& compare_fn)
 
   } while (min_index < write_variants.size());
 
-  auto a = 0;
-
   return true;
 }
 

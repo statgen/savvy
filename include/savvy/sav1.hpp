@@ -36,7 +36,7 @@ namespace savvy
 
     template <>
     template <typename T>
-    inline std::tuple<T, std::uint64_t> detail::allele_decoder<0>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
+    inline std::tuple<T, std::uint64_t> detail::allele_decoder<0>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& /*missing_value*/)
     {
       std::tuple<T, std::uint64_t> ret{T(1), 0};
       in_it = varint_decode(in_it, end_it, std::get<1>(ret));
@@ -56,7 +56,7 @@ namespace savvy
 
     template<std::uint8_t BitWidth>
     template <typename T>
-    inline std::tuple<T, std::uint64_t> detail::allele_decoder<BitWidth>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
+    inline std::tuple<T, std::uint64_t> detail::allele_decoder<BitWidth>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& /*missing_value*/)
     {
       std::tuple<T, std::uint64_t> ret;
       std::uint8_t allele;
@@ -67,7 +67,7 @@ namespace savvy
 
     template<>
     template <typename T>
-    inline void detail::allele_encoder<0>::encode(const T& allele, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
+    inline void detail::allele_encoder<0>::encode(const T& /*allele*/, std::uint64_t offset, std::ostreambuf_iterator<char>& os_it)
     {
       varint_encode(offset, os_it);
     }
@@ -88,7 +88,7 @@ namespace savvy
 
     template<>
     template <typename T>
-    inline std::int8_t detail::allele_encoder<0>::encode(const T& allele)
+    inline std::int8_t detail::allele_encoder<0>::encode(const T& /*allele*/)
     {
       return -1;
     }

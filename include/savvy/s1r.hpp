@@ -558,8 +558,9 @@ namespace savvy
           }
           else
           {
-            std::string uuid(footer.begin() + (footer.size() - bytes_parsed - 16), footer.begin() + (footer.size() - bytes_parsed));
-            bytes_parsed += uuid.size();
+            auto cp_it = std::copy(footer.begin() + (footer.size() - bytes_parsed - 16), footer.begin() + (footer.size() - bytes_parsed), uuid_.begin());
+            assert(cp_it - uuid_.begin() == uuid_.size());
+            bytes_parsed += cp_it - uuid_.begin();
 
             std::uint16_t tree_details_size_be;
             std::memcpy((char*)(&tree_details_size_be), footer.data() + (footer.size() - bytes_parsed - sizeof(tree_details_size_be)), sizeof(tree_details_size_be));
@@ -674,6 +675,7 @@ namespace savvy
       std::string file_path_;
       std::ifstream input_file_;
       std::vector<tree_reader> trees_;
+      std::array<char, 16> uuid_;
       std::streampos index_file_offset_ = 0;
       std::size_t size_on_disk_ = 0;
     };
@@ -681,8 +683,7 @@ namespace savvy
     class reader::query
     {
     public:
-      query(std::ifstream& ifs, std::vector<tree_reader>& trees, std::vector<genomic_region> regs) :
-        ifs_(&ifs),
+      query(std::vector<tree_reader>& trees, std::vector<genomic_region> regs) :
         regions_{regs}
       {
         for (auto i = regions_.begin(); i != regions_.end(); ++i)
@@ -702,13 +703,12 @@ namespace savvy
         tree_queries_.emplace_back(trees.back().create_query(0, 0)); // empty tree.
       }
 
-      query(std::ifstream& ifs, std::vector<tree_reader>& trees, genomic_region reg) : query(ifs, trees, std::vector<genomic_region>({reg})) {}
+      query(std::vector<tree_reader>& trees, genomic_region reg) : query(trees, std::vector<genomic_region>({reg})) {}
 
       class iterator;
       iterator begin();
       iterator end();
     private:
-      std::ifstream* ifs_;
       std::vector<tree_reader::query> tree_queries_;
       std::vector<genomic_region> regions_;
     };
@@ -723,11 +723,10 @@ namespace savvy
       typedef const value_type* pointer;
       typedef std::bidirectional_iterator_tag iterator_category;
 
-      iterator(std::istream& ifs, std::vector<tree_reader::query>::iterator tree_query_it, tree_reader::query::iterator tree_query_beg, tree_reader::query::iterator tree_query_end) :
+      iterator(std::vector<tree_reader::query>::iterator tree_query_it, tree_reader::query::iterator tree_query_beg, tree_reader::query::iterator tree_query_end) :
         tree_it_(tree_query_it),
         tree_query_it_(tree_query_beg),
-        tree_query_end_(tree_query_end),
-        ifs_(&ifs)
+        tree_query_end_(tree_query_end)
       {
 
       }
@@ -761,7 +760,6 @@ namespace savvy
       std::vector<tree_reader::query>::iterator tree_it_;
       tree_reader::query::iterator tree_query_it_;
       tree_reader::query::iterator tree_query_end_;
-      std::istream* ifs_;
     };
 
     class writer
@@ -812,7 +810,7 @@ namespace savvy
         std::memcpy(&footer_block[cur], (char *) (&index_size_be), 2);
         cur += 2;
 
-        std::memset(&footer_block[cur], '\0', 16); // uuid
+        std::memcpy(&footer_block[cur], uuid_.data(), 16); // uuid
         cur += 16;
 
         std::memcpy(&footer_block[cur], "s1r\x00\x01\x00\x00", 7);
@@ -1149,24 +1147,24 @@ namespace savvy
 
     inline reader::query reader::create_query(genomic_region reg)
     {
-      query ret(input_file_, trees_, reg);
+      query ret(trees_, reg);
       return ret;
     }
 
     inline reader::query reader::create_query(std::vector<genomic_region> regs)
     {
-      query ret(input_file_, trees_, regs);
+      query ret(trees_, regs);
       return ret;
     }
 
     inline reader::query::iterator reader::query::begin()
     {
-      return reader::query::iterator(*ifs_, tree_queries_.begin(), tree_queries_.begin()->begin(), tree_queries_.begin()->end());
+      return reader::query::iterator(tree_queries_.begin(), tree_queries_.begin()->begin(), tree_queries_.begin()->end());
     }
 
     inline reader::query::iterator reader::query::end()
     {
-      return reader::query::iterator(*ifs_, std::prev(tree_queries_.end()), std::prev(tree_queries_.end())->begin(), std::prev(tree_queries_.end())->end());
+      return reader::query::iterator(std::prev(tree_queries_.end()), std::prev(tree_queries_.end())->begin(), std::prev(tree_queries_.end())->end());
     }
   }
 }

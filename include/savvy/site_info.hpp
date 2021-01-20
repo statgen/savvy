@@ -1021,7 +1021,7 @@ namespace savvy
 
         if (v.format_fields().empty() || !v.format_fields().front().second.val_ptr_)
         {
-          auto a = 0;
+
         }
 
         return true;

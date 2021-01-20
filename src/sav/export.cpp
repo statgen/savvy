@@ -575,8 +575,8 @@ std::string create_sparse_offsets_string(const std::vector<T>& genotypes)
   //ret.reserve(genotypes.size());
 
   bool first_entry = true;
-  const int max_size = std::numeric_limits<std::size_t>::digits10 + 1;
-  char buffer[max_size] = {0};
+  //const int max_size = std::numeric_limits<std::size_t>::digits10 + 1;
+  //char buffer[max_size] = {0};
   const T empty_value = T();
   for (std::size_t i = 0; i < genotypes.size(); ++i)
   {

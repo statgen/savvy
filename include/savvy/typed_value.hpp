@@ -218,7 +218,6 @@ namespace savvy
     typename std::enable_if<std::is_signed<T>::value, bool>::type
     serialize_typed_scalar(OutT out_it, const T& val)
     {
-      std::uint8_t type_byte = 1;
       if (std::is_integral<T>::value)
       {
         if (val <= std::numeric_limits<std::int8_t>::max() && val >= std::numeric_limits<std::int8_t>::min())
@@ -483,7 +482,7 @@ namespace savvy
 
     template <typename T>
     typename std::enable_if<std::is_signed<T>::value, std::uint32_t>::type
-    get_typed_value_size(T vec)
+    get_typed_value_size(T)
     {
       static_assert(!std::is_same<T, std::int64_t>::value, "64-bit integers not allowed in BCF spec.");
       return 1 + sizeof(T);
@@ -632,7 +631,7 @@ namespace savvy
       }
     }
 
-    void bcf_encode_gt_ph(float* val_ptr, float* val_end_ptr, const std::int8_t* phase, std::size_t stride) { }
+    void bcf_encode_gt_ph(float* /*val_ptr*/, float* /*val_end_ptr*/, const std::int8_t* /*phase*/, std::size_t /*stride*/) { }
 
 
     class bcf_gt_encoder
@@ -667,8 +666,8 @@ namespace savvy
         }
       }
 
-      void operator()(float* val_ptr, float* val_end_ptr, bool phased) { return; }
-      void operator()(float* val_ptr, float* val_end_ptr, const std::int8_t* phase, std::size_t stride) { return; }
+      void operator()(float* /*val_ptr*/, float* /*val_end_ptr*/, bool /*phased*/) { return; }
+      void operator()(float* /*val_ptr*/, float* /*val_end_ptr*/, const std::int8_t* /*phase*/, std::size_t /*stride*/) { return; }
     };
 
     class bcf_gt_decoder
@@ -719,8 +718,8 @@ namespace savvy
         }
       }
 
-      void operator()(float* valp, float* endp) { return; }
-      void operator()(float* valp, float* endp, std::int8_t* ph, std::size_t stride) { return; }
+      void operator()(float* /*valp*/, float* /*endp*/) { return; }
+      void operator()(float* /*valp*/, float* /*endp*/, std::int8_t* /*ph*/, std::size_t /*stride*/) { return; }
     };
 
     enum class get_status : std::uint8_t
@@ -851,7 +850,7 @@ namespace savvy
     struct fill_sparse_data
     {
       template <typename ValT, typename OffT>
-      void operator()(ValT* p, ValT* p_end, OffT* off_p, const char* src_p, std::size_t dense_sz)
+      void operator()(ValT* p, ValT* /*p_end*/, OffT* off_p, const char* src_p, std::size_t dense_sz)
       {
         const ValT* dense_p = (const ValT*)src_p;
 
@@ -1803,8 +1802,6 @@ namespace savvy
         std::size_t sp_sz = endp - valp;
         std::size_t stride = sz / subset_map.size();
 
-        std::size_t surplus = 0;
-
         auto dest_valp = valp;
         auto dest_offp = offp;
 
@@ -2081,7 +2078,7 @@ namespace savvy
   }
 
   template<>
-  inline bool typed_value::is_end_of_vector(const char& v)
+  inline bool typed_value::is_end_of_vector(const char& /*v*/)
   {
     return false;
   }
@@ -2106,7 +2103,7 @@ namespace savvy
   }
 
   template<>
-  inline bool typed_value::is_special_value(const char& v)
+  inline bool typed_value::is_special_value(const char& /*v*/)
   {
     return false;
   }
@@ -2284,8 +2281,8 @@ namespace savvy
     off_type_(off_type),
     size_(sz),
     sparse_size_(sp_sz),
-    val_ptr_(data_ptr + sp_sz * (1u << bcf_type_shift[off_type])),
-    off_ptr_(data_ptr)
+    off_ptr_(data_ptr),
+    val_ptr_(data_ptr + sp_sz * (1u << bcf_type_shift[off_type]))
   {
   }
 
@@ -2436,7 +2433,7 @@ namespace savvy
     if (prev_sort_mapping.empty())
     {
       prev_sort_mapping.resize(sz);
-      for (int i = 0; i < sz; ++i)
+      for (std::size_t i = 0; i < sz; ++i)
         prev_sort_mapping[i] = i;
     }
 
@@ -2454,7 +2451,7 @@ namespace savvy
     counts.clear();
     counts.resize(std::numeric_limits<utype>::max() + 2);
     auto counts_ptr = counts.data() + 1;
-    for (int i = 0; i < sz; ++i)
+    for (std::size_t i = 0; i < sz; ++i)
     {
 //        unsigned int d = utype(src_ptr[i]) + 1u;
 //        if (d >= counts.size())
@@ -2463,10 +2460,10 @@ namespace savvy
       ++(counts_ptr[src_uptr[i]]);
     }
 
-    for (int i = 1; i < counts.size(); ++i)
+    for (std::size_t i = 1; i < counts.size(); ++i)
       counts[i] = counts[i - 1] + counts[i];
 
-    for (int i = 0; i < prev_sort_mapping.size(); ++i)
+    for (std::size_t i = 0; i < prev_sort_mapping.size(); ++i)
     {
 //        std::size_t unsorted_index = prev_sort_mapping[i];
 //        dest_ptr[unsorted_index] = src_ptr[i];
@@ -2568,7 +2565,7 @@ namespace savvy
     if (prev_sort_mapping.empty())
     {
       prev_sort_mapping.resize(in_data_sz);
-      for (int i = 0; i < in_data_sz; ++i)
+      for (std::size_t i = 0; i < in_data_sz; ++i)
         prev_sort_mapping[i] = i;
     }
 
@@ -2592,20 +2589,20 @@ namespace savvy
       ++counts[d];
     }
 
-    for (int i = 1; i < counts.size(); ++i)
+    for (std::size_t i = 1; i < counts.size(); ++i)
       counts[i] = counts[i - 1] + counts[i];
 
-    for (int i = 0; i < prev_sort_mapping.size(); ++i)
+    for (std::size_t i = 0; i < prev_sort_mapping.size(); ++i)
     {
       std::size_t unsorted_index = prev_sort_mapping[i];
-      val_t d(in_data[unsorted_index]);
+      utype d(in_data[unsorted_index]);
       sort_mapping[counts[d]++] = unsorted_index;
     }
 
     //sorted_data.resize(in_data_sz);
     if (std::is_same<val_t, std::int8_t>::value)
     {
-      for (int i = 0; i < prev_sort_mapping.size(); ++i)
+      for (std::size_t i = 0; i < prev_sort_mapping.size(); ++i)
       {
         *(out_it++) = in_data[prev_sort_mapping[i]];
       }
@@ -2614,7 +2611,7 @@ namespace savvy
     {
       if (endianness::is_big())
       {
-        for (int i = 0; i < prev_sort_mapping.size(); ++i)
+        for (std::size_t i = 0; i < prev_sort_mapping.size(); ++i)
         {
           char* v_ptr = (char*)(&in_data[prev_sort_mapping[i]]);
           *(out_it++) = v_ptr[1];
@@ -2623,7 +2620,7 @@ namespace savvy
       }
       else
       {
-        for (int i = 0; i < prev_sort_mapping.size(); ++i)
+        for (std::size_t i = 0; i < prev_sort_mapping.size(); ++i)
         {
           char* v_ptr = (char*)(&in_data[prev_sort_mapping[i]]);
           *(out_it++) = v_ptr[0];

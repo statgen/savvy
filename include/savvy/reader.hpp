@@ -76,8 +76,8 @@ namespace savvy
         csi_index_data(const std::string& file_path, const std::unordered_map<std::string, std::uint32_t>& contig_map, genomic_region bounds, bounding_point bound_type = bounding_point::beg) :
           file(file_path),
           reg(bounds),
-          bounding_type(bound_type),
-          interval_off(0)
+          interval_off(0),
+          bounding_type(bound_type)
         {
           auto tmp = file.query_intervals(reg.chromosome(), contig_map, reg.from(), reg.to()); // TODO: have this return list instead of vector
           intervals.assign(tmp.begin(), tmp.end());

@@ -138,10 +138,10 @@ namespace savvy
     writer::writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level, std::string custom_index_path) :
       rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t) this),
       output_buf_(create_out_streambuf(file_path, file_format, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
-      ofs_(output_buf_.get()),
-      //samples_(samples_beg, samples_end),
       file_path_(file_path),
-      index_path_(custom_index_path)
+      //samples_(samples_beg, samples_end),
+      index_path_(custom_index_path),
+      ofs_(output_buf_.get())
     {
       file_format_ = file_format;
       uuid_ = ::savvy::detail::gen_uuid(rng_);

@@ -111,7 +111,6 @@ int concat_main(int argc, char **argv)
 
   savvy::dictionary dict;
   std::vector<std::string> samples;
-  savvy::fmt data_format;
 
   std::vector<std::pair<std::string,std::string>> headers;
   //std::vector<std::pair<std::string,std::string>> merged_headers;

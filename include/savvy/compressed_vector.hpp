@@ -378,8 +378,8 @@ namespace savvy
       return ret;
     }
 
-    const std::size_t* const index_data() const { return offsets_.data(); }
-    const value_type* const value_data() const { return values_.data(); }
+    const std::size_t* index_data() const { return offsets_.data(); }
+    const value_type* value_data() const { return values_.data(); }
     std::size_t size() const { return size_; }
     std::size_t non_zero_size() const { return values_.size(); }
 
