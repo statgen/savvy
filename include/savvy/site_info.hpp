@@ -165,7 +165,7 @@ namespace savvy
       static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_map*>& pbwt_format_pointers);
       static bool deserialize(variant& v, const dictionary& dict, internal::pbwt_sort_context& pbwt_context, std::size_t sample_size, bool is_bcf, phasing phased);
       static bool deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status);
-      static bool deserialize_sav1(variant& v, std::istream& is, const std::list<header_value_details>& format_headers, std::size_t sample_size, phasing phasing_status);
+      static bool deserialize_sav1(variant& v, std::istream& is, const std::list<header_value_details>& format_headers, std::size_t sample_size);
     };
 
     inline
@@ -767,7 +767,7 @@ namespace savvy
 
 
     inline
-    bool variant::deserialize_sav1(variant& var, std::istream& is, const std::list<header_value_details>& format_headers, std::size_t sample_size, phasing phasing_status)
+    bool variant::deserialize_sav1(variant& var, std::istream& is, const std::list<header_value_details>& format_headers, std::size_t sample_size)
     {
       if (format_headers.empty()) return false;
 

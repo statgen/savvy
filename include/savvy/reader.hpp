@@ -469,7 +469,7 @@ namespace savvy
         input_stream_->setstate(input_stream_->rdstate() | std::ios::eofbit);
       else if (!site_info::deserialize_sav1(r, *input_stream_, info_headers_))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
-      else if (!variant::deserialize_sav1(r, *input_stream_, format_headers_, ids_.size(), phasing_))
+      else if (!variant::deserialize_sav1(r, *input_stream_, format_headers_, ids_.size()))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
       else
       {
