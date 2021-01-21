@@ -157,30 +157,48 @@ namespace savvy
       {
         auto p = (std::int8_t *)char_p;
         std::copy_n(p, sz, dest.begin());
+        break;
       }
       case 0x02u:
       {
         auto p = (std::int16_t *)char_p;
-        std::copy_n(p, sz, dest.begin()); // TODO: use transform to switch endian when needed
+        if (endianness::is_big())
+          std::transform(p, p + sz, dest.begin(), endianness::swap<std::int16_t>);
+        else
+          std::copy_n(p, sz, dest.begin());
+        break;
       }
       case 0x03u:
       {
         auto p = (std::int32_t *)char_p;
-        std::copy_n(p, sz, dest.begin());
+        if (endianness::is_big())
+          std::transform(p, p + sz, dest.begin(), endianness::swap<std::int32_t>);
+        else
+          std::copy_n(p, sz, dest.begin());
+        break;
       }
       case 0x04u:
       {
         auto p = (std::int64_t *)char_p;
-        std::copy_n(p, sz, dest.begin());
+        if (endianness::is_big())
+          std::transform(p, p + sz, dest.begin(), endianness::swap<std::int64_t>);
+        else
+          std::copy_n(p, sz, dest.begin());
+        break;
       }
       case 0x05u:
       {
         auto p = (float *)char_p;
-        std::copy_n(p, sz, dest.begin());
+        if (endianness::is_big())
+          std::transform(p, p + sz, dest.begin(), endianness::swap<float>);
+        else
+          std::copy_n(p, sz, dest.begin());
+        break;
       }
       case 0x07u:
       {
         std::copy_n(char_p, sz, dest.begin());
+        break;
       }
       }
 
