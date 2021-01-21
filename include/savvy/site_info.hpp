@@ -230,7 +230,7 @@ namespace savvy
 
         std::int32_t tmp_int = buf[0].i;
 
-        if (dict.entries[dictionary::contig].size() <= tmp_int)
+        if (dict.entries[dictionary::contig].size() <= (std::uint32_t)tmp_int)
         {
           std::fprintf(stderr, "Error: Invalid contig id (%i)\n", tmp_int);
           return false;
@@ -274,7 +274,7 @@ namespace savvy
           s.filters_.reserve(filter_ints.size());
           for (auto it = filter_ints.begin(); it != filter_ints.end(); ++it)
           {
-            if (dict.entries[dictionary::id].size() <= *it)
+            if (dict.entries[dictionary::id].size() <= (std::uint32_t)*it)
             {
               std::fprintf(stderr, "Error: Invalid filter id (%i)\n", *it);
               return false;
@@ -289,7 +289,7 @@ namespace savvy
           {
             std::int32_t info_key_id;
             shared_it = bcf::deserialize_int(shared_it, s.shared_data_.end(), info_key_id);
-            if (dict.entries[dictionary::id].size() <= info_key_id)
+            if (dict.entries[dictionary::id].size() <= (std::uint32_t)info_key_id)
             {
               std::fprintf(stderr, "Error: Invalid info id (%i)\n", info_key_id);
               return false;
@@ -307,7 +307,7 @@ namespace savvy
             if (sz == 15u)
               shared_it = bcf::deserialize_int(shared_it, s.shared_data_.end(), sz);
 
-            if (s.shared_data_.end() - shared_it < (sz * type_width))
+            if (s.shared_data_.end() - shared_it < std::int64_t(sz * type_width))
               break;
 
             *info_it = std::make_pair(std::move(info_key), typed_value(type_byte & 0x0Fu, sz, sz * type_width ? &(*shared_it) : nullptr));
@@ -665,7 +665,7 @@ namespace savvy
           {
             std::int32_t fmt_key_id;
             indiv_it = bcf::deserialize_int(indiv_it, v.indiv_buf_.end(), fmt_key_id);
-            if (dict.entries[dictionary::id].size() <= fmt_key_id)
+            if (dict.entries[dictionary::id].size() <= (std::uint32_t)fmt_key_id)
             {
               std::fprintf(stderr, "Error: Invalid FMT id\n");
               return false;
@@ -702,7 +702,7 @@ namespace savvy
               std::size_t pair_width = 1u << bcf_type_shift[off_type];
               pair_width += 1u << bcf_type_shift[val_type];
 
-              if (v.indiv_buf_.end() - indiv_it < (sp_sz * pair_width))
+              if (v.indiv_buf_.end() - indiv_it < std::int64_t(sp_sz * pair_width))
                 break;
 
               //fmt_it->first = fmt_key;
@@ -717,7 +717,7 @@ namespace savvy
               // TODO: make sure size is multiple of sample size and not zero
               std::size_t type_width = 1u << bcf_type_shift[type];
 
-              if (v.indiv_buf_.end() - indiv_it < (sz * type_width))
+              if (v.indiv_buf_.end() - indiv_it < std::int64_t(sz * type_width))
                 break;
 
               //fmt_it->first = fmt_key;
@@ -1390,4 +1390,5 @@ namespace savvy
 
 #endif
 }
+
 #endif //LIBSAVVY_SITE_INFO_HPP

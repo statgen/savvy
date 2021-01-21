@@ -698,7 +698,7 @@ namespace savvy
           std::size_t last_pos = tab_pos;
 
           std::int64_t tab_cnt = std::count(hdr_line.begin(), hdr_line.end(), '\t');
-          std::size_t sample_size = tab_cnt - 8;
+          std::int64_t sample_size = tab_cnt - 8;
           ids_.reserve(sample_size);
 
           while ((tab_pos = hdr_line.find('\t', tab_pos)) != std::string::npos)
@@ -715,7 +715,7 @@ namespace savvy
 
           ids_.emplace_back(hdr_line.substr(last_pos, tab_pos - last_pos)); // TODO: allow for no samples.
 
-          assert(ids_.size() == sample_size);
+          assert(ids_.size() == std::size_t(sample_size));
           subset_size_ = sample_size;
 
           if (header_block_sz - bytes_read < 0)

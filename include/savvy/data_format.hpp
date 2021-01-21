@@ -42,6 +42,7 @@ namespace savvy
       case fmt::ds: return 1;
       case fmt::hds: return ploidy;
     }
+    return 0;
   }
 
   inline std::string fmt_to_string(fmt f)
@@ -56,6 +57,7 @@ namespace savvy
     case fmt::ds: return "DS";
     case fmt::hds: return "HDS";
     }
+    return "";
   }
 }
 #endif //LIBSAVVY_DATA_FORMAT_HPP

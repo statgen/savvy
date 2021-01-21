@@ -182,7 +182,7 @@ namespace savvy
       {
         std::size_t sz = std::min((std::size_t)index_file_size_64, buf.size());
         is.read(buf.data(), sz);
-        assert(sz == is.gcount());
+        assert(sz == std::size_t(is.gcount()));
         os.write(buf.data(), sz);
         index_file_size_64 -= sz;
       }

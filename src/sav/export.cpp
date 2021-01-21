@@ -237,6 +237,7 @@ public:
         {
           sites_only_ = true;
         }
+        break;
       }
       case '0':
       case '1':

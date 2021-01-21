@@ -136,7 +136,7 @@ namespace savvy
 
       void operator++(int) { ++cur_; }
       reference operator*() const { return *cur_; }
-      const pointer operator->() const { return cur_; }
+      pointer operator->() const { return cur_; }
       bool operator==(const self_type& rhs) const { return (cur_ == rhs.cur_); }
       bool operator!=(const self_type& rhs) const { return (cur_ != rhs.cur_); }
     private:

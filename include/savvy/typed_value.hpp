@@ -59,17 +59,17 @@ namespace savvy
       if (it != end)
       {
         std::uint8_t type_byte = *(it++);
-        std::size_t int_width = 1u << bcf_type_shift[type_byte & 0x0Fu];
+        std::int64_t int_width = 1u << bcf_type_shift[type_byte & 0x0Fu];
         if (end - it >= int_width)
         {
           switch (int_width)
           {
-          case 1u:
+          case 1:
           {
             dest = IntT(*(it++));
             return it;
           }
-          case 2u:
+          case 2:
           {
             std::int16_t tmp;
             char *tmp_p = (char *)&tmp;
@@ -78,7 +78,7 @@ namespace savvy
             dest = le16toh(tmp);
             return it;
           }
-          case 4u:
+          case 4:
           {
             std::int32_t tmp;
             char *tmp_p = (char *)&tmp;
@@ -89,7 +89,7 @@ namespace savvy
             dest = le32toh(tmp);
             return it;
           }
-          case 8u:
+          case 8:
           {
             std::int64_t tmp;
             char *tmp_p = (char *)&tmp;
@@ -146,7 +146,7 @@ namespace savvy
 
       std::size_t type_width = 1u << bcf_type_shift[0x0Fu & type_byte];
 
-      if (end - it < sz * type_width)
+      if (end - it < std::int64_t(sz * type_width))
         throw std::runtime_error("Invalid byte sequence");
 
       dest.resize(sz);

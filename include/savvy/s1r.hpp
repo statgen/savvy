@@ -188,7 +188,7 @@ namespace savvy
         {
           for (auto it = entry_counts_per_level_.begin(); it != entry_counts_per_level_.end(); ++it)
           {
-            if (1 + std::distance(entry_counts_per_level_.begin(), it) < input.level)
+            if (1 + std::distance(entry_counts_per_level_.begin(), it) < (std::int64_t)input.level)
             {
               ret -= (*it * block_size_);
             }
@@ -559,7 +559,7 @@ namespace savvy
           else
           {
             auto cp_it = std::copy(footer.begin() + (footer.size() - bytes_parsed - 16), footer.begin() + (footer.size() - bytes_parsed), uuid_.begin());
-            assert(cp_it - uuid_.begin() == uuid_.size());
+            assert(std::size_t(cp_it - uuid_.begin()) == uuid_.size());
             bytes_parsed += cp_it - uuid_.begin();
 
             std::uint16_t tree_details_size_be;

@@ -87,7 +87,7 @@ private:
     {
     }
 
-    bool operator()(const savvy::site_info& site) const
+    bool operator()(const savvy::site_info& /*site*/) const
     {
       return val_;
     }
@@ -389,6 +389,8 @@ private:
         log_op = logical::op_and;
       else if (*delim == '|') // || *delim == ',')
         log_op = logical::op_or;
+      else
+        return std::make_tuple(make_unique<boolean_expression>(false), false);
 
       cur = delim + 1;
       auto tmp = parse(cur, end);
