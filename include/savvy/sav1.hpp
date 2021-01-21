@@ -43,9 +43,6 @@ namespace savvy
       return ret;
     }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunknown-warning-option"
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     template<>
     template <typename T>
     inline std::tuple<T, std::uint64_t> detail::allele_decoder<1>::decode(std::istreambuf_iterator<char>& in_it, const std::istreambuf_iterator<char>& end_it, const T& missing_value)
@@ -67,7 +64,6 @@ namespace savvy
       std::get<0>(ret) = (static_cast<T>(allele) + T(1)) / denom;
       return ret;
     }
-#pragma GCC diagnostic pop
 
     template<>
     template <typename T>
