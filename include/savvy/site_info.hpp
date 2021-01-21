@@ -310,8 +310,8 @@ namespace savvy
             if (s.shared_data_.end() - shared_it < std::int64_t(sz * type_width))
               break;
 
-            *info_it = std::make_pair(std::move(info_key), typed_value(type_byte & 0x0Fu, sz, sz * type_width ? &(*shared_it) : nullptr));
-            if (endianness::is_big() && sz * type_width)
+            *info_it = std::make_pair(std::move(info_key), typed_value(type_byte & 0x0Fu, sz, sz ? &(*shared_it) : nullptr));
+            if (endianness::is_big() && sz)
             {
               info_it->second.apply(endian_swapper_fn());
             }
@@ -725,7 +725,7 @@ namespace savvy
               *fmt_it = std::make_pair(std::string(fmt_key), typed_value(type, sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin())));
               indiv_it += sz * type_width;
 
-              if (endianness::is_big() && sz * type_width)
+              if (endianness::is_big() && sz)
               {
                 fmt_it->second.apply(endian_swapper_fn());
               }
