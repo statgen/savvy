@@ -367,42 +367,46 @@ namespace savvy
       std::string info_line;
       if (is >> info_line)
       {
-        auto info_pairs = detail::split_string_to_vector(info_line, ';');
         s.info_.clear();
-        s.info_.reserve(info_pairs.size());
-        for (auto it = info_pairs.begin(); it != info_pairs.end(); ++it)
+
+        if (info_line != ".")
         {
-          auto kvp = detail::split_string_to_vector(*it, '=');
-          if (kvp.size() == 1)
+          auto info_pairs = detail::split_string_to_vector(info_line, ';');
+          s.info_.reserve(info_pairs.size());
+          for (auto it = info_pairs.begin(); it != info_pairs.end(); ++it)
           {
-            if (dict.str_to_int[dictionary::id].find(kvp[0]) == dict.str_to_int[dictionary::id].end())
+            auto kvp = detail::split_string_to_vector(*it, '=');
+            if (kvp.size() == 1)
             {
-              fprintf(stderr, "Info key not in header: %s\n", kvp[0].c_str());
+              if (dict.str_to_int[dictionary::id].find(kvp[0]) == dict.str_to_int[dictionary::id].end())
+              {
+                fprintf(stderr, "Info key not in header: %s\n", kvp[0].c_str());
+                is.setstate(is.rdstate() | std::ios::failbit);
+                return false;
+              }
+
+              s.info_.emplace_back(kvp[0], typed_value(std::int8_t(1)));
+            }
+            else if (kvp.size() == 2)
+            {
+              auto res = dict.str_to_int[dictionary::id].find(kvp[0]);
+              if (res == dict.str_to_int[dictionary::id].end())
+              {
+                fprintf(stderr, "Info key not in header: %s\n", kvp[0].c_str());
+                is.setstate(is.rdstate() | std::ios::failbit);
+                return false;
+              }
+
+              // TODO: get info data type from header
+              char* p = kvp[1].size() ? &kvp[1][0] : nullptr;
+              s.info_.emplace_back(kvp[0], typed_value(dict.entries[dictionary::id][res->second].type, p, p + kvp[1].size()));
+            }
+            else
+            {
+              fprintf(stderr, "Invalid info field: %s\n", it->c_str());
               is.setstate(is.rdstate() | std::ios::failbit);
               return false;
             }
-
-            s.info_.emplace_back(kvp[0], typed_value(std::int8_t(1)));
-          }
-          else if (kvp.size() == 2)
-          {
-            auto res = dict.str_to_int[dictionary::id].find(kvp[0]);
-            if (res == dict.str_to_int[dictionary::id].end())
-            {
-              fprintf(stderr, "Info key not in header: %s\n", kvp[0].c_str());
-              is.setstate(is.rdstate() | std::ios::failbit);
-              return false;
-            }
-
-            // TODO: get info data type from header
-            char* p = kvp[1].size() ? &kvp[1][0] : nullptr;
-            s.info_.emplace_back(kvp[0], typed_value(dict.entries[dictionary::id][res->second].type, p, p + kvp[1].size()));
-          }
-          else
-          {
-            fprintf(stderr, "Invalid info field: %s\n", it->c_str());
-            is.setstate(is.rdstate() | std::ios::failbit);
-            return false;
           }
         }
       }

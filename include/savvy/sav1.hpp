@@ -44,6 +44,7 @@ namespace savvy
     }
 
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-warning-option"
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     template<>
     template <typename T>
