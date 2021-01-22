@@ -3,6 +3,10 @@ project(savvy VERSION 1.3.0)
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose build type (Debug|Release|RelWithDebInfo|MinSizeRel)" FORCE)
+endif(NOT CMAKE_BUILD_TYPE)
+
 set(CMAKE_CXX_STANDARD 11)
 
 #add_library(hts STATIC IMPORTED)
