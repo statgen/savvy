@@ -22,6 +22,8 @@ target_link_libraries(prog savvy)
 
 ## Read Variants from File 
 ```c++
+#include <savvy/reader.hpp>
+
 savvy::reader f("chr1.sav");
 savvy::variant var;
 std::vector<int> geno;
@@ -45,16 +47,22 @@ while (f >> var)
 ```
 
 ## Random Access
+In addition to the genomic region queries that CSI indices enable for VCF/BCF files, S1R indices also enable SAV files to be queried by record offset.  
+
+### Genomic Queries
 ```c++
-savvy::indexed_reader f("chr1.sav");
+#include <savvy/reader.hpp>
+
+savvy::reader f("chr1.sav");
 savvy::variant var;
 
-f.reset_bounds({"X", 60001, 2699520});
+f.reset_bounds(savvy::genomic_region("X", 60001, 2699520));
 while (f >> var)
 {
   ...
 }
 
+// Shorthand
 f.reset_bounds({"X", 154931044, 155260560});
 while (f >> var)
 {
@@ -62,8 +70,21 @@ while (f >> var)
 }
 ```
 
+### Slice Queries
+```c++
+#include <savvy/reader.hpp>
+savvy::reader f("chr1.sav");
+
+// Get the 10,000th record through the 19,999th record (0-based amd non-inclusive)
+f.reset_bounds(savvy::slice_bounds(10000, 20000));
+
+// Shorthand
+f.reset_bounds({20000, 30000});
+```
+
 ## Subsetting Samples
 ```c++
+#include <savvy/reader.hpp>
 savvy::reader f("chr1.sav");
 std::vector<std::string> requested = {"ID001","ID002","ID003"};
 std::vector<std::string> intersect = f.subset_samples({requested.begin(), requested.end()});

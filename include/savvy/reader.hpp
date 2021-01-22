@@ -87,40 +87,127 @@ namespace savvy
       std::unique_ptr<index_data> s1r_index_;
       std::unique_ptr<csi_index_data> csi_index_;
     public:
-      reader(const std::string& file_path);
-
-      const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
-      const std::vector<std::string>& samples() const { return ids_; } // TODO: return subset when applicable.
-
-      const std::list<header_value_details>& format_headers() const { return format_headers_; }
-      const std::list<header_value_details>& info_headers() const { return info_headers_; }
-
-//      /**
-//       *
-//       * @param subset IDs to include if they exist in file.
-//       * @return subset context to be used with typed_value::get().
-//       */
-//      sample_subset make_sample_subset(const std::unordered_set<std::string>& subset);
+      /**
+       * Default constuctor.
+       */
+       reader() : reader("") {}
 
       /**
+       * Constructs reader object and opens SAV, BCF, or VCF file.
        *
-       * @param subset IDs to include if they exist in file.
-       * @return Ordered vector of file IDs that overlap subset.
+       * @param file_path Path to file that will be opened
+       */
+      reader(const std::string& file_path);
+
+      /**
+       * Getter for meta-information lines found in file header.
+       *
+       * @return Vector of header line key-value pairs
+       */
+      const std::vector<std::pair<std::string, std::string>>& headers() const { return headers_; }
+
+      /**
+       * Getter for sample IDs found in file header
+       *
+       * @return Vector of sample IDs
+       */
+      const std::vector<std::string>& samples() const { return ids_; } // TODO: return subset when applicable.
+
+      /**
+       * Getter for FORMAT headers found in file.
+       *
+       * @return List of parsed FORMAT headers
+       */
+      const std::list<header_value_details>& format_headers() const { return format_headers_; }
+
+      /**
+       * Getter for INFO headers found in file.
+       *
+       * @return List of parsed INFO headers
+       */
+      const std::list<header_value_details>& info_headers() const { return info_headers_; }
+
+      /**
+       * Subsets individual data for future calls to read().
+       *
+       * @param subset IDs to include if they exist in file
+       * @return Ordered vector of file IDs that overlap subset
        */
       std::vector<std::string> subset_samples(const std::unordered_set<std::string>& subset);
 
+      /**
+       * Uses S1R or CSI index to query genomic region.
+       *
+       * @param reg Genomic region to query
+       * @param bp Specifies how indels are treated when they cross region bounds
+       * @return *this
+       */
       reader& reset_bounds(genomic_region reg, bounding_point bp = bounding_point::beg);
+
+      /**
+       * Uses S1R index to query records by offset within file.
+       *
+       * @param reg Bounds of slice query
+       * @return *this
+       */
       reader& reset_bounds(slice_bounds reg);
+
+      /**
+       * Getter for file's phasing status.
+       *
+       * @return Phasing status
+       */
       phasing phasing_status() { return phasing_; }
+
+      /**
+       * Sets phasing status. This is useful for ignoring phase when reading BCF/VCF files.
+       *
+       * @param val Phasing status
+       */
       void phasing_status(phasing val) { phasing_ = val; };
 
+      /**
+       * Checks for EOF or read error.
+       *
+       * @return False if either EOF or read error has occurred.
+       */
       bool good() const { return this->input_stream_->good(); }
+
+      /**
+       * Checks for read error.
+       *
+       * @return True if read error has occurred
+       */
       bool bad() const { return this->input_stream_->bad(); }
 
+      /**
+       * Reads next record from file.
+       *
+       * @param r Destination record object
+       * @return *this
+       */
       reader& read(variant& r);
+
+      /**
+       * Shorthand for read() function.
+       *
+       * @param r Destination record object
+       * @return *this
+       */
       reader& operator>>(variant& r) { return read(r); }
 
+      /**
+       * Shorthand for good().
+       *
+       * @return True if good()
+       */
       operator bool() const { return good(); };
+
+      /**
+       * For SAV files, gets file position for the beginning of current zstd block. For VCF/BCF files, gets "virtual offset".
+       *
+       * @return File position
+       */
       std::streampos tellg() { return this->input_stream_->tellg(); }
     private:
 //      void process_header_pair(const std::string& key, const std::string& val);

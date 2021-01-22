@@ -47,7 +47,7 @@ namespace savvy
       std::string chrom_;
       std::string id_;
       std::uint32_t pos_ = 0;
-      float qual_; //0.f;
+      float qual_ = typed_value::missing_value<float>(); //0.f;
       std::string ref_;
       std::vector<std::string> alts_;
       std::vector<std::string> filters_;
@@ -56,38 +56,95 @@ namespace savvy
     protected:
       std::uint32_t n_fmt_ = 0;
     public:
+      /**
+       * Default constructor.
+       */
       site_info() {}
 
+      /**
+       * Constructs site_info object.
+       * @param chrom Chromosome
+       * @param pos 1-based genomic position
+       * @param ref Reference allele
+       * @param alts Vector of alternate alleles
+       * @param id Variant ID
+       * @param qual Variant quality
+       * @param filters Vector of variant filters
+       * @param info Vector of INFO key-value pairs.
+       */
       site_info(std::string chrom, std::uint32_t pos, std::string ref, std::vector<std::string> alts,
         std::string id = "",
         float qual = typed_value::missing_value<float>(), // std::numeric_limits<float>::quiet_NaN(), // bcf_missing_value = 0x7F800001
         std::vector<std::string> filters = {},
         std::vector<std::pair<std::string, typed_value>> info = {});
 
-      const std::string& chrom() const { return chrom_; }
+      /**
+       * Gets chromosome.
+       * @return Chromosome string
+       */
       const std::string& chromosome() const { return chrom_; }
+      const std::string& chrom() const { return chrom_; } ///< Shorthand for chromosome().
 
+      /**
+       * Gets variant ID.
+       * @return Variant ID string
+       */
       const std::string& id() const { return id_; }
 
-      std::uint32_t pos() const { return pos_; }
+
+      /**
+       * Gets genomic position.
+       * @return 1-based position
+       */
       std::uint32_t position() const { return pos_; }
+      std::uint32_t pos() const { return pos_; } ///< Shorthand for position().
 
-      float qual() const { return qual_; }
+
+      /**
+       * Gets variant quality.
+       * @return Quality
+       */
       float quality() const { return qual_; }
+      float qual() const { return qual_; } ///< Shorthand for quality().
 
+      /**
+       * Gets reference allele.
+       * @return Reference allele stirng
+       */
       const std::string& ref() const { return ref_; }
 
+      /**
+       * Gets vector of alternate alleles.
+       * @return Alternate allele strings
+       */
       const std::vector<std::string>& alts() const { return alts_; }
 
+      /**
+       * Gets vector of filter stirngs
+       * @return FILTER strings
+       */
       const std::vector<std::string>& filters() const { return filters_; }
 
-      const std::vector<std::pair<std::string, typed_value>>& info() const { return info_; }
+      /**
+       * Gets vector of INFO key-value pairs.
+       * @return INFO fields
+       */
+      const std::vector<std::pair<std::string, typed_value>>& info_fields() const { return info_; }
 
+      /**
+       * Removes INFO field.
+       * @param it Iterator of INFO filed to remove.
+       * @return  Iterator to INFO field after the filed being removed.
+       */
       std::vector<std::pair<std::string, typed_value>>::const_iterator remove_info(std::vector<std::pair<std::string, typed_value>>::const_iterator it)
       {
         return info_.erase(info_.begin() + (it - info_.cbegin()));
       }
 
+      /**
+       * Removes INFO field by key.
+       * @param key Key of INFO field to remove
+       */
       void remove_info(const std::string& key)
       {
         auto res = std::find_if(info_.begin(), info_.end(), [&key](const std::pair<std::string, savvy::typed_value>& v) { return v.first == key; });
@@ -95,6 +152,13 @@ namespace savvy
           info_.erase(res);
       }
 
+      /**
+       * Gets value of INFO field
+       * @tparam T Destination vector or scalar type
+       * @param key Key of INFO field to retrieve
+       * @param dest Destination object
+       * @return False if INFO field is not present
+       */
       template<typename T>
       bool get_info(const std::string& key, T& dest) const
       {
@@ -105,12 +169,24 @@ namespace savvy
       }
 
 
+      /**
+       * Updates INFO field specified by iterator.
+       * @tparam T Type of value object
+       * @param off Iterator of INFO field to update
+       * @param val New value for INFO field
+       */
       template<typename T>
       void set_info(decltype(info_)::const_iterator off, const T& val)
       {
         (info_.begin() + std::distance(info_.cbegin(), off))->second = val;
       }
 
+      /**
+       * Sets INFO field.
+       * @tparam T Type of value object
+       * @param key Key for INFO field
+       * @param val Value for INFO field
+       */
       template<typename T>
       void set_info(const std::string& key, const T& val)
       {
@@ -148,17 +224,45 @@ namespace savvy
     public:
       using site_info::site_info;
 
+      /**
+       * Gets vector of FORMAT key-value pairs.
+       * @return FORMAT fields
+       */
       const decltype(format_fields_)& format_fields() const { return format_fields_; }
 
+      /**
+       * Gets value of FORMAT field.
+       * @tparam T Data type of destination
+       * @param key Key for INFO field
+       * @param destination_vector Destinaton value object
+       * @return False if FORMAT field is not present
+       */
       template<typename T>
       bool get_format(const std::string& key, T& destination_vector) const;
 
+      /**
+       * Sets value of FORMAT field.
+       * @tparam T Scalar type of data vector
+       * @param key Key for FORMAT field
+       * @param geno Vector of FORMAT field values
+       */
       template<typename T>
       void set_format(const std::string& key, const std::vector<T>& geno/*, std::set<std::string> sparse_keys = {"GT", "EC", "DS", "HDS"}*/);
 
+      /**
+       * Sets value of FORMAT field.
+       * @tparam T Scalar type of data vector
+       * @param key Key for FORMAT field
+       * @param geno Compressed vector of FORMAT field values
+       */
       template<typename T>
       void set_format(const std::string& key, const compressed_vector <T>& geno);
 
+      /**
+       * Sets value of FORMAT field.
+       * @param key Key for FORMAT field
+       * @param val Value for FORMAT field
+       */
       void set_format(const std::string& key, typed_value&& val);
     private:
       template <typename OutT>

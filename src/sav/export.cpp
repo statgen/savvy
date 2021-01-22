@@ -871,7 +871,7 @@ void update_standard_info_fields(savvy::variant& var)
     maf = static_cast<float>(mac) / an;
   }
 
-  for (auto it = var.info().begin(); it != var.info().end(); ++it)
+  for (auto it =var.info_fields().begin(); it != var.info_fields().end(); ++it)
   {
     if (it->first == "AN") var.set_info(it, an);
     if (it->first == "AC") var.set_info(it, allele_counts);

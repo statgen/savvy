@@ -126,8 +126,8 @@ private:
           return ss.str();
         }
 
-        auto res = std::find_if(site.info().begin(), site.info().end(), [&operand](const std::pair<std::string, savvy::typed_value>& v) { return v.first == operand; });
-        if (res != site.info().end())
+        auto res = std::find_if(site.info_fields().begin(), site.info_fields().end(), [&operand](const std::pair<std::string, savvy::typed_value>& v) { return v.first == operand; });
+        if (res != site.info_fields().end())
         {
           std::stringstream ss;
           ss << res->second;

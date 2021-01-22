@@ -42,6 +42,10 @@ namespace savvy
 
       }
 
+      /**
+       * Offset of element.
+       * @return Offset
+       */
       std::size_t offset() const
       {
         return vec_->offsets_[cur_ - beg_];
@@ -122,6 +126,10 @@ namespace savvy
         return *this;
       }
 
+      /**
+       * Offset of element.
+       * @return Offset
+       */
       std::size_t offset() const
       {
         return vec_->offsets_[cur_ - beg_];
@@ -145,11 +153,22 @@ namespace savvy
       const value_type* cur_;
     };
 
+    /**
+     * Constructs compressed_vector object and sets size.
+     * @param sz Size of vector.
+     */
     compressed_vector(std::size_t sz = 0)
     {
       resize(sz);
     }
 
+    /**
+     * Constructs compressed_vector class and initializes with sparse data.
+     * @param val_it Begin iterator of non-zero values
+     * @param val_end End iterator of non-zero values
+     * @param off_it Begin iterator of offsets for non-zero values
+     * @param sz Total number of elements (both zero and non-zero)
+     */
     template <typename ValT, typename OffT>
     compressed_vector(ValT val_it, ValT val_end, OffT off_it, std::size_t sz)
     {
@@ -162,6 +181,12 @@ namespace savvy
       T operator()(const InT& in) const { return T(in); }
     };
 
+    /**
+     * Assigns dense data and performs optional transformation on input data.
+     * @param val_it Begin iterator
+     * @param val_end End iterator
+     * @param t_fn Optional transformation function
+     */
     template <typename ValT, typename Transform = noop_functor>
     void assign(ValT val_it, ValT val_end, Transform t_fn = Transform())
     {
@@ -181,6 +206,14 @@ namespace savvy
       }
     }
 
+    /**
+     * Assigns sparse data and performs optional transformation on input data.
+     * @param val_it Begin iterator of non-zero values
+     * @param val_end End iterator of non-zero values
+     * @param off_it Begin iterator of offsets for non-zero values
+     * @param sz Total number of elements (both zero and non-zero)
+     * @param t_fn Optional transformation function
+     */
     template <typename ValT, typename OffT, typename Transform = noop_functor>
     void assign(ValT val_it, ValT val_end, OffT off_it, std::size_t sz, Transform t_fn = Transform())
     {
@@ -203,6 +236,11 @@ namespace savvy
 //      std::copy_n(off_it, values_.size(), offsets_.begin());
 //    }
 
+    /**
+     * Accesses element at index and inserts new non-zero element if it does not already exist. Use with caution. Logarithmic in non-zero size of vector.
+     * @param pos Index of element to access
+     * @return Reference to element
+     */
     value_type& operator[](std::size_t pos)
     {
       if (offsets_.empty() || offsets_.back() < pos)
@@ -229,17 +267,34 @@ namespace savvy
     const_iterator begin() const  { return this->cbegin(); }
     const_iterator end() const { return this->cend(); }
 
+    /**
+     * @return Begin iterator to non-zero elements
+     */
     iterator begin() { return iterator(*this, 0); }
+
+    /**
+     * @return End iterator to non-zero elements
+     */
     iterator end() { return iterator(*this, this->values_.size()); }
 
-//    const value_type& operator[](std::size_t pos) const
-//    {
-//      auto it = std::lower_bound(offsets_.begin(), offsets_.end(), pos);
-//      if (it == offsets_.end() || *it != pos)
-//        return const_value_type;
-//      return values_[it - offsets_.begin()];
-//    }
+    /**
+     * Accesses element at index. Use with caution. Logarithmic in non-zero size of vector.
+     * @param pos Index of element to access
+     * @return Reference to element
+     */
+    const value_type& operator[](std::size_t pos) const
+    {
+      auto it = std::lower_bound(offsets_.begin(), offsets_.end(), pos);
+      if (it == offsets_.end() || *it != pos)
+        return const_value_type;
+      return values_[it - offsets_.begin()];
+    }
 
+    /**
+     * Erases element pointed to by iterator.
+     * @param pos Iterator of element to erase
+     * @return Iterator of next non-zero element
+     */
     iterator erase(const_iterator pos)
     {
       assert(pos != cend());
@@ -251,6 +306,11 @@ namespace savvy
       return iterator{*this, diff};
     }
 
+    /**
+     * Sets element pointed to by iterator to zero and removes it from non-zero element storage.
+     * @param pos Iterator to remove
+     * @return Iterator to next non-zero element
+     */
     iterator zero(const_iterator pos)
     {
       std::size_t idx = pos.cur_ - pos.beg_;
@@ -261,6 +321,12 @@ namespace savvy
       return iterator{*this, idx};
     }
 
+    /**
+     * Sets range of elements to zero and removes them from non-zero element storage.
+     * @param pos Begin iterator to set to zero
+     * @param end End iterator (will no be set to zero)
+     * @return Iterator to next non-zero element
+     */
     iterator zero(const_iterator pos, const_iterator end)
     {
       std::size_t idx = pos.cur_ - pos.beg_;
@@ -272,6 +338,11 @@ namespace savvy
       return iterator{*this, idx};
     }
 
+    /**
+     * Resizes vector
+     * @param sz Total number of elements (both zero and non-zero)
+     * @param val Value used for initialization
+     */
     void resize(std::size_t sz, value_type val = value_type())
     {
       if (!sz)
@@ -296,22 +367,35 @@ namespace savvy
       size_ = sz;
     }
 
+    /**
+     * Reserves memory for non-zero elements.
+     * @param non_zero_size_hint Number of non-zero elements to reserve
+     */
     void reserve(std::size_t non_zero_size_hint)
     {
       this->offsets_.reserve(non_zero_size_hint);
       this->values_.reserve(non_zero_size_hint);
     }
 
+    /**
+     * Removes all elements from container.
+     */
     void clear()
     {
       resize(0);
     }
 
+    /// Shorthand for dot().
     value_type operator*(const self_type& other) const
     {
       return dot(other, value_type());
     }
 
+    /**
+     * Performs dot product with another compressed vector.
+     * @param other Other operand
+     * @return Result of dot product
+     */
     value_type dot(const self_type& other) const
     {
       return dot(other, value_type());
@@ -354,6 +438,12 @@ namespace savvy
       return ret;
     }
 
+    /**
+     * Performs dot product with another compressed vector.
+     * @param other Other operand
+     * @param ret Initial value for aggreation (specifies aggregate scalar data type)
+     * @return Result of dot product
+     */
     template <typename AggregateT>
     AggregateT dot(const self_type& other, AggregateT ret) const
     {
@@ -378,11 +468,31 @@ namespace savvy
       return ret;
     }
 
+    /**
+     * @return Pointer to non-zero offset data.
+     */
     const std::size_t* index_data() const { return offsets_.data(); }
+
+    /**
+     * @return Pointer to non-zero value data.
+     */
     const value_type* value_data() const { return values_.data(); }
+
+    /**
+     * @return  Total number of elements in container (both zero and non-zero)
+     */
     std::size_t size() const { return size_; }
+
+    /**
+     * @return Number of non-zero elements in container
+     */
     std::size_t non_zero_size() const { return values_.size(); }
 
+    /**
+     * Treat vector as two-dimensional array and sum elements of each sub-vector. The resulting size of the input vector will be initial size divided by stride.
+     * @param vec Compressed vector to reduce
+     * @param stride Size of sub-vectors.
+     */
     static void stride_reduce(savvy::compressed_vector<T>& vec, std::size_t stride)
     {
       if (stride <= 1)

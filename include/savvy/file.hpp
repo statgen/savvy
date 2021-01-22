@@ -23,6 +23,7 @@ namespace savvy
     {
       sav1 = 1,
       sav2,
+      sav = sav2,
       bcf,
       vcf
     };
@@ -38,7 +39,17 @@ namespace savvy
     format file_format_;
   public:
     const ::savvy::dictionary& dictionary() const { return dict_; }
+
+    /**
+     * Gets Universally Unique Identifier (UUID) for file.
+     * @return UUID bytes
+     */
     const std::array<std::uint8_t, 16>& uuid() const { return uuid_; }
+
+    /**
+     * Gets format of file (SAV, BCF, or VCF).
+     * @return File format
+     */
     file::format file_format() const { return file_format_; }
     virtual ~file() {}
   protected:

@@ -84,20 +84,53 @@ namespace savvy
       static std::unique_ptr<std::streambuf> create_out_streambuf(const std::string& file_path, format file_format, std::uint8_t compression_level);
 
     public:
+      /**
+       * Constructs writer object.
+       * @param file_path Path to output file
+       * @param file_format Type of file to create (SAV, BCF, or VCF)
+       * @param headers Meta-information lines for file header
+       * @param ids Sample IDs for file
+       * @param compression_level Compression level (0 is no compression)
+       * @param custom_index_path Non-default path for index file (use /dev/null to disable indexing)
+       */
       writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level = default_compression_level, std::string custom_index_path = "");
 
       ~writer();
 
+      /**
+       * Sets number of records per zstd block for SAV files.
+       * @param bs Block size
+       */
       void set_block_size(std::uint16_t bs);
+
+      /**
+       * Specifies FORMAT fields for which PBWT will be applied.
+       * @param pbwt_fields Set of fields
+       */
       void set_pbwt(const std::unordered_set<std::string>& pbwt_fields);
 
+      /**
+       * Checks for EOF or write error.
+       *
+       * @return False if either EOF or write error has occurred.
+       */
       bool good() const { return ofs_.good(); }
-      operator bool() const { return ofs_.good(); }
+      operator bool() const { return ofs_.good(); } ///< Shorthand for good()
       //bool bad() const { return ofs_.bad(); }
 
+      /**
+       * Writes record to file.
+       * @param r Record object to write
+       * @return *this
+       */
       writer& write(const variant& r);
-      writer& operator<<(const variant& v) { return write(v); }
+      writer& operator<<(const variant& v) { return write(v); } ///< Shorthand for write()
 
+      /**
+       * For SAV files, gets file position for the beginning of current zstd block. For VCF/BCF files, gets "virtual offset".
+       *
+       * @return File position
+       */
       std::streampos tellp() { return ofs_.tellp(); }
     private:
       writer& write_vcf(const variant& r);

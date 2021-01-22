@@ -485,7 +485,7 @@ private:
       for (const auto& a : var.alts())
         ret = hash_combine(ret, a);
 
-      for (const auto& field : var.info())
+      for (const auto& field : var.info_fields())
       {
         std::stringstream prop_val;
         prop_val << field.second;

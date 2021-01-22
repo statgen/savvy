@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-
+#if 0
 #ifndef LIBSAVVY_M3VCF_READER_HPP
 #define LIBSAVVY_M3VCF_READER_HPP
 
@@ -472,3 +472,4 @@ namespace savvy
 }
 
 #endif //VC_M3VCF_READER_HPP
+#endif

@@ -17,17 +17,25 @@
 
 namespace savvy
 {
+  /// Bounding point enum.
   enum class bounding_point : std::uint8_t
   {
-    any = 0,
-    all,
-    beg,
-    end
+    any = 0, ///< Variants for which any nucleotide in reference or alternate alleles are within query region
+    all, ///< Variants for which all nucleotides in reference or alternate alleles are within query region
+    beg, ///< Variants for which begin position are within query region
+    end ///< Variants for which end position (i.e., position + max[size_of_ref, size_of_alts]) are within query region
   };
 
   class query_bounds
   {
   public:
+    /**
+     * Merges container of overlapping regions.
+     * @tparam Iter Iterator type
+     * @param beg Begin iterator of container
+     * @param end End iterator of container
+     * @return Vector of merged regions
+     */
     template <typename Iter>
     static std::vector<query_bounds> merge(Iter beg, Iter end);
 
@@ -37,8 +45,23 @@ namespace savvy
       to_(to)
     {
     }
+
+    /**
+     * Gets chromosome for query.
+     * @return Chromosome string
+     */
     const std::string& chromosome() const { return chromosome_; }
+
+    /**
+     * Gets start position of query.
+     * @return Start position
+     */
     std::uint64_t from() const { return from_; }
+
+    /**
+     * Gets end position of query. Genomic regions are 1-based and inclusive end. Slice bounds are 0-based and exclusive end.
+     * @return End position
+     */
     std::uint64_t to() const { return to_; }
   private:
     std::string chromosome_;
