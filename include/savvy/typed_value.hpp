@@ -887,6 +887,9 @@ namespace savvy
       }
     };
 
+#if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
+    __attribute((optimize("no-tree-vectorize")))
+#endif
     bool copy_as_sparse(typed_value& dest) const
     {
       if (off_type_)
@@ -913,6 +916,9 @@ namespace savvy
       return true;
     }
 
+#if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
+    __attribute((optimize("no-tree-vectorize")))
+#endif
     bool copy_as_dense(typed_value& dest) const
     {
       dest.local_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
@@ -1037,6 +1043,9 @@ namespace savvy
       std::vector<std::string> subset_ids_;
     };
 
+#if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
+    __attribute((optimize("no-tree-vectorize")))
+#endif
     bool copy_as_dense(typed_value& dest, const dense_subset_functor& subset_fn) const
     {
       copy_as_dense(dest);
@@ -1328,6 +1337,9 @@ namespace savvy
 
 
     template<typename T>
+#if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
+    __attribute((optimize("no-tree-vectorize")))
+#endif
     bool get(std::vector<T>& dest) const // TOOD: handle missing / end_of_vector
     {
       static_assert(std::is_signed<T>::value, "Destination value_type must be signed.");
@@ -1480,6 +1492,9 @@ namespace savvy
 #endif
 
     template<typename T>
+#if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
+    __attribute((optimize("no-tree-vectorize")))
+#endif
     bool get(savvy::compressed_vector<T>& dest) const
     {
       static_assert(std::is_signed<T>::value, "Destination value_type must be signed.");
@@ -1775,6 +1790,9 @@ namespace savvy
       }
     };
 
+#if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
+    __attribute((optimize("no-tree-vectorize")))
+#endif
     void minimize()
     {
       if (off_ptr_)
@@ -1843,6 +1861,9 @@ namespace savvy
     };
 
 
+#if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
+    __attribute((optimize("no-tree-vectorize")))
+#endif
     bool subset(const std::vector<std::size_t>& subset_mask, std::size_t subset_size)
     {
       if (val_type_ == 0x07u)
@@ -2784,7 +2805,11 @@ namespace savvy
     }
   }
 
+
   template<typename T>
+#if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
+  __attribute((optimize("no-tree-vectorize")))
+#endif
   typename std::enable_if<std::is_same<T, ::savvy::compressed_vector<typename T::value_type>>::value && std::is_signed<typename T::value_type>::value, void>::type
   typed_value::init(const T& vec)
   {
