@@ -13,9 +13,6 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        pwd
-        ls -ahl
-        ls -ahl ..
         sudo apt update
         sudo apt install -y build-essential cmake git python-dev python-pip
         sudo pip install cget
@@ -23,6 +20,6 @@ jobs:
         cget install -f ./requirements.txt
         cmake --version
         mkdir build && cd build
-        cmake -DBUILD_TESTS=1 -DCMAKE_TOOLCHAIN_FILE=../cget/cget/cget.cmake ..
+        cmake -DBUILD_TESTS=1 -DCMAKE_TOOLCHAIN_FILE=../cget/cget/cget.cmake -DCMAKE_BUILD_TYPE=Debug ..
         make all sav
         make CTEST_OUTPUT_ON_FAILURE=1 test
