@@ -1,9 +1,9 @@
 name: build and run tests
 on:
   push:
-    branches: [ develop ]
+    branches: [ master ]
   pull_request:
-    branches: [ develop ]
+    branches: [ master ]
 jobs:
   build:
     runs-on: ubuntu-16.04
