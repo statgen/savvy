@@ -1,4 +1,4 @@
-This branch contains version 2.0 progress. The latest stable release can be found in the [releases](https://github.com/statgen/savvy/releases) section.
+All branches in this repository are development branches. The latest stable release can be found in the [releases](https://github.com/statgen/savvy/releases) section.
 
 # Savvy Library
 Savvy is the official C++ interface for the [SAV file format](sav_spec_v2.md) and offers seamless support for BCF and VCF files.
@@ -139,22 +139,25 @@ out.write(var);
 File manipulation for SAV format.
 
 ## Import
+The `import` sub-command generates a SAV file from a BCF or VCF file. An S1R index is automatically generated and appended to the end of the resulting SAV file.
 ```shell
-sav import --sort --index file.bcf file.sav
-```
-
-## Concatenate
-```shell
-sav concat file1.sav file2.sav > concat.sav
+sav import file.bcf file.sav
 ```
 
 ## Export
+The `export` sub-command can be used to manipulate SAV files and/or convert between file formats.
 ```shell
 sav export --regions chr1,chr2:10000-20000 --sample-ids ID1,ID2,ID3 file.sav > file.vcf
 ```
 
+## Concatenate
+Fast concatenation of SAV files (similar to `bcftools concat --naive`) can be achieved with the `concat` sub-command. This command avoids deserialization of variant data by performing a byte-for-byte copy of compressed variant blocks. The S1R index is also quickly concatenated without having to parse records in the SAV file. 
+```shell
+sav concat file1.sav file2.sav > concat.sav
+```
+
 ## Slice Queries
-In addition to querying genomic regions, S1R indexes can be used to quickly subset records by their offset within a file.
+In addition to querying genomic regions, S1R indices can be used to quickly subset records by their offset within a file.
 ```shell
 # export first 1,000 records
 sav export --slice 0:1000 file.sav > file.vcf
