@@ -47,7 +47,8 @@ public:
     os << " import:      Imports VCF or BCF into SAV\n";
     os << " index:       Indexes SAV file\n";
     //os << " merge:       Merges multiple files into one\n";
-    os << " rehead:      Replaces headers without recompressing variant blocks.\n";
+    os << " rehead:      Replaces headers without recompressing variant blocks\n";
+    os << " sort:        Sorts variant records\n";
     os << " stat:        Gathers statistics on SAV file\n";
     os << " stat-index:  Gathers statistics on s1r index\n";
     os << "\n";
