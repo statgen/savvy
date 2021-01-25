@@ -20,7 +20,7 @@ add_executable(prog main.cpp)
 target_link_libraries(prog savvy)
 ```
 
-## Read Variants from File 
+## Reading Variants from File 
 ```c++
 #include <savvy/reader.hpp>
 
@@ -164,6 +164,28 @@ sav export --slice 0:1000 file.sav > file.vcf
 
 # export second 1,000 records (1,000-1,999)
 sav export --slice 1000:2000 file.sav > file.vcf
+```
+
+## Statistics
+There are two sub-commands for gathering statistics on sav files. The `stat` command parses the entire file to calculate statistics. The `stat-index` sub-command only parsed the S1R index, making it a faster alternative for some statistics (e.g., number of variant records, chromosomes, etc.).
+```shell
+sav stat file.sav
+sav stat-index file.sav
+```
+
+## Sort
+The `sort` sub-command sorts variant records by chromosome and position.  It can also be used to sort in descending order, which is supported by S1R indices.
+```shell
+sav sort unsorted.sav > sorted.sav
+sav sort --direction desc unsorted.sav > reversed.sav
+```
+
+## Header
+The `head` and `rehead` sub-commands are used for retrieving and manipulating header information.
+```shell
+sav head file.sav > header.txt
+sav head --sample-ids file.sav > sample_ids.txt
+sav rehead --sample-ids new_ids_file.txt old.sav new.sav
 ```
 
 ## Parameter Trade-offs
