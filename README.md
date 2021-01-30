@@ -3,12 +3,12 @@ All branches in this repository are development branches. The latest stable rele
 # Savvy Library
 Savvy is the official C++ interface for the [SAV file format](sav_spec_v2.md) and offers seamless support for BCF and VCF files.
 
-Since the release of version 2.0, savvy no longer supports writing of SAV 1.x files, but will continue to support reading of existing 1.x files.  
+Since the release of version 2.0, Savvy no longer supports writing of SAV 1.x files but will continue to support reading of existing 1.x files.  
 
 ## Installing
-The easiest way to install savvy and its dependencies is to use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget).
-```bash
-cget install --prefix <install_prefix> statgen/savvy
+The easiest way to install Savvy and its dependencies is to use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget).
+```shell
+cget install --prefix <install_prefix> statgen/savvy # default <install_prefix> is ./cget/
 ```
 
 ## Including in Projects
@@ -128,7 +128,7 @@ savvy::writer out("out.sav", savvy::fmt::sav2, headers, sample_ids);
 std::vector<int8_t> geno = {0,0,1,0,0,1};
 
 savvy::variant var("chr1", 10000000, "A", {"AC"}); // chrom, pos, ref, alts
-var.set_info("AC", std::accumulate(geno.begin(), geno.end(), 0));
+var.set_info("AC", std::count(geno.begin(), geno.end(), 1));
 var.set_info("AN", geno.size());
 var.set_format("GT", geno);
 

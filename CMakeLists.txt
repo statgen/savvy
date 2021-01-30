@@ -5,7 +5,7 @@ include(GNUInstallDirs)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose build type (Debug|Release|RelWithDebInfo|MinSizeRel)" FORCE)
-endif(NOT CMAKE_BUILD_TYPE)
+endif()
 
 set(CMAKE_CXX_STANDARD 11)
 
