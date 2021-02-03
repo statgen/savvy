@@ -163,6 +163,17 @@ namespace savvy
     }
 
     /**
+     * Constructs compressed_vector class and initializes with dense data.
+     * @param val_it Begin iterator
+     * @param val_end End iterator
+     */
+    template <typename ValT>
+    compressed_vector(ValT val_it, ValT val_end)
+    {
+      assign(val_it, val_end);
+    }
+
+    /**
      * Constructs compressed_vector class and initializes with sparse data.
      * @param val_it Begin iterator of non-zero values
      * @param val_end End iterator of non-zero values
@@ -358,10 +369,13 @@ namespace savvy
       }
       else if (val != value_type())
       {
-        values_.resize(sz, val);
+        values_.reserve(values_.size() + (sz - size_));
         offsets_.reserve(offsets_.size() + (sz - size_));
         for (std::size_t i = size_; i < sz; ++i)
+        {
           offsets_.emplace_back(i);
+          values_.emplace_back(val);
+        }
       }
 
       size_ = sz;
@@ -521,8 +535,8 @@ namespace savvy
 
         vec.offsets_.resize(dest_idx + 1);
         vec.values_.resize(dest_idx + 1);
-        vec.size_ = vec.size_ / stride;
       }
+      vec.size_ = vec.size_ / stride;
     }
   private:
     std::vector<value_type> values_;
