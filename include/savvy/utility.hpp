@@ -35,10 +35,10 @@ namespace savvy
 
     for (std::size_t i = 0; i < sz; )
     {
+      const std::size_t local_end = i + stride;
       auto dest_idx = i / stride;
       vec[dest_idx] = vec[i++];
 
-      const std::size_t local_end = i + stride;
       for ( ; i < local_end; ++i)
       {
         vec[dest_idx] += vec[i];
