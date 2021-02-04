@@ -58,8 +58,8 @@ namespace savvy
       }
 
       void operator++(int) { ++cur_; }
-      reference operator*() { return *cur_; }
-      pointer operator->() { return cur_; }
+      reference operator*() const { return vec_->values_[*cur_]; }
+      pointer operator->() const { return vec_->values_.data() + *cur_; }
       bool operator==(const self_type& rhs) const { return (cur_ == rhs.cur_); }
       bool operator!=(const self_type& rhs) const { return (cur_ != rhs.cur_); }
     private:
