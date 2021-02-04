@@ -8,6 +8,7 @@
 #define LIBSAVVY_TYPED_VALUE_HPP
 
 #include "compressed_vector.hpp"
+#include "sparse_vector.hpp"
 #include "sample_subset.hpp"
 #include "portable_endian.hpp"
 #include "endianness.hpp"
@@ -1277,8 +1278,10 @@ namespace savvy
     }
 
     template<typename T>
-    bool get(T& dest) const
+    typename std::enable_if<std::is_scalar<T>::value, bool>::type // Using is_scalar instead of is_signed so that static assert can give more informative error message.
+    get(T& dest) const
     {
+      static_assert(std::is_signed<T>::value, "Destination value_type must be signed.");
       if (!val_ptr_ || size_ == 0)
         return false;
 
@@ -1491,12 +1494,14 @@ namespace savvy
     }
 #endif
 
-    template<typename T>
+    template<typename VecT>
 #if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
     __attribute((optimize("no-tree-vectorize")))
 #endif
-    bool get(savvy::compressed_vector<T>& dest) const
+    typename std::enable_if<std::is_same<VecT, ::savvy::compressed_vector<typename VecT::value_type>>::value || std::is_same<VecT, ::savvy::sparse_vector<typename VecT::value_type>>::value, bool>::type
+    get(VecT& dest) const
     {
+      typedef typename VecT::value_type T;
       static_assert(std::is_signed<T>::value, "Destination value_type must be signed.");
       static_assert(!std::is_same<T, char>::value, "Destination value_type cannot be char. Use std::int8_t instead.");
 
@@ -2048,7 +2053,7 @@ namespace savvy
     init(const T& vec);
 
     template<typename T>
-    typename std::enable_if<std::is_same<T, ::savvy::compressed_vector<typename T::value_type>>::value && std::is_signed<typename T::value_type>::value, void>::type
+    typename std::enable_if<(std::is_same<T, ::savvy::compressed_vector<typename T::value_type>>::value || std::is_same<T, ::savvy::sparse_vector<typename T::value_type>>::value) && std::is_signed<typename T::value_type>::value, void>::type
     init(const T& vec);
 
     template<typename T>
@@ -2810,7 +2815,7 @@ namespace savvy
 #if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
   __attribute((optimize("no-tree-vectorize")))
 #endif
-  typename std::enable_if<std::is_same<T, ::savvy::compressed_vector<typename T::value_type>>::value && std::is_signed<typename T::value_type>::value, void>::type
+  typename std::enable_if<(std::is_same<T, ::savvy::compressed_vector<typename T::value_type>>::value || std::is_same<T, ::savvy::sparse_vector<typename T::value_type>>::value) && std::is_signed<typename T::value_type>::value, void>::type
   typed_value::init(const T& vec)
   {
     std::size_t offset_max = 0;
@@ -2882,19 +2887,19 @@ namespace savvy
     switch (val_type_)
     {
     case 0x01u:
-      std::transform(vec.value_data(), vec.value_data() + sparse_size_, (std::int8_t*) val_ptr_, reserved_transformation<std::int8_t, typename T::value_type>);
+      std::transform(vec.begin(), vec.end(), (std::int8_t*) val_ptr_, reserved_transformation<std::int8_t, typename T::value_type>);
       break;
     case 0x02u:
-      std::transform(vec.value_data(), vec.value_data() + sparse_size_, (std::int16_t*) val_ptr_, reserved_transformation<std::int16_t, typename T::value_type>); // TODO: handle endianess
+      std::transform(vec.begin(), vec.end(), (std::int16_t*) val_ptr_, reserved_transformation<std::int16_t, typename T::value_type>); // TODO: handle endianess
       break;
     case 0x03u:
-      std::transform(vec.value_data(), vec.value_data() + sparse_size_, (std::int32_t*) val_ptr_, reserved_transformation<std::int32_t, typename T::value_type>);
+      std::transform(vec.begin(), vec.end(), (std::int32_t*) val_ptr_, reserved_transformation<std::int32_t, typename T::value_type>);
       break;
     case 0x04u:
-      std::transform(vec.value_data(), vec.value_data() + sparse_size_, (std::int64_t*) val_ptr_, reserved_transformation<std::int64_t, typename T::value_type>);
+      std::transform(vec.begin(), vec.end(), (std::int64_t*) val_ptr_, reserved_transformation<std::int64_t, typename T::value_type>);
       break;
     case 0x05u:
-      std::transform(vec.value_data(), vec.value_data() + sparse_size_, (float*) val_ptr_, reserved_transformation<float, typename T::value_type>);
+      std::transform(vec.begin(), vec.end(), (float*) val_ptr_, reserved_transformation<float, typename T::value_type>);
       break;
     }
   }

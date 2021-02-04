@@ -242,21 +242,12 @@ namespace savvy
 
       /**
        * Sets value of FORMAT field.
-       * @tparam T Scalar type of data vector
+       * @tparam T Type of data vector
        * @param key Key for FORMAT field
        * @param geno Vector of FORMAT field values
        */
       template<typename T>
-      void set_format(const std::string& key, const std::vector<T>& geno/*, std::set<std::string> sparse_keys = {"GT", "EC", "DS", "HDS"}*/);
-
-      /**
-       * Sets value of FORMAT field.
-       * @tparam T Scalar type of data vector
-       * @param key Key for FORMAT field
-       * @param geno Compressed vector of FORMAT field values
-       */
-      template<typename T>
-      void set_format(const std::string& key, const compressed_vector <T>& geno);
+      void set_format(const std::string& key, const T& geno);
 
       /**
        * Sets value of FORMAT field.
@@ -1214,34 +1205,7 @@ namespace savvy
     }
 
     template <typename T>
-    void variant::set_format(const std::string& key, const std::vector<T>& geno/*, std::set<std::string> sparse_keys*/)
-    {
-      auto it = format_fields_.begin();
-      for ( ; it != format_fields_.end(); ++it)
-      {
-        if (it->first == key)
-        {
-          if (geno.size() == 0)
-          {
-            format_fields_.erase(it);
-            return;
-          }
-
-          it->second = geno;
-          return;
-        }
-      }
-
-      if (it == format_fields_.end() && geno.size())
-      {
-        format_fields_.emplace_back(key, geno);
-      }
-
-      //serialize(format_fields_[it - format_fields_.begin()], geno, sparse_keys.find(key) != sparse_keys.end());
-    }
-
-    template <typename T>
-    void variant::set_format(const std::string& key, const compressed_vector<T>& geno)
+    void variant::set_format(const std::string& key, const T& geno)
     {
       auto it = format_fields_.begin();
       for ( ; it != format_fields_.end(); ++it)
