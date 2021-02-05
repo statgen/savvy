@@ -54,7 +54,7 @@ private:
   std::string headers_path_;
   savvy::phasing phasing_ = savvy::phasing::unknown;
   std::unique_ptr<savvy::s1r::sort_point> sort_type_;
-  savvy::fmt format_ = savvy::fmt::gt;
+  //savvy::fmt format_ = savvy::fmt::gt;
   savvy::bounding_point bounding_point_ = savvy::bounding_point::beg;
   double sparse_threshold_ = 1.0;
   int update_info_ = -1;
@@ -69,7 +69,7 @@ public:
       {
         {"block-size", required_argument, 0, 'b'},
         {"bounding-point", required_argument, 0, 'p'},
-        {"data-format", required_argument, 0, 'd'},
+        //{"data-format", required_argument, 0, 'd'},
         {"filter", required_argument, 0, 'f'},
         {"generate-info", required_argument, 0, '\x01'},
         {"headers", required_argument, 0, '\x01'},
@@ -112,7 +112,7 @@ public:
   const std::unique_ptr<savvy::slice_bounds>& slice() const { return slice_; }
   double sparse_threshold() const { return sparse_threshold_; }
   savvy::phasing phasing() { return phasing_; }
-  savvy::fmt format() const { return format_; }
+  //savvy::fmt format() const { return format_; }
   savvy::bounding_point bounding_point() const { return bounding_point_; }
   std::uint8_t compression_level() const { return std::uint8_t(compression_level_); }
   std::uint16_t block_size() const { return block_size_; }
@@ -131,7 +131,7 @@ public:
     os << " -#                     Number (#) of compression level (1-19, default: " << default_compression_level << ")\n";
     os << " -b, --block-size       Number of markers in SAV compression block (0-65535, default: " << default_block_size << ")\n";
     os << " -c, --slice            Range formatted as begin:end (non-inclusive end) that specifies a subset of record offsets within file\n";
-    os << " -d, --data-format      Format field to export (GT, DS, HDS or GP, default: GT)\n";
+    //os << " -d, --data-format      Format field to export (GT, DS, HDS or GP, default: GT)\n";
     os << " -f, --filter           Filter expression for including variants based on FILTER, QUAL, and INFO fields (eg, -f 'AC>=10;AF>0.01')\n";
     os << " -g, --generate-info    Generate info fields specified as a comma separated list (AC,MAC,AN,AF,MAF)\n"; //,SPARSE_OFFSETS_<FMT>,SPARSE_VALUES_<FMT>)\n";
     os << " -h, --help             Print usage\n";
@@ -164,7 +164,7 @@ public:
 
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:c:d:f:hi:I:m:O:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:c:f:hi:I:m:O:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -276,28 +276,28 @@ public:
         std::cerr << "Invalid --slice range.\n";
         return false;
       }
-      case 'd':
-      {
-        std::string str_opt_arg(optarg ? optarg : "");
-        if (str_opt_arg == "HDS")
-        {
-          format_ = savvy::fmt::hds;
-        }
-        else if (str_opt_arg == "DS")
-        {
-          format_ = savvy::fmt::ds;
-        }
-        else if (str_opt_arg == "GP")
-        {
-          format_ = savvy::fmt::gp;
-        }
-        else if (str_opt_arg != "GT")
-        {
-          std::cerr << "Invalid format field value (" << str_opt_arg << ")\n";
-          return false;
-        }
-        break;
-      }
+//      case 'd':
+//      {
+//        std::string str_opt_arg(optarg ? optarg : "");
+//        if (str_opt_arg == "HDS")
+//        {
+//          format_ = savvy::fmt::hds;
+//        }
+//        else if (str_opt_arg == "DS")
+//        {
+//          format_ = savvy::fmt::ds;
+//        }
+//        else if (str_opt_arg == "GP")
+//        {
+//          format_ = savvy::fmt::gp;
+//        }
+//        else if (str_opt_arg != "GT")
+//        {
+//          std::cerr << "Invalid format field value (" << str_opt_arg << ")\n";
+//          return false;
+//        }
+//        break;
+//      }
       case 'f':
       {
         std::string str_opt_arg(optarg ? optarg : "");
@@ -522,22 +522,22 @@ public:
     }
 
     {
-      std::set<std::string> allowed = {"AC", "AN", "AF", "MAF"};
+      std::set<std::string> allowed = {"AC", "MAC", "AN", "AF", "MAF"};
       for (auto it = fields_to_generate_.begin(); it != fields_to_generate_.end(); ++it)
       {
         if (allowed.find(*it) == allowed.end())
         {
-          if (*it != "SPARSE_OFFSETS_" + savvy::fmt_to_string(format_) && *it != "SPARSE_VALUES_" + savvy::fmt_to_string(format_))
+          //if (*it != "SPARSE_OFFSETS_" + savvy::fmt_to_string(format_) && *it != "SPARSE_VALUES_" + savvy::fmt_to_string(format_))
           {
             std::cerr << "Invalid --generate-info value (" << (*it) << ")\n";
             return false;
           }
 
-          if (format_ != savvy::fmt::gt && format_ != savvy::fmt::hds)
-          {
-            std::cerr << "Only GT and HDS are supported with --generate-info (" + *it + ")\n";
-            return false;
-          }
+          //if (format_ != savvy::fmt::gt && format_ != savvy::fmt::hds)
+          //{
+          //  std::cerr << "Only GT and HDS are supported with --generate-info (" + *it + ")\n";
+          //  return false;
+          //}
         }
       }
     }
