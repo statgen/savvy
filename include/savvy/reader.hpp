@@ -79,7 +79,7 @@ namespace savvy
           interval_off(0),
           bounding_type(bound_type)
         {
-          auto tmp = file.query_intervals(reg.chromosome(), contig_map, reg.from(), reg.to()); // TODO: have this return list instead of vector
+          auto tmp = file.query_intervals(reg.chromosome(), contig_map, reg.from(), std::min<std::uint64_t>(reg.to(), std::numeric_limits<std::int64_t>::max())); // TODO: have this return list instead of vector
           intervals.assign(tmp.begin(), tmp.end());
         }
       };
