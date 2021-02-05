@@ -534,7 +534,7 @@ namespace savvy
         input_stream_->setstate(input_stream_->rdstate() | std::ios::eofbit);
       else if (!site_info::deserialize_vcf(r, *input_stream_, dict_))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
-      else if (!variant::deserialize_vcf(r, *input_stream_, dict_, ids_.size(), phasing_))
+      else if (ids_.size() && !variant::deserialize_vcf(r, *input_stream_, dict_, ids_.size(), phasing_))
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
       else
       {
