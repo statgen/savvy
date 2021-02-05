@@ -9,6 +9,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <cassert>
 
 namespace savvy
 {
