@@ -140,5 +140,5 @@ int head_main(int argc, char** argv)
     }
   }
 
-  return EXIT_FAILURE;
+  return sav_reader.bad() ? EXIT_FAILURE : EXIT_SUCCESS;
 }
