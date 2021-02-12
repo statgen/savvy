@@ -433,6 +433,7 @@ namespace savvy
     inline
     bool site_info::deserialize_vcf(site_info& s, std::istream& is, const dictionary& dict)
     {
+      s.chrom_ = "";
       s.alts_.resize(1);
       s.filters_.resize(1);
       std::string qual_str;
@@ -511,6 +512,12 @@ namespace savvy
         is.setstate(is.rdstate() | std::ios::failbit);
         return false;
       }
+
+      int peekc = is.peek();
+      if (std::isspace(peekc)) // TODO: might need to check for
+        is.get();
+      if (peekc == 13 && std::isspace(is.peek())) // CR
+        is.get();
 
       return true;
     }
