@@ -275,7 +275,8 @@ namespace  savvy
         for (std::size_t i = 1; i < n_off; ++i)
           if (ret[i-1].second >= ret[i].first) ret[i-1].second = ret[i].first;
         // merge adjacent blocks
-        for (std::size_t i = 1, l = 0; i < n_off; ++i)
+        l = 0;
+        for (std::size_t i = 1; i < n_off; ++i)
         {
           if ((ret[l].second >> 16) == (ret[i].first >> 16))
             ret[l].second = ret[i].second;
