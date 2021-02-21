@@ -24,65 +24,126 @@ namespace  savvy
     csi_index(const std::string& file_path)
       : fs_(file_path)
     {
-      std::array<char, 4> magic;
-      fs_.read(magic.data(), magic.size());
+      std::string magic(4, '\0');
+      fs_.read(&magic[0], magic.size());
 
-      fs_.read((char*)&min_shift_, sizeof(min_shift_));
-      fs_.read((char*)&depth_, sizeof(depth_));
-
-      std::uint32_t aux_sz{};
-      std::vector<std::uint8_t> aux_data;
-      if (fs_.read((char*)&aux_sz, sizeof(aux_sz)))
+      if (magic == "CSI\x01")
       {
-        aux_data.resize(aux_sz);
-        fs_.read((char*)aux_data.data(), aux_sz);
+        fs_.read((char*)&min_shift_, sizeof(min_shift_));
+        fs_.read((char*)&depth_, sizeof(depth_));
 
-        std::size_t off = 28;
-        while (off < aux_sz)
+        std::uint32_t aux_sz{};
+        std::vector<std::uint8_t> aux_data;
+        if (fs_.read((char*)&aux_sz, sizeof(aux_sz)))
         {
-          const char* p = (char*)aux_data.data() + off;
-          aux_contigs_.emplace_back(std::string(p));
-          off += aux_contigs_.back().size() + 1;
-        }
+          aux_data.resize(aux_sz);
+          fs_.read((char*)aux_data.data(), aux_sz);
 
-        std::uint32_t n_indices{};
-        if (fs_.read((char*)&n_indices, sizeof(n_indices)))
-        {
-          indices_.resize(n_indices);
-          for (std::size_t i = 0; i < n_indices; ++i)
+          std::size_t off = 28;
+          while (off < aux_sz)
           {
-            std::uint32_t n_bins{};
-            if (fs_.read((char*)&n_bins, sizeof(n_bins)))
+            const char* p = (char*)aux_data.data() + off;
+            aux_contigs_.emplace_back(std::string(p));
+            off += aux_contigs_.back().size() + 1;
+          }
+
+          std::uint32_t n_indices{};
+          if (fs_.read((char*)&n_indices, sizeof(n_indices)))
+          {
+            indices_.resize(n_indices);
+            for (std::size_t i = 0; i < n_indices; ++i)
             {
-              indices_[i].reserve(n_bins);
-              for (std::size_t b = 0; b < n_bins; ++b)
+              std::uint32_t n_bins{};
+              if (fs_.read((char*)&n_bins, sizeof(n_bins)))
               {
-                std::uint32_t bin_id{}, n_chunks{};
-                std::uint64_t voff{};
-
-                fs_.read((char*)&bin_id, sizeof(bin_id));
-                fs_.read((char*)&voff, sizeof(voff));
-
-                if (fs_.read((char*)&n_chunks, sizeof(n_chunks)))
+                indices_[i].reserve(n_bins);
+                for (std::size_t b = 0; b < n_bins; ++b)
                 {
-                  auto& bin = indices_[i][bin_id];
-                  bin.loff = voff;
-                  bin.chunks.resize(n_chunks);
-                  for (std::size_t c = 0; c < n_chunks; ++c)
+                  std::uint32_t bin_id{}, n_chunks{};
+                  std::uint64_t voff{};
+
+                  fs_.read((char*)&bin_id, sizeof(bin_id));
+                  fs_.read((char*)&voff, sizeof(voff));
+
+                  if (fs_.read((char*)&n_chunks, sizeof(n_chunks)))
                   {
-                    fs_.read((char*)&bin.chunks[c].first, 8);
-                    fs_.read((char*)&bin.chunks[c].second, 8);
+                    auto& bin = indices_[i][bin_id];
+                    bin.loff = voff;
+                    bin.chunks.resize(n_chunks);
+                    for (std::size_t c = 0; c < n_chunks; ++c)
+                    {
+                      fs_.read((char*)&bin.chunks[c].first, 8);
+                      fs_.read((char*)&bin.chunks[c].second, 8);
+                    }
                   }
                 }
               }
             }
           }
         }
-      }
 
-      if (!fs_)
+        if (!fs_)
+        {
+          std::cerr << "Error: malformed csi index" << std::endl;
+        }
+      }
+      else if (magic == "TBI\x01")
       {
-        std::cerr << "Error: malformed csi index" << std::endl;
+        min_shift_ = 14;
+        depth_ = 5;
+
+        std::uint32_t n_indices{};
+        if (fs_.read((char*)&n_indices, sizeof(n_indices)))
+        {
+          std::uint32_t names_sz{};
+          std::string discard(6 * sizeof(std::int32_t), '\0');
+          if (fs_.read(&discard[0], discard.size()) && fs_.read((char*)&names_sz, sizeof(std::int32_t)))
+          {
+            discard.resize(names_sz);
+            if (discard.empty() || fs_.read(&discard[0], discard.size()))
+            {
+              indices_.resize(n_indices);
+              for (std::size_t i = 0; i < n_indices; ++i)
+              {
+                std::uint32_t n_bins{};
+                if (fs_.read((char*)&n_bins, sizeof(n_bins)))
+                {
+                  indices_[i].reserve(n_bins);
+                  for (std::size_t b = 0; b < n_bins; ++b)
+                  {
+                    std::uint32_t bin_id{}, n_chunks{};
+                    std::uint64_t voff{};
+
+                    fs_.read((char*)&bin_id, sizeof(bin_id));
+                    //fs_.read((char*)&voff, sizeof(voff));
+
+                    if (fs_.read((char*)&n_chunks, sizeof(n_chunks)))
+                    {
+                      auto& bin = indices_[i][bin_id];
+                      bin.loff = voff;
+                      bin.chunks.resize(n_chunks);
+                      for (std::size_t c = 0; c < n_chunks; ++c)
+                      {
+                        fs_.read((char*)&bin.chunks[c].first, 8);
+                        fs_.read((char*)&bin.chunks[c].second, 8);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (!fs_)
+        {
+          std::cerr << "Error: malformed tbi index" << std::endl;
+        }
+      }
+      else
+      {
+        std::cerr << "Error: unsupported index format" << std::endl;
+        fs_.setstate(fs_.rdstate() | std::ios::badbit);
       }
 
     }

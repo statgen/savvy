@@ -308,6 +308,7 @@ namespace savvy
     {
       input_stream_->clear();
 
+      bool csi_exists = false;
       if (file_format_ == format::sav1 || file_format_ == format::sav2)
       {
         // TODO: First check whether index is appended, than check file_path_ + ".s1r"
@@ -317,9 +318,9 @@ namespace savvy
           input_stream_->setstate(std::ios::failbit); //TODO: error message
         }
       }
-      else if (::savvy::detail::file_exists(file_path_ + ".csi"))
+      else if ((csi_exists = ::savvy::detail::file_exists(file_path_ + ".csi")) || ::savvy::detail::file_exists(file_path_ + ".tbi"))
       {
-        csi_index_ = ::savvy::detail::make_unique<csi_index_data>(file_path_ + ".csi", dict_.str_to_int[dictionary::contig], reg, bp);
+        csi_index_ = ::savvy::detail::make_unique<csi_index_data>(file_path_ + (csi_exists ? ".csi" : ".tbi"), dict_.str_to_int[dictionary::contig], reg, bp);
         if (!csi_index_->file.good())
         {
           input_stream_->setstate(std::ios::failbit); //TODO: error message
