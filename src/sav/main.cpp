@@ -51,6 +51,7 @@ public:
     os << " sort:        Sorts variant records\n";
     os << " stat:        Gathers statistics on SAV file\n";
     os << " stat-index:  Gathers statistics on s1r index\n";
+    os << " stat-merge:  Merges output from multiple calls to stat\n";
     os << "\n";
     os << "Options:\n";
     os << " -h, --help     Print usage\n";
@@ -133,6 +134,10 @@ int main(int argc, char** argv)
   else if (args.sub_command() == "stat-index")
   {
     return stat_index_main(argc, argv);
+  }
+  else if (args.sub_command() == "stat-merge")
+  {
+    return stat_merge_main(argc, argv);
   }
 
   if (args.help_is_set())

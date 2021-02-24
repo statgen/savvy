@@ -382,7 +382,7 @@ namespace savvy
           auto info_it = s.info_.begin();
           for ( ; info_it != s.info_.end(); ++info_it)
           {
-            std::int32_t info_key_id;
+            std::int32_t info_key_id = -1;
             shared_it = bcf::deserialize_int(shared_it, s.shared_data_.end(), info_key_id);
             if (dict.entries[dictionary::id].size() <= (std::uint32_t)info_key_id)
             {

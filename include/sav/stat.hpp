@@ -9,5 +9,6 @@
 
 int stat_index_main(int argc, char** argv);
 int stat_main(int argc, char** argv);
+int stat_merge_main(int argc, char** argv);
 
 #endif //SAVVY_SAV_INDEX_HPP
