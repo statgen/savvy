@@ -112,16 +112,38 @@ public:
   }
 };
 
+struct per_ac_t
+{
+  std::size_t n_snp = 0;
+  std::size_t n_indel = 0;
+  std::size_t n_syn = 0;
+  std::size_t n_nonsyn = 0;
+
+  static void print_header(std::ostream& os)
+  {
+    os << "#bin_id\tn_snp\tn_indel\tn_syn\tn_nonsyn\n";
+  }
+
+  void print(std::ostream& os, std::size_t bin) const
+  {
+    os << bin << "\t"
+       << n_snp  << "\t"
+       << n_indel << "\t"
+       << n_syn << "\t"
+       << n_nonsyn << "\n";
+  }
+};
+
 struct per_sample_t
 {
   std::string sample_id;
   std::size_t n_het = 0;
   std::size_t n_hom = 0;
-  std::size_t n_syn = 0;
-  std::size_t n_nonsyn = 0;
   std::size_t n_snp = 0;
   std::size_t n_indel = 0;
   std::size_t n_singletons = 0;
+  std::size_t n_syn = 0;
+  std::size_t n_nonsyn = 0;
 
   per_sample_t(std::string sid) :
     sample_id(std::move(sid))
@@ -188,6 +210,9 @@ int stat_main(int argc, char** argv)
   if (args.per_sample_path().size())
     per_sample_stats.assign(input_file.samples().begin(), input_file.samples().end());
 
+  std::size_t bin_width = 1;
+  std::vector<per_ac_t> per_ac_stats;
+
   std::unordered_set<std::string> synonymous_labels = {
     "start_retained",
     "stop_retained",
@@ -209,39 +234,70 @@ int stat_main(int argc, char** argv)
     variant_cnt += std::max<std::size_t>(1, rec.alts().size());
     ++record_cnt;
 
+    bool is_snp = rec.ref().size() == 1 && rec.alts()[0].size() == 1;
+    bool is_syn = false;
+    bool is_nonsyn = false;
+    std::string ann;
+    if (rec.get_info("ANN", ann))
+    {
+      std::size_t scnt = 0, nonscnt = 0;
+      std::vector<std::string> transcripts = split_string_to_vector(ann.c_str(), ',');
+      for (auto it = transcripts.begin(); it != transcripts.end(); ++it)
+      {
+        std::vector<std::string> fields = split_string_to_vector(it->c_str(), '|');
+        if (fields.size() >= 2)
+        {
+          std::vector<std::string> effects = split_string_to_vector(fields[1].c_str(), '&');
+          for (auto jt = effects.begin(); jt != effects.end(); ++jt)
+          {
+            if (synonymous_labels.find(*jt) != synonymous_labels.end())
+              ++scnt;
+            else if (nonsynonymous_labels.find(*jt) != nonsynonymous_labels.end())
+              ++nonscnt;
+          }
+        }
+      }
+
+      //is_syn = scnt && !nonscnt;
+      //is_nonsyn = !scnt && nonscnt;
+      is_nonsyn = nonscnt > 0;
+      is_syn = scnt && !nonscnt;
+    }
+
+    if (args.per_ac_path().size())
+    {
+      std::int64_t ac,an;
+      if (!rec.get_info("AC", ac) || !rec.get_info("AN", an))
+      {
+        std::cerr << "Error: AC and AN INFO fields are required" << std::endl;
+        return EXIT_FAILURE;
+      }
+
+      if (ac > an || ac < 0)
+      {
+        std::cerr << "Error: AC INFO field must be in range of [0, AN]" << std::endl;
+        return EXIT_FAILURE;
+      }
+
+      if (an / bin_width + 1 > per_ac_stats.size())
+        per_ac_stats.resize(an / bin_width + 1);
+
+      auto& s = per_ac_stats[ac / bin_width];
+
+      if (is_snp)
+        s.n_snp += 1;
+      else
+        s.n_indel += 1;
+
+      if (is_syn)
+        s.n_syn += 1;
+      if (is_nonsyn)
+        s.n_nonsyn += 1;
+    }
+
     if (per_sample_stats.size())
     {
       if (!rec.get_format("GT", geno)) continue;
-
-      bool is_snp = rec.ref().size() == 1 && rec.alts()[0].size() == 1;
-      bool is_syn = false;
-      bool is_nonsyn = false;
-      std::string ann;
-      if (rec.get_info("ANN", ann))
-      {
-        std::size_t scnt = 0, nonscnt = 0;
-        std::vector<std::string> transcripts = split_string_to_vector(ann.c_str(), ',');
-        for (auto it = transcripts.begin(); it != transcripts.end(); ++it)
-        {
-          std::vector<std::string> fields = split_string_to_vector(it->c_str(), '|');
-          if (fields.size() >= 2)
-          {
-            std::vector<std::string> effects = split_string_to_vector(fields[1].c_str(), '&');
-            for (auto jt = effects.begin(); jt != effects.end(); ++jt)
-            {
-              if (synonymous_labels.find(*jt) != synonymous_labels.end())
-                ++scnt;
-              else if (nonsynonymous_labels.find(*jt) != nonsynonymous_labels.end())
-                ++nonscnt;
-            }
-          }
-        }
-
-        //is_syn = scnt && !nonscnt;
-        //is_nonsyn = !scnt && nonscnt;
-        is_nonsyn = nonscnt > 0;
-        is_syn = scnt && !nonscnt;
-      }
 
       savvy::stride_reduce(geno, geno.size() / per_sample_stats.size());
       std::size_t allele_cnt = 0;
@@ -288,6 +344,16 @@ int stat_main(int argc, char** argv)
     for (const per_sample_t& s : per_sample_stats)
     {
       s.print(per_sample_out);
+    }
+  }
+
+  if (args.per_ac_path().size())
+  {
+    std::ofstream per_ac_out(args.per_ac_path(), std::ios::binary);
+    per_ac_t::print_header(per_ac_out);
+    for (std::size_t i = 0; i < per_ac_stats.size(); ++i)
+    {
+      per_ac_stats[i].print(per_ac_out, i / bin_width);
     }
   }
 
@@ -540,12 +606,12 @@ int stat_merge_main(int argc, char** argv)
     {
       if (!std::getline(*ft, line))
       {
-        files.clear();
         if (ft != files.begin())
         {
           std::cerr << "Error: Number of lines does not match" << std::endl;
           return EXIT_FAILURE;
         }
+        files.clear();
         break;
       }
 
