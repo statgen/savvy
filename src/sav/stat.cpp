@@ -10,6 +10,7 @@
 #include "savvy/savvy.hpp"
 #include "savvy/reader.hpp"
 #include "savvy/writer.hpp"
+#include "sav/filter.hpp"
 
 #include <functional>
 #include <getopt.h>
@@ -18,6 +19,7 @@
 class stat_prog_args
 {
 private:
+  filter filter_;
   std::vector<option> long_options_;
   std::string input_path_;
   std::string summary_path_ = "/dev/stdout";
@@ -29,6 +31,7 @@ public:
   stat_prog_args() :
     long_options_(
       {
+        {"filter", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {"per-ac-out", required_argument, 0, '\x01'},
         {"per-sample-out", required_argument, 0, '\x01'},
@@ -39,6 +42,7 @@ public:
   {
   }
 
+  const filter& filter_functor() const { return filter_; }
   const std::string& input_path() const { return input_path_; }
   const std::string& summary_path() const { return summary_path_; }
   const std::string& per_ac_path() const { return per_ac_path_; }
@@ -71,7 +75,7 @@ public:
           per_ac_path_ = optarg ? optarg : "";
           break;
         }
-        else if (long_opt_name == "per-ac-out")
+        else if (long_opt_name == "per-sample-out")
         {
           per_sample_path_ = optarg ? optarg : "";
           break;
@@ -79,6 +83,17 @@ public:
 
         std::cerr << "Invalid long only index (" << long_index << ")\n";
         return false;
+      }
+      case 'f':
+      {
+        std::string str_opt_arg(optarg ? optarg : "");
+        filter_ = str_opt_arg;
+        if (!filter_)
+        {
+          std::cerr << "Invalid filter expression (" << str_opt_arg << ")\n";
+          return false;
+        }
+        break;
       }
       case 'h':
         help_ = true;
@@ -141,7 +156,6 @@ struct per_sample_t
   std::size_t n_hom = 0;
   std::size_t n_snp = 0;
   std::size_t n_indel = 0;
-  std::size_t n_singletons = 0;
   std::size_t n_syn = 0;
   std::size_t n_nonsyn = 0;
 
@@ -152,7 +166,7 @@ struct per_sample_t
 
   static void print_header(std::ostream& os)
   {
-    os << "#sample_id\tn_het\tn_hom\tn_snp\tn_indel\tn_singletons\tn_syn\tn_nonsyn\n";
+    os << "#sample_id\tn_het\tn_hom\tn_snp\tn_indel\tn_syn\tn_nonsyn\n";
   }
 
   void print(std::ostream& os) const
@@ -162,7 +176,6 @@ struct per_sample_t
        << n_hom << "\t"
        << n_snp  << "\t"
        << n_indel << "\t"
-       << n_singletons << "\t"
        << n_syn << "\t"
        << n_nonsyn << "\n";
   }
@@ -229,6 +242,8 @@ int stat_main(int argc, char** argv)
 
   while (input_file.read(rec))
   {
+    if (!args.filter_functor()(rec)) continue;
+
     if (rec.alts().size() > 1)
       ++multi_allelic;
     variant_cnt += std::max<std::size_t>(1, rec.alts().size());
@@ -300,17 +315,13 @@ int stat_main(int argc, char** argv)
       if (!rec.get_format("GT", geno)) continue;
 
       savvy::stride_reduce(geno, geno.size() / per_sample_stats.size());
-      std::size_t allele_cnt = 0;
-      std::size_t last_carrier = per_sample_stats.size();
+
       for (std::size_t i = 0; i < geno.size(); ++i)
       {
         int8_t g = geno[i];
         if (g < 0) continue;
         if (g)
         {
-          allele_cnt += g;
-          last_carrier = i;
-
           if (is_snp)
             per_sample_stats[i].n_snp += g;
           else
@@ -327,9 +338,6 @@ int stat_main(int argc, char** argv)
             per_sample_stats[i].n_nonsyn += g;
         }
       }
-
-      if (allele_cnt == 1)
-        ++per_sample_stats[last_carrier].n_singletons;
     }
   }
 
