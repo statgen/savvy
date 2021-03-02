@@ -654,10 +654,13 @@ int stat_merge_main(int argc, char** argv)
       std::transform(agg_data_vec.begin(), agg_data_vec.end(), data_vec.begin(), agg_data_vec.begin(), std::plus<std::size_t>());
     }
 
-    std::cout << line_id;
-    for (std::int64_t d : agg_data_vec)
-      std::cout << "\t" << d;
-    std::cout << "\n";
+    if (files.size())
+    {
+      std::cout << line_id;
+      for (std::int64_t d : agg_data_vec)
+        std::cout << "\t" << d;
+      std::cout << "\n";
+    }
   }
 
   return EXIT_SUCCESS;
