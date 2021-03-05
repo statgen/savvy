@@ -102,6 +102,16 @@ namespace  savvy
             discard.resize(names_sz);
             if (discard.empty() || fs_.read(&discard[0], discard.size()))
             {
+              {
+                std::size_t off = 0;
+                while (off < discard.size())
+                {
+                  const char* p = discard.data() + off;
+                  aux_contigs_.emplace_back(std::string(p));
+                  off += aux_contigs_.back().size() + 1;
+                }
+              }
+
               indices_.resize(n_indices);
               for (std::size_t i = 0; i < n_indices; ++i)
               {
