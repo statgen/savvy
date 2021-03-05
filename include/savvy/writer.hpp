@@ -440,12 +440,12 @@ namespace savvy
             if (file_format_ == format::sav2)
             {
               if (hval.type == "String")
-                it->second = "<ID=GT, Type=Integer, Number=G, Description=\"Genotype\">";
+                it->second = "<ID=GT,Number=G,Type=Integer,Description=\"Genotype\">";
             }
             else
             {
               if (hval.type != "String")
-                it->second = "<ID=GT, Type=String, Number=1, Description=\"Genotype\">";
+                it->second = "<ID=GT,Number=1,Type=String,Description=\"Genotype\">";
             }
 
             gt_present = true;
