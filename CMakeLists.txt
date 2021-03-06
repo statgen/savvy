@@ -27,8 +27,9 @@ endif()
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".a;${CMAKE_FIND_LIBRARY_SUFFIXES}") # Prefer libz.a when both are available
 #endif()
 
-find_library(ZLIB_LIBRARY z)
-find_library(ZSTD_LIBRARY zstd)
+#find_library(ZLIB_LIBRARY z)
+#find_library(ZSTD_LIBRARY zstd)
+find_package(shrinkwrap REQUIRED)
 find_package(Threads)
 
 #get_target_property(SHRINKWRAP_LIBS shrinkwrap INTERFACE_LINK_LIBRARIES)
@@ -55,7 +56,7 @@ add_library(savvy INTERFACE)
 #        include/savvy/varint.hpp #src/savvy/varint.cpp include/savvy/varint.hpp
 #        include/savvy/vcf_reader.hpp) #src/savvy/vcf_reader.cpp include/savvy/vcf_reader.hpp)
 
-target_link_libraries(savvy INTERFACE ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(savvy INTERFACE shrinkwrap) #${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(savvy INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 add_executable(sav
