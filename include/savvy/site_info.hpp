@@ -260,6 +260,7 @@ namespace savvy
       static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_map*>& pbwt_format_pointers);
       static bool deserialize(variant& v, const dictionary& dict, internal::pbwt_sort_context& pbwt_context, std::size_t sample_size, bool is_bcf, phasing phased);
       static bool deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status);
+      static bool deserialize_vcf2(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status);
       static bool deserialize_sav1(variant& v, std::istream& is, const std::list<header_value_details>& format_headers, std::size_t sample_size);
     };
 
@@ -968,6 +969,212 @@ namespace savvy
 
       return true;
     }
+
+
+    inline
+    bool variant::deserialize_vcf2(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status)
+    {
+      v.format_fields_.clear();
+      std::vector<std::string> fmt_keys(1);
+      if (!(is >> fmt_keys.front()) || fmt_keys.front().empty())
+      {
+        std::fprintf(stderr, "Error: FMT column empty\n");
+        return false;
+      }
+
+      fmt_keys = detail::split_string_to_vector(fmt_keys.front(), ':');
+
+      v.format_fields_.reserve(fmt_keys.size());
+
+      bool gt_present = fmt_keys[0] == "GT";
+
+      std::string sample_line;
+      if (!std::getline(is, sample_line, '\n') || sample_line.empty())
+      {
+        std::fprintf(stderr, "Error: Truncated file. No indiv VCf data.\n");
+        return false;
+      }
+
+      struct vcf_fmt_stats
+      {
+        bool is_gt = false;
+        std::size_t max_stride = 0;
+        std::size_t max_ploidy = 0; // redundant with stride ?
+        std::size_t max_byte_length = 0;
+      };
+
+      std::vector<vcf_fmt_stats> fmt_stats(fmt_keys.size());
+      if (fmt_keys[0] == "GT")
+        fmt_stats[0].is_gt = true;
+
+      // ================================================================ //
+      // Adapted from https://github.com/samtools/htslib/blob/8127bfc98e9b4361dca2423fd42a59ad7c25dda7/vcf.c#L2324-L2383
+      // collect fmt stats: max vector size, length, number of alleles
+      std::size_t sample_cnt = 0;
+      vcf_fmt_stats* f = fmt_stats.data();
+      vcf_fmt_stats* f_end = f + fmt_stats.size();
+      std::size_t byte_length = 0, stride = 1, ploidy = 1;
+      const char* c_end = sample_line.c_str() + sample_line.size();
+      for (char* c = &sample_line[0] + 1; c <= c_end; ++c,++byte_length)
+      {
+        switch (*c)
+        {
+        case ',':
+          ++stride;
+          break;
+
+        case '|':
+        case '/':
+          if (f->is_gt) ++ploidy,++stride;
+          break;
+
+        case ':':
+        case '\t':  //*c = 0; // fall through
+        case '\r':
+        case '\0':
+        {
+          if (f->max_stride < stride) f->max_stride = stride;
+          if (f->max_byte_length < byte_length) f->max_byte_length = byte_length;
+          if (f->is_gt && f->max_ploidy < ploidy) f->max_ploidy = ploidy;
+          byte_length = std::size_t(-1), stride = ploidy = 1;
+          if (*c == ':')
+          {
+            f++;
+            if (f >= f_end)
+            {
+              std::fprintf(stderr, "Error: incorrect number of FORMAT fields at position %s:%i\n", v.chrom().c_str(), v.position());
+              return false;
+            }
+          }
+          else
+          {
+            f = fmt_stats.data();
+            ++sample_cnt;
+          }
+          break;
+        }
+        }
+      }
+
+      if (sample_cnt != sample_size)
+      {
+        std::fprintf(stderr, "Error: incorrect number of sample columns at position %s:%i\n", v.chrom().c_str(), v.position());
+        return false;
+      }
+      // ================================================================ //
+
+      typed_value* ph_value = nullptr;
+      for (std::size_t i = 0; i < fmt_keys.size(); ++i)
+      {
+        // TDOO: get fmt type from header
+        auto fmt_id_it = dict.str_to_int[dictionary::id].find(fmt_keys[i]);
+        if (fmt_id_it == dict.str_to_int[dictionary::id].end() || fmt_id_it->second >= dict.entries[dictionary::id].size())
+        {
+          std::fprintf(stderr, "Error: FMT key '%s' not in header\n", fmt_keys[i].c_str());
+          return false;
+        }
+
+        std::uint8_t type = dict.entries[dictionary::id][fmt_id_it->second].type;
+        std::size_t number = 0;
+        std::string number_str = dict.entries[dictionary::id][fmt_id_it->second].number;
+        if (number_str == "A")
+        {
+          number = v.alts().size(); // TODO: possibly make 1 the minimum value
+        }
+        else if (number_str == "R")
+        {
+          number = 1 + v.alts().size(); // TODO: possibly make 2 the minimum value
+        }
+        else if (number_str == "G")
+        {
+          std::size_t n = 1 + v.alts().size(); // TODO: possibly make 2 the minimum value
+          std::size_t r = 2;
+          if (gt_present)
+            r = fmt_stats[i].max_stride;
+
+          auto factorial = [](std::size_t n)
+          {
+            if (n == 0) return std::size_t(1);
+
+            std::size_t ret = n--;
+            while (n > 0)
+            {
+              ret *= n--;
+            }
+            return ret;
+          };
+
+          number = factorial(n) / (factorial(r) * factorial(n - 1));
+        }
+        else
+        {
+          number = std::atoi(number_str.c_str());
+        }
+
+
+        if (number && !fmt_stats[i].is_gt && number != fmt_stats[i].max_stride)
+        {
+          std::fprintf(stderr, "Warning: Number (%i) in FMT field (%s) does not match record stride (%i)\n", (int)number, fmt_keys[i].c_str(), (int)fmt_stats[i].max_stride);
+        }
+
+        if (fmt_keys[i] == "GT")
+        {
+          type = typed_value::type_code((std::int64_t)v.alts().size()); //typed_value::int8;
+          assert(fmt_stats[i].max_stride == fmt_stats[i].max_ploidy);
+          number = fmt_stats[i].max_stride;
+          assert(v.format_fields_.empty());
+          if (!v.format_fields_.empty())
+          {
+            std::fprintf(stderr, "Error: GT must be first FMT field\n");
+            return false;
+          }
+        }
+
+        if (type == typed_value::str)
+          fmt_stats[i].max_stride = fmt_stats[i].max_byte_length;
+
+        v.format_fields_.emplace_back(fmt_keys[i], typed_value(type, sample_size * fmt_stats[i].max_stride, nullptr));
+      }
+
+      if (fmt_stats[0].is_gt && fmt_stats[0].max_stride > 1 && (phasing_status == phasing::partial || phasing_status == phasing::unknown))
+      {
+        fmt_keys.insert(fmt_keys.begin() + 1, "PH");
+        auto insert_it = fmt_stats.insert(fmt_stats.begin() + 1, vcf_fmt_stats());
+        insert_it->max_stride = insert_it->max_byte_length = fmt_stats[0].max_stride - 1;
+
+        v.format_fields_.emplace(v.format_fields_.begin() + 1, "PH", typed_value(typed_value::int8, sample_size * (fmt_stats[0].max_stride - 1), nullptr));
+        ph_value = &v.format_fields_[1].second;
+      }
+
+      char* c = &sample_line[0]; // c starts with tab
+      std::size_t sample_idx = std::size_t(-1);
+      std::size_t fmt_idx = 0;
+      while (c < c_end)
+      {
+        if (*c == '\t')
+        {
+          fmt_idx = 0;
+          ++sample_idx;
+        }
+        ++c;
+
+        if (fmt_stats[fmt_idx].is_gt)
+        {
+          v.format_fields_[fmt_idx].second.deserialize_vcf2_gt(sample_idx * fmt_stats[fmt_idx].max_stride, fmt_stats[fmt_idx].max_stride, c, ph_value);
+          if (ph_value) ++fmt_idx; // skip PH
+        }
+        else
+        {
+          v.format_fields_[fmt_idx].second.deserialize_vcf2(sample_idx * fmt_stats[fmt_idx].max_stride, fmt_stats[fmt_idx].max_stride, c);
+        }
+
+        ++fmt_idx;
+
+      }
+
+      return true;
+    }
+
 
     inline
     bool variant::deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status)

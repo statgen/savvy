@@ -1985,12 +1985,20 @@ namespace savvy
         else os << v;
         break;
       }
+      case 0x07u:
+      {
+        if (val_ptr_[idx] > '\r')
+          os.put(val_ptr_[idx]);
+        break;
+      }
       default:
         os.setstate(os.rdstate() | std::ios::failbit);
       }
     }
 
     void deserialize_vcf(std::size_t idx, std::size_t length, char* str);
+    void deserialize_vcf2(std::size_t idx, std::size_t length, char*& str);
+    void deserialize_vcf2_gt(std::size_t idx, std::size_t length, char*& str, typed_value* ph_value);
 
     template<typename ValT, typename OffT, typename DestT>
     void copy_sparse2(DestT* dest) const
@@ -3107,6 +3115,223 @@ namespace savvy
         if (*str == '.') ((std::int64_t*)val_ptr_)[idx] = missing_value<float>(), ++str;
         else ((float*)val_ptr_)[idx] = std::strtof(str, &str);
         if (*str == '\0') --str;
+      }
+
+      for ( ; idx < end; ++idx)
+        ((float*)val_ptr_)[idx] = end_of_vector_value<float>();
+      break;
+    }
+    default:
+      return; // TODO: Maybe return false
+
+    }
+  }
+
+  inline
+  void typed_value::deserialize_vcf2(std::size_t idx, std::size_t length, char*& str)
+  {
+    assert(!off_ptr_ && idx < size_);
+
+    std::size_t end = idx + length;
+
+    switch (val_type_)
+    {
+    case 0x01u:
+    {
+      for ( ; idx < end; ++str)
+      {
+        if (*str == '.') ((std::int8_t*)val_ptr_)[idx++] = std::int8_t(0x80), ++str;
+        else ((std::int8_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str != ',') break;
+      }
+
+      for ( ; idx < end; ++idx)
+        ((std::int8_t*)val_ptr_)[idx] = std::int8_t(0x81);
+      break;
+    }
+    case 0x02u:
+    {
+      for ( ; idx < end; ++str)
+      {
+        if (*str == '.') ((std::int16_t*)val_ptr_)[idx++] = std::int16_t(0x8000), ++str;
+        else ((std::int16_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str != ',') break;
+      }
+
+      for ( ; idx < end; ++idx)
+        ((std::int16_t*)val_ptr_)[idx] = std::int16_t(0x8001);
+      break;
+    }
+    case 0x03u:
+    {
+      for ( ; idx < end; ++str)
+      {
+        if (*str == '.') ((std::int32_t*)val_ptr_)[idx++] = std::int32_t(0x80000000), ++str;
+        else ((std::int32_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str != ',') break;
+      }
+
+      for ( ; idx < end; ++idx)
+        ((std::int32_t*)val_ptr_)[idx] = std::int32_t(0x80000001);
+      break;
+    }
+    case 0x04u:
+    {
+      for ( ; idx < end; ++str)
+      {
+        if (*str == '.') ((std::int64_t*)val_ptr_)[idx++] = std::int64_t(0x8000000000000000), ++str;
+        else ((std::int64_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str != ',') break;
+      }
+
+      for ( ; idx < end; ++idx)
+        ((std::int64_t*)val_ptr_)[idx] = std::int64_t(0x8000000000000001);
+      break;
+    }
+    case 0x05u:
+    {
+      for ( ; idx < end; ++str)
+      {
+        if (*str == '.') ((float*)val_ptr_)[idx++] = missing_value<float>(), ++str;
+        else ((float*)val_ptr_)[idx++] = std::strtof(str, &str);
+        if (*str != ',') break;
+      }
+
+      for ( ; idx < end; ++idx)
+        ((float*)val_ptr_)[idx] = end_of_vector_value<float>();
+      break;
+    }
+    case 0x07u:
+    {
+      for ( ; *str > '\r' && *str != ':'; ++str)
+      {
+        ((char*)val_ptr_)[idx++] = *str;
+      }
+
+      for ( ; idx < end; ++idx)
+        ((char*)val_ptr_)[idx] = '\0';
+      break;
+    }
+    default:
+      return; // TODO: Maybe return false
+
+    }
+  }
+
+  inline
+  void typed_value::deserialize_vcf2_gt(std::size_t idx, std::size_t length, char*& str, typed_value* ph_value)
+  {
+    assert(!off_ptr_ && idx < size_);
+
+    std::size_t end = idx + length;
+    assert(length);
+    std::size_t ph_idx = idx / length * (length - 1);
+
+    switch (val_type_)
+    {
+    case 0x01u:
+    {
+      for ( ; idx < end; ++str)
+      {
+        if (*str == '.') ((std::int8_t*)val_ptr_)[idx++] = std::int8_t(0x80), ++str;
+        else ((std::int8_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '/')
+        {
+          if (ph_value) ph_value->val_ptr_[ph_idx++] = 0;
+        }
+        else if(*str == '|')
+        {
+          if (ph_value) ph_value->val_ptr_[ph_idx++] = 1;
+        }
+        else
+          break;
+      }
+
+      for ( ; idx < end; ++idx)
+        ((std::int8_t*)val_ptr_)[idx] = std::int8_t(0x81);
+      break;
+    }
+    case 0x02u:
+    {
+      for ( ; idx < end; ++str)
+      {
+        if (*str == '.') ((std::int16_t*)val_ptr_)[idx++] = std::int16_t(0x8000), ++str;
+        else ((std::int16_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '/')
+        {
+          if (ph_value) ph_value->val_ptr_[ph_idx++] = 0;
+        }
+        else if(*str == '|')
+        {
+          if (ph_value) ph_value->val_ptr_[ph_idx++] = 1;
+        }
+        else
+          break;
+      }
+
+      for ( ; idx < end; ++idx)
+        ((std::int16_t*)val_ptr_)[idx] = std::int16_t(0x8001);
+    }
+    case 0x03u:
+    {
+      for ( ; idx < end; ++str)
+      {
+        if (*str == '.') ((std::int32_t*)val_ptr_)[idx++] = std::int32_t(0x80000000), ++str;
+        else ((std::int32_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '/')
+        {
+          if (ph_value) ph_value->val_ptr_[ph_idx++] = 0;
+        }
+        else if(*str == '|')
+        {
+          if (ph_value) ph_value->val_ptr_[ph_idx++] = 1;
+        }
+        else
+          break;
+      }
+
+      for ( ; idx < end; ++idx)
+        ((std::int32_t*)val_ptr_)[idx] = std::int32_t(0x80000001);
+      break;
+    }
+    case 0x04u:
+    {
+      for ( ; idx < end; ++str)
+      {
+        if (*str == '.') ((std::int64_t*)val_ptr_)[idx++] = std::int64_t(0x8000000000000000), ++str;
+        else ((std::int64_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '/')
+        {
+          if (ph_value) ph_value->val_ptr_[ph_idx++] = 0;
+        }
+        else if(*str == '|')
+        {
+          if (ph_value) ph_value->val_ptr_[ph_idx++] = 1;
+        }
+        else
+          break;
+      }
+
+      for ( ; idx < end; ++idx)
+        ((std::int64_t*)val_ptr_)[idx] = std::int64_t(0x8000000000000001);
+      break;
+    }
+    case 0x05u:
+    {
+      for ( ; idx < end; ++str)
+      {
+        if (*str == '.') ((float*)val_ptr_)[idx++] = missing_value<float>(), ++str;
+        else ((float*)val_ptr_)[idx++] = std::strtof(str, &str);
+        if (*str == '/')
+        {
+          if (ph_value) ph_value->val_ptr_[ph_idx++] = 0;
+        }
+        else if(*str == '|')
+        {
+          if (ph_value) ph_value->val_ptr_[ph_idx++] = 1;
+        }
+        else
+          break;
       }
 
       for ( ; idx < end; ++idx)
