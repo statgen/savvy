@@ -134,24 +134,26 @@ if(BUILD_SLR_EXAMPLES)
 endif()
 
 install(DIRECTORY include/savvy COMPONENT api DESTINATION include)
-install(TARGETS savvy COMPONENT api EXPORT ${PROJECT_NAME}-config
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS savvy COMPONENT api EXPORT ${PROJECT_NAME}-targets)
 
 install(TARGETS sav COMPONENT cli
         RUNTIME DESTINATION bin
         OPTIONAL)
 
-install(EXPORT ${PROJECT_NAME}-config COMPONENT api DESTINATION share/${PROJECT_NAME})
+install(EXPORT ${PROJECT_NAME}-targets COMPONENT api DESTINATION share/${PROJECT_NAME})
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake
+     "include(CMakeFindDependencyMacro)\n"
+     "find_dependency(shrinkwrap REQUIRED)\n"
+     "include(\${CMAKE_CURRENT_LIST_DIR}/${PROJECT_NAME}-targets.cmake)\n")
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPATIBILITY SameMajorVersion)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPONENT api DESTINATION share/${PROJECT_NAME})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake COMPONENT api DESTINATION share/${PROJECT_NAME})
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sav.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_export.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_head.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_import.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_index.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_merge.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_rehead.1 ${CMAKE_CURRENT_BINARY_DIR}/sav_stat-index.1
         COMPONENT cli
         DESTINATION share/man/man1
         OPTIONAL)
 
-export(EXPORT ${PROJECT_NAME}-config)
+export(EXPORT ${PROJECT_NAME}-targets)
 
 #set(CPACK_PACKAGE_NAME "${PROJECT_NAME")
 #set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
