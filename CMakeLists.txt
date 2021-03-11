@@ -117,7 +117,7 @@ if (BUILD_EVAL)
         message(FATAL_ERROR "Error: missing htslib. Run the following from base directory of repo\ncget install https://github.com/samtools/htslib/releases/download/1.6/htslib-1.6.tar.bz2 -DCMAKE_VERBOSE_MAKEFILE=1 --cmake dep/htslib.cmake")
     endif()
     add_executable(sav-eval src/eval/main.cpp)
-    target_link_libraries(sav-eval savvy ${HTS_LIBRARY})
+    target_link_libraries(sav-eval savvy ${HTS_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
 
 #    add_executable(columnar-eval src/eval/columnar_main.cpp)
 #    target_link_libraries(columnar-eval savvy)
