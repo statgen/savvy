@@ -102,7 +102,7 @@ while (f.read(var))
 #include <savvy/writer.hpp>
 
 savvy::reader in("in.sav");
-savvy::writer out("out.bcf", savvy::fmt::bcf, in.headers(), in.samples());
+savvy::writer out("out.bcf", savvy::file::format::bcf, in.headers(), in.samples());
 savvy::variant var;
 while (in >> var)
   out << var;
@@ -123,7 +123,7 @@ std::vector<std::pair<std::string, std::string>> headers = {
   {"FORMAT", "<ID=GT,Type=Integer,Description=\"Genotype\">"} 
 };
 
-savvy::writer out("out.sav", savvy::fmt::sav2, headers, sample_ids);
+savvy::writer out("out.sav", savvy::file::format::sav2, headers, sample_ids);
 
 std::vector<int8_t> geno = {0,0,1,0,0,1};
 
