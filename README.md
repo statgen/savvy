@@ -125,7 +125,7 @@ std::vector<std::pair<std::string, std::string>> headers = {
 
 savvy::writer out("out.sav", savvy::file::format::sav2, headers, sample_ids);
 
-std::vector<int8_t> geno = {0,0,1,0,0,1};
+std::vector<std::int8_t> geno = {0,0,1,0,0,1};
 
 savvy::variant var("chr1", 10000000, "A", {"AC"}); // chrom, pos, ref, alts
 var.set_info("AC", std::count(geno.begin(), geno.end(), 1));
