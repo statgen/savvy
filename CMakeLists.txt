@@ -133,6 +133,14 @@ if(BUILD_SLR_EXAMPLES)
     target_link_libraries(linreg-ttest savvy ${OPENCL_LIB})
 endif()
 
+if(BUILD_SPARSE_REGRESSION)
+    set(CMAKE_CXX_STANDARD 17)
+    include(CMakeFindDependencyMacro)
+    find_package(xtensor-blas REQUIRED)
+    add_executable(sp-reg src/test/sp_reg.cpp)
+    target_link_libraries(sp-reg savvy xtensor-blas)
+endif()
+
 install(DIRECTORY include/savvy COMPONENT api DESTINATION include)
 install(TARGETS savvy COMPONENT api EXPORT ${PROJECT_NAME}-targets)
 
