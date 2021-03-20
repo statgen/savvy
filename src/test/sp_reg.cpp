@@ -48,6 +48,7 @@ private:
   std::string geno_path_;
   std::string pheno_path_;
   std::string output_path_ = "/dev/stdout";
+  bool logit_ = false;
   bool help_ = false;
 public:
   prog_args() :
@@ -56,6 +57,7 @@ public:
         {"cov", required_argument, 0, 'c'},
         {"help", no_argument, 0, 'h'},
         {"id", required_argument, 0, 'i'},
+        {"logit", no_argument, 0, 'b'},
         {"output", required_argument, 0, 'o'},
         {"pheno", required_argument, 0, 'p'},
         {0, 0, 0, 0}
@@ -69,6 +71,7 @@ public:
   const std::string& geno_path() const { return geno_path_; }
   const std::string& pheno_path() const { return pheno_path_; }
   const std::string& output_path() const { return output_path_; }
+  bool logit_enabled() const { return logit_; }
   bool help_is_set() const { return help_; }
 
   void print_usage(std::ostream& os)
@@ -78,6 +81,7 @@ public:
     os << " -c, --cov     Comma separated list of covariate columns\n";
     os << " -h, --help    Print usage\n";
     os << " -i, --id      Sample ID column\n";
+    os << " -b, --logit   Enable logistic model\n";
     os << " -o, --output  Output path (default: appends index to SAV file)\n";
     os << " -p, --pheno   Phenotype column\n";
     os << std::flush;
@@ -87,11 +91,14 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "hcop:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "bhc:o:p:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
       {
+      case 'b':
+        logit_ = true;
+        break;
       case 'h':
         help_ = true;
         return true;
@@ -190,7 +197,7 @@ int test_xtensor()
   return 0;
 }
 
-typedef float scalar_type;
+typedef double scalar_type;
 
 struct phenotype_file_data
 {
@@ -303,14 +310,52 @@ auto parse_pheno_file(const prog_args& args, phenotype_file_data& dest)
 typedef xt::xarray<scalar_type> residuals_type;
 
 template <typename T, typename T2>
-residuals_type compute_residuals(T& y, T2& x)
+residuals_type compute_residuals(const T& y, const T2& x)
 {
   using namespace xt;
   using namespace xt::linalg;
   auto a = dot(transpose(x), x);
+  std::cerr << a << std::endl;
   auto b = pinv(a);
+  std::cerr << "END A ------------------------------" << std::endl;
+  std::cerr << b << std::endl;
+  std::cerr << "END B ------------------------------" << std::endl;
+  auto c = dot(b, transpose(x));
+  std::cerr << c << std::endl;
   auto pbetas = dot(dot(pinv(dot(transpose(x), x)), transpose(x)), y);
+  std::cerr << pbetas << std::endl;
   residuals_type residuals = y - dot(x, pbetas);
+  std::cerr << "sum(y): " << sum(y) << std::endl;
+  return residuals;
+}
+
+template <typename T, typename T2>
+residuals_type compute_residuals_logit(const T& y, const T2& x)
+{
+  using namespace xt;
+  using namespace xt::linalg;
+  const scalar_type epsilon = 0.00001;
+
+  T y2 = xt::maximum(epsilon, xt::minimum(y, 1. - epsilon));
+  T div_y = xt::operator/(1., y2);
+  T logit_y = -xt::log(1. / y2 - 1.);
+
+  auto a = dot(transpose(x), x);
+  std::cerr << a << std::endl;
+  auto b = pinv(a);
+  std::cerr << "END A ------------------------------" << std::endl;
+  std::cerr << b << std::endl;
+  std::cerr << "END B ------------------------------" << std::endl;
+  auto c = dot(b, transpose(x));
+  std::cerr << c << std::endl;
+  auto pbetas = dot(dot(pinv(dot(transpose(x), x)), transpose(x)), logit_y);
+  std::cerr << pbetas << std::endl;
+  auto xw = dot(x, pbetas);
+  T y_hat = 1. / (1. + xt::exp(-xw));
+  residuals_type residuals = y - y_hat;
+  scalar_type se = xt::mean(residuals * residuals)();
+
+  std::cerr << "sum(y): " << sum(y) << std::endl;
   return residuals;
 }
 
@@ -563,7 +608,7 @@ int main(int argc, char** argv)
 //  auto xresp_data = xt::adapt(response_data, {response_data.size()});
 //  auto xcov_data = xt::adapt(covariate_data, {std::size_t(covariate_data.size() / 2), std::size_t(2)});
   //residuals_type res = compute_residuals(xt::adapt(response_data, {response_data.size()}), xt::adapt(covariate_data, {std::size_t(covariate_data.size() / 2), std::size_t(cov_fields.size())}));
-  residuals_type res = compute_residuals(xresp, xcov);
+  residuals_type res = args.logit_enabled() ? compute_residuals_logit(xresp, xcov) : compute_residuals(xresp, xcov);
   std::cerr << res << std::endl;
   std::vector<scalar_type> res_std(res.begin(), res.end());
   scalar_type res_sum = std::accumulate(res_std.begin(), res_std.end(), scalar_type());
@@ -572,7 +617,7 @@ int main(int argc, char** argv)
 
 
 
-  std::size_t n_samples = geno_file.samples().size();
+  //std::size_t n_samples = geno_file.samples().size();
 
   std::ofstream output_file(args.output_path(), std::ios::binary);
 
@@ -583,6 +628,7 @@ int main(int argc, char** argv)
   std::vector<scalar_type> dense_geno;
   while (geno_file >> var)
   {
+    std::size_t ploidy = 0;
     bool is_sparse = false;
     bool found = false;
     for (const auto& f : var.format_fields())
@@ -592,7 +638,8 @@ int main(int argc, char** argv)
         found = true;
         is_sparse = !never_sparse && f.second.is_sparse();
         is_sparse ? f.second.get(sparse_geno) : f.second.get(dense_geno);
-        is_sparse ? savvy::stride_reduce(sparse_geno, sparse_geno.size() / n_samples) : savvy::stride_reduce(dense_geno, dense_geno.size() / n_samples);
+        ploidy = is_sparse ? sparse_geno.size() / res_std.size() : dense_geno.size() / res_std.size();
+        is_sparse ? savvy::stride_reduce(sparse_geno, ploidy) : savvy::stride_reduce(dense_geno, ploidy);
         break;
       }
     }
@@ -603,12 +650,14 @@ int main(int argc, char** argv)
       continue;
     }
 
+    assert(ploidy != 0);
+
     float af = 0;
     std::int64_t ac = 0, an = 0;
     if (var.get_info("AC", ac) && var.get_info("AN", an) && an > 0)
       af = float(ac) / an;
-    else
-      var.get_info("AF", af);
+    else if (!var.get_info("AF", af))
+      af = std::accumulate(dense_geno.begin(), dense_geno.end(), 0.f) / (res_std.size() * ploidy); // TODO: make ac a float
 
 #if 0
     if (is_sparse)
@@ -626,7 +675,8 @@ int main(int argc, char** argv)
     }
 #endif
 
-    auto [beta, se, t, pval] = is_sparse ? linreg_ttest(res_std, sparse_geno, res_sum) : linreg_ttest(res_std, dense_geno, res_sum);
+    float beta, se, t, pval;
+    std::tie(beta, se, t, pval) = is_sparse ? linreg_ttest(res_std, sparse_geno, res_sum) : linreg_ttest(res_std, dense_geno, res_sum);
     output_file << var.chromosome()
         << "\t" << var.position()
         << "\t" << (af > 0.5 ? 1.f - af : af)
