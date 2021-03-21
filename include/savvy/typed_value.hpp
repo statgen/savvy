@@ -1300,7 +1300,7 @@ namespace savvy
         dest = reserved_transformation<T>(*((std::int64_t*) val_ptr_));
         break;
       case 0x05u:
-        dest = *((float*)val_ptr_);
+        dest = *((float*)val_ptr_); // TODO: this needs a reserved_transformation for float to int conversions.
         break;
       default:
         return false;
@@ -1895,6 +1895,7 @@ namespace savvy
 
       if (off_type_)
       {
+        assert(local_data_.data() != off_ptr_);
         local_data_.resize(sizeof(std::uint64_t) * sparse_size_);
         switch (off_type_)
         {
@@ -1921,6 +1922,113 @@ namespace savvy
       }
 
       size_ = subset_size * stride;
+      return ret;
+    }
+
+    struct copy_subset_functor
+    {
+      typed_value& dest_;
+      const std::vector<std::size_t>& subset_map_;
+      std::size_t subset_size_;
+
+      copy_subset_functor(typed_value& destination, const std::vector<std::size_t>& subset_map, std::size_t subset_size) :
+        dest_(destination),
+        subset_map_(subset_map),
+        subset_size_(subset_size)
+      {
+      }
+
+      template <typename ValT, typename OffT>
+      void operator()(const ValT* val_ptr, const ValT* val_end, const OffT* off_ptr, std::size_t sz)
+      {
+        std::size_t sp_sz = val_end - val_ptr;
+        std::size_t stride = sz / subset_map_.size();
+
+        dest_.size_ = subset_size_ * stride;
+        dest_.val_type_ = type_code<ValT>();
+        dest_.off_type_ = type_code<std::int64_t>();
+        //dest_.size_ = subset_size_ * stride;
+        dest_.local_data_.resize(sp_sz * stride * sizeof(std::int64_t) + sp_sz * stride  * sizeof(ValT));
+        dest_.off_ptr_ = dest_.local_data_.data();
+        dest_.val_ptr_ = dest_.local_data_.data() + sp_sz * stride * sizeof(std::uint64_t);
+        ValT* dest_valp = (ValT*)dest_.val_ptr_;
+        std::uint64_t* dest_offp = (std::uint64_t*)dest_.off_ptr_;
+
+        std::size_t last_offset_new = 0;
+        std::size_t total_offset_old = 0;
+        for (std::size_t i = 0; i < sp_sz; ++i,++total_offset_old)
+        {
+          total_offset_old += off_ptr[i];
+          if (subset_map_[total_offset_old / stride] != std::numeric_limits<std::size_t>::max())
+          {
+            std::size_t new_off = subset_map_[total_offset_old / stride] * stride + (total_offset_old % stride);
+            assert(new_off - last_offset_new < subset_map_.size() * stride);
+            *(dest_offp++) = new_off - last_offset_new;
+            *(dest_valp++) = val_ptr[i];
+            last_offset_new = new_off + 1;
+          }
+        }
+
+        dest_.sparse_size_ = dest_valp - (ValT*)dest_.val_ptr_;
+      }
+
+      template <typename T>
+      void operator()(const T* valp, const T* endp)
+      {
+        std::size_t sz = endp - valp;;
+        std::size_t stride = sz / subset_map_.size();
+
+        dest_.val_type_ = type_code<T>();
+        dest_.size_ = subset_size_ * stride;
+        dest_.local_data_.resize(dest_.size_ * sizeof(T));
+        dest_.val_ptr_ = dest_.local_data_.data();
+
+        for (std::size_t i = 0; i < subset_map_.size(); ++i)
+        {
+          if (subset_map_[i] < std::numeric_limits<std::size_t>::max())
+          {
+            for (std::size_t j = 0; j < stride; ++j)
+              ((T*)dest_.val_ptr_)[subset_map_[i] * stride + j] = valp[i * stride + j];
+          }
+        }
+      }
+    };
+
+#if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
+    __attribute((optimize("no-tree-vectorize")))
+#endif
+    bool copy_subset(typed_value& dest, const std::vector<std::size_t>& subset_mask, std::size_t subset_size) const
+    {
+      if (val_type_ == 0x07u)
+      {
+        // TODO: print error message
+        return false;
+      }
+
+      if (size_ < subset_mask.size())
+      {
+        // TODO: print error message
+        return false;
+      }
+
+      if (size_ % subset_mask.size())
+      {
+        // TODO: print error message
+        return false;
+      }
+
+      bool ret = false;
+
+      if (off_type_)
+      {
+        ret = capply_sparse(copy_subset_functor(dest, subset_mask, subset_size), size_);
+      }
+      else if (val_type_)
+      {
+
+        ret = capply_dense(copy_subset_functor(dest, subset_mask, subset_size)); // TODO: handle endianess
+      }
+
       return ret;
     }
 

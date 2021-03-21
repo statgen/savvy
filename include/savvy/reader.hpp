@@ -34,6 +34,7 @@ namespace savvy
       std::unique_ptr<std::istream> input_stream_;
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> ids_;
+      typed_value temp_val_;
 
       std::vector<std::size_t> subset_map_;
       std::size_t subset_size_;
@@ -627,11 +628,19 @@ namespace savvy
         {
           //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
           // Apply sample subset
-          if (subset_size_ != ids_.size())
+          if (subset_size_ != ids_.size()) // TODO: maybe do this after region_compare.
           {
             for (auto it = r.format_fields_.begin(); it != r.format_fields_.end(); ++it)
             {
-              it->second.subset(subset_map_, subset_size_);
+              if (file_format_ == file::format::sav1)
+              {
+                it->second.copy_subset(temp_val_, subset_map_, subset_size_);
+                it->second = std::move(temp_val_); // TODO: use this approach for all file formats.
+              }
+              else
+              {
+                it->second.subset(subset_map_, subset_size_);
+              }
               it->second.minimize(); // TODO: Set not_minimized flag and move minimize routine to writer.
             }
           }
