@@ -310,18 +310,19 @@ auto parse_pheno_file(const prog_args& args, phenotype_file_data& dest)
 typedef xt::xarray<scalar_type> residuals_type;
 
 template <typename T, typename T2>
-residuals_type compute_residuals(const T& y, const T2& x)
+residuals_type compute_residuals(const T& y, const T2& x_orig)
 {
   using namespace xt;
   using namespace xt::linalg;
-  auto a = dot(transpose(x), x);
-  std::cerr << a << std::endl;
-  auto b = pinv(a);
-  std::cerr << "END A ------------------------------" << std::endl;
-  std::cerr << b << std::endl;
-  std::cerr << "END B ------------------------------" << std::endl;
-  auto c = dot(b, transpose(x));
-  std::cerr << c << std::endl;
+  T2 x = concatenate(xtuple(xt::ones<scalar_type>({y.size(), std::size_t(1)}), x_orig), 1);
+//  auto a = dot(transpose(x), x);
+//  std::cerr << a << std::endl;
+//  auto b = pinv(a);
+//  std::cerr << "END A ------------------------------" << std::endl;
+//  std::cerr << b << std::endl;
+//  std::cerr << "END B ------------------------------" << std::endl;
+//  auto c = dot(b, transpose(x));
+//  std::cerr << c << std::endl;
   auto pbetas = dot(dot(pinv(dot(transpose(x), x)), transpose(x)), y);
   std::cerr << pbetas << std::endl;
   residuals_type residuals = y - dot(x, pbetas);
@@ -330,24 +331,26 @@ residuals_type compute_residuals(const T& y, const T2& x)
 }
 
 template <typename T, typename T2>
-residuals_type compute_residuals_logit(const T& y, const T2& x)
+residuals_type compute_residuals_logit(const T& y, const T2& x_orig)
 {
   using namespace xt;
   using namespace xt::linalg;
   const scalar_type epsilon = 0.00001;
 
+  T2 x = concatenate(xtuple(xt::ones<scalar_type>({y.size(), std::size_t(1)}), x_orig), 1);
+
   T y2 = xt::maximum(epsilon, xt::minimum(y, 1. - epsilon));
   T div_y = xt::operator/(1., y2);
   T logit_y = -xt::log(1. / y2 - 1.);
 
-  auto a = dot(transpose(x), x);
-  std::cerr << a << std::endl;
-  auto b = pinv(a);
-  std::cerr << "END A ------------------------------" << std::endl;
-  std::cerr << b << std::endl;
-  std::cerr << "END B ------------------------------" << std::endl;
-  auto c = dot(b, transpose(x));
-  std::cerr << c << std::endl;
+//  auto a = dot(transpose(x), x);
+//  std::cerr << a << std::endl;
+//  auto b = pinv(a);
+//  std::cerr << "END A ------------------------------" << std::endl;
+//  std::cerr << b << std::endl;
+//  std::cerr << "END B ------------------------------" << std::endl;
+//  auto c = dot(b, transpose(x));
+//  std::cerr << c << std::endl;
   auto pbetas = dot(dot(pinv(dot(transpose(x), x)), transpose(x)), logit_y);
   std::cerr << pbetas << std::endl;
   auto xw = dot(x, pbetas);
@@ -575,8 +578,48 @@ bool load_phenotypes(const prog_args& args, savvy::reader& geno_file, xt::xtenso
   return true;
 }
 
+void slope_test()
+{
+  using namespace xt;
+  using namespace xt::linalg;
+
+  xarray<double> x = {1., 2., 3.};
+  x.reshape({3,1});
+  xtensor<double, 1> y = {3.1, 2.9, 3.2};
+  //y.reshape({3,1});
+
+  auto pbetas = dot(dot(pinv(dot(transpose(x), x)), transpose(x)), y);
+  std::cerr << pbetas << std::endl;
+
+  xtensor<double, 2> dmat = xt::concatenate(xtuple(xt::ones<double>({3, 1}), x), 1);
+  std::cerr << dmat << std::endl;
+  xarray<double> i = pinv(dot(transpose(dmat), dmat));
+  auto pbetas2 = dot(dot(i, transpose(dmat)), y);
+  std::cerr << pbetas2 << std::endl;
+
+  //-----------------------//
+  const std::size_t n = x.size();
+  const double s_x     = std::accumulate(x.begin(), x.end(), 0.0);
+  const double s_y     = std::accumulate(y.begin(), y.end(), 0.0);
+  const double s_xx    = std::inner_product(x.begin(), x.end(), x.begin(), 0.0);
+  const double s_xy    = std::inner_product(x.begin(), x.end(), y.begin(), 0.0);
+  const double m       = (n * s_xy - s_x * s_y) / (n * s_xx - s_x * s_x);
+
+  const double b       = (s_y - m * s_x) / n;
+  std::cerr << b << " , " << m << std::endl;
+  auto fx              = [m,b](double x) { return m * x + b; };
+  double se_line       = 0.0f; for (std::size_t i = 0; i < n; ++i) se_line += ::square(y[i] - fx(x[i]));
+  const double x_mean  = s_x / n;
+  double se_x_mean     = 0.0f; for (std::size_t i = 0; i < n; ++i) se_x_mean += ::square(x[i] - x_mean);
+  const double dof     = n - 2;
+  const double std_err = std::sqrt(se_line / dof) / std::sqrt(se_x_mean);
+  float t = m / std_err;
+
+}
+
 int main(int argc, char** argv)
 {
+  //slope_test();
   //return test_xtensor();
   prog_args args;
   if (!args.parse(argc, argv))
@@ -652,12 +695,12 @@ int main(int argc, char** argv)
 
     assert(ploidy != 0);
 
-    float af = 0;
-    std::int64_t ac = 0, an = 0;
+    float ac = 0.f, af = 0.f;
+    std::int64_t an = 0;
     if (var.get_info("AC", ac) && var.get_info("AN", an) && an > 0)
       af = float(ac) / an;
     else if (!var.get_info("AF", af))
-      af = std::accumulate(dense_geno.begin(), dense_geno.end(), 0.f) / (res_std.size() * ploidy); // TODO: make ac a float
+      af = std::accumulate(dense_geno.begin(), dense_geno.end(), 0.f) / (res_std.size() * ploidy);
 
 #if 0
     if (is_sparse)
