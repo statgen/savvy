@@ -113,13 +113,13 @@ public:
 
   void print_usage(std::ostream& os)
   {
-    os << "Usage: sav index [opts ...] <in.sav> \n";
+    os << "Usage: sp-reg [opts ...] <geno_file> <pheno_file> \n";
     os << "\n";
     os << " -c, --cov     Comma separated list of covariate columns\n";
     os << " -h, --help    Print usage\n";
-    os << " -i, --id      Sample ID column\n";
+    os << " -i, --id      Sample ID column (defaults to first column)\n";
     os << " -b, --logit   Enable logistic model\n";
-    os << " -o, --output  Output path (default: appends index to SAV file)\n";
+    os << " -o, --output  Output path (default: /dev/stdout)\n";
     os << " -p, --pheno   Phenotype column\n";
     os << " -r, --region  Genomic region to test (chrom:beg-end)\n";
     os << std::flush;
