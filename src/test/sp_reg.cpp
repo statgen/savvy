@@ -38,6 +38,40 @@ std::vector<std::string> split_string_to_vector(const char* in, char delim)
   return ret;
 }
 
+savvy::genomic_region string_to_region(const std::string& s)
+{
+  const std::size_t colon_pos = s.find(':');
+  if (colon_pos == std::string::npos)
+  {
+    return savvy::genomic_region(s);
+  }
+  else
+  {
+    std::string chr = s.substr(0, colon_pos);
+    const std::size_t hyphen_pos = s.find('-', colon_pos + 1);
+    if (hyphen_pos == std::string::npos)
+    {
+      std::string slocus = s.substr(colon_pos + 1);
+      std::uint64_t ilocus = std::uint64_t(std::atoll(slocus.c_str()));
+      return savvy::genomic_region(chr, ilocus, ilocus);
+    }
+    else
+    {
+      std::string sbeg = s.substr(colon_pos + 1, hyphen_pos - chr.size() - 1);
+      std::string send = s.substr(hyphen_pos + 1);
+      if (send.empty())
+      {
+        return savvy::genomic_region(chr, std::uint64_t(std::atoll(sbeg.c_str())));
+      }
+      else
+      {
+        return savvy::genomic_region(chr, std::uint64_t(std::atoll(sbeg.c_str())), std::uint64_t(std::atoll(send.c_str())));
+      }
+    }
+  }
+
+}
+
 class prog_args
 {
 private:
@@ -48,6 +82,7 @@ private:
   std::string geno_path_;
   std::string pheno_path_;
   std::string output_path_ = "/dev/stdout";
+  std::unique_ptr<savvy::genomic_region> region_;
   bool logit_ = false;
   bool help_ = false;
 public:
@@ -60,6 +95,7 @@ public:
         {"logit", no_argument, 0, 'b'},
         {"output", required_argument, 0, 'o'},
         {"pheno", required_argument, 0, 'p'},
+        {"region", required_argument, 0, 'r'},
         {0, 0, 0, 0}
       })
   {
@@ -71,6 +107,7 @@ public:
   const std::string& geno_path() const { return geno_path_; }
   const std::string& pheno_path() const { return pheno_path_; }
   const std::string& output_path() const { return output_path_; }
+  const std::unique_ptr<savvy::genomic_region>& region() const { return region_; }
   bool logit_enabled() const { return logit_; }
   bool help_is_set() const { return help_; }
 
@@ -84,6 +121,7 @@ public:
     os << " -b, --logit   Enable logistic model\n";
     os << " -o, --output  Output path (default: appends index to SAV file)\n";
     os << " -p, --pheno   Phenotype column\n";
+    os << " -r, --region  Genomic region to test (chrom:beg-end)\n";
     os << std::flush;
   }
 
@@ -91,7 +129,7 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "bhc:o:p:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "bhc:o:p:r:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -110,6 +148,9 @@ public:
         break;
       case 'p':
         phenotype_field_ = optarg ? optarg : "";
+        break;
+      case 'r':
+        region_.reset(new savvy::genomic_region(string_to_region(optarg ? optarg : "")));
         break;
       default:
         return false;
@@ -641,6 +682,10 @@ int main(int argc, char** argv)
   if (!geno_file)
     return std::cerr << "Could not open geno file\n", EXIT_FAILURE;
 
+  if (args.region() && !geno_file.reset_bounds(*args.region()))
+    return std::cerr << "Could not open genomic region\n", EXIT_FAILURE;
+
+
   xt::xtensor<scalar_type, 1> xresp;
   xt::xtensor<scalar_type, 2> xcov;
   if (!load_phenotypes(args, geno_file, xresp, xcov))
@@ -697,10 +742,23 @@ int main(int argc, char** argv)
 
     float ac = 0.f, af = 0.f;
     std::int64_t an = 0;
+    // For now, we are pulling from INFO fields but will likely always compute AC (along with case/ctrl AC) in the future.
     if (var.get_info("AC", ac) && var.get_info("AN", an) && an > 0)
+    {
       af = float(ac) / an;
+    }
     else if (!var.get_info("AF", af))
-      af = std::accumulate(dense_geno.begin(), dense_geno.end(), 0.f) / (res_std.size() * ploidy);
+    {
+      // For computing ac and af we use AN of sample subset.
+      an = (res_std.size() * ploidy);
+      ac = is_sparse ? std::accumulate(sparse_geno.begin(), sparse_geno.end(), 0.f) : std::accumulate(dense_geno.begin(), dense_geno.end(), 0.f);
+      af = ac / an;
+    }
+    else
+    {
+      an = (geno_file.samples().size() * ploidy);
+      ac = af * an;
+    }
 
 #if 0
     if (is_sparse)
