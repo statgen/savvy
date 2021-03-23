@@ -98,7 +98,7 @@ public:
         {"id", required_argument, 0, 'i'},
         {"logit", no_argument, 0, 'b'},
         {"min-mac", required_argument, 0, '\x02'},
-        {"no-sparse", required_argument, 0, '\x01'},
+        {"no-sparse", no_argument, 0, '\x01'},
         {"output", required_argument, 0, 'o'},
         {"pheno", required_argument, 0, 'p'},
         {"region", required_argument, 0, 'r'},
