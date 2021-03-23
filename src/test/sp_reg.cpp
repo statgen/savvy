@@ -83,6 +83,7 @@ private:
   std::string pheno_path_;
   std::string output_path_ = "/dev/stdout";
   std::unique_ptr<savvy::genomic_region> region_;
+  double min_mac_ = 1.0;
   bool logit_ = false;
   bool help_ = false;
 public:
@@ -93,6 +94,7 @@ public:
         {"help", no_argument, 0, 'h'},
         {"id", required_argument, 0, 'i'},
         {"logit", no_argument, 0, 'b'},
+        {"min-mac", required_argument, 0, '\x02'},
         {"output", required_argument, 0, 'o'},
         {"pheno", required_argument, 0, 'p'},
         {"region", required_argument, 0, 'r'},
@@ -108,6 +110,7 @@ public:
   const std::string& pheno_path() const { return pheno_path_; }
   const std::string& output_path() const { return output_path_; }
   const std::unique_ptr<savvy::genomic_region>& region() const { return region_; }
+  double min_mac() const { return min_mac_; }
   bool logit_enabled() const { return logit_; }
   bool help_is_set() const { return help_; }
 
@@ -115,13 +118,14 @@ public:
   {
     os << "Usage: sp-reg [opts ...] <geno_file> <pheno_file> \n";
     os << "\n";
-    os << " -c, --cov     Comma separated list of covariate columns\n";
-    os << " -h, --help    Print usage\n";
-    os << " -i, --id      Sample ID column (defaults to first column)\n";
-    os << " -b, --logit   Enable logistic model\n";
-    os << " -o, --output  Output path (default: /dev/stdout)\n";
-    os << " -p, --pheno   Phenotype column\n";
-    os << " -r, --region  Genomic region to test (chrom:beg-end)\n";
+    os << " -c, --cov      Comma separated list of covariate columns\n";
+    os << " -h, --help     Print usage\n";
+    os << " -i, --id       Sample ID column (defaults to first column)\n";
+    os << " -b, --logit    Enable logistic model\n";
+    os << " -o, --output   Output path (default: /dev/stdout)\n";
+    os << " -p, --pheno    Phenotype column\n";
+    os << " -r, --region   Genomic region to test (chrom:beg-end)\n";
+    os << "     --min-mac  Minimum minor allele count (default: 1)\n";
     os << std::flush;
   }
 
@@ -129,11 +133,17 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "bhc:o:p:r:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "\x02:bhc:o:p:r:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
       {
+      case '\x02':
+        if (std::string("min-mac") == long_options_[long_index].name)
+        {
+          min_mac_ = std::atof(optarg ? optarg : "");
+        }
+        break;
       case 'b':
         logit_ = true;
         break;
@@ -460,11 +470,11 @@ auto linreg_ttest(const std::vector<scalar_type>& y, const std::vector<scalar_ty
     se_x_mean += square(x[i] - x_mean);
   }
 
-  const scalar_type dof     = n - 2;
+  const scalar_type dof     = n - 1;
   const scalar_type std_err = std::sqrt(se_line / dof) / std::sqrt(se_x_mean);
   scalar_type t = m / std_err;
   //boost::math::students_t_distribution<float> dist(dof);
-  scalar_type pval =  tcdf(t, n - 1); //cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
+  scalar_type pval =  tcdf(t, dof); //cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
 
   return std::make_tuple(m, std_err, t, pval); // slope, std error, t statistic, p value
 }
@@ -528,16 +538,14 @@ auto linreg_ttest(const std::vector<scalar_type>& y, const savvy::compressed_vec
   float se_x_mean{};
 
   const scalar_type f_of_zero = fx(0.0f);
-//  const auto x_idx_beg = x.index_data();
-//  const auto x_idx_end = x.index_data() + x.non_zero_size();
+
   std::size_t i = 0;
-  for (auto it = x.begin(); it != x.end(); ++i) // TODO: this loop could be better. se_line should start with (y[i] - slope)^2 * n. Then subtract at non-zero x positins.
+  for (auto it = x.begin(); it != x.end(); ++i)
   {
     if (i == it.offset())
     {
-      scalar_type x_val = *it;
-      se_line += square(y[i] - fx(x_val));
-      se_x_mean += square(x_val - x_mean);
+      se_line += square(y[i] - fx(*it));
+      se_x_mean += square(*it - x_mean);
       ++it;
     }
     else
@@ -551,13 +559,13 @@ auto linreg_ttest(const std::vector<scalar_type>& y, const savvy::compressed_vec
     se_line += square(y[i] - f_of_zero);
   }
 
-  se_x_mean += (square(0.0f - x_mean) * float(n - x.non_zero_size()));
+  se_x_mean += (square(0.0f - x_mean) * scalar_type(n - x.non_zero_size()));
 
-  const scalar_type dof     = n - 2;
+  const scalar_type dof = n - 1;
   const scalar_type std_err = std::sqrt(se_line / dof) / std::sqrt(se_x_mean);
   scalar_type t = m / std_err;
   //std::students_t_distribution<float> dist(dof);
-  scalar_type pval = tcdf(t, n - 1); //cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
+  scalar_type pval = tcdf(t, dof); //cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
   /*
   beta = ((c+1)*sxy-sx*sy)/((c+1)*sxx-sx*sx);
   varE = 1/(c+1.)/(c-1.)*((c+1)*syy-sy*sy-beta*beta*((c+1)*sxx-sx*sx));
@@ -760,6 +768,11 @@ int main(int argc, char** argv)
       ac = af * an;
     }
 
+    float mac = (ac > (an/2) ? an - ac : ac);
+    float maf = (af > 0.5 ? 1.f - af : af);
+
+    if (mac < args.min_mac()) continue;
+
 #if 0
     if (is_sparse)
     {
@@ -780,8 +793,8 @@ int main(int argc, char** argv)
     std::tie(beta, se, t, pval) = is_sparse ? linreg_ttest(res_std, sparse_geno, res_sum) : linreg_ttest(res_std, dense_geno, res_sum);
     output_file << var.chromosome()
         << "\t" << var.position()
-        << "\t" << (af > 0.5 ? 1.f - af : af)
-        << "\t" << (ac > (an/2) ? an - ac : ac)
+        << "\t" << maf
+        << "\t" << mac
         << "\t" << beta
         << "\t" << se
         << "\t" << t
