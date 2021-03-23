@@ -82,6 +82,7 @@ private:
   std::string geno_path_;
   std::string pheno_path_;
   std::string output_path_ = "/dev/stdout";
+  std::string fmt_field_ = "";
   std::unique_ptr<savvy::genomic_region> region_;
   double min_mac_ = 1.0;
   bool sparse_ = true;
@@ -92,6 +93,7 @@ public:
     long_options_(
       {
         {"cov", required_argument, 0, 'c'},
+        {"fmt-field", required_argument, 0, '\x02'},
         {"help", no_argument, 0, 'h'},
         {"id", required_argument, 0, 'i'},
         {"logit", no_argument, 0, 'b'},
@@ -111,6 +113,7 @@ public:
   const std::string& geno_path() const { return geno_path_; }
   const std::string& pheno_path() const { return pheno_path_; }
   const std::string& output_path() const { return output_path_; }
+  const std::string& fmt_field() const { return fmt_field_; }
   const std::unique_ptr<savvy::genomic_region>& region() const { return region_; }
   double min_mac() const { return min_mac_; }
   bool sparse_enabled() { return sparse_; }
@@ -130,6 +133,7 @@ public:
     os << " -r, --region     Genomic region to test (chrom:beg-end)\n";
     os << "     --min-mac    Minimum minor allele count (default: 1)\n";
     os << "     --no-sparse  Disables sparse optimizations\n";
+    os << "     --fmt-field  Format field to use (DS, HDS, or GT)\n";
     os << std::flush;
   }
 
@@ -152,6 +156,12 @@ public:
         if (std::string("min-mac") == long_options_[long_index].name)
         {
           min_mac_ = std::atof(optarg ? optarg : "");
+        }
+        else if (std::string("fmt-field") == long_options_[long_index].name)
+        {
+          fmt_field_ = optarg ? optarg : "";
+          if (fmt_field_ != "DS" && fmt_field_ != "HDS" && fmt_field_ != "GT")
+            return std::cerr << "Error: --fmt-field must be DS, HDS, or GT\n", false;
         }
         break;
       case 'b':
@@ -705,6 +715,26 @@ int main(int argc, char** argv)
   if (args.region() && !geno_file.reset_bounds(*args.region()))
     return std::cerr << "Could not open genomic region\n", EXIT_FAILURE;
 
+  std::string format_field = args.fmt_field();
+  std::unordered_set<std::string> fmt_avail;
+
+  for (const auto& h : geno_file.format_headers())
+    fmt_avail.insert(h.id);
+
+  if (format_field.empty())
+  {
+    if (fmt_avail.find("DS") != fmt_avail.end()) format_field = "DS";
+    else if (fmt_avail.find("HDS") != fmt_avail.end()) format_field = "HDS";
+    else if (fmt_avail.find("GT") != fmt_avail.end()) format_field = "GT";
+    else return std::cerr << "Error: file must contain DS, HDS, or GT format fields\n", EXIT_FAILURE;
+    std::cerr << "Notice: --fmt-field not specified so auto selecting " << format_field << std::endl;
+  }
+  else
+  {
+    if (fmt_avail.find(format_field) == fmt_avail.end())
+      return std::cerr << "Error: requested format field (" << format_field << ") not found in file headers\n", EXIT_FAILURE;
+  }
+
 
   xt::xtensor<scalar_type, 1> xresp;
   xt::xtensor<scalar_type, 2> xcov;
@@ -737,7 +767,7 @@ int main(int argc, char** argv)
     bool found = false;
     for (const auto& f : var.format_fields())
     {
-      if (f.first == "HDS")
+      if (f.first == format_field)
       {
         found = true;
         is_sparse = args.sparse_enabled() && f.second.is_sparse();
