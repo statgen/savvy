@@ -247,7 +247,9 @@ int test_xtensor()
     psos_res += e*e;
 
   {
-    auto [solution, sos_residuals, rank, s] = lstsq(x, y); // xt::transpose(y));
+    //auto [solution, sos_residuals, rank, s] = lstsq(x, y); // xt::transpose(y));
+    xarray<double> solution, sos_residuals, rank, s;
+    std::tie(solution, sos_residuals, rank, s) = lstsq(x, y);
     double sos_res2 = sos_residuals[0];
 
     std::cerr << solution << std::endl;
