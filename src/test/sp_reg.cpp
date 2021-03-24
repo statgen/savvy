@@ -492,10 +492,10 @@ auto linreg_ttest(const std::vector<scalar_type>& y, const std::vector<scalar_ty
     se_x_mean += square(x[i] - x_mean);
   }
 
-  const scalar_type dof     = n - 1;
+  const scalar_type dof     = n - 2;
   const scalar_type std_err = std::sqrt(se_line / dof) / std::sqrt(se_x_mean);
   scalar_type t = m / std_err;
-  //boost::math::students_t_distribution<float> dist(dof);
+  //boost::math::students_t_distribution<scalar-type> dist(dof);
   scalar_type pval =  tcdf(t, dof); //cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
 
   return std::make_tuple(m, std_err, t, pval); // slope, std error, t statistic, p value
@@ -531,7 +531,7 @@ auto sp_lin_reg_old(const std::vector<float>& y, const savvy::compressed_vector<
 }
 #endif
 
-auto linreg_ttest(const std::vector<scalar_type>& y, const savvy::compressed_vector<scalar_type>& x, const scalar_type s_y)
+auto linreg_ttest(const std::vector<scalar_type>& y, const savvy::compressed_vector<scalar_type>& x, const scalar_type& s_y, const scalar_type& s_yy)
 {
   assert(y.size() == x.size());
   const std::size_t n = x.size();
@@ -552,52 +552,73 @@ auto linreg_ttest(const std::vector<scalar_type>& y, const savvy::compressed_vec
 
   //const float s_y     = std::accumulate(y.begin(), y.end(), 0.0f);
   const scalar_type m       = (n * s_xy - s_x * s_y) / (n * s_xx - s_x * s_x);
-  const scalar_type b       = (s_y - m * s_x) / n;
-  auto fx             = [m,b](scalar_type x) { return m * x + b; };
   const scalar_type x_mean  = s_x / n;
 
-  float se_line{};
   float se_x_mean{};
 
-  const scalar_type f_of_zero = fx(0.0f);
-
-  std::size_t i = 0;
-  for (auto it = x.begin(); it != x.end(); ++i)
+  if (false)
   {
-    if (i == it.offset())
+    const scalar_type b       = (s_y - m * s_x) / n;
+    auto fx             = [m,b](scalar_type x) { return m * x + b; };
+    const scalar_type f_of_zero = fx(0.0f);
+
+    float se_line{};
+    std::size_t i = 0;
+    for (auto it = x.begin(); it != x.end(); ++i)
     {
-      se_line += square(y[i] - fx(*it));
-      se_x_mean += square(*it - x_mean);
-      ++it;
+      if (i == it.offset())
+      {
+        se_line += square(y[i] - fx(*it));
+        se_x_mean += square(*it - x_mean);
+        ++it;
+      }
+      else
+      {
+        se_line += square(y[i] - f_of_zero);
+      }
     }
-    else
+
+    for ( ; i < n; ++i)
     {
       se_line += square(y[i] - f_of_zero);
     }
-  }
 
-  for ( ; i < n; ++i)
+    se_x_mean += (square(0.0f - x_mean) * scalar_type(n - x.non_zero_size()));
+
+    const scalar_type dof = n - 2;
+    const scalar_type std_err = std::sqrt(se_line / dof) / std::sqrt(se_x_mean);
+    scalar_type t = m / std_err;
+    //std::students_t_distribution<float> dist(dof);
+    scalar_type pval = tcdf(t, dof); //cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
+    /*
+    beta = ((c+1)*sxy-sx*sy)/((c+1)*sxx-sx*sx);
+    varE = 1/(c+1.)/(c-1.)*((c+1)*syy-sy*sy-beta*beta*((c+1)*sxx-sx*sx));
+    sebeta = sqrt((c+1)*varE/((c+1)*sxx-sx*sx));
+    r = ((c+1)*sxy-sx*sy)/sqrt(((c+1)*sxx-sx*sx)*((c+1)*syy-sy*sy));
+    t = r * sqrt((c-1)/(1-r*r+pEmmaxHelper::ZEPS));
+    pval = pEmmaxHelper::tcdf(t, c-1);
+    */
+
+    return std::make_tuple(m, std_err, t, pval); // slope, std error, t statistic, p value
+  }
+  else
   {
-    se_line += square(y[i] - f_of_zero);
+    for (auto it = x.begin(); it != x.end(); ++it)
+    {
+      se_x_mean += square(*it - x_mean);
+    }
+
+    se_x_mean += (square(0.0f - x_mean) * scalar_type(n - x.non_zero_size()));
+    double se2 = 1./(n*(n-2)) * (n*s_yy - s_y*s_y - square(m)*(n*s_xx - square(s_x)));
+
+    const scalar_type dof = n - 2;
+    const scalar_type std_err = std::sqrt(se2) / std::sqrt(se_x_mean);
+    scalar_type t = m / std_err;
+    //std::students_t_distribution<float> dist(dof);
+    scalar_type pval = tcdf(t, dof); //cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
+
+    return std::make_tuple(m, std_err, t, pval); // slope, std error, t statistic, p value
   }
-
-  se_x_mean += (square(0.0f - x_mean) * scalar_type(n - x.non_zero_size()));
-
-  const scalar_type dof = n - 1;
-  const scalar_type std_err = std::sqrt(se_line / dof) / std::sqrt(se_x_mean);
-  scalar_type t = m / std_err;
-  //std::students_t_distribution<float> dist(dof);
-  scalar_type pval = tcdf(t, dof); //cdf(complement(dist, std::fabs(std::isnan(t) ? 0 : t))) * 2;
-  /*
-  beta = ((c+1)*sxy-sx*sy)/((c+1)*sxx-sx*sx);
-  varE = 1/(c+1.)/(c-1.)*((c+1)*syy-sy*sy-beta*beta*((c+1)*sxx-sx*sx));
-  sebeta = sqrt((c+1)*varE/((c+1)*sxx-sx*sx));
-  r = ((c+1)*sxy-sx*sy)/sqrt(((c+1)*sxx-sx*sx)*((c+1)*syy-sy*sy));
-  t = r * sqrt((c-1)/(1-r*r+pEmmaxHelper::ZEPS));
-  pval = pEmmaxHelper::tcdf(t, c-1);
-  */
-
-  return std::make_tuple(m, std_err, t, pval); // slope, std error, t statistic, p value
 }
 
 //void lin_reg(const residuals_type& y, const std::vector<scalar_type>& x)
@@ -688,8 +709,42 @@ void slope_test()
 
 }
 
+void test()
+{
+  // Example from https://en.wikipedia.org/wiki/Simple_linear_regression#Numerical_example
+  std::vector<double> x = {1.47, 1.50, 1.52, 1.55, 1.57, 1.60, 1.63, 1.65, 1.68, 1.70, 1.73, 1.75, 1.78, 1.80, 1.83};
+//  std::vector<double> y = {52.21, 53.12, 54.48, 55.84, 57.20, 58.57, 59.93, 61.29, 63.11, 64.47, 66.28, 68.10, 69.92, 72.19, 74.46};
+  std::vector<double> y = {52.21, 53.12, 54.48, 55.84, 57.20, 58.57, 29.93, 61.29, 163.11, 164.47, 66.28, 68.10, 69.92, 72.19, 74.46};
+
+  std::size_t n = x.size();
+  double s_x = std::accumulate(x.begin(), x.end(), 0.);
+  double s_y = std::accumulate(y.begin(), y.end(), 0.);
+  double s_xx = std::inner_product(x.begin(), x.end(), x.begin(), 0.);
+  double s_yy = std::inner_product(y.begin(), y.end(), y.begin(), 0.);
+  double s_xy = std::inner_product(x.begin(), x.end(), y.begin(), 0.);
+  std::cerr << s_x << " " << s_y << std::endl;
+  std::cerr << s_xx << " " << s_yy << std::endl;
+  std::cerr << s_xy << std::endl;
+
+  double beta = (n * s_xy - s_x * s_y) / (n * s_xx - s_x * s_x);
+  double alpha = (1./n) * s_y - beta * (1./n) * s_x;
+
+  //se2 = se_line / dof
+  double se2 = 1./(n*(n-2)) * (n*s_yy - s_y*s_y - beta*beta*(n*s_xx - s_x*s_x));
+  double sbeta2 = n*se2 / (n*s_xx - s_x*s_x);
+  double salpha2 = sbeta2*(1./n)*s_xx;
+
+  double r = (n*s_xy - s_x*s_y) / std::sqrt((n*s_xx - s_x * s_x) * (n*s_yy - s_y * s_y));
+
+  double m, std_err, t, pval;
+  std::tie(m, std_err, t, pval) = linreg_ttest(y, x, s_y);
+
+  return;
+}
+
 int main(int argc, char** argv)
 {
+  //test();
   //slope_test();
   //return test_xtensor();
   prog_args args;
@@ -750,6 +805,7 @@ int main(int argc, char** argv)
   std::cerr << res << std::endl;
   std::vector<scalar_type> res_std(res.begin(), res.end());
   scalar_type res_sum = std::accumulate(res_std.begin(), res_std.end(), scalar_type());
+  scalar_type rss = std::inner_product(res_std.begin(), res_std.end(), res_std.begin(), scalar_type());
 
   //std::size_t n_samples = geno_file.samples().size();
 
@@ -828,7 +884,7 @@ int main(int argc, char** argv)
 #endif
 
     float beta, se, t, pval;
-    std::tie(beta, se, t, pval) = is_sparse ? linreg_ttest(res_std, sparse_geno, res_sum) : linreg_ttest(res_std, dense_geno, res_sum);
+    std::tie(beta, se, t, pval) = is_sparse ? linreg_ttest(res_std, sparse_geno, res_sum, rss) : linreg_ttest(res_std, dense_geno, res_sum);
     output_file << var.chromosome()
         << "\t" << var.position()
         << "\t" << maf
