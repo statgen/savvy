@@ -85,7 +85,8 @@ private:
   std::string fmt_field_ = "";
   std::unique_ptr<savvy::genomic_region> region_;
   double min_mac_ = 1.0;
-  bool sparse_ = true;
+  bool no_sparse_ = false;
+  bool always_sparse_ = false;
   bool logit_ = false;
   bool help_ = false;
 public:
@@ -99,6 +100,7 @@ public:
         {"logit", no_argument, 0, 'b'},
         {"min-mac", required_argument, 0, '\x02'},
         {"no-sparse", no_argument, 0, '\x01'},
+        {"always-sparse", no_argument, 0, '\x01'},
         {"output", required_argument, 0, 'o'},
         {"pheno", required_argument, 0, 'p'},
         {"region", required_argument, 0, 'r'},
@@ -116,7 +118,8 @@ public:
   const std::string& fmt_field() const { return fmt_field_; }
   const std::unique_ptr<savvy::genomic_region>& region() const { return region_; }
   double min_mac() const { return min_mac_; }
-  bool sparse_enabled() { return sparse_; }
+  bool sparse_disabled() { return no_sparse_; }
+  bool force_sparse() { return always_sparse_; }
   bool logit_enabled() const { return logit_; }
   bool help_is_set() const { return help_; }
 
@@ -124,16 +127,17 @@ public:
   {
     os << "Usage: sp-reg [opts ...] <geno_file> <pheno_file> \n";
     os << "\n";
-    os << " -c, --cov        Comma separated list of covariate columns\n";
-    os << " -h, --help       Print usage\n";
-    os << " -i, --id         Sample ID column (defaults to first column)\n";
-    os << " -b, --logit      Enable logistic model\n";
-    os << " -o, --output     Output path (default: /dev/stdout)\n";
-    os << " -p, --pheno      Phenotype column\n";
-    os << " -r, --region     Genomic region to test (chrom:beg-end)\n";
-    os << "     --min-mac    Minimum minor allele count (default: 1)\n";
-    os << "     --no-sparse  Disables sparse optimizations\n";
-    os << "     --fmt-field  Format field to use (DS, HDS, or GT)\n";
+    os << " -c, --cov            Comma separated list of covariate columns\n";
+    os << " -h, --help           Print usage\n";
+    os << " -i, --id             Sample ID column (defaults to first column)\n";
+    os << " -b, --logit          Enable logistic model\n";
+    os << " -o, --output         Output path (default: /dev/stdout)\n";
+    os << " -p, --pheno          Phenotype column\n";
+    os << " -r, --region         Genomic region to test (chrom:beg-end)\n";
+    os << "     --min-mac        Minimum minor allele count (default: 1)\n";
+    os << "     --no-sparse      Disables sparse optimizations\n";
+    os << "     --always-sparse  Forces sparse optimizations even for dense file records\n";
+    os << "     --fmt-field      Format field to use (DS, HDS, or GT)\n";
     os << std::flush;
   }
 
@@ -149,7 +153,15 @@ public:
       case '\x01':
         if (std::string("no-sparse") == long_options_[long_index].name)
         {
-          sparse_ = false;
+          no_sparse_ = true;
+        }
+        else if (std::string("always-sparse") == long_options_[long_index].name)
+        {
+          always_sparse_ = true;
+        }
+        else
+        {
+          return std::cerr << "Error: invalid option " << long_options_[long_index].name << std::endl, false;
         }
         break;
       case '\x02':
@@ -162,6 +174,10 @@ public:
           fmt_field_ = optarg ? optarg : "";
           if (fmt_field_ != "DS" && fmt_field_ != "HDS" && fmt_field_ != "GT")
             return std::cerr << "Error: --fmt-field must be DS, HDS, or GT\n", false;
+        }
+        else
+        {
+          return std::cerr << "Error: invalid option " << long_options_[long_index].name << std::endl, false;
         }
         break;
       case 'b':
@@ -826,7 +842,7 @@ int main(int argc, char** argv)
       if (f.first == format_field)
       {
         found = true;
-        is_sparse = args.sparse_enabled() && f.second.is_sparse();
+        is_sparse = args.force_sparse() || (!args.sparse_disabled() && f.second.is_sparse());
         is_sparse ? f.second.get(sparse_geno) : f.second.get(dense_geno);
         ploidy = is_sparse ? sparse_geno.size() / res_std.size() : dense_geno.size() / res_std.size();
         is_sparse ? savvy::stride_reduce(sparse_geno, ploidy) : savvy::stride_reduce(dense_geno, ploidy);
