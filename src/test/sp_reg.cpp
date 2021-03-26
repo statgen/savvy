@@ -10,6 +10,8 @@
 //#ifndef __cpp_lib_as_const
 //#define __cpp_lib_as_const
 //#endif
+#include <xtensor/xarray.hpp>
+#include <xtensor/xview.hpp>
 #include <xtensor/xadapt.hpp>
 #include <xtensor-blas/xlinalg.hpp>
 
@@ -758,8 +760,56 @@ void test()
   return;
 }
 
+void challenger_test()
+{
+  using namespace xt;
+  using namespace xt::linalg;
+
+  xarray<double> x = {53,57,58,63,66,67,67,67,68,69,70,70,70,70,72,73,75,75,76,76,78,79,81};
+  xtensor<double, 1> y = {1,1,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0};
+  assert(y.size() == x.size());
+  x.reshape({y.size(), 1});
+  x = xt::concatenate(xt::xtuple(xt::ones<double>({y.size(), std::size_t(1)}), x), 1);
+  xarray<double> x_transpose_copy; // We use this later for the result of (X^t)W. W is too large (n x n), so we populate the result without generating W.
+
+  xtensor<double, 1> beta = {2.90476190, -0.03738095}; // TODO: use linear model to produce initial betas
+
+  std::size_t n_iter = 8;
+  for (std::size_t i = 0; i < n_iter; ++i)
+  {
+    //std::cerr << xt::transpose(beta) << std::endl;
+    //std::cerr << x << std::endl;
+
+    xarray<double> z = dot(x, beta);
+    //std::cerr << z << std::endl;
+    xarray<double> p = 1. / (1. + xt::exp(-z));
+    //std::cerr << p << std::endl;
+
+    xarray<double> F = dot(transpose(x), y - p);
+    //std::cerr << F << std::endl;
+    x_transpose_copy = transpose(x);
+    for (std::size_t i = 0; i < p.size(); ++i)
+    {
+      xt::col(x_transpose_copy, i) *= p(i) * (1. - p(i));
+    }
+    //std::cerr << transpose(x) << std::endl;
+    //std::cerr << x_transpose_copy << std::endl;
+
+    //xtensor<double, 2> I = -dot(x_transpose_copy, x);
+    xtensor<double, 2> I = dot(x_transpose_copy, x);
+    //std::cerr << I << std::endl;
+    //std::cerr << pinv(I) << std::endl;
+
+    beta = beta + dot(pinv(I), F);
+    std::cerr << beta << std::endl;
+  }
+
+  auto a = 0;
+}
+
 int main(int argc, char** argv)
 {
+  //challenger_test();
   //test();
   //slope_test();
   //return test_xtensor();
