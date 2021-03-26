@@ -426,25 +426,43 @@ residuals_type compute_residuals_logit(const T& y, const T2& x_orig)
 {
   using namespace xt;
   using namespace xt::linalg;
-  const scalar_type epsilon = 0.00001;
+  const scalar_type tolerance = 0.00001;
 
-  T2 x = concatenate(xtuple(xt::ones<scalar_type>({y.size(), std::size_t(1)}), x_orig), 1);
+  // ==== Fit Model ==== //
+//  xarray<double> x = {53,57,58,63,66,67,67,67,68,69,70,70,70,70,72,73,75,75,76,76,78,79,81};
+//  xtensor<double, 1> y = {1,1,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0};
+//  assert(y.size() == x.size());
+  T2 x = xt::concatenate(xt::xtuple(xt::ones<double>({y.size(), std::size_t(1)}), x_orig), 1);
+  xarray<double> x_transpose_copy; // We use this later for the result of (X^t)W. W is too large (n x n), so we populate the result without generating W.
 
-  T y2 = xt::maximum(epsilon, xt::minimum(y, 1. - epsilon));
-  T div_y = xt::operator/(1., y2);
-  T logit_y = -xt::log(1. / y2 - 1.);
+  xtensor<double, 1> beta = dot(dot(pinv(dot(transpose(x), x)), transpose(x)), y);
 
-//  auto a = dot(transpose(x), x);
-//  std::cerr << a << std::endl;
-//  auto b = pinv(a);
-//  std::cerr << "END A ------------------------------" << std::endl;
-//  std::cerr << b << std::endl;
-//  std::cerr << "END B ------------------------------" << std::endl;
-//  auto c = dot(b, transpose(x));
-//  std::cerr << c << std::endl;
-  auto pbetas = dot(dot(pinv(dot(transpose(x), x)), transpose(x)), logit_y);
-  std::cerr << pbetas << std::endl;
-  auto xw = dot(x, pbetas);
+  std::size_t n_iter = 8;
+  for (std::size_t i = 0; i < n_iter; ++i)
+  {
+//    xarray<double> z = dot(x, beta);
+//    std::cerr << z << std::endl;
+//    xarray<double> p = 1. / (1. + xt::exp(-z));
+
+    xarray<double> p = 1. / (1. + xt::exp(-dot(x, beta)));
+
+
+    xarray<double> F = dot(transpose(x), y - p);
+
+    x_transpose_copy = transpose(x);
+    for (std::size_t i = 0; i < p.size(); ++i)
+    {
+      xt::col(x_transpose_copy, i) *= p(i) * (1. - p(i));
+    }
+    xtensor<double, 2> I = dot(x_transpose_copy, x);
+    beta = beta + dot(pinv(I), F);
+    std::cerr << beta << std::endl;
+  }
+  // =================== //
+
+
+
+  auto xw = dot(x, beta);
   T y_hat = 1. / (1. + xt::exp(-xw));
   residuals_type residuals = y - y_hat;
   scalar_type se = xt::mean(residuals * residuals)();
@@ -773,6 +791,7 @@ void challenger_test()
   xarray<double> x_transpose_copy; // We use this later for the result of (X^t)W. W is too large (n x n), so we populate the result without generating W.
 
   xtensor<double, 1> beta = {2.90476190, -0.03738095}; // TODO: use linear model to produce initial betas
+  //xtensor<double, 1> beta = dot(dot(pinv(dot(transpose(x), x)), transpose(x)), y);
 
   std::size_t n_iter = 8;
   for (std::size_t i = 0; i < n_iter; ++i)
@@ -781,7 +800,7 @@ void challenger_test()
     //std::cerr << x << std::endl;
 
     xarray<double> z = dot(x, beta);
-    //std::cerr << z << std::endl;
+    std::cerr << z << std::endl;
     xarray<double> p = 1. / (1. + xt::exp(-z));
     //std::cerr << p << std::endl;
 
