@@ -22,6 +22,7 @@
 #include <vector>
 #include <unordered_map>
 #include <random>
+#include <chrono>
 #include <getopt.h>
 
 std::vector<std::string> split_string_to_vector(const char* in, char delim)
@@ -848,6 +849,7 @@ int main(int argc, char** argv)
 //  std::string pheno_file_path = "../test-data/pheno_2000.tsv";
 //  std::string geno_file_path = "../test-data/rand2000.freeze9.merged.chr20.filtered.anno.gtonly.minDP10.passonly.w280000.ligated.10000001-20000000.b8192.c19.sav";
 
+  auto start = std::chrono::steady_clock::now();
   savvy::reader geno_file(args.geno_path());
   if (!geno_file)
     return std::cerr << "Could not open geno file\n", EXIT_FAILURE;
@@ -979,6 +981,8 @@ int main(int argc, char** argv)
         << "\t" << t
         << "\t" << pval << "\n";
   }
+  std::size_t elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+  std::cerr << "Analysis time (ms): " << elapsed_ms << std::endl;
 
   // gzip -cd sp-reg-results-chr19-ldl.tsv | tail -n+2 | awk -F'\t' '$4>5  {print $2"\t"$8}' | gnuplot --persist -e "set logscale y; set yrange [0.99:5e-32] reverse; set xrange [1:65000000]; plot '-' using 1:2 w points"
 
