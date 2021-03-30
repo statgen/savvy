@@ -857,6 +857,8 @@ int main(int argc, char** argv)
   if (args.region() && !geno_file.reset_bounds(*args.region()))
     return std::cerr << "Could not open genomic region\n", EXIT_FAILURE;
 
+  geno_file.phasing_status(savvy::phasing::none);
+
   std::string format_field = args.fmt_field();
   std::unordered_set<std::string> fmt_avail;
 
