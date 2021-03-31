@@ -418,8 +418,8 @@ namespace savvy
 
           reference operator*() { return leaf_node_[position_.entry_offset]; }
           pointer operator->() { return &(leaf_node_[position_.entry_offset]); }
-          bool operator==(const self_type& other) { return position_ == other.position_; }
-          bool operator!=(const self_type& other) { return position_ != other.position_; }
+          bool operator==(const self_type& other) const { return position_ == other.position_; }
+          bool operator!=(const self_type& other) const { return position_ != other.position_; }
 
         private:
           tree_reader* reader_;
