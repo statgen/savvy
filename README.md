@@ -1,3 +1,6 @@
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/savvy/badges/installer/conda.svg)](https://anaconda.org/bioconda/savvy)
+
+
 All branches in this repository are development branches. The latest stable release can be found in the [releases](https://github.com/statgen/savvy/releases) section.
 
 # Savvy Library
@@ -6,9 +9,14 @@ Savvy is the official C++ interface for the [SAV file format](sav_spec_v2.md) an
 Since the release of version 2.0, Savvy no longer supports writing of SAV 1.x files but will continue to support reading of existing 1.x files.  
 
 ## Installing
-The easiest way to install Savvy and its dependencies is to use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget).
+The easiest way to install Savvy and its dependencies from source is to use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget).
 ```shell
 cget install --prefix <install_prefix> statgen/savvy # default <install_prefix> is ./cget/
+```
+
+Installing binaries of Savvy and its dependencies can be done with [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html).
+```shell
+conda install -c conda-forge -c bioconda savvy
 ```
 
 ## Including in Projects
