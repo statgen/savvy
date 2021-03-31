@@ -133,7 +133,7 @@ public:
     os << " -c, --cov            Comma separated list of covariate columns\n";
     os << " -h, --help           Print usage\n";
     os << " -i, --id             Sample ID column (defaults to first column)\n";
-    os << " -b, --logit          Enable logistic model\n";
+    //os << " -b, --logit          Enable logistic model\n";
     os << " -o, --output         Output path (default: /dev/stdout)\n";
     os << " -p, --pheno          Phenotype column\n";
     os << " -r, --region         Genomic region to test (chrom:beg-end)\n";
