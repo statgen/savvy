@@ -418,8 +418,8 @@ namespace savvy
 
           reference operator*() { return leaf_node_[position_.entry_offset]; }
           pointer operator->() { return &(leaf_node_[position_.entry_offset]); }
-          bool operator==(const self_type& other) { return position_ == other.position_; }
-          bool operator!=(const self_type& other) { return position_ != other.position_; }
+          bool operator==(const self_type& other) const { return position_ == other.position_; }
+          bool operator!=(const self_type& other) const { return position_ != other.position_; }
 
         private:
           tree_reader* reader_;
@@ -753,8 +753,8 @@ namespace savvy
 
       reference operator*() { return *tree_query_it_; }
       pointer operator->() { return &(*tree_query_it_); }
-      bool operator==(const self_type& other) { return tree_it_ == other.tree_it_ && tree_query_it_ == other.tree_query_it_; }
-      bool operator!=(const self_type& other) { return tree_it_ != other.tree_it_ || tree_query_it_ != other.tree_query_it_; }
+      bool operator==(const self_type& other) const { return tree_it_ == other.tree_it_ && tree_query_it_ == other.tree_query_it_; }
+      bool operator!=(const self_type& other) const{ return tree_it_ != other.tree_it_ || tree_query_it_ != other.tree_query_it_; }
 
     private:
       std::vector<tree_reader::query>::iterator tree_it_;
