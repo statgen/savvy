@@ -342,7 +342,7 @@ namespace savvy
       for (auto it = r.format_fields().begin(); it != r.format_fields().end(); ++it)
       {
         pbwt_format_pointers.emplace_back(nullptr);
-        if (!it->second.is_sparse() && pbwt_fields_.find(it->first) != pbwt_fields_.end())
+        if (!it->second.is_sparse() && it->second.val_width() <= 2 && pbwt_fields_.find(it->first) != pbwt_fields_.end())
         {
           pbwt_format_pointers.back() = &sort_context_.format_contexts[it->first][it->second.size()];
         }

@@ -825,6 +825,8 @@ namespace savvy
     std::size_t non_zero_size() const { return sparse_size_; }
 
     bool is_sparse() const { return off_type_ != 0; }
+    std::size_t off_width() const { return (1u << bcf_type_shift[off_type_]); }
+    std::size_t val_width() const { return (1u << bcf_type_shift[val_type_]); }
 
     template<typename T>
     typed_value& operator=(const T& v)
