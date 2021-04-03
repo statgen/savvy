@@ -760,6 +760,7 @@ namespace savvy
           pbwt_context.reset();
 
         auto indiv_it = v.indiv_buf_.begin();
+        v.format_fields_.clear(); // Temp fix for crash until flat buffer design is removed.
         v.format_fields_.reserve(v.n_fmt_ + 1);
         v.format_fields_.resize(v.n_fmt_);
 

@@ -2469,7 +2469,7 @@ namespace savvy
       sparse_size_ = src.sparse_size_;
       val_ptr_ = src.val_ptr_;
       off_ptr_ = src.off_ptr_;
-      local_data_ .swap(src.local_data_); // src may be reused, so keep src.local_data_ valid by swapping.
+      local_data_.swap(src.local_data_); // src may be reused, so keep src.local_data_ valid by swapping.
 
       src.val_type_ = 0;
       src.off_type_ = 0;
@@ -2729,8 +2729,7 @@ namespace savvy
         prev_sort_mapping[i] = i;
     }
 
-    if (sort_mapping.empty())
-      sort_mapping.resize(in_data_sz);
+    sort_mapping.resize(in_data_sz);
 
     if (prev_sort_mapping.size() != in_data_sz)
     {
