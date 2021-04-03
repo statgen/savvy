@@ -2599,8 +2599,7 @@ namespace savvy
         prev_sort_mapping[i] = i;
     }
 
-    if (sort_mapping.empty())
-      sort_mapping.resize(sz);
+    sort_mapping.resize(sz);
 
     if (prev_sort_mapping.size() != sz)
     {
