@@ -209,3 +209,8 @@ docker build -t savvy-packaging - < packaging-dockerfile-ubuntu16
 mkdir -p packages
 docker run -v $(pwd):/savvy-src -v $(pwd)/packages:/out savvy-packaging /savvy-src/package-linux.sh /savvy-src /out
 ```
+
+# Optional Build Targets
+* `-DBUILD_TESTS=ON` allows running of tests with `make test`
+* `-DBUILD_EVAL=ON` enables building of sav-eval executable used to evaluate deserialization peformance
+* `-DBUILD_SPARSE_REGRESSION=ON` enables building of sav-at executable

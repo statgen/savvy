@@ -499,7 +499,8 @@ auto linreg_ttest_old(const std::vector<float>& y, const std::vector<float>& x)
   return std::make_tuple(m, std_err, t, pval); // slope, std error, t statistic, p value
 }
 #endif
-auto linreg_ttest(const std::vector<scalar_type>& y, const std::vector<scalar_type>& x, const scalar_type s_y)
+template <typename GenoT>
+auto linreg_ttest(const std::vector<scalar_type>& y, const std::vector<GenoT>& x, const scalar_type s_y)
 {
   assert(y.size() == x.size());
   const std::size_t n = x.size();
@@ -568,7 +569,8 @@ auto sp_lin_reg_old(const std::vector<float>& y, const savvy::compressed_vector<
 }
 #endif
 
-auto linreg_ttest(const std::vector<scalar_type>& y, const savvy::compressed_vector<scalar_type>& x, const scalar_type& s_y, const scalar_type& s_yy)
+template <typename GenoT>
+auto linreg_ttest(const std::vector<scalar_type>& y, const savvy::compressed_vector<GenoT>& x, const scalar_type& s_y, const scalar_type& s_yy)
 {
   assert(y.size() == x.size());
   const std::size_t n = x.size();
