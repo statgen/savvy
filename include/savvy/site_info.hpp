@@ -321,7 +321,14 @@ namespace savvy
         if (endianness::is_big())
         {
           for (auto it = buf.begin(); it != buf.end(); ++it)
-            it->i = endianness::swap(it->i); // TODO: n_allele << 16 | n_info is treated as two 16-bit integers in htslib. Need to figure out what is correct.
+            it->i = endianness::swap(it->i);
+
+          // See https://github.com/samtools/htslib/issues/1194
+          buf[4].i = endianness::swap(buf[4].i);
+          std::uint16_t* p = (std::uint16_t*)&buf[4].i;
+          *p = endianness::swap(*p);
+          ++p;
+          *p = endianness::swap(*p);
         }
 
         std::int32_t tmp_int = buf[0].i;
@@ -337,11 +344,14 @@ namespace savvy
         // skip rlen
         s.qual_ = buf[3].f;
 
-        std::uint32_t tmp_uint = static_cast<std::uint32_t>(buf[4].i);
-        std::size_t n_allele = tmp_uint >> 16u;
-        std::size_t n_info = 0xFFFFu & tmp_uint;
+//        std::uint32_t tmp_uint = static_cast<std::uint32_t>(buf[4].i);
+//        std::size_t n_allele = tmp_uint >> 16u;
+//        std::size_t n_info = 0xFFFFu & tmp_uint;
+        std::uint16_t* p16 = (std::uint16_t*)&buf[4].i;
+        std::size_t n_info = *p16++;
+        std::size_t n_allele = *p16;
 
-        tmp_uint = static_cast<std::uint32_t>(buf[5].i);
+        std::uint32_t tmp_uint = static_cast<std::uint32_t>(buf[5].i);
         s.n_fmt_ = tmp_uint >> 24u;
         n_sample = 0xFFFFFFu & tmp_uint;
 
@@ -698,7 +708,13 @@ namespace savvy
       if (endianness::is_big())
       {
         for (auto it = buf.begin(); it != buf.end(); ++it)
-          it->i = endianness::swap(it->i); // TODO: n_allele << 16 | n_info is treated as two 16-bit integers in htslib. Need to figure out what is correct.
+          it->i = endianness::swap(it->i);
+
+        // See https://github.com/samtools/htslib/issues/1194
+        std::uint16_t le_n_allele = endianness::swap(std::uint16_t(s.alts_.size() + 1));
+        std::uint16_t le_n_info = endianness::swap(std::uint16_t(s.info_.size()));
+        std::memcpy(&buf[4].i, &le_n_info, 2);
+        std::memcpy(((char*)&buf[4].i) + 2, &le_n_allele, 2);
       }
 
       std::copy_n((char*)buf.data(), buf.size() * sizeof(u), out_it);

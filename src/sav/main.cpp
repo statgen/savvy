@@ -14,6 +14,7 @@
 #include "sav/sort.hpp"
 #include "sav/stat.hpp"
 #include "savvy/utility.hpp"
+#include "savvy/endianness.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -149,6 +150,10 @@ int main(int argc, char** argv)
   if (args.version_is_set())
   {
     std::cout << "sav v" << SAVVY_VERSION << std::endl;
+    if (savvy::endianness::is_big())
+    {
+      std::cerr << "Warning: big endian detected. This application has not yet been tested on BE systems." << std::endl;
+    }
     return EXIT_SUCCESS;
   }
 
