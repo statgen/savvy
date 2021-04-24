@@ -784,6 +784,9 @@ namespace savvy
         }
       }
 
+      if (endianness::is_big())
+        header_block_sz = endianness::swap(header_block_sz);
+
       std::int64_t bytes_read = 0;
       std::string hdr_line;
       while (std::getline(ifs, hdr_line))

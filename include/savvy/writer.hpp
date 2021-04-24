@@ -490,7 +490,8 @@ namespace savvy
         if (file_format_ == format::bcf)
           magic = {'B', 'C', 'F', '\x02', '\x02'};
         ofs_.write(magic.data(), magic.size());
-        ofs_.write((char *) (&header_block_sz), sizeof(header_block_sz));
+        std::uint32_t le_header_block_sz = endianness::is_big() ? endianness::swap(header_block_sz) : header_block_sz;
+        ofs_.write((char *) (&le_header_block_sz), sizeof(le_header_block_sz));
       }
 
       for (auto it = headers.begin(); it != headers.end(); ++it)

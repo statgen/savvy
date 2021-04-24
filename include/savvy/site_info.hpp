@@ -833,6 +833,11 @@ namespace savvy
               //fmt_it->second.init(val_type, sz, off_type, sp_sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin()));
               *fmt_it = std::make_pair(std::string(fmt_key), typed_value(val_type, sz, off_type, sp_sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin())));
               indiv_it += sp_sz * pair_width;
+
+              if (endianness::is_big() && sp_sz)
+              {
+                fmt_it->second.apply(endian_swapper_fn());
+              }
             }
             else
             {
