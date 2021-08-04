@@ -15,10 +15,8 @@ jobs:
         set -euo pipefail
         sudo apt update
         sudo apt install -y build-essential cmake git python-dev python-pip
-        pip --version
-        sudo pip install --upgrade pip
-        pip --version
-        sudo pip install cget
+        pip3 --version
+        sudo pip3 install cget
         cget ignore xz
         cget install -f ./requirements.txt
         cmake --version
