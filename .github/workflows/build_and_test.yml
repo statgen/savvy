@@ -14,7 +14,7 @@ jobs:
       run: |
         set -euo pipefail
         sudo apt update
-        sudo apt install -y build-essential cmake git python-dev python-pip
+        sudo apt install -y build-essential cmake git python3-dev python3-pip python3-setuptools
         pip3 --version
         pip3 install cget
         cget ignore xz
