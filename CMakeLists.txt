@@ -6,6 +6,8 @@ include(GNUInstallDirs)
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose build type (Debug|Release|RelWithDebInfo|MinSizeRel)" FORCE)
 endif()
+#set(CMAKE_CXX_FLAGS "-fsanitize=address")
+#set(CMAKE_CXX_FLAGS "-fPIC -funsigned-char")
 
 set(CMAKE_CXX_STANDARD 11)
 
