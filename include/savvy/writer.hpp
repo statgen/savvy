@@ -590,7 +590,7 @@ namespace savvy
         if (v.format_fields_[i].first == "PH")
         {
           assert(i == 1); // TODO: return error
-          ph_ptr = (std::int8_t*)v.format_fields_[i].second.val_ptr_;
+          ph_ptr = (std::int8_t*)v.format_fields_[i].second.val_data_.data();
           continue;
         }
 

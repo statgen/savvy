@@ -52,7 +52,7 @@ namespace savvy
       std::vector<std::string> alts_;
       std::vector<std::string> filters_;
       std::vector<std::pair<std::string, typed_value>> info_;
-      std::vector<char> shared_data_;
+      //std::vector<char> shared_data_;
     protected:
       std::uint32_t n_fmt_ = 0;
     public:
@@ -206,7 +206,8 @@ namespace savvy
         }
       }
     protected:
-      static bool deserialize(site_info& s, const dictionary& dict, std::uint32_t& n_sample);
+      // static bool deserialize(site_info& s, const dictionary& dict, std::uint32_t& n_sample); OLD METHOD USED FOR FLAT BUFFER DESIGN
+      static std::int64_t deserialize_shared(site_info& s, std::istream& is, const dictionary& dict, std::uint32_t& n_sample);
       static bool deserialize_vcf(site_info& s, std::istream& is, const dictionary& dict);
       static bool deserialize_sav1(site_info& s, std::istream& is, const std::list<header_value_details>& info_headers);
 
@@ -220,7 +221,7 @@ namespace savvy
       friend class writer;
     private:
       std::vector<std::pair<std::string, typed_value>> format_fields_;
-      std::vector<char> indiv_buf_;
+      //std::vector<char> indiv_buf_;
     public:
       using site_info::site_info;
 
@@ -258,7 +259,8 @@ namespace savvy
     private:
       template <typename OutT>
       static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_map*>& pbwt_format_pointers);
-      static bool deserialize(variant& v, const dictionary& dict, internal::pbwt_sort_context& pbwt_context, std::size_t sample_size, bool is_bcf, phasing phased);
+      static std::int64_t deserialize_indiv(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased);
+      static void pbwt_unsort_typed_values(variant& v, typed_value& extra_val, internal::pbwt_sort_context& pbwt_context);
       static bool deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status);
       static bool deserialize_vcf2(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status);
       static bool deserialize_sav1(variant& v, std::istream& is, const std::list<header_value_details>& format_headers, std::size_t sample_size);
@@ -286,25 +288,7 @@ namespace savvy
 
     }
 
-    struct endian_swapper_fn
-    {
-      template <typename T>
-      void operator()(T* valp, T* endp)
-      {
-        if (sizeof(T) > 1)
-          std::transform(valp, endp, valp, endianness::swap<T>);
-      }
-
-      template <typename ValT, typename OffT>
-      void operator()(ValT* valp, ValT* endp, OffT* offp)
-      {
-        if (sizeof(OffT) > 1)
-          std::transform(offp, offp + (endp - valp), offp, endianness::swap<OffT>);
-        if (sizeof(ValT) > 1)
-          std::transform(valp, endp, valp, endianness::swap<ValT>);
-      }
-    };
-
+    /* THIS IS OLD DESERIALIZE METHOD USED FOR FLAT BUFFER DESIGN
     inline
     bool site_info::deserialize(site_info& s, const dictionary& dict, std::uint32_t& n_sample)
     {
@@ -439,6 +423,131 @@ namespace savvy
 
       std::fprintf(stderr, "Error: Invalid record data\n");
       return false;
+    }
+     */
+
+    inline
+    std::int64_t site_info::deserialize_shared(site_info& s, std::istream& is, const dictionary& dict, std::uint32_t& n_sample)
+    {
+      union u
+      {
+        std::int32_t i;
+        float f;
+      };
+
+      std::array<u, 6> buf; // chrom through n.fmt.sample
+
+      if (is.read((char*)buf.data(), buf.size() * 4))
+      {
+        if (endianness::is_big())
+        {
+          for (auto it = buf.begin(); it != buf.end(); ++it)
+            it->i = endianness::swap(it->i);
+
+          // See https://github.com/samtools/htslib/issues/1194
+          buf[4].i = endianness::swap(buf[4].i);
+          std::uint16_t* p = (std::uint16_t*)&buf[4].i;
+          *p = endianness::swap(*p);
+          ++p;
+          *p = endianness::swap(*p);
+        }
+
+        std::int32_t tmp_int = buf[0].i;
+
+        if (dict.entries[dictionary::contig].size() <= (std::uint32_t)tmp_int)
+        {
+          std::fprintf(stderr, "Error: Invalid contig id (%i)\n", tmp_int);
+          return false;
+        }
+        s.chrom_ = dict.entries[dictionary::contig][tmp_int].id;
+
+        s.pos_ = static_cast<std::uint32_t>(buf[1].i) + 1;
+        // skip rlen
+        s.qual_ = buf[3].f;
+
+        //        std::uint32_t tmp_uint = static_cast<std::uint32_t>(buf[4].i);
+        //        std::size_t n_allele = tmp_uint >> 16u;
+        //        std::size_t n_info = 0xFFFFu & tmp_uint;
+        std::uint16_t* p16 = (std::uint16_t*)&buf[4].i;
+        std::size_t n_info = *p16++;
+        std::size_t n_allele = *p16;
+
+        std::uint32_t tmp_uint = static_cast<std::uint32_t>(buf[5].i);
+        s.n_fmt_ = tmp_uint >> 24u;
+        n_sample = 0xFFFFFFu & tmp_uint;
+
+        auto bytes_read = buf.size() * 4;
+
+        try
+        {
+          // Parse ID
+          bytes_read += typed_value::internal::deserialize_vec(is, s.id_);
+
+          // Parse REF/ALT
+          if (n_allele)
+          {
+            bytes_read += typed_value::internal::deserialize_vec(is, s.ref_);
+            s.alts_.resize(n_allele - 1);
+            for (auto it = s.alts_.begin(); it != s.alts_.end(); ++it)
+            {
+              bytes_read += typed_value::internal::deserialize_vec(is, *it);
+            }
+          }
+
+          // Parse FILTER
+          std::vector<std::int32_t> filter_ints;
+          bytes_read += typed_value::internal::deserialize_vec(is, filter_ints);
+          s.filters_.clear();
+          s.filters_.reserve(filter_ints.size());
+          for (auto it = filter_ints.begin(); it != filter_ints.end(); ++it)
+          {
+            if (dict.entries[dictionary::id].size() <= (std::uint32_t)*it)
+            {
+              std::fprintf(stderr, "Error: Invalid filter id (%i)\n", *it);
+              return -1;
+            }
+            s.filters_.emplace_back(dict.entries[dictionary::id][*it].id);
+          }
+
+          // Parse INFO
+          s.info_.resize(n_info);
+          auto info_it = s.info_.begin();
+          for ( ; info_it != s.info_.end(); ++info_it)
+          {
+            std::int32_t info_key_id = -1;
+            bytes_read += typed_value::internal::deserialize_int(is, info_key_id);
+            if (dict.entries[dictionary::id].size() <= (std::uint32_t)info_key_id)
+            {
+              std::fprintf(stderr, "Error: Invalid info id (%i)\n", info_key_id);
+              return -1;
+            }
+            std::string info_key = dict.entries[dictionary::id][info_key_id].id;
+
+            if (!is.good())
+              break;
+
+            // ------------------------------------------- //
+            info_it->first = std::move(info_key);
+            bytes_read += typed_value::internal::deserialize(info_it->second, is, 1);
+
+            if (!is.good())
+              break;
+            // ------------------------------------------- //
+
+          }
+
+          if (info_it == s.info_.end() && is.good())
+            return bytes_read;
+        }
+        catch (const std::exception& e)
+        {
+          std::fprintf(stderr, "Error: Invalid record data\n");
+          return -1;
+        }
+      }
+
+      std::fprintf(stderr, "Error: Invalid record data\n");
+      return -1;
     }
 
     inline
@@ -720,10 +829,10 @@ namespace savvy
       std::copy_n((char*)buf.data(), buf.size() * sizeof(u), out_it);
 
       // Encode REF/ALTS
-      bcf::serialize_typed_str(out_it, s.id_);
-      bcf::serialize_typed_str(out_it, s.ref_);
+      typed_value::internal::serialize_typed_str(out_it, s.id_);
+      typed_value::internal::serialize_typed_str(out_it, s.ref_);
       for (auto it = s.alts_.begin(); it != s.alts_.end(); ++it)
-        bcf::serialize_typed_str(out_it, *it);
+        typed_value::internal::serialize_typed_str(out_it, *it);
 
       // Encode FILTER
       std::vector<std::int32_t> filter_ints;
@@ -738,7 +847,7 @@ namespace savvy
         }
         filter_ints.emplace_back(res->second);
       }
-      bcf::serialize_typed_vec(out_it, filter_ints);
+      typed_value::internal::serialize_typed_vec(out_it, filter_ints);
 
       // Encode INFO
       bool encode_res = true;
@@ -753,7 +862,7 @@ namespace savvy
           return;
         }
 
-        bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
+        typed_value::internal::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
         typed_value::internal::serialize(kvp.second, out_it, 1);
       };
 
@@ -764,7 +873,21 @@ namespace savvy
       return encode_res;
     }
 
+    inline
+    void variant::pbwt_unsort_typed_values(variant& v, typed_value& extra_val, internal::pbwt_sort_context& pbwt_context)
+    {
+      for (auto it = v.format_fields_.begin(); it != v.format_fields_.end(); ++it)
+      {
+        if (it->second.pbwt_flag())
+        {
+          auto& format_pbwt_ctx = pbwt_context.format_contexts[it->first][it->second.size()];
+          typed_value::internal::pbwt_unsort(it->second, extra_val, format_pbwt_ctx, pbwt_context.prev_sort_mapping, pbwt_context.counts);
+          std::swap(it->second, extra_val);
+        }
+      }
+    }
 
+    /* OLD METHOD USED FOR FLAT BUFFER DESIGN
     inline
     bool variant::deserialize(variant& v, const dictionary& dict, internal::pbwt_sort_context& pbwt_context, std::size_t sample_size, bool is_bcf, phasing phased)
     {
@@ -899,6 +1022,74 @@ namespace savvy
       std::fprintf(stderr, "Error: Invalid record data\n");
       return false;
     }
+    */
+
+    inline
+    std::int64_t variant::deserialize_indiv(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased)
+    {
+      std::int64_t res = 0;
+      std::int64_t bytes_read = 0;
+
+      //auto indiv_it = v.indiv_buf_.begin();
+      v.format_fields_.clear(); // Temp fix for crash until flat buffer design is removed.
+      v.format_fields_.reserve(v.n_fmt_ + 1);
+      v.format_fields_.resize(v.n_fmt_);
+
+      typed_value ph_value;
+
+      auto fmt_it = v.format_fields_.begin();
+      for (; fmt_it != v.format_fields_.end(); ++fmt_it)
+      {
+        try
+        {
+          std::int32_t fmt_key_id;
+          if ((res = typed_value::internal::deserialize_int(is, fmt_key_id)) < 0)
+            break;
+          bytes_read += res;
+
+          if (dict.entries[dictionary::id].size() <= (std::uint32_t)fmt_key_id)
+          {
+            std::fprintf(stderr, "Error: Invalid FMT id\n");
+            return -1;
+          }
+
+          fmt_it->first = dict.entries[dictionary::id][fmt_key_id].id;
+          if ((res = typed_value::internal::deserialize(fmt_it->second, is, is_bcf ? sample_size : 1)) < 0)
+            break;
+          bytes_read += res;
+
+
+          if (is_bcf && fmt_it->first == "GT")
+          {
+            // TODO: save phases when partially phased.
+            if (phased == phasing::unknown || phased == phasing::partial)
+            {
+              ph_value = typed_value(typed_value::int8, (fmt_it->second.size() / sample_size - 1) * sample_size);
+              fmt_it->second.apply_dense(typed_value::bcf_gt_decoder(), (std::int8_t*) ph_value.val_data_.data(), fmt_it->second.size() / sample_size);
+            }
+            else
+            {
+              fmt_it->second.apply_dense(typed_value::bcf_gt_decoder());
+            }
+          }
+        }
+        catch (const std::exception& e)
+        {
+          std::fprintf(stderr, "Error: Invalid record data\n");
+          return -1;
+        }
+      }
+
+      if (fmt_it == v.format_fields_.end() && is.good())
+      {
+        if (v.format_fields_.size() && ph_value.size())
+          v.format_fields_.insert(v.format_fields_.begin() + 1, std::make_pair("PH", std::move(ph_value)));
+        return bytes_read;
+      }
+
+      std::fprintf(stderr, "Error: Invalid record data\n");
+      return -1;
+    }
 
 
     inline
@@ -937,13 +1128,12 @@ namespace savvy
       if (format_headers.front().id == "GT")
       {
         v.val_type_ = typed_value::int8;
-        v.local_data_.resize(sz * off_width + sz);
-        v.off_ptr_ = v.local_data_.data();
-        v.val_ptr_ = v.local_data_.data() + sz * off_width;
+        v.off_data_.resize(sz * off_width);
+        v.val_data_.resize(sz);
 
 
-        std::int64_t* off_ptr = (std::int64_t*)v.off_ptr_;
-        std::int8_t* val_ptr = (std::int8_t*)v.val_ptr_;
+        std::int64_t* off_ptr = (std::int64_t*)v.off_data_.data();
+        std::int8_t* val_ptr = (std::int8_t*)v.val_data_.data();
         for (std::size_t i = 0; i < sz && in_it != end_it; ++i,++off_ptr,++val_ptr)
         {
           std::int8_t allele;
@@ -958,13 +1148,12 @@ namespace savvy
       else if (format_headers.front().id == "HDS")
       {
         v.val_type_ = typed_value::real;
-        v.local_data_.resize(sz * off_width + sz * sizeof(float));
-        v.off_ptr_ = v.local_data_.data();
-        v.val_ptr_ = v.local_data_.data() + sz * off_width;
+        v.off_data_.resize(sz * off_width);
+        v.val_data_.resize(sz * sizeof(float));
 
 
-        std::int64_t* off_ptr = (std::int64_t*)v.off_ptr_;
-        float* val_ptr = (float*)v.val_ptr_;
+        std::int64_t* off_ptr = (std::int64_t*)v.off_data_.data();
+        float* val_ptr = (float*)v.val_data_.data();
         for (std::size_t i = 0; i < sz && in_it != end_it; ++i,++off_ptr,++val_ptr)
         {
           float allele;
@@ -1155,7 +1344,7 @@ namespace savvy
         if (type == typed_value::str)
           fmt_stats[i].max_stride = fmt_stats[i].max_byte_length;
 
-        v.format_fields_.emplace_back(fmt_keys[i], typed_value(type, sample_size * fmt_stats[i].max_stride, nullptr));
+        v.format_fields_.emplace_back(fmt_keys[i], typed_value(type, sample_size * fmt_stats[i].max_stride));
       }
 
       if (fmt_stats[0].is_gt && fmt_stats[0].max_stride > 1 && (phasing_status == phasing::partial || phasing_status == phasing::unknown))
@@ -1164,7 +1353,7 @@ namespace savvy
         auto insert_it = fmt_stats.insert(fmt_stats.begin() + 1, vcf_fmt_stats());
         insert_it->max_stride = insert_it->max_byte_length = fmt_stats[0].max_stride - 1;
 
-        v.format_fields_.emplace(v.format_fields_.begin() + 1, "PH", typed_value(typed_value::int8, sample_size * (fmt_stats[0].max_stride - 1), nullptr));
+        v.format_fields_.emplace(v.format_fields_.begin() + 1, "PH", typed_value(typed_value::int8, sample_size * (fmt_stats[0].max_stride - 1)));
         ph_value = &v.format_fields_[1].second;
       }
 
@@ -1196,7 +1385,6 @@ namespace savvy
 
       return true;
     }
-
 
     inline
     bool variant::deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status)
@@ -1282,7 +1470,7 @@ namespace savvy
           }
         }
 
-        v.format_fields_.emplace_back(*it, typed_value(type, sample_size * number, nullptr));
+        v.format_fields_.emplace_back(*it, typed_value(type, sample_size * number));
         // TODO: update format fields whose "number" is G
       }
 
@@ -1310,11 +1498,11 @@ namespace savvy
           }
 
           strides[0] = (max_cnt + 1);
-          v.format_fields_.front().second = typed_value(typed_value::type_code((std::int64_t)v.alts().size()), sample_size * strides[0], nullptr);
+          v.format_fields_.front().second = typed_value(typed_value::type_code((std::int64_t)v.alts().size()), sample_size * strides[0]);
           if (phasing_status == phasing::partial || phasing_status == phasing::unknown)
           {
             ph_stride = max_cnt;
-            ph_value = typed_value(typed_value::int8, sample_size * ph_stride, nullptr);
+            ph_value = typed_value(typed_value::int8, sample_size * ph_stride);
           }
         }
 
@@ -1333,13 +1521,13 @@ namespace savvy
               for (auto it = &(*start_pos); *it != '\0'; ++it)
               {
                 if (*it == '|')
-                  ph_value.val_ptr_[i * ph_stride + ps_cnt++] = 1;
+                  ph_value.val_data_.data()[i * ph_stride + ps_cnt++] = 1;
                 else if (*it == '/')
-                  ph_value.val_ptr_[i * ph_stride + ps_cnt++] = 0;
+                  ph_value.val_data_.data()[i * ph_stride + ps_cnt++] = 0;
               }
 
               for ( ; ps_cnt < (strides[j] - 1); ++ps_cnt)
-                ph_value.val_ptr_[i * ph_stride + ps_cnt++] = std::int8_t(0x81); // END_OF_VECTOR;
+                ph_value.val_data_.data()[i * ph_stride + ps_cnt++] = std::int8_t(0x81); // END_OF_VECTOR;
             }
 
             if (colon_pos != tab_pos)
@@ -1360,10 +1548,10 @@ namespace savvy
         if (ph_value.size())
           v.format_fields_.insert(v.format_fields_.begin() + 1, std::make_pair("PH", std::move(ph_value)));
 
-        if (v.format_fields().empty() || !v.format_fields().front().second.val_ptr_)
-        {
-
-        }
+//        if (v.format_fields().empty() || !v.format_fields().front().second.val_data_.data())
+//        {
+//
+//        }
 
         return true;
       }
@@ -1385,7 +1573,7 @@ namespace savvy
         }
 
         // TODO: Allow for BCF writing.
-        bcf::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
+        typed_value::internal::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
 
         auto* pbwt_ptr = pbwt_format_pointers[it - v.format_fields_.begin()];
         if (pbwt_ptr)
@@ -1405,7 +1593,7 @@ namespace savvy
               if (jt->first == "PH")
               {
                 assert(dense_gt.size() % sample_size == 0 && (dense_gt.size() / sample_size - 1) * sample_size == jt->second.size()); // TODO: graceful error
-                dense_gt.apply_dense(typed_value::bcf_gt_encoder(), (std::int8_t*) jt->second.val_ptr_, dense_gt.size() / sample_size);
+                dense_gt.apply_dense(typed_value::bcf_gt_encoder(), (std::int8_t*) jt->second.val_data_.data(), dense_gt.size() / sample_size);
                 break;
               }
             }

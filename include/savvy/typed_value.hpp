@@ -40,472 +40,7 @@ namespace savvy
 
   namespace bcf
   {
-    template<typename T>
-    typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, std::uint8_t>::type
-    int_type(T val)
-    { // TODO: Handle missing values
-      if (val <= std::numeric_limits<std::int8_t>::max() && val >= std::numeric_limits<std::int8_t>::min())
-        return 0x01;
-      else if (val <= std::numeric_limits<std::int16_t>::max() && val >= std::numeric_limits<std::int16_t>::min())
-        return 0x02;
-      else if (val <= std::numeric_limits<std::int32_t>::max() && val >= std::numeric_limits<std::int32_t>::min())
-        return 0x03;
-      else
-        return 0x04;
-    }
 
-    template <typename Iter, typename IntT>
-    Iter deserialize_int(Iter it, Iter end, IntT& dest)
-    {
-      if (it != end)
-      {
-        std::uint8_t type_byte = *(it++);
-        std::int64_t int_width = 1u << bcf_type_shift[type_byte & 0x0Fu];
-        if (end - it >= int_width)
-        {
-          switch (int_width)
-          {
-          case 1:
-          {
-            dest = IntT(*(it++));
-            return it;
-          }
-          case 2:
-          {
-            std::int16_t tmp;
-            char *tmp_p = (char *)&tmp;
-            *(tmp_p) = *(it++);
-            *(tmp_p + 1) = *(it++);
-            dest = le16toh(tmp);
-            return it;
-          }
-          case 4:
-          {
-            std::int32_t tmp;
-            char *tmp_p = (char *)&tmp;
-            *(tmp_p) = *(it++);
-            *(tmp_p + 1) = *(it++);
-            *(tmp_p + 2) = *(it++);
-            *(tmp_p + 3) = *(it++);
-            dest = le32toh(tmp);
-            return it;
-          }
-          case 8:
-          {
-            std::int64_t tmp;
-            char *tmp_p = (char *)&tmp;
-            *(tmp_p) = *(it++);
-            *(tmp_p + 1) = *(it++);
-            *(tmp_p + 2) = *(it++);
-            *(tmp_p + 3) = *(it++);
-            *(tmp_p + 4) = *(it++);
-            *(tmp_p + 5) = *(it++);
-            *(tmp_p + 6) = *(it++);
-            *(tmp_p + 7) = *(it++);
-            dest = le64toh(tmp);
-            return it;
-          }
-          }
-        }
-      }
-      throw std::runtime_error("Not a BCF integer");
-    }
-
-//    template <typename Iter>
-//    Iter deserialize_string(Iter it, Iter end, std::string& dest)
-//    {
-//      if (it == end) return end;
-//
-//      std::uint8_t type_byte = *(it++);
-//      if (it == end || (type_byte & 0x0Fu) != 0x07u)
-//        throw std::runtime_error("Not a BCF string");
-//
-//      std::int32_t sz = (type_byte >> 4u);
-//      if (sz == 15)
-//        it = deserialize_int(it, end, sz);
-//
-//      if (end - it < sz)
-//        throw std::runtime_error("Invalid byte sequence");
-//
-//      dest.resize(sz);
-//      std::copy_n(it, sz, dest.begin());
-//      return it + sz;
-//    }
-
-    template <typename Iter, typename VecT>
-    typename std::enable_if<std::is_same<typename std::iterator_traits<Iter>::value_type, char>::value, Iter>::type
-    deserialize_vec(Iter it, Iter end, VecT& dest)
-    {
-      if (it == end)
-        throw std::runtime_error("Invalid byte sequence");
-
-      std::uint8_t type_byte = *(it++);
-
-      std::int32_t sz = (type_byte >> 4u);
-      if (sz == 15)
-        it = deserialize_int(it, end, sz);
-
-      std::size_t type_width = 1u << bcf_type_shift[0x0Fu & type_byte];
-
-      if (end - it < std::int64_t(sz * type_width))
-        throw std::runtime_error("Invalid byte sequence");
-
-      dest.resize(sz);
-      char* char_p = &(*it);
-      switch (0x0Fu & type_byte)
-      {
-      case 0x01u:
-      {
-        auto p = (std::int8_t *)char_p;
-        std::copy_n(p, sz, dest.begin());
-        break;
-      }
-      case 0x02u:
-      {
-        auto p = (std::int16_t *)char_p;
-        if (endianness::is_big())
-          std::transform(p, p + sz, dest.begin(), endianness::swap<std::int16_t>);
-        else
-          std::copy_n(p, sz, dest.begin());
-        break;
-      }
-      case 0x03u:
-      {
-        auto p = (std::int32_t *)char_p;
-        if (endianness::is_big())
-          std::transform(p, p + sz, dest.begin(), endianness::swap<std::int32_t>);
-        else
-          std::copy_n(p, sz, dest.begin());
-        break;
-      }
-      case 0x04u:
-      {
-        auto p = (std::int64_t *)char_p;
-        if (endianness::is_big())
-          std::transform(p, p + sz, dest.begin(), endianness::swap<std::int64_t>);
-        else
-          std::copy_n(p, sz, dest.begin());
-        break;
-      }
-      case 0x05u:
-      {
-        auto p = (float *)char_p;
-        if (endianness::is_big())
-          std::transform(p, p + sz, dest.begin(), endianness::swap<float>);
-        else
-          std::copy_n(p, sz, dest.begin());
-        break;
-      }
-      case 0x07u:
-      {
-        std::copy_n(char_p, sz, dest.begin());
-        break;
-      }
-      }
-
-      return it + (sz * type_width);
-    }
-
-    template <typename OutT, typename T>
-    typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, bool>::type
-    serialize_typed_int_exact(OutT out_it, const T& val)
-    {
-      T v = endianness::is_big() ? endianness::swap(val) : val; //static_cast<T>(val);
-      std::uint8_t type;
-      if (std::is_same<T, std::int8_t>::value)
-        type = 0x01;
-      else if (std::is_same<T, std::int16_t>::value)
-        type = 0x02;
-      else if (std::is_same<T, std::int32_t>::value)
-        type = 0x03;
-      else if (std::is_same<T, std::int64_t>::value)
-        type = 0x04;
-      else
-        return false;
-
-      *(out_it++) = (1u << 4u) | type;
-
-      char* p_end = ((char*)&v) + sizeof(T);
-      for (char* p = (char*)&v; p != p_end; ++p)
-      {
-        *(out_it++) = *p;
-      }
-      return true;
-    }
-
-    template <typename OutT, typename T>
-    typename std::enable_if<std::is_signed<T>::value, bool>::type
-    serialize_typed_scalar(OutT out_it, const T& val)
-    {
-      if (std::is_integral<T>::value)
-      {
-        if (val <= std::numeric_limits<std::int8_t>::max() && val >= std::numeric_limits<std::int8_t>::min())
-          return serialize_typed_int_exact(out_it, std::int8_t(val));
-        else if (val <= std::numeric_limits<std::int16_t>::max() && val >= std::numeric_limits<std::int16_t>::min())
-          return serialize_typed_int_exact(out_it, std::int16_t(val));
-        else if (val <= std::numeric_limits<std::int32_t>::max() && val >= std::numeric_limits<std::int32_t>::min())
-          return serialize_typed_int_exact(out_it, std::int32_t(val));
-        else
-          return serialize_typed_int_exact(out_it, std::int64_t(val));
-      }
-
-      if (std::is_same<T, float>::value)
-        *(out_it++) = (1u << 4u) | 0x05u;
-      else if (std::is_same<T, double>::value)
-        *(out_it++) = (1u << 4u) | 0x06u;
-      else
-        return false;
-
-      T le_val = endianness::is_big() ? endianness::swap(val) : val;
-      char* p_end = ((char*)&le_val) + sizeof(T);
-      for (char* p = (char*)&le_val; p != p_end; ++p)
-      {
-        *(out_it++) = *p;
-      }
-
-      return true;
-    }
-
-    template <typename T>
-    typename std::enable_if<std::is_signed<T>::value, bool>::type
-    write_typed_scalar(std::ostream& os, const T& val)
-    {
-      std::uint8_t type_byte = 1;
-      if (std::is_integral<T>::value)
-      {
-        if (std::is_same<T, std::int8_t>::value)
-        {
-          type_byte = (type_byte << 4) | 0x01;
-        }
-        else if (std::is_same<T, std::int16_t>::value)
-        {
-          type_byte = (type_byte << 4) | 0x02;
-        }
-        else if (std::is_same<T, std::int32_t>::value)
-        {
-          type_byte = (type_byte << 4) | 0x03;
-        }
-        else
-        {
-          return false;
-        }
-      }
-      else if (std::is_same<T, float>::value)
-      {
-        type_byte = (type_byte << 4) | 0x05;
-      }
-      else
-      {
-        return false;
-      }
-
-      T le_val = endianness::is_big() ? endianness::swap(val) : val;
-      os.write((char*)&type_byte, 1);
-      os.write((char*)&le_val, sizeof(le_val));
-      return true;
-    }
-
-    template <typename OutT>
-    bool serialize_type_and_size(OutT out_it, std::uint8_t type, std::size_t size) // TODO: review this function
-    {
-      if (size < 15)
-      {
-        *out_it = size << 4u | type;
-        ++out_it;
-        return true;
-      }
-
-      *out_it = 0xF0 | type;
-      ++out_it;
-
-      return serialize_typed_scalar(out_it, (std::int64_t)size);
-    }
-
-    template <typename Iter, typename T>
-    typename std::enable_if<std::is_signed<T>::value, void>::type
-    serialize_typed_vec(Iter out_it, const std::vector<T>& vec) // TODO: use smallest int type.
-    {
-      static_assert(!std::is_same<T, std::int64_t>::value && !std::is_same<T, double>::value, "64-bit integers not allowed in BCF spec.");
-
-      std::uint8_t type_byte = vec.size() < 15 ? vec.size() : 15;
-      if (std::is_same<T, std::int8_t>::value)
-      {
-        type_byte = (type_byte << 4) | 0x01;
-      }
-      else if (std::is_same<T, std::int16_t>::value)
-      {
-        type_byte = (type_byte << 4) | 0x02;
-      }
-      else if (std::is_same<T, std::int32_t>::value)
-      {
-        type_byte = (type_byte << 4) | 0x03;
-      }
-      else if (std::is_same<T, float>::value)
-      {
-        type_byte = (type_byte << 4) | 0x05;
-      }
-
-      *out_it = type_byte;
-
-      if (vec.size() >= 15)
-      {
-        if (vec.size() <= 0x7F)
-          serialize_typed_int_exact(out_it, (std::int8_t)vec.size());
-        else if (vec.size() <= 0x7FFF)
-          serialize_typed_int_exact(out_it, (std::int16_t)vec.size());
-        else if (vec.size() <= 0x7FFFFFFF)
-          serialize_typed_int_exact(out_it, (std::int32_t)vec.size());
-        else
-          throw std::runtime_error("string too big");
-      }
-
-
-
-      if (endianness::is_big() && sizeof(T) > 1)
-      {
-        for (auto it = vec.begin(); it != vec.end(); ++it)
-        {
-          T le_val = endianness::swap(*it);
-          char* p_end = ((char*)&le_val) + sizeof(T);
-          for (char* p = (char*)&le_val; p != p_end; ++p)
-          {
-            *(out_it++) = *p;
-          }
-        }
-      }
-      else
-      {
-        std::copy_n((char*)vec.data(), sizeof(T) * vec.size(), out_it);
-      }
-    }
-
-    template <typename T>
-    typename std::enable_if<std::is_signed<T>::value, void>::type
-    write_typed_vec(std::ostream& os, const std::vector<T>& vec)
-    {
-      static_assert(!std::is_same<T, std::int64_t>::value && !std::is_same<T, double>::value, "64-bit integers not allowed in BCF spec.");
-
-      std::uint8_t type_byte = vec.size() < 15 ? vec.size() : 15;
-      if (std::is_same<T, std::int8_t>::value)
-      {
-        type_byte = (type_byte << 4) | 0x01;
-      }
-      else if (std::is_same<T, std::int16_t>::value)
-      {
-        type_byte = (type_byte << 4) | 0x02;
-      }
-      else if (std::is_same<T, std::int32_t>::value)
-      {
-        type_byte = (type_byte << 4) | 0x03;
-      }
-      else if (std::is_same<T, float>::value)
-      {
-        type_byte = (type_byte << 4) | 0x05;
-      }
-
-      os.write((char*)&type_byte, 1);
-
-      if (vec.size() >= 15)
-      {
-        if (vec.size() <= 0x7F)
-          write_typed_scalar(os, (std::int8_t)vec.size());
-        else if (vec.size() <= 0x7FFF)
-          write_typed_scalar(os, (std::int16_t)vec.size());
-        else if (vec.size() <= 0x7FFFFFFF)
-          write_typed_scalar(os, (std::int32_t)vec.size());
-        else
-          throw std::runtime_error("vector too big");
-      }
-
-
-
-      if (endianness::is_big() && sizeof(T) > 1)
-      {
-        for (auto it = vec.begin(); it != vec.end(); ++it)
-        {
-          T le_val = endianness::swap(*it);
-          os.write((char*)&le_val, sizeof(T));
-        }
-      }
-      else
-      {
-        os.write((char*)vec.data(), std::int32_t(sizeof(T) * vec.size()));
-      }
-    }
-
-    template <typename OutT>
-    void serialize_typed_str(OutT out_it, const std::string& str)
-    {
-      std::uint8_t type_byte = str.size() < 15 ? str.size() : 15;
-      type_byte = (type_byte << 4) | 0x07;
-
-      *out_it = type_byte;
-
-      if (str.size() >= 15)
-      {
-        if (str.size() <= 0x7F)
-          serialize_typed_int_exact(out_it, (std::int8_t)str.size());
-        else if (str.size() <= 0x7FFF)
-          serialize_typed_int_exact(out_it, (std::int16_t)str.size());
-        else if (str.size() <= 0x7FFFFFFF)
-          serialize_typed_int_exact(out_it, (std::int32_t)str.size());
-        else
-          throw std::runtime_error("string too big");
-      }
-
-      std::copy_n(str.begin(), str.size(), out_it);
-    }
-
-    inline void write_typed_str(std::ostream& os, const std::string& str)
-    {
-      std::uint8_t type_byte = str.size() < 15 ? str.size() : 15;
-      type_byte = (type_byte << 4) | 0x07;
-
-
-      os.write((char*)&type_byte, 1);
-      if (str.size() >= 15)
-      {
-        if (str.size() <= 0x7F)
-          serialize_typed_int_exact(std::ostreambuf_iterator<char>(os), (std::int8_t)str.size());
-        else if (str.size() <= 0x7FFF)
-          serialize_typed_int_exact(std::ostreambuf_iterator<char>(os), (std::int16_t)str.size());
-        else if (str.size() <= 0x7FFFFFFF)
-          serialize_typed_int_exact(std::ostreambuf_iterator<char>(os), (std::int32_t)str.size());
-        else
-          throw std::runtime_error("string too big");
-      }
-
-      os.write(str.data(), str.size());
-    }
-
-    template <typename T>
-    typename std::enable_if<std::is_signed<typename T::value_type>::value, std::uint32_t>::type
-    get_typed_value_size(const T& vec)
-    {
-      static_assert(!std::is_same<typename T::value_type, std::int64_t>::value && !std::is_same<typename T::value_type, double>::value, "64-bit integers not allowed in BCF spec.");
-      std::uint32_t ret;
-      if (vec.size() < 15)
-        ret = 1;
-      else if (vec.size() <= 0x7F)
-        ret = 2 + 1;
-      else if (vec.size() <= 0x7FFF)
-        ret = 2 + 2;
-      else if (vec.size() <= 0x7FFFFFFF)
-        ret = 2 + 4;
-      else
-        return -1; // vec too big
-
-      ret += vec.size() * sizeof(typename T::value_type);
-      return ret;
-    }
-
-    template <typename T>
-    typename std::enable_if<std::is_signed<T>::value, std::uint32_t>::type
-    get_typed_value_size(T)
-    {
-      static_assert(!std::is_same<T, std::int64_t>::value, "64-bit integers not allowed in BCF spec.");
-      return 1 + sizeof(T);
-    }
   }
 
   //namespace v2
@@ -583,8 +118,7 @@ namespace savvy
     static bool is_special_value(const T& v);
 
     template<typename T>
-    static typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type
-    type_code();
+    inline static std::uint8_t type_code();
 
     template<typename T>
     static typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type
@@ -804,12 +338,13 @@ namespace savvy
       init(v);
     }
 
-    typed_value(std::uint8_t type, std::size_t sz, char *data_ptr);
-    typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr);
+//    typed_value(std::uint8_t type, std::size_t sz, char *data_ptr);
+//    typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr);
     typed_value(std::int8_t type, char* str, char*const str_end);
+    typed_value(std::int8_t type, std::size_t sz);
 
-    void init(std::uint8_t type, std::size_t sz, char *data_ptr);
-    void init(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr);
+//    void init(std::uint8_t type, std::size_t sz, char *data_ptr);
+//    void init(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr);
 
     typed_value(typed_value&& src)
     {
@@ -824,6 +359,7 @@ namespace savvy
     std::size_t size() const { return size_; }
     std::size_t non_zero_size() const { return sparse_size_; }
 
+    bool pbwt_flag() const { return pbwt_flag_; }
     bool is_sparse() const { return off_type_ != 0; }
     std::size_t off_width() const { return (1u << bcf_type_shift[off_type_]); }
     std::size_t val_width() const { return (1u << bcf_type_shift[val_type_]); }
@@ -901,18 +437,17 @@ namespace savvy
       }
       else if (val_type_)
       {
-
+        // also sets dest.sparse_size_
         capply_dense(set_off_type(), std::ref(dest));
 
         dest.val_type_ = val_type_;
         dest.size_ = size_;
 
-        dest.local_data_.resize(dest.sparse_size_ * (1u << bcf_type_shift[dest.off_type_]) + dest.sparse_size_ * (1u << bcf_type_shift[val_type_]));
-        dest.off_ptr_ = dest.local_data_.data();
-        dest.val_ptr_ = dest.local_data_.data() + dest.sparse_size_ * (1u << bcf_type_shift[dest.off_type_]);
+        dest.off_data_.resize(dest.sparse_size_ * (1u << bcf_type_shift[dest.off_type_]));
+        dest.val_data_.resize(dest.sparse_size_ * (1u << bcf_type_shift[dest.val_type_]));
 
 
-        dest.apply_sparse(fill_sparse_data(), val_ptr_, size_);
+        dest.apply_sparse(fill_sparse_data(), val_data_.data(), size_);
 
       }
 
@@ -924,11 +459,10 @@ namespace savvy
 #endif
     bool copy_as_dense(typed_value& dest) const
     {
-      dest.local_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
+      dest.val_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
 
       dest.val_type_ = val_type_;
       dest.size_ = size_;
-      dest.val_ptr_ = dest.local_data_.data();
 
       if (off_type_)
       {
@@ -936,27 +470,27 @@ namespace savvy
         {
         case 0x01u:
         {
-          auto p = (std::int8_t*)dest.local_data_.data();
+          auto p = (std::int8_t*)dest.val_data_.data();
           return copy_sparse1<std::int8_t>(p);
         }
         case 0x02u:
         {
-          auto p = (std::int16_t*)dest.local_data_.data();
+          auto p = (std::int16_t*)dest.val_data_.data();
           return copy_sparse1<std::int16_t>(p); // TODO: handle endianess
         }
         case 0x03u:
         {
-          auto p = (std::int32_t*)dest.local_data_.data();
+          auto p = (std::int32_t*)dest.val_data_.data();
           return copy_sparse1<std::int32_t>(p);
         }
         case 0x04u:
         {
-          auto p = (std::int64_t*)dest.local_data_.data();
+          auto p = (std::int64_t*)dest.val_data_.data();
           return copy_sparse1<std::int64_t>(p);
         }
         case 0x05u:
         {
-          auto p = (float*)dest.local_data_.data();
+          auto p = (float*)dest.val_data_.data();
           return copy_sparse1<float>(p);
         }
         default:
@@ -968,19 +502,19 @@ namespace savvy
         switch (val_type_)
         {
         case 0x01u:
-          std::copy_n((std::int8_t*)val_ptr_, size_, (std::int8_t*)dest.local_data_.data());
+          std::copy_n((std::int8_t*)val_data_.data(), size_, (std::int8_t*)dest.val_data_.data());
           break;
         case 0x02u:
-          std::copy_n((std::int16_t*)val_ptr_, size_, (std::int16_t*)dest.local_data_.data()); // TODO: handle endianess
+          std::copy_n((std::int16_t*)val_data_.data(), size_, (std::int16_t*)dest.val_data_.data()); // TODO: handle endianess
           break;
         case 0x03u:
-          std::copy_n((std::int32_t*)val_ptr_, size_, (std::int32_t*)dest.local_data_.data());
+          std::copy_n((std::int32_t*)val_data_.data(), size_, (std::int32_t*)dest.val_data_.data());
           break;
         case 0x04u:
-          std::copy_n((std::int64_t*)val_ptr_, size_, (std::int64_t*)dest.local_data_.data());
+          std::copy_n((std::int64_t*)val_data_.data(), size_, (std::int64_t*)dest.val_data_.data());
           break;
         case 0x05u:
-          std::copy_n((float*)val_ptr_, size_, (float*)dest.local_data_.data());
+          std::copy_n((float*)val_data_.data(), size_, (float*)dest.val_data_.data());
           break;
         default:
           return false;
@@ -1065,21 +599,21 @@ namespace savvy
     template <typename ValT, typename Fn, typename... Args>
     bool apply_sparse_offsets(Fn fn, Args... args)
     {
-      if (!off_ptr_)
+      if (!off_data_.data())
         return false;
       switch (off_type_)
       {
       case 0x01u:
-        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint8_t*)off_ptr_, std::forward<Args>(args)...);
+        fn((ValT*)val_data_.data(), ((ValT*)val_data_.data()) + sparse_size_, (std::uint8_t*)off_data_.data(), std::forward<Args>(args)...);
         break;
       case 0x02u:
-        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint16_t*)off_ptr_, std::forward<Args>(args)...); // TODO: handle endianess
+        fn((ValT*)val_data_.data(), ((ValT*)val_data_.data()) + sparse_size_, (std::uint16_t*)off_data_.data(), std::forward<Args>(args)...); // TODO: handle endianess
         break;
       case 0x03u:
-        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint32_t*)off_ptr_, std::forward<Args>(args)...);
+        fn((ValT*)val_data_.data(), ((ValT*)val_data_.data()) + sparse_size_, (std::uint32_t*)off_data_.data(), std::forward<Args>(args)...);
         break;
       case 0x04u:
-        fn((ValT*)val_ptr_, ((ValT*)val_ptr_) + sparse_size_, (std::uint64_t*)off_ptr_, std::forward<Args>(args)...);
+        fn((ValT*)val_data_.data(), ((ValT*)val_data_.data()) + sparse_size_, (std::uint64_t*)off_data_.data(), std::forward<Args>(args)...);
         break;
       default:
         return false;
@@ -1112,21 +646,21 @@ namespace savvy
     template <typename ValT, typename Fn, typename... Args>
     bool capply_sparse_offsets(Fn fn, Args... args) const
     {
-      if (!off_ptr_)
+      if (!off_data_.data())
         return false;
       switch (off_type_)
       {
       case 0x01u:
-        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint8_t*)off_ptr_, std::forward<Args>(args)...);
+        fn((const ValT*)val_data_.data(), ((const ValT*)val_data_.data()) + sparse_size_, (const std::uint8_t*)off_data_.data(), std::forward<Args>(args)...);
         break;
       case 0x02u:
-        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint16_t*)off_ptr_, std::forward<Args>(args)...); // TODO: handle endianess
+        fn((const ValT*)val_data_.data(), ((const ValT*)val_data_.data()) + sparse_size_, (const std::uint16_t*)off_data_.data(), std::forward<Args>(args)...); // TODO: handle endianess
         break;
       case 0x03u:
-        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint32_t*)off_ptr_, std::forward<Args>(args)...);
+        fn((const ValT*)val_data_.data(), ((const ValT*)val_data_.data()) + sparse_size_, (const std::uint32_t*)off_data_.data(), std::forward<Args>(args)...);
         break;
       case 0x04u:
-        fn((const ValT*)val_ptr_, ((const ValT*)val_ptr_) + sparse_size_, (const std::uint64_t*)off_ptr_, std::forward<Args>(args)...);
+        fn((const ValT*)val_data_.data(), ((const ValT*)val_data_.data()) + sparse_size_, (const std::uint64_t*)off_data_.data(), std::forward<Args>(args)...);
         break;
       default:
         return false;
@@ -1159,27 +693,27 @@ namespace savvy
     template <typename Fn, typename... Args>
     bool apply_dense(Fn fn, Args... args)
     {
-      std::size_t sz = off_ptr_ ? sparse_size_ : size_;
+      std::size_t sz = off_type_ ? sparse_size_ : size_;
 
       switch (val_type_)
       {
       case 0x01u:
-        fn((std::int8_t*)val_ptr_, ((std::int8_t*)val_ptr_) + sz, std::forward<Args>(args)...);
+        fn((std::int8_t*)val_data_.data(), ((std::int8_t*)val_data_.data()) + sz, std::forward<Args>(args)...);
         break;
       case 0x02u:
-        fn((std::int16_t*)val_ptr_, ((std::int16_t*)val_ptr_) + sz, std::forward<Args>(args)...); // TODO: handle endianess
+        fn((std::int16_t*)val_data_.data(), ((std::int16_t*)val_data_.data()) + sz, std::forward<Args>(args)...); // TODO: handle endianess
         break;
       case 0x03u:
-        fn((std::int32_t*)val_ptr_, ((std::int32_t*)val_ptr_) + sz, std::forward<Args>(args)...);
+        fn((std::int32_t*)val_data_.data(), ((std::int32_t*)val_data_.data()) + sz, std::forward<Args>(args)...);
         break;
       case 0x04u:
-        fn((std::int64_t*)val_ptr_, ((std::int64_t*)val_ptr_) + sz, std::forward<Args>(args)...);
+        fn((std::int64_t*)val_data_.data(), ((std::int64_t*)val_data_.data()) + sz, std::forward<Args>(args)...);
         break;
       case 0x05u:
-        fn((float*)val_ptr_, ((float*)val_ptr_) + sz, std::forward<Args>(args)...);
+        fn((float*)val_data_.data(), ((float*)val_data_.data()) + sz, std::forward<Args>(args)...);
         break;
       case 0x07u:
-        fn(val_ptr_, val_ptr_ + sz, std::forward<Args>(args)...);
+        fn(val_data_.data(), val_data_.data() + sz, std::forward<Args>(args)...);
         break;
       default:
         return false;
@@ -1190,27 +724,27 @@ namespace savvy
     template <typename Fn, typename... Args>
     bool capply_dense(Fn fn, Args... args) const
     {
-      std::size_t sz = off_ptr_ ? sparse_size_ : size_;
+      std::size_t sz = off_type_ ? sparse_size_ : size_;
 
       switch (val_type_)
       {
       case 0x01u:
-        fn((const std::int8_t*)val_ptr_, ((const std::int8_t*)val_ptr_) + sz, std::forward<Args>(args)...);
+        fn((const std::int8_t*)val_data_.data(), ((const std::int8_t*)val_data_.data()) + sz, std::forward<Args>(args)...);
         break;
       case 0x02u:
-        fn((const std::int16_t*)val_ptr_, ((const std::int16_t*)val_ptr_) + sz, std::forward<Args>(args)...); // TODO: handle endianess
+        fn((const std::int16_t*)val_data_.data(), ((const std::int16_t*)val_data_.data()) + sz, std::forward<Args>(args)...); // TODO: handle endianess
         break;
       case 0x03u:
-        fn((const std::int32_t*)val_ptr_, ((const std::int32_t*)val_ptr_) + sz, std::forward<Args>(args)...);
+        fn((const std::int32_t*)val_data_.data(), ((const std::int32_t*)val_data_.data()) + sz, std::forward<Args>(args)...);
         break;
       case 0x04u:
-        fn((const std::int64_t*)val_ptr_, ((const std::int64_t*)val_ptr_) + sz, std::forward<Args>(args)...);
+        fn((const std::int64_t*)val_data_.data(), ((const std::int64_t*)val_data_.data()) + sz, std::forward<Args>(args)...);
         break;
       case 0x05u:
-        fn((const float*)val_ptr_, ((const float*)val_ptr_) + sz, std::forward<Args>(args)...);
+        fn((const float*)val_data_.data(), ((const float*)val_data_.data()) + sz, std::forward<Args>(args)...);
         break;
       case 0x07u:
-        fn((const char*)val_ptr_, ((const char*)val_ptr_) + sz, std::forward<Args>(args)...);
+        fn((const char*)val_data_.data(), ((const char*)val_data_.data()) + sz, std::forward<Args>(args)...);
         break;
       default:
         return false;
@@ -1221,7 +755,7 @@ namespace savvy
     template <typename Fn, typename... Args>
     bool apply(Fn fn, Args... args)
     {
-      if (off_ptr_)
+      if (off_type_)
         return apply_sparse(std::forward<Fn>(fn), std::forward<Args>(args)...);
       else
         return apply_dense(std::forward<Fn>(fn), std::forward<Args>(args)...);
@@ -1230,7 +764,7 @@ namespace savvy
     template <typename Fn, typename... Args>
     bool capply(Fn fn, Args... args) const
     {
-      if (off_ptr_)
+      if (off_type_)
         return capply_sparse(std::forward<Fn>(fn), std::forward<Args>(args)...);
       else
         return capply_dense(std::forward<Fn>(fn), std::forward<Args>(args)...);
@@ -1239,37 +773,37 @@ namespace savvy
     template <typename Fn>
     bool foreach_value(Fn& fn)
     {
-      std::size_t sz = off_ptr_ ? sparse_size_ : size_;
+      std::size_t sz = off_type_ ? sparse_size_ : size_;
       switch (val_type_)
       {
       case 0x01u:
         {
           typedef std::int8_t T;
-          std::for_each((T*)val_ptr_, ((T*)val_ptr_) + sz, fn);
+          std::for_each((T*)val_data_.data(), ((T*)val_data_.data()) + sz, fn);
         }
         break;
       case 0x02u:
         {
           typedef std::int16_t T;
-          std::for_each((T*)val_ptr_, ((T*)val_ptr_) + sz, fn); // TODO: handle endianess
+          std::for_each((T*)val_data_.data(), ((T*)val_data_.data()) + sz, fn); // TODO: handle endianess
         }
         break;
       case 0x03u:
         {
           typedef std::int32_t T;
-          std::for_each((T*)val_ptr_, ((T*)val_ptr_) + sz, fn);
+          std::for_each((T*)val_data_.data(), ((T*)val_data_.data()) + sz, fn);
         }
         break;
       case 0x04u:
         {
           typedef std::int64_t T;
-          std::for_each((T*)val_ptr_, ((T*)val_ptr_) + sz, fn);
+          std::for_each((T*)val_data_.data(), ((T*)val_data_.data()) + sz, fn);
         }
         break;
       case 0x05u:
         {
           typedef float T;
-          std::for_each((T*)val_ptr_, ((T*)val_ptr_) + sz, fn);
+          std::for_each((T*)val_data_.data(), ((T*)val_data_.data()) + sz, fn);
         }
         break;
       default:
@@ -1284,25 +818,25 @@ namespace savvy
     get(T& dest) const
     {
       static_assert(std::is_signed<T>::value, "Destination value_type must be signed.");
-      if (!val_ptr_ || size_ == 0)
+      if (!val_data_.data() || size_ == 0)
         return false;
 
       switch (val_type_)
       {
       case 0x01u:
-        dest = reserved_transformation<T>(*((std::int8_t*) val_ptr_));
+        dest = reserved_transformation<T>(*((std::int8_t*) val_data_.data()));
         break;
       case 0x02u:
-        dest = reserved_transformation<T>(*((std::int16_t*) val_ptr_)); // TODO: handle endianess
+        dest = reserved_transformation<T>(*((std::int16_t*) val_data_.data())); // TODO: handle endianess
         break;
       case 0x03u:
-        dest = reserved_transformation<T>(*((std::int32_t*) val_ptr_));
+        dest = reserved_transformation<T>(*((std::int32_t*) val_data_.data()));
         break;
       case 0x04u:
-        dest = reserved_transformation<T>(*((std::int64_t*) val_ptr_));
+        dest = reserved_transformation<T>(*((std::int64_t*) val_data_.data()));
         break;
       case 0x05u:
-        dest = *((float*)val_ptr_); // TODO: this needs a reserved_transformation for float to int conversions.
+        dest = *((float*)val_data_.data()); // TODO: this needs a reserved_transformation for float to int conversions.
         break;
       default:
         return false;
@@ -1313,7 +847,7 @@ namespace savvy
 
     bool get(std::string& dest) const
     {
-      if (!val_ptr_ || size_ == 0)
+      if (!val_data_.data() || size_ == 0)
         return false;
 
       switch (val_type_)
@@ -1331,7 +865,7 @@ namespace savvy
 //        dest = missing_transformation<T>(*((std::int64_t*)val_ptr_));
 //        break;
       case 0x07u:
-        dest.assign(val_ptr_, val_ptr_ + size_);
+        dest.assign(val_data_.data(), val_data_.data() + size_);
         break;
       default:
         return false;
@@ -1379,31 +913,31 @@ namespace savvy
         {
         case 0x01u:
         {
-          auto p = (std::int8_t*)val_ptr_;
+          auto p = (std::int8_t*)val_data_.data();
           std::transform(p, p + size_, dest.data(), reserved_transformation<T, std::int8_t>);
           break;
         }
         case 0x02u:
         {
-          auto p = (std::int16_t*)val_ptr_;
+          auto p = (std::int16_t*)val_data_.data();
           std::transform(p, p + size_, dest.data(), reserved_transformation<T, std::int16_t>);
           break;
         }
         case 0x03u:
         {
-          auto p = (std::int32_t*)val_ptr_;
+          auto p = (std::int32_t*)val_data_.data();
           std::transform(p, p + size_, dest.data(), reserved_transformation<T, std::int32_t>);
           break;
         }
         case 0x04u:
         {
-          auto p = (std::int64_t*)val_ptr_;
+          auto p = (std::int64_t*)val_data_.data();
           std::transform(p, p + size_, dest.data(), reserved_transformation<T, std::int64_t>);
           break;
         }
         case 0x05u:
         {
-          auto p = (float*)val_ptr_;
+          auto p = (float*)val_data_.data();
           std::transform(p, p + size_, dest.data(), reserved_transformation<T, float>);
           break;
         }
@@ -1517,20 +1051,20 @@ namespace savvy
         {
         case 0x01u:
         {
-          auto *vp = (std::int8_t *) val_ptr_;
+          auto *vp = (std::int8_t *) val_data_.data();
           switch (off_type_)
           {
           case 0x01u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x02u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x03u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x04u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           default:
             return false;
@@ -1539,20 +1073,20 @@ namespace savvy
         }
         case 0x02u:
         {
-          auto *vp = (std::int16_t *) val_ptr_;
+          auto *vp = (std::int16_t *) val_data_.data();
           switch (off_type_)
           {
           case 0x01u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x02u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x03u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x04u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           default:
             return false;
@@ -1561,20 +1095,20 @@ namespace savvy
         }
         case 0x03u:
         {
-          auto *vp = (std::int32_t *) val_ptr_;
+          auto *vp = (std::int32_t *) val_data_.data();
           switch (off_type_)
           {
           case 0x01u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x02u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x03u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_), reserved_transformation_functor<T>();
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_data_.data()), size_), reserved_transformation_functor<T>();
             break;
           case 0x04u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           default:
             return false;
@@ -1583,20 +1117,20 @@ namespace savvy
         }
         case 0x04u:
         {
-          auto *vp = (std::int64_t *) val_ptr_;
+          auto *vp = (std::int64_t *) val_data_.data();
           switch (off_type_)
           {
           case 0x01u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x02u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x03u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x04u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           default:
             return false;
@@ -1605,20 +1139,20 @@ namespace savvy
         }
         case 0x05u:
         {
-          auto *vp = (float *) val_ptr_;
+          auto *vp = (float *) val_data_.data();
           switch (off_type_)
           {
           case 0x01u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint8_t>((std::uint8_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x02u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint16_t>((std::uint16_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x03u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint32_t>((std::uint32_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           case 0x04u:
-            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_ptr_), size_, reserved_transformation_functor<T>());
+            dest.assign(vp, vp + sparse_size_, compressed_offset_iterator<std::uint64_t>((std::uint64_t *) off_data_.data()), size_, reserved_transformation_functor<T>());
             break;
           default:
             return false;
@@ -1638,31 +1172,31 @@ namespace savvy
         {
         case 0x01u:
         {
-          auto *p = (std::int8_t *) val_ptr_;
+          auto *p = (std::int8_t *) val_data_.data();
           dest.assign(p, p + size_, reserved_transformation_functor<T>());
           break;
         }
         case 0x02u:
         {
-          auto *p = (std::int16_t *) val_ptr_;
+          auto *p = (std::int16_t *) val_data_.data();
           dest.assign(p, p + size_, reserved_transformation_functor<T>());
           break;
         }// TODO: handle endianess
         case 0x03u:
         {
-          auto *p = (std::int32_t *) val_ptr_;
+          auto *p = (std::int32_t *) val_data_.data();
           dest.assign(p, p + size_, reserved_transformation_functor<T>());
           break;
         }
         case 0x04u:
         {
-          auto *p = (std::int64_t *) val_ptr_;
+          auto *p = (std::int64_t *) val_data_.data();
           dest.assign(p, p + size_, reserved_transformation_functor<T>());
           break;
         }
         case 0x05u:
         {
-          auto *p = (float *) val_ptr_;
+          auto *p = (float *) val_data_.data();
           dest.assign(p, p + size_, reserved_transformation_functor<T>());
           break;
         }
@@ -1680,16 +1214,94 @@ namespace savvy
     class internal
     {
     public:
-      static void pbwt_unsort(typed_value& v, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
+      struct endian_swapper_fn
+      {
+        template <typename T>
+        void operator()(T* valp, T* endp)
+        {
+          if (sizeof(T) > 1)
+            std::transform(valp, endp, valp, endianness::swap<T>);
+        }
+
+        template <typename ValT, typename OffT>
+        void operator()(ValT* valp, ValT* endp, OffT* offp)
+        {
+          if (sizeof(OffT) > 1)
+            std::transform(offp, offp + (endp - valp), offp, endianness::swap<OffT>);
+          if (sizeof(ValT) > 1)
+            std::transform(valp, endp, valp, endianness::swap<ValT>);
+        }
+      };
+
+      static void pbwt_unsort(const typed_value& src_v, typed_value& dest_v, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
 
       template<typename InIter, typename OutIter>
       static void pbwt_sort(InIter in_data, std::size_t in_data_size, OutIter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
+
+      static std::int64_t deserialize(typed_value& v, std::istream& is, std::size_t size_divisor);
 
       template<typename Iter>
       static void serialize(const typed_value& v, Iter out_it, std::size_t size_divisor);
 
       template<typename Iter>
       static void serialize(const typed_value& v, Iter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
+
+      //~~~~~~~~ OLD BCF ROUTINES ~~~~~~~~//
+      template<typename T>
+      static typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, std::uint8_t>::type
+      int_type(T val);
+
+      template <typename Iter, typename IntT>
+      static Iter deserialize_int(Iter it, Iter end, IntT& dest);
+
+      template <typename IntT>
+      static std::int64_t deserialize_int(std::istream& is, IntT& dest);
+
+      //    template <typename Iter>
+      //    static Iter deserialize_string(Iter it, Iter end, std::string& dest);
+
+      template <typename Iter, typename VecT>
+      static typename std::enable_if<std::is_same<typename std::iterator_traits<Iter>::value_type, char>::value, Iter>::type
+      deserialize_vec(Iter it, Iter end, VecT& dest);
+
+      template <typename VecT>
+      static std::int64_t deserialize_vec(std::istream& is, VecT& dest);
+
+      template <typename OutT, typename T>
+      static typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, bool>::type
+      serialize_typed_int_exact(OutT out_it, const T& val);
+
+      template <typename OutT, typename T>
+      static typename std::enable_if<std::is_signed<T>::value, bool>::type
+      serialize_typed_scalar(OutT out_it, const T& val);
+
+      template <typename T>
+      static typename std::enable_if<std::is_signed<T>::value, bool>::type
+      write_typed_scalar(std::ostream& os, const T& val);
+
+      template <typename OutT>
+      static bool serialize_type_and_size(OutT out_it, std::uint8_t type, std::size_t size);
+
+      template <typename Iter, typename T>
+      static typename std::enable_if<std::is_signed<T>::value, void>::type
+      serialize_typed_vec(Iter out_it, const std::vector<T>& vec);
+
+      template <typename T>
+      static typename std::enable_if<std::is_signed<T>::value, void>::type
+      write_typed_vec(std::ostream& os, const std::vector<T>& vec);
+
+      template <typename OutT>
+      static void serialize_typed_str(OutT out_it, const std::string& str);
+
+      static void write_typed_str(std::ostream& os, const std::string& str);
+
+      template <typename T>
+      static typename std::enable_if<std::is_signed<typename T::value_type>::value, std::uint32_t>::type
+      get_typed_value_size(const T& vec);
+
+      template <typename T>
+      static typename std::enable_if<std::is_signed<T>::value, std::uint32_t>::type
+      get_typed_value_size(T);
     };
 
   private:
@@ -1697,11 +1309,11 @@ namespace savvy
     {
       sparse_size_ = 0;
       size_ = 0;
-      off_ptr_ = nullptr;
-      val_ptr_ = nullptr;
       off_type_ = 0;
       val_type_ = 0;
-      local_data_.clear();
+      off_data_.clear();
+      val_data_.clear();
+      pbwt_flag_ = false;
     }
 
     struct thin_types_fn
@@ -1802,11 +1414,11 @@ namespace savvy
 #endif
     void minimize()
     {
-      if (off_ptr_)
+      if (off_type_)
       {
         apply_sparse(thin_types_fn(), this);
       }
-      else if (val_ptr_)
+      else if (val_type_)
       {
         apply_dense(thin_types_fn(), this);
       }
@@ -1871,7 +1483,7 @@ namespace savvy
 #if defined(__GNUC__) && !(defined(__clang__) || defined(__INTEL_COMPILER))
     __attribute((optimize("no-tree-vectorize")))
 #endif
-    bool subset(const std::vector<std::size_t>& subset_mask, std::size_t subset_size)
+    bool subset(const std::vector<std::size_t>& subset_mask, std::size_t subset_size, typed_value& tmp_value)
     {
       if (val_type_ == 0x07u)
       {
@@ -1897,30 +1509,30 @@ namespace savvy
 
       if (off_type_)
       {
-        assert(local_data_.data() != off_ptr_);
-        local_data_.resize(sizeof(std::uint64_t) * sparse_size_);
+        tmp_value.off_data_.resize(sizeof(std::uint64_t) * sparse_size_);
         switch (off_type_)
         {
         case 0x01u:
-          std::copy((std::uint8_t*)off_ptr_, ((std::uint8_t*)off_ptr_) + sparse_size_, (std::uint64_t*)local_data_.data());
+          std::copy((std::uint8_t*)off_data_.data(), ((std::uint8_t*)off_data_.data()) + sparse_size_, (std::uint64_t*)tmp_value.off_data_.data());
           break;
         case 0x02u:
-          std::copy((std::uint16_t*)off_ptr_, ((std::uint16_t*)off_ptr_) + sparse_size_, (std::uint64_t*)local_data_.data());
+          std::copy((std::uint16_t*)off_data_.data(), ((std::uint16_t*)off_data_.data()) + sparse_size_, (std::uint64_t*)tmp_value.off_data_.data());
           break;
         case 0x03u:
-          std::copy((std::uint32_t*)off_ptr_, ((std::uint32_t*)off_ptr_) + sparse_size_, (std::uint64_t*)local_data_.data());
+          std::copy((std::uint32_t*)off_data_.data(), ((std::uint32_t*)off_data_.data()) + sparse_size_, (std::uint64_t*)tmp_value.off_data_.data());
           break;
 //        case 0x04u:
 //          DO NOTHING
 //          break;
         }
+        std::swap(off_data_, tmp_value.off_data_);
         ret = apply_sparse(subset_shift_sparse_tpl(), subset_mask, size_, std::ref(sparse_size_));
       }
       else if (val_type_)
       {
         //dest.resize(subset.ids().size() * stride);
 
-        ret =apply_dense(subset_shift_tpl(), subset_mask); // TODO: handle endianess
+        ret = apply_dense(subset_shift_tpl(), subset_mask);
       }
 
       size_ = subset_size * stride;
@@ -1950,11 +1562,10 @@ namespace savvy
         dest_.val_type_ = type_code<ValT>();
         dest_.off_type_ = type_code<std::int64_t>();
         //dest_.size_ = subset_size_ * stride;
-        dest_.local_data_.resize(sp_sz * stride * sizeof(std::int64_t) + sp_sz * stride  * sizeof(ValT));
-        dest_.off_ptr_ = dest_.local_data_.data();
-        dest_.val_ptr_ = dest_.local_data_.data() + sp_sz * stride * sizeof(std::uint64_t);
-        ValT* dest_valp = (ValT*)dest_.val_ptr_;
-        std::uint64_t* dest_offp = (std::uint64_t*)dest_.off_ptr_;
+        dest_.off_data_.resize(sp_sz * stride * sizeof(std::int64_t));
+        dest_.val_data_.resize(sp_sz * stride  * sizeof(ValT));
+        ValT* dest_valp = (ValT*)dest_.val_data_.data();
+        std::uint64_t* dest_offp = (std::uint64_t*)dest_.off_data_.data();
 
         std::size_t last_offset_new = 0;
         std::size_t total_offset_old = 0;
@@ -1971,7 +1582,7 @@ namespace savvy
           }
         }
 
-        dest_.sparse_size_ = dest_valp - (ValT*)dest_.val_ptr_;
+        dest_.sparse_size_ = dest_valp - (ValT*)dest_.val_data_.data();
       }
 
       template <typename T>
@@ -1982,15 +1593,14 @@ namespace savvy
 
         dest_.val_type_ = type_code<T>();
         dest_.size_ = subset_size_ * stride;
-        dest_.local_data_.resize(dest_.size_ * sizeof(T));
-        dest_.val_ptr_ = dest_.local_data_.data();
+        dest_.val_data_.resize(dest_.size_ * sizeof(T));
 
         for (std::size_t i = 0; i < subset_map_.size(); ++i)
         {
           if (subset_map_[i] < std::numeric_limits<std::size_t>::max())
           {
             for (std::size_t j = 0; j < stride; ++j)
-              ((T*)dest_.val_ptr_)[subset_map_[i] * stride + j] = valp[i * stride + j];
+              ((T*)dest_.val_data_.data())[subset_map_[i] * stride + j] = valp[i * stride + j];
           }
         }
       }
@@ -2036,13 +1646,13 @@ namespace savvy
 
     void serialize_vcf(std::size_t idx, std::ostream& os, char delim) const
     {
-      assert(!off_ptr_ && idx < size_);
+      assert(!off_type_ && idx < size_);
 
       switch (val_type_)
       {
       case 0x01u:
       {
-        auto v = ((std::int8_t*)val_ptr_)[idx];
+        auto v = ((std::int8_t*)val_data_.data())[idx];
         if (is_end_of_vector(v))
           break;
         if (delim)
@@ -2053,7 +1663,7 @@ namespace savvy
       }
       case 0x02u:
       {
-        auto v = ((std::int16_t*)val_ptr_)[idx];
+        auto v = ((std::int16_t*)val_data_.data())[idx];
         if (is_end_of_vector(v))
           break;
         if (delim)
@@ -2064,7 +1674,7 @@ namespace savvy
       }
       case 0x03u:
       {
-        auto v = ((std::int32_t*)val_ptr_)[idx];
+        auto v = ((std::int32_t*)val_data_.data())[idx];
         if (is_end_of_vector(v))
           break;
         if (delim)
@@ -2075,7 +1685,7 @@ namespace savvy
       }
       case 0x04u:
       {
-        auto v = ((std::int64_t*)val_ptr_)[idx];
+        auto v = ((std::int64_t*)val_data_.data())[idx];
         if (is_end_of_vector(v))
           break;
         if (delim)
@@ -2086,7 +1696,7 @@ namespace savvy
       }
       case 0x05u:
       {
-        auto v = ((float*)val_ptr_)[idx];
+        auto v = ((float*)val_data_.data())[idx];
         if (is_end_of_vector(v))
           break;
         if (delim)
@@ -2097,8 +1707,8 @@ namespace savvy
       }
       case 0x07u:
       {
-        if (val_ptr_[idx] > '\r')
-          os.put(val_ptr_[idx]);
+        if (val_data_.data()[idx] > '\r')
+          os.put(val_data_.data()[idx]);
         break;
       }
       default:
@@ -2116,9 +1726,9 @@ namespace savvy
       std::size_t total_offset = 0;
       for (std::size_t i = 0; i < sparse_size_; ++i)
       {
-        int tmp_off = ((const OffT *) off_ptr_)[i];
+        OffT tmp_off = ((const OffT *) off_data_.data())[i];
         total_offset += tmp_off;
-        dest[total_offset++] = reserved_transformation<DestT, ValT>(((const ValT *) val_ptr_)[i]);;
+        dest[total_offset++] = reserved_transformation<DestT, ValT>(((const ValT *) val_data_.data())[i]);;
       }
     }
 
@@ -2183,9 +1793,12 @@ namespace savvy
     std::uint8_t off_type_ = 0;
     std::size_t size_ = 0;
     std::size_t sparse_size_ = 0;
-    char *off_ptr_ = nullptr;
-    char *val_ptr_ = nullptr;
-    std::vector<char> local_data_;
+//    char *off_ptr_ = nullptr;
+//    char *val_ptr_ = nullptr;
+//    std::vector<char> local_data_;
+    std::vector<char> off_data_;
+    std::vector<char> val_data_;
+    bool pbwt_flag_ = false;
   };
 
   template<>
@@ -2270,23 +1883,13 @@ namespace savvy
     return false;
   }
 
-  template<typename T>
-  typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type typed_value::type_code()
-  {
-    if (std::is_same<T, std::int8_t>::value)
-      return typed_value::int8;
-    if (std::is_same<T, std::int16_t>::value)
-      return typed_value::int16;
-    if (std::is_same<T, std::int32_t>::value)
-      return typed_value::int32;
-    if (std::is_same<T, std::int64_t>::value)
-      return typed_value::int64;
-    if (std::is_same<T, float>::value)
-      return typed_value::real;
-    if (std::is_same<T, double>::value)
-      return typed_value::real64;
-    return 0;
-  }
+  template <> inline std::uint8_t typed_value::type_code<std::int8_t>() { return typed_value::int8; }
+  template <> inline std::uint8_t typed_value::type_code<std::int16_t>() { return typed_value::int16; }
+  template <> inline std::uint8_t typed_value::type_code<std::int32_t>() { return typed_value::int32; }
+  template <> inline std::uint8_t typed_value::type_code<std::int64_t>() { return typed_value::int64; }
+  template <> inline std::uint8_t typed_value::type_code<float>() { return typed_value::real; }
+  template <> inline std::uint8_t typed_value::type_code<double>() { return typed_value::real64; }
+  template <> inline std::uint8_t typed_value::type_code<char>() { return typed_value::str; }
 
   template<typename T>
   typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type typed_value::type_code_ignore_missing(const T& val)
@@ -2412,53 +2015,53 @@ namespace savvy
     return DestT(in);
   }
 
-  inline
-  typed_value::typed_value(std::uint8_t type, std::size_t sz, char *data_ptr) :
-    val_type_(type),
-    size_(sz),
-    val_ptr_(data_ptr)
-  {
-    if (!val_ptr_)
-    {
-      local_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
-      val_ptr_ = local_data_.data();
-    }
-  }
-
-  inline
-  void typed_value::init(std::uint8_t type, std::size_t sz, char *data_ptr)
-  {
-    val_type_ = type;
-    off_type_ =  0;
-    size_ = sz;
-    sparse_size_ = 0;
-    val_ptr_ = data_ptr;
-    off_ptr_ = nullptr;
-    local_data_.clear();
-  }
-
-  inline
-  typed_value::typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr) :
-    val_type_(val_type),
-    off_type_(off_type),
-    size_(sz),
-    sparse_size_(sp_sz),
-    off_ptr_(data_ptr),
-    val_ptr_(data_ptr + sp_sz * (1u << bcf_type_shift[off_type]))
-  {
-  }
-
-  inline
-  void typed_value::init(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr)
-  {
-    val_type_ = val_type;
-    off_type_ = off_type;
-    size_ = sz;
-    sparse_size_ = sp_sz;
-    val_ptr_ = data_ptr + sp_sz * (1u << bcf_type_shift[off_type]);
-    off_ptr_ = data_ptr;
-    local_data_.clear();
-  }
+//  inline
+//  typed_value::typed_value(std::uint8_t type, std::size_t sz, char *data_ptr) :
+//    val_type_(type),
+//    size_(sz),
+//    val_ptr_(data_ptr)
+//  {
+//    if (!val_ptr_)
+//    {
+//      local_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
+//      val_ptr_ = local_data_.data();
+//    }
+//  }
+//
+//  inline
+//  void typed_value::init(std::uint8_t type, std::size_t sz, char *data_ptr)
+//  {
+//    val_type_ = type;
+//    off_type_ =  0;
+//    size_ = sz;
+//    sparse_size_ = 0;
+//    val_ptr_ = data_ptr;
+//    off_ptr_ = nullptr;
+//    local_data_.clear();
+//  }
+//
+//  inline
+//  typed_value::typed_value(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr) :
+//    val_type_(val_type),
+//    off_type_(off_type),
+//    size_(sz),
+//    sparse_size_(sp_sz),
+//    off_ptr_(data_ptr),
+//    val_ptr_(data_ptr + sp_sz * (1u << bcf_type_shift[off_type]))
+//  {
+//  }
+//
+//  inline
+//  void typed_value::init(std::uint8_t val_type, std::size_t sz, std::uint8_t off_type, std::size_t sp_sz, char *data_ptr)
+//  {
+//    val_type_ = val_type;
+//    off_type_ = off_type;
+//    size_ = sz;
+//    sparse_size_ = sp_sz;
+//    val_ptr_ = data_ptr + sp_sz * (1u << bcf_type_shift[off_type]);
+//    off_ptr_ = data_ptr;
+//    local_data_.clear();
+//  }
 
   inline
   typed_value& typed_value::operator=(typed_value&& src)
@@ -2469,16 +2072,16 @@ namespace savvy
       off_type_ = src.off_type_;
       size_ = src.size_;
       sparse_size_ = src.sparse_size_;
-      val_ptr_ = src.val_ptr_;
-      off_ptr_ = src.off_ptr_;
-      local_data_.swap(src.local_data_); // src may be reused, so keep src.local_data_ valid by swapping.
+      // src may be reused, so keep src.{val|off}_data_ valid by swapping.
+      val_data_.swap(src.val_data_);
+      off_data_.swap(src.off_data_);
+      pbwt_flag_ = src.pbwt_flag_;
 
       src.val_type_ = 0;
       src.off_type_ = 0;
       src.size_ = 0;
       src.sparse_size_ = 0;
-      src.val_ptr_ = nullptr;
-      src.off_ptr_ = nullptr;
+      src.pbwt_flag_ = false;
     }
     return *this;
   }
@@ -2504,16 +2107,16 @@ namespace savvy
       off_type_ = src.off_type_;
       size_ = src.size_;
       sparse_size_ = src.sparse_size_;
+      pbwt_flag_ = src.pbwt_flag_;
 
       std::size_t off_width = off_type_ ? 1u << bcf_type_shift[off_type_] : 0;
       std::size_t val_width = val_type_ ?  1u << bcf_type_shift[val_type_] : 0;
       std::size_t sz = off_type_ ? sparse_size_ : size_;
-      local_data_.resize(off_width * sz + val_width * sz);
-      off_ptr_ = off_type_ ? local_data_.data() : nullptr;
-      val_ptr_ = val_type_ ? local_data_.data() + off_width * sz : nullptr;
+      off_data_.resize(off_width * sz);
+      val_data_.resize(val_width * sz);
 
-      std::memcpy(off_ptr_, src.off_ptr_, off_width * sz);
-      std::memcpy(val_ptr_, src.val_ptr_, val_width * sz);
+      std::memcpy(off_data_.data(), src.off_data_.data(), off_width * sz);
+      std::memcpy(val_data_.data(), src.val_data_.data(), val_width * sz);
     }
     return *this;
   }
@@ -2638,29 +2241,105 @@ namespace savvy
     }
   }
 
-  inline void typed_value::internal::pbwt_unsort(typed_value& v, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts)
+  inline void typed_value::internal::pbwt_unsort(const typed_value& src_v, typed_value& dest_v, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts)
   {
-    assert(v.off_ptr_ == nullptr);
+    assert(src_v.off_type_ == 0);
     //assert(v.local_data_.empty());
 
-    if (v.off_ptr_)
+    dest_v.size_ = src_v.size_;
+    dest_v.sparse_size_ = src_v.sparse_size_;
+    dest_v.val_type_ = src_v.val_type_;
+    dest_v.off_type_ = src_v.off_type_;
+    dest_v.pbwt_flag_ = false;
+
+    if (src_v.off_type_)
     {
       fprintf(stderr, "PBWT sort not supported with sparse vectors\n"); // TODO: implement
       exit(-1);
     }
-    else if (v.val_ptr_)
+    else if (src_v.val_type_)
     {
-
-      v.local_data_.resize(v.size_ * (1u << bcf_type_shift[v.val_type_]));
-      if (v.val_type_ == 0x01u) ::savvy::pbwt_unsort((std::int8_t *) v.val_ptr_, v.size_, (std::int8_t *) v.local_data_.data(), sort_mapping, prev_sort_mapping, counts);
-      else if (v.val_type_ == 0x02u) ::savvy::pbwt_unsort((std::int16_t *) v.val_ptr_, v.size_, (std::int16_t *) v.local_data_.data(), sort_mapping, prev_sort_mapping, counts); // TODO: make sure this works
+      dest_v.val_data_.resize(src_v.size_ * (1u << bcf_type_shift[src_v.val_type_]));
+      if (src_v.val_type_ == 0x01u) ::savvy::pbwt_unsort((std::int8_t *) src_v.val_data_.data(), src_v.size_, (std::int8_t *) dest_v.val_data_.data(), sort_mapping, prev_sort_mapping, counts);
+      else if (src_v.val_type_ == 0x02u) ::savvy::pbwt_unsort((std::int16_t *) src_v.val_data_.data(), src_v.size_, (std::int16_t *) dest_v.val_data_.data(), sort_mapping, prev_sort_mapping, counts); // TODO: make sure this works
       else
       {
         fprintf(stderr, "PBWT sorted vector values cannot be wider than 16 bits\n"); // TODO: handle better
         exit(-1);
       }
-      v.val_ptr_ = v.local_data_.data();
     }
+  }
+
+  inline
+  std::int64_t typed_value::internal::deserialize(typed_value& v, std::istream& is, std::size_t size_divisor)
+  {
+    v.clear();
+    std::uint8_t type_byte = is.get();
+    std::uint8_t type = 0x07u & type_byte;
+    v.pbwt_flag_ = bool(0x08u & type_byte);
+
+    std::int64_t bytes_read = 1;
+    v.size_ = type_byte >> 4u; // TODO: support BCF vector size.
+    if (v.size_ == 15u)
+      bytes_read += internal::deserialize_int(is, v.size_);
+
+    v.size_ *= size_divisor; // for BCF FORMAT fields.
+
+    if (!is.good())
+      return -1;
+
+    if (v.size_ && type == typed_value::sparse)
+    {
+
+      std::uint8_t sp_type_byte = is.get();
+      ++bytes_read;
+      v.off_type_ = sp_type_byte >> 4u;
+      v.val_type_ = sp_type_byte & 0x0Fu;
+      v.sparse_size_ = 0;
+      bytes_read += internal::deserialize_int(is, v.sparse_size_);
+      //                if (indiv_it == v.indiv_buf_.end())
+      //                  break;
+      std::size_t off_width = 1u << bcf_type_shift[v.off_type_];
+      std::size_t val_width = 1u << bcf_type_shift[v.val_type_];
+      //std::size_t pair_width = off_width + val_width;
+
+      //fmt_it->first = fmt_key;
+      //fmt_it->second.init(val_type, sz, off_type, sp_sz, v.indiv_buf_.data() + (indiv_it - v.indiv_buf_.begin()));
+      v.off_data_.resize(v.sparse_size_ * off_width);
+      is.read(v.off_data_.data(), v.off_data_.size());
+      bytes_read += v.off_data_.size();
+
+      v.val_data_.resize(v.sparse_size_ * val_width);
+      is.read(v.val_data_.data(), v.val_data_.size());
+      bytes_read += v.val_data_.size();
+
+      if (!is.good())
+        return -1;
+
+      if (endianness::is_big() && v.sparse_size_)
+      {
+        v.apply(endian_swapper_fn());
+      }
+    }
+    else
+    {
+      v.off_type_ = 0;
+      v.val_type_ = type;
+      v.sparse_size_ = 0;
+
+      std::size_t type_width = 1u << bcf_type_shift[v.val_type_];
+
+      v.val_data_.resize(v.size_ * type_width);
+      is.read(v.val_data_.data(), v.val_data_.size());
+      bytes_read += v.val_data_.size();
+
+      if (endianness::is_big() && v.size_)
+      {
+        v.apply(endian_swapper_fn());
+      }
+    }
+
+    return is.good() ? bytes_read : -1;
   }
 
   template <typename Iter>
@@ -2673,30 +2352,30 @@ namespace savvy
     *(out_it++) = type_byte;
 
     if (sz >= 15u)
-      bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(sz));
+      internal::serialize_typed_scalar(out_it, static_cast<std::int64_t>(sz));
 
     sz = v.size_;
 
-    if (v.off_type_)
+    if (v.off_type_ && v.size_)
     {
       sz = v.sparse_size_;
       type_byte = std::uint8_t(v.off_type_ << 4u) | v.val_type_;
       *(out_it++) = type_byte;
-      bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(sz));
+      internal::serialize_typed_scalar(out_it, static_cast<std::int64_t>(sz));
       std::size_t off_width = (1u << bcf_type_shift[v.off_type_]);
       if (endianness::is_big() && off_width > 1)
       {
         // TODO: this is a slow approach, but big-endian systems should be rare.
-        char* ip_end = v.off_ptr_ + sz * off_width;
-        for (char* ip = v.off_ptr_; ip < ip_end; ip+=off_width)
+        const char* ip_end = v.off_data_.data() + sz * off_width;
+        for (const char* ip = v.off_data_.data(); ip < ip_end; ip+=off_width)
         {
-          for (char* jp = ip + off_width - 1; jp >= ip; --jp)
+          for (const char* jp = ip + off_width - 1; jp >= ip; --jp)
             *(out_it++) = *jp;
         }
       }
       else
       {
-        std::copy_n(v.off_ptr_, sz * off_width, out_it);
+        std::copy_n(v.off_data_.data(), sz * off_width, out_it);
       }
     }
 
@@ -2705,16 +2384,16 @@ namespace savvy
     if (endianness::is_big() && val_width > 1)
     {
       // TODO: this is a slow approach, but big-endian systems should be rare.
-      char* ip_end = v.val_ptr_ + sz * val_width;
-      for (char* ip = v.val_ptr_; ip < ip_end; ip+=val_width)
+      const char* ip_end = v.val_data_.data() + sz * val_width;
+      for (const char* ip = v.val_data_.data(); ip < ip_end; ip+=val_width)
       {
-        for (char* jp = ip + val_width - 1; jp >= ip; --jp)
+        for (const char* jp = ip + val_width - 1; jp >= ip; --jp)
           *(out_it++) = *jp;
       }
     }
     else
     {
-      std::copy_n(v.val_ptr_, sz * val_width, out_it);
+      std::copy_n(v.val_data_.data(), sz * val_width, out_it);
     }
 
   }
@@ -2797,14 +2476,14 @@ namespace savvy
     type_byte = std::uint8_t(std::min(std::size_t(15), v.size_) << 4u) | type_byte;
     *(out_it++) = type_byte;
     if (v.size_ >= 15u)
-      bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.size_));
+      internal::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.size_));
 
-    if (v.off_type_)
+    if (v.off_type_ && v.size_)
     {
       assert(!"This should never happen"); // TODO: Then why is this here?
       type_byte = std::uint8_t(v.off_type_ << 4u) | v.val_type_;
       *(out_it++) = type_byte;
-      bcf::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.sparse_size_));
+      internal::serialize_typed_scalar(out_it, static_cast<std::int64_t>(v.sparse_size_));
       //std::size_t pair_width = (1u << bcf_type_shift[v.off_type_]) + (1u << bcf_type_shift[v.val_type_]);
       std::size_t off_width = (1u << bcf_type_shift[v.off_type_]);
       std::size_t val_width = (1u << bcf_type_shift[v.val_type_]);
@@ -2812,31 +2491,31 @@ namespace savvy
       if (endianness::is_big() && off_width > 1)
       {
         // TODO: this is a slow approach, but big-endian systems should be rare.
-        char* ip_end = v.off_ptr_ + v.sparse_size_ * off_width;
-        for (char* ip = v.off_ptr_; ip < ip_end; ip+=off_width)
+        const char* ip_end = v.off_data_.data() + v.sparse_size_ * off_width;
+        for (const char* ip = v.off_data_.data(); ip < ip_end; ip+=off_width)
         {
-          for (char* jp = ip + off_width - 1; jp >= ip; --jp)
+          for (const char* jp = ip + off_width - 1; jp >= ip; --jp)
             *(out_it++) = *jp;
         }
 
-        ip_end = v.val_ptr_ + v.sparse_size_ * val_width;
-        for (char* ip = v.val_ptr_; ip < ip_end; ip+=val_width)
+        ip_end = v.val_data_.data() + v.sparse_size_ * val_width;
+        for (const char* ip = v.val_data_.data(); ip < ip_end; ip+=val_width)
         {
-          for (char* jp = ip + val_width - 1; jp >= ip; --jp)
+          for (const char* jp = ip + val_width - 1; jp >= ip; --jp)
             *(out_it++) = *jp;
         }
       }
       else
       {
-        std::copy_n(v.off_ptr_, v.sparse_size_ * off_width, out_it);
-        std::copy_n(v.val_ptr_, v.sparse_size_ * val_width, out_it);
+        std::copy_n(v.off_data_.data(), v.sparse_size_ * off_width, out_it);
+        std::copy_n(v.val_data_.data(), v.sparse_size_ * val_width, out_it);
       }
     }
     else
     {
       // ---- PBWT ---- //
-      if (v.val_type_ == 0x01u) internal::pbwt_sort((std::int8_t *) v.val_ptr_, v.size_, out_it, sort_mapping, prev_sort_mapping, counts);
-      else if (v.val_type_ == 0x02u) internal::pbwt_sort((std::int16_t *) v.val_ptr_, v.size_, out_it, sort_mapping, prev_sort_mapping, counts); // TODO: make sure this works
+      if (v.val_type_ == 0x01u) internal::pbwt_sort((std::int8_t *) v.val_data_.data(), v.size_, out_it, sort_mapping, prev_sort_mapping, counts);
+      else if (v.val_type_ == 0x02u) internal::pbwt_sort((std::int16_t *) v.val_data_.data(), v.size_, out_it, sort_mapping, prev_sort_mapping, counts); // TODO: make sure this works
       else
       {
         fprintf(stderr, "PBWT sorted vector values cannot be wider than 16 bits\n"); // TODO: handle better
@@ -2854,9 +2533,8 @@ namespace savvy
     size_ = 1;
     std::size_t width = 1u << bcf_type_shift[val_type_];
     // TODO: handle endianess
-    local_data_.resize(width);
-    std::memcpy(local_data_.data(), &v, width);
-    val_ptr_ = local_data_.data();
+    val_data_.resize(width);
+    std::memcpy(val_data_.data(), &v, width);
   }
 
   template<typename T>
@@ -2889,25 +2567,24 @@ namespace savvy
     size_ = vec.size();
     std::size_t width = 1u << bcf_type_shift[val_type_];
 
-    local_data_.resize(width * size_);
-    val_ptr_ = local_data_.data();
+    val_data_.resize(width * size_);
 
     switch (val_type_)
     {
     case 0x01u:
-      std::transform(vec.begin(), vec.begin() + size_, (std::int8_t*) val_ptr_, reserved_transformation<std::int8_t, typename T::value_type>);
+      std::transform(vec.begin(), vec.begin() + size_, (std::int8_t*) val_data_.data(), reserved_transformation<std::int8_t, typename T::value_type>);
       break;
     case 0x02u:
-      std::transform(vec.begin(), vec.begin() + size_, (std::int16_t*) val_ptr_, reserved_transformation<std::int16_t, typename T::value_type>); // TODO: handle endianess
+      std::transform(vec.begin(), vec.begin() + size_, (std::int16_t*) val_data_.data(), reserved_transformation<std::int16_t, typename T::value_type>); // TODO: handle endianess
       break;
     case 0x03u:
-      std::transform(vec.begin(), vec.begin() + size_, (std::int32_t*) val_ptr_, reserved_transformation<std::int32_t, typename T::value_type>);
+      std::transform(vec.begin(), vec.begin() + size_, (std::int32_t*) val_data_.data(), reserved_transformation<std::int32_t, typename T::value_type>);
       break;
     case 0x04u:
-      std::transform(vec.begin(), vec.begin() + size_, (std::int64_t*) val_ptr_, reserved_transformation<std::int64_t, typename T::value_type>);
+      std::transform(vec.begin(), vec.begin() + size_, (std::int64_t*) val_data_.data(), reserved_transformation<std::int64_t, typename T::value_type>);
       break;
     case 0x05u:
-      std::transform(vec.begin(), vec.begin() + size_, (float*) val_ptr_, reserved_transformation<float, typename T::value_type>);
+      std::transform(vec.begin(), vec.begin() + size_, (float*) val_data_.data(), reserved_transformation<float, typename T::value_type>);
       break;
     }
   }
@@ -2975,47 +2652,42 @@ namespace savvy
     size_ = vec.size();
     std::size_t off_width = 1u << bcf_type_shift[off_type_];
     std::size_t val_width = 1u << bcf_type_shift[val_type_];
-    std::size_t pair_width = off_width + val_width;
 
-    local_data_.resize(pair_width * sparse_size_);
-    off_ptr_ = local_data_.data();
-    val_ptr_ = local_data_.data() + (sparse_size_ * off_width);
-
-
-
+    off_data_.resize(off_width * sparse_size_);
+    val_data_.resize(val_width * sparse_size_);
 
     switch (off_type_)
     {
     case 0x01u:
-      copy_offsets(vec.index_data(), sparse_size_, (std::uint8_t*)off_ptr_);
+      copy_offsets(vec.index_data(), sparse_size_, (std::uint8_t*)off_data_.data());
       break;
     case 0x02u:
-      copy_offsets(vec.index_data(), sparse_size_, (std::uint16_t*)off_ptr_); // TODO: handle endianess
+      copy_offsets(vec.index_data(), sparse_size_, (std::uint16_t*)off_data_.data()); // TODO: handle endianess
       break;
     case 0x03u:
-      copy_offsets(vec.index_data(), sparse_size_, (std::uint32_t*)off_ptr_);
+      copy_offsets(vec.index_data(), sparse_size_, (std::uint32_t*)off_data_.data());
       break;
     case 0x04u:
-      copy_offsets(vec.index_data(), sparse_size_, (std::uint64_t*)off_ptr_);
+      copy_offsets(vec.index_data(), sparse_size_, (std::uint64_t*)off_data_.data());
       break;
     }
 
     switch (val_type_)
     {
     case 0x01u:
-      std::transform(vec.begin(), vec.end(), (std::int8_t*) val_ptr_, reserved_transformation<std::int8_t, typename T::value_type>);
+      std::transform(vec.begin(), vec.end(), (std::int8_t*) val_data_.data(), reserved_transformation<std::int8_t, typename T::value_type>);
       break;
     case 0x02u:
-      std::transform(vec.begin(), vec.end(), (std::int16_t*) val_ptr_, reserved_transformation<std::int16_t, typename T::value_type>); // TODO: handle endianess
+      std::transform(vec.begin(), vec.end(), (std::int16_t*) val_data_.data(), reserved_transformation<std::int16_t, typename T::value_type>); // TODO: handle endianess
       break;
     case 0x03u:
-      std::transform(vec.begin(), vec.end(), (std::int32_t*) val_ptr_, reserved_transformation<std::int32_t, typename T::value_type>);
+      std::transform(vec.begin(), vec.end(), (std::int32_t*) val_data_.data(), reserved_transformation<std::int32_t, typename T::value_type>);
       break;
     case 0x04u:
-      std::transform(vec.begin(), vec.end(), (std::int64_t*) val_ptr_, reserved_transformation<std::int64_t, typename T::value_type>);
+      std::transform(vec.begin(), vec.end(), (std::int64_t*) val_data_.data(), reserved_transformation<std::int64_t, typename T::value_type>);
       break;
     case 0x05u:
-      std::transform(vec.begin(), vec.end(), (float*) val_ptr_, reserved_transformation<float, typename T::value_type>);
+      std::transform(vec.begin(), vec.end(), (float*) val_data_.data(), reserved_transformation<float, typename T::value_type>);
       break;
     }
   }
@@ -3028,9 +2700,8 @@ namespace savvy
 
     size_ = vec.size();
 
-    local_data_.resize(size_);
-    val_ptr_ = local_data_.data();
-    std::copy_n(vec.begin(), size_, local_data_.begin());
+    val_data_.resize(size_);
+    std::copy_n(vec.begin(), size_, val_data_.begin());
   }
 
 
@@ -3039,7 +2710,7 @@ namespace savvy
   inline
   std::ostream& operator<<(std::ostream& os, const typed_value& v)
   {
-    if (!v.val_ptr_ || v.size_ == 0)
+    if (!v.val_type_ || v.size_ == 0)
     {
       os << ".";
     }
@@ -3052,22 +2723,22 @@ namespace savvy
         switch (v.val_type_)
         {
         case 0x01u:
-          os << static_cast<int>(*(((std::int8_t*)v.val_ptr_) + i));
+          os << static_cast<int>(*(((std::int8_t*)v.val_data_.data()) + i));
           break;
         case 0x02u:
-          os << *(((std::int16_t*)v.val_ptr_) + i); // TODO: handle endianess
+          os << *(((std::int16_t*)v.val_data_.data()) + i); // TODO: handle endianess
           break;
         case 0x03u:
-          os << *(((std::int32_t*)v.val_ptr_) + i);
+          os << *(((std::int32_t*)v.val_data_.data()) + i);
           break;
         case 0x04u:
-          os << *(((std::int64_t*)v.val_ptr_) + i);
+          os << *(((std::int64_t*)v.val_data_.data()) + i);
           break;
         case 0x05u:
-          os << *(((float*)v.val_ptr_) + i);
+          os << *(((float*)v.val_data_.data()) + i);
           break;
         case 0x07u:
-          os.write(v.val_ptr_, v.size_);
+          os.write(v.val_data_.data(), v.size_);
           i = v.size_;
           break;
         default:
@@ -3091,9 +2762,9 @@ namespace savvy
       for ( ; str < str_end; ++str)
       {
         typedef std::int8_t T;
-        local_data_.resize(local_data_.size() + sizeof(T));
-        if (*str == '.') ((T*)val_ptr_)[size_++] = T(0x80), ++str;
-        else ((T*)local_data_.data())[size_++] = std::strtol(str, &str, 10);
+        val_data_.resize(val_data_.size() + sizeof(T));
+        if (*str == '.') ((T*)val_data_.data())[size_++] = T(0x80), ++str;
+        else ((T*)val_data_.data())[size_++] = std::strtol(str, &str, 10);
       }
       break;
     }
@@ -3102,9 +2773,9 @@ namespace savvy
       for ( ; str < str_end; ++str)
       {
         typedef std::int16_t T;
-        local_data_.resize(local_data_.size() + sizeof(T));
-        if (*str == '.') ((T*)val_ptr_)[size_++] = T(0x8000), ++str;
-        else ((T*)local_data_.data())[size_++] = std::strtol(str, &str, 10);
+        val_data_.resize(val_data_.size() + sizeof(T));
+        if (*str == '.') ((T*)val_data_.data())[size_++] = T(0x8000), ++str;
+        else ((T*)val_data_.data())[size_++] = std::strtol(str, &str, 10);
       }
       break;
     }
@@ -3113,9 +2784,9 @@ namespace savvy
       for ( ; str < str_end; ++str)
       {
         typedef std::int32_t T;
-        local_data_.resize(local_data_.size() + sizeof(T));
-        if (*str == '.') ((T*)val_ptr_)[size_++] = T(0x80000000), ++str;
-        else ((T*)local_data_.data())[size_++] = std::strtol(str, &str, 10);
+        val_data_.resize(val_data_.size() + sizeof(T));
+        if (*str == '.') ((T*)val_data_.data())[size_++] = T(0x80000000), ++str;
+        else ((T*)val_data_.data())[size_++] = std::strtol(str, &str, 10);
       }
       break;
     }
@@ -3124,9 +2795,9 @@ namespace savvy
       for ( ; str < str_end; ++str)
       {
         typedef std::int64_t T;
-        local_data_.resize(local_data_.size() + sizeof(T));
-        if (*str == '.') ((T*)val_ptr_)[size_++] = T(0x8000000000000000), ++str;
-        else ((T*)local_data_.data())[size_++] = std::strtol(str, &str, 10);
+        val_data_.resize(val_data_.size() + sizeof(T));
+        if (*str == '.') ((T*)val_data_.data())[size_++] = T(0x8000000000000000), ++str;
+        else ((T*)val_data_.data())[size_++] = std::strtol(str, &str, 10);
       }
       break;
     }
@@ -3135,30 +2806,36 @@ namespace savvy
       for ( ; str < str_end; ++str)
       {
         typedef float T;
-        local_data_.resize(local_data_.size() + sizeof(T));
-        if (*str == '.') ((T*)val_ptr_)[size_++] = missing_value<float>(), ++str;
-        else ((T*)local_data_.data())[size_++] = std::strtof(str, &str);
+        val_data_.resize(val_data_.size() + sizeof(T));
+        if (*str == '.') ((T*)val_data_.data())[size_++] = missing_value<float>(), ++str;
+        else ((T*)val_data_.data())[size_++] = std::strtof(str, &str);
       }
       break;
     }
     case 0x07u:
     {
-      local_data_.assign(str, str_end);
-      size_ = local_data_.size();
+      val_data_.assign(str, str_end);
+      size_ = val_data_.size();
       break;
     }
     default:
       return; // TODO: Maybe return false
 
     }
+  }
 
-    val_ptr_ = local_data_.data();
+  inline
+  typed_value::typed_value(std::int8_t type, std::size_t sz) :
+    val_type_(type),
+    size_(sz)
+  {
+    val_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
   }
 
   inline
   void typed_value::deserialize_vcf(std::size_t idx, std::size_t length, char* str)
   {
-    assert(!off_ptr_ && idx < size_);
+    assert(!off_type_ && idx < size_);
 
     std::size_t end = idx + length;
 
@@ -3168,65 +2845,65 @@ namespace savvy
     {
       for ( ; idx < end && *str != '\0'; ++idx,++str)
       {
-        if (*str == '.') ((std::int8_t*)val_ptr_)[idx] = std::int8_t(0x80), ++str;
-        else ((std::int8_t*)val_ptr_)[idx] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int8_t*)val_data_.data())[idx] = std::int8_t(0x80), ++str;
+        else ((std::int8_t*)val_data_.data())[idx] = std::strtol(str, &str, 10);
         if (*str == '\0') --str;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int8_t*)val_ptr_)[idx] = std::int8_t(0x81);
+        ((std::int8_t*)val_data_.data())[idx] = std::int8_t(0x81);
       break;
     }
     case 0x02u:
     {
       for ( ; idx < end && *str != '\0'; ++idx,++str)
       {
-        if (*str == '.') ((std::int16_t*)val_ptr_)[idx] = std::int16_t(0x8000), ++str;
-        else ((std::int16_t*)val_ptr_)[idx] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int16_t*)val_data_.data())[idx] = std::int16_t(0x8000), ++str;
+        else ((std::int16_t*)val_data_.data())[idx] = std::strtol(str, &str, 10);
         if (*str == '\0') --str;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int16_t*)val_ptr_)[idx] = std::int16_t(0x8001);
+        ((std::int16_t*)val_data_.data())[idx] = std::int16_t(0x8001);
       break;
     }
     case 0x03u:
     {
       for ( ; idx < end && *str != '\0'; ++idx,++str)
       {
-        if (*str == '.') ((std::int32_t*)val_ptr_)[idx] = std::int32_t(0x80000000), ++str;
-        else ((std::int32_t*)val_ptr_)[idx] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int32_t*)val_data_.data())[idx] = std::int32_t(0x80000000), ++str;
+        else ((std::int32_t*)val_data_.data())[idx] = std::strtol(str, &str, 10);
         if (*str == '\0') --str;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int32_t*)val_ptr_)[idx] = std::int32_t(0x80000001);
+        ((std::int32_t*)val_data_.data())[idx] = std::int32_t(0x80000001);
       break;
     }
     case 0x04u:
     {
       for ( ; idx < end && *str != '\0'; ++idx,++str)
       {
-        if (*str == '.') ((std::int64_t*)val_ptr_)[idx] = std::int64_t(0x8000000000000000), ++str;
-        else ((std::int64_t*)val_ptr_)[idx] = std::strtoll(str, &str, 10);
+        if (*str == '.') ((std::int64_t*)val_data_.data())[idx] = std::int64_t(0x8000000000000000), ++str;
+        else ((std::int64_t*)val_data_.data())[idx] = std::strtoll(str, &str, 10);
         if (*str == '\0') --str;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int64_t*)val_ptr_)[idx] = std::int64_t(0x8000000000000001);
+        ((std::int64_t*)val_data_.data())[idx] = std::int64_t(0x8000000000000001);
       break;
     }
     case 0x05u:
     {
       for ( ; idx < end && *str != '\0'; ++idx,++str)
       {
-        if (*str == '.') ((std::int64_t*)val_ptr_)[idx] = missing_value<float>(), ++str;
-        else ((float*)val_ptr_)[idx] = std::strtof(str, &str);
+        if (*str == '.') ((std::int64_t*)val_data_.data())[idx] = missing_value<float>(), ++str;
+        else ((float*)val_data_.data())[idx] = std::strtof(str, &str);
         if (*str == '\0') --str;
       }
 
       for ( ; idx < end; ++idx)
-        ((float*)val_ptr_)[idx] = end_of_vector_value<float>();
+        ((float*)val_data_.data())[idx] = end_of_vector_value<float>();
       break;
     }
     default:
@@ -3238,7 +2915,7 @@ namespace savvy
   inline
   void typed_value::deserialize_vcf2(std::size_t idx, std::size_t length, char*& str)
   {
-    assert(!off_ptr_ && idx < size_);
+    assert(!off_type_ && idx < size_);
 
     std::size_t end = idx + length;
 
@@ -3248,76 +2925,76 @@ namespace savvy
     {
       for ( ; idx < end; ++str)
       {
-        if (*str == '.') ((std::int8_t*)val_ptr_)[idx++] = std::int8_t(0x80), ++str;
-        else ((std::int8_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int8_t*)val_data_.data())[idx++] = std::int8_t(0x80), ++str;
+        else ((std::int8_t*)val_data_.data())[idx++] = std::strtol(str, &str, 10);
         if (*str != ',') break;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int8_t*)val_ptr_)[idx] = std::int8_t(0x81);
+        ((std::int8_t*)val_data_.data())[idx] = std::int8_t(0x81);
       break;
     }
     case 0x02u:
     {
       for ( ; idx < end; ++str)
       {
-        if (*str == '.') ((std::int16_t*)val_ptr_)[idx++] = std::int16_t(0x8000), ++str;
-        else ((std::int16_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int16_t*)val_data_.data())[idx++] = std::int16_t(0x8000), ++str;
+        else ((std::int16_t*)val_data_.data())[idx++] = std::strtol(str, &str, 10);
         if (*str != ',') break;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int16_t*)val_ptr_)[idx] = std::int16_t(0x8001);
+        ((std::int16_t*)val_data_.data())[idx] = std::int16_t(0x8001);
       break;
     }
     case 0x03u:
     {
       for ( ; idx < end; ++str)
       {
-        if (*str == '.') ((std::int32_t*)val_ptr_)[idx++] = std::int32_t(0x80000000), ++str;
-        else ((std::int32_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int32_t*)val_data_.data())[idx++] = std::int32_t(0x80000000), ++str;
+        else ((std::int32_t*)val_data_.data())[idx++] = std::strtol(str, &str, 10);
         if (*str != ',') break;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int32_t*)val_ptr_)[idx] = std::int32_t(0x80000001);
+        ((std::int32_t*)val_data_.data())[idx] = std::int32_t(0x80000001);
       break;
     }
     case 0x04u:
     {
       for ( ; idx < end; ++str)
       {
-        if (*str == '.') ((std::int64_t*)val_ptr_)[idx++] = std::int64_t(0x8000000000000000), ++str;
-        else ((std::int64_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int64_t*)val_data_.data())[idx++] = std::int64_t(0x8000000000000000), ++str;
+        else ((std::int64_t*)val_data_.data())[idx++] = std::strtol(str, &str, 10);
         if (*str != ',') break;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int64_t*)val_ptr_)[idx] = std::int64_t(0x8000000000000001);
+        ((std::int64_t*)val_data_.data())[idx] = std::int64_t(0x8000000000000001);
       break;
     }
     case 0x05u:
     {
       for ( ; idx < end; ++str)
       {
-        if (*str == '.') ((float*)val_ptr_)[idx++] = missing_value<float>(), ++str;
-        else ((float*)val_ptr_)[idx++] = std::strtof(str, &str);
+        if (*str == '.') ((float*)val_data_.data())[idx++] = missing_value<float>(), ++str;
+        else ((float*)val_data_.data())[idx++] = std::strtof(str, &str);
         if (*str != ',') break;
       }
 
       for ( ; idx < end; ++idx)
-        ((float*)val_ptr_)[idx] = end_of_vector_value<float>();
+        ((float*)val_data_.data())[idx] = end_of_vector_value<float>();
       break;
     }
     case 0x07u:
     {
       for ( ; *str > '\r' && *str != ':'; ++str)
       {
-        ((char*)val_ptr_)[idx++] = *str;
+        ((char*)val_data_.data())[idx++] = *str;
       }
 
       for ( ; idx < end; ++idx)
-        ((char*)val_ptr_)[idx] = '\0';
+        ((char*)val_data_.data())[idx] = '\0';
       break;
     }
     default:
@@ -3329,7 +3006,7 @@ namespace savvy
   inline
   void typed_value::deserialize_vcf2_gt(std::size_t idx, std::size_t length, char*& str, typed_value* ph_value)
   {
-    assert(!off_ptr_ && idx < size_);
+    assert(!off_type_ && idx < size_);
 
     std::size_t end = idx + length;
     assert(length);
@@ -3341,109 +3018,109 @@ namespace savvy
     {
       for ( ; idx < end; ++str)
       {
-        if (*str == '.') ((std::int8_t*)val_ptr_)[idx++] = std::int8_t(0x80), ++str;
-        else ((std::int8_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int8_t*)val_data_.data())[idx++] = std::int8_t(0x80), ++str;
+        else ((std::int8_t*)val_data_.data())[idx++] = std::strtol(str, &str, 10);
         if (*str == '/')
         {
-          if (ph_value) ph_value->val_ptr_[ph_idx++] = 0;
+          if (ph_value) ph_value->val_data_.data()[ph_idx++] = 0;
         }
         else if(*str == '|')
         {
-          if (ph_value) ph_value->val_ptr_[ph_idx++] = 1;
+          if (ph_value) ph_value->val_data_.data()[ph_idx++] = 1;
         }
         else
           break;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int8_t*)val_ptr_)[idx] = std::int8_t(0x81);
+        ((std::int8_t*)val_data_.data())[idx] = std::int8_t(0x81);
       break;
     }
     case 0x02u:
     {
       for ( ; idx < end; ++str)
       {
-        if (*str == '.') ((std::int16_t*)val_ptr_)[idx++] = std::int16_t(0x8000), ++str;
-        else ((std::int16_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int16_t*)val_data_.data())[idx++] = std::int16_t(0x8000), ++str;
+        else ((std::int16_t*)val_data_.data())[idx++] = std::strtol(str, &str, 10);
         if (*str == '/')
         {
-          if (ph_value) ph_value->val_ptr_[ph_idx++] = 0;
+          if (ph_value) ph_value->val_data_.data()[ph_idx++] = 0;
         }
         else if(*str == '|')
         {
-          if (ph_value) ph_value->val_ptr_[ph_idx++] = 1;
+          if (ph_value) ph_value->val_data_.data()[ph_idx++] = 1;
         }
         else
           break;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int16_t*)val_ptr_)[idx] = std::int16_t(0x8001);
+        ((std::int16_t*)val_data_.data())[idx] = std::int16_t(0x8001);
     }
     case 0x03u:
     {
       for ( ; idx < end; ++str)
       {
-        if (*str == '.') ((std::int32_t*)val_ptr_)[idx++] = std::int32_t(0x80000000), ++str;
-        else ((std::int32_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int32_t*)val_data_.data())[idx++] = std::int32_t(0x80000000), ++str;
+        else ((std::int32_t*)val_data_.data())[idx++] = std::strtol(str, &str, 10);
         if (*str == '/')
         {
-          if (ph_value) ph_value->val_ptr_[ph_idx++] = 0;
+          if (ph_value) ph_value->val_data_.data()[ph_idx++] = 0;
         }
         else if(*str == '|')
         {
-          if (ph_value) ph_value->val_ptr_[ph_idx++] = 1;
+          if (ph_value) ph_value->val_data_.data()[ph_idx++] = 1;
         }
         else
           break;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int32_t*)val_ptr_)[idx] = std::int32_t(0x80000001);
+        ((std::int32_t*)val_data_.data())[idx] = std::int32_t(0x80000001);
       break;
     }
     case 0x04u:
     {
       for ( ; idx < end; ++str)
       {
-        if (*str == '.') ((std::int64_t*)val_ptr_)[idx++] = std::int64_t(0x8000000000000000), ++str;
-        else ((std::int64_t*)val_ptr_)[idx++] = std::strtol(str, &str, 10);
+        if (*str == '.') ((std::int64_t*)val_data_.data())[idx++] = std::int64_t(0x8000000000000000), ++str;
+        else ((std::int64_t*)val_data_.data())[idx++] = std::strtol(str, &str, 10);
         if (*str == '/')
         {
-          if (ph_value) ph_value->val_ptr_[ph_idx++] = 0;
+          if (ph_value) ph_value->val_data_.data()[ph_idx++] = 0;
         }
         else if(*str == '|')
         {
-          if (ph_value) ph_value->val_ptr_[ph_idx++] = 1;
+          if (ph_value) ph_value->val_data_.data()[ph_idx++] = 1;
         }
         else
           break;
       }
 
       for ( ; idx < end; ++idx)
-        ((std::int64_t*)val_ptr_)[idx] = std::int64_t(0x8000000000000001);
+        ((std::int64_t*)val_data_.data())[idx] = std::int64_t(0x8000000000000001);
       break;
     }
     case 0x05u:
     {
       for ( ; idx < end; ++str)
       {
-        if (*str == '.') ((float*)val_ptr_)[idx++] = missing_value<float>(), ++str;
-        else ((float*)val_ptr_)[idx++] = std::strtof(str, &str);
+        if (*str == '.') ((float*)val_data_.data())[idx++] = missing_value<float>(), ++str;
+        else ((float*)val_data_.data())[idx++] = std::strtof(str, &str);
         if (*str == '/')
         {
-          if (ph_value) ph_value->val_ptr_[ph_idx++] = 0;
+          if (ph_value) ph_value->val_data_.data()[ph_idx++] = 0;
         }
         else if(*str == '|')
         {
-          if (ph_value) ph_value->val_ptr_[ph_idx++] = 1;
+          if (ph_value) ph_value->val_data_.data()[ph_idx++] = 1;
         }
         else
           break;
       }
 
       for ( ; idx < end; ++idx)
-        ((float*)val_ptr_)[idx] = end_of_vector_value<float>();
+        ((float*)val_data_.data())[idx] = end_of_vector_value<float>();
       break;
     }
     default:
@@ -3451,6 +3128,614 @@ namespace savvy
 
     }
   }
+
+  //########### OLD BCF ROUTINES ##########//
+
+  template<typename T>
+  typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, std::uint8_t>::type
+  typed_value::internal::int_type(T val)
+  { // TODO: Handle missing values
+    if (val <= std::numeric_limits<std::int8_t>::max() && val >= std::numeric_limits<std::int8_t>::min())
+      return 0x01;
+    else if (val <= std::numeric_limits<std::int16_t>::max() && val >= std::numeric_limits<std::int16_t>::min())
+      return 0x02;
+    else if (val <= std::numeric_limits<std::int32_t>::max() && val >= std::numeric_limits<std::int32_t>::min())
+      return 0x03;
+    else
+      return 0x04;
+  }
+
+  template <typename Iter, typename IntT>
+  Iter typed_value::internal::deserialize_int(Iter it, Iter end, IntT& dest)
+  {
+    if (it != end)
+    {
+      std::uint8_t type_byte = *(it++);
+      std::int64_t int_width = 1u << bcf_type_shift[type_byte & 0x0Fu];
+      if (end - it >= int_width)
+      {
+        switch (int_width)
+        {
+        case 1:
+        {
+          dest = IntT(*(it++));
+          return it;
+        }
+        case 2:
+        {
+          std::int16_t tmp;
+          char *tmp_p = (char *)&tmp;
+          *(tmp_p) = *(it++);
+          *(tmp_p + 1) = *(it++);
+          dest = le16toh(tmp);
+          return it;
+        }
+        case 4:
+        {
+          std::int32_t tmp;
+          char *tmp_p = (char *)&tmp;
+          *(tmp_p) = *(it++);
+          *(tmp_p + 1) = *(it++);
+          *(tmp_p + 2) = *(it++);
+          *(tmp_p + 3) = *(it++);
+          dest = le32toh(tmp);
+          return it;
+        }
+        case 8:
+        {
+          std::int64_t tmp;
+          char *tmp_p = (char *)&tmp;
+          *(tmp_p) = *(it++);
+          *(tmp_p + 1) = *(it++);
+          *(tmp_p + 2) = *(it++);
+          *(tmp_p + 3) = *(it++);
+          *(tmp_p + 4) = *(it++);
+          *(tmp_p + 5) = *(it++);
+          *(tmp_p + 6) = *(it++);
+          *(tmp_p + 7) = *(it++);
+          dest = le64toh(tmp);
+          return it;
+        }
+        }
+      }
+    }
+    throw std::runtime_error("Not a BCF integer");
+  }
+
+  template <typename IntT>
+  std::int64_t typed_value::internal::deserialize_int(std::istream& is, IntT& dest)
+  {
+    std::uint8_t type_byte = is.get();
+    std::int64_t int_width = 1u << bcf_type_shift[type_byte & 0x0Fu];
+
+    switch (int_width)
+    {
+    case 1:
+    {
+      std::int8_t tmp;
+      is.read((char*)&tmp, 1);
+      dest = tmp;
+      return is.good() ? 1 + sizeof(int8_t) : -1;
+    }
+    case 2:
+    {
+      std::int16_t tmp;
+      is.read((char*)&tmp, 2);
+      dest = le16toh(tmp);
+      return is.good() ? 1 + sizeof(int16_t) : -1;
+    }
+    case 4:
+    {
+      std::int32_t tmp;
+      is.read((char*)&tmp, 4);
+      dest = le32toh(tmp);
+      return is.good() ? 1 + sizeof(int32_t) : -1;
+    }
+    case 8:
+    {
+      std::int64_t tmp;
+      is.read((char*)&tmp, 8);
+      dest = le64toh(tmp);
+      return is.good() ? 1 + sizeof(int64_t) : -1;
+    }
+    }
+    std::cerr << "Error: Not a BCF integer" << std::endl;
+    return -1;
+  }
+
+  //    template <typename Iter>
+  //    Iter deserialize_string(Iter it, Iter end, std::string& dest)
+  //    {
+  //      if (it == end) return end;
+  //
+  //      std::uint8_t type_byte = *(it++);
+  //      if (it == end || (type_byte & 0x0Fu) != 0x07u)
+  //        throw std::runtime_error("Not a BCF string");
+  //
+  //      std::int32_t sz = (type_byte >> 4u);
+  //      if (sz == 15)
+  //        it = deserialize_int(it, end, sz);
+  //
+  //      if (end - it < sz)
+  //        throw std::runtime_error("Invalid byte sequence");
+  //
+  //      dest.resize(sz);
+  //      std::copy_n(it, sz, dest.begin());
+  //      return it + sz;
+  //    }
+
+  template <typename Iter, typename VecT>
+  typename std::enable_if<std::is_same<typename std::iterator_traits<Iter>::value_type, char>::value, Iter>::type
+  typed_value::internal::deserialize_vec(Iter it, Iter end, VecT& dest)
+  {
+    if (it == end)
+      throw std::runtime_error("Invalid byte sequence");
+
+    std::uint8_t type_byte = *(it++);
+
+    std::int32_t sz = (type_byte >> 4u);
+    if (sz == 15)
+      it = deserialize_int(it, end, sz);
+
+    std::size_t type_width = 1u << bcf_type_shift[0x0Fu & type_byte];
+
+    if (end - it < std::int64_t(sz * type_width))
+      throw std::runtime_error("Invalid byte sequence");
+
+    dest.resize(sz);
+    char* char_p = &(*it);
+    switch (0x0Fu & type_byte)
+    {
+    case 0x01u:
+    {
+      auto p = (std::int8_t *)char_p;
+      std::copy_n(p, sz, dest.begin());
+      break;
+    }
+    case 0x02u:
+    {
+      auto p = (std::int16_t *)char_p;
+      if (endianness::is_big())
+        std::transform(p, p + sz, dest.begin(), endianness::swap<std::int16_t>);
+      else
+        std::copy_n(p, sz, dest.begin());
+      break;
+    }
+    case 0x03u:
+    {
+      auto p = (std::int32_t *)char_p;
+      if (endianness::is_big())
+        std::transform(p, p + sz, dest.begin(), endianness::swap<std::int32_t>);
+      else
+        std::copy_n(p, sz, dest.begin());
+      break;
+    }
+    case 0x04u:
+    {
+      auto p = (std::int64_t *)char_p;
+      if (endianness::is_big())
+        std::transform(p, p + sz, dest.begin(), endianness::swap<std::int64_t>);
+      else
+        std::copy_n(p, sz, dest.begin());
+      break;
+    }
+    case 0x05u:
+    {
+      auto p = (float *)char_p;
+      if (endianness::is_big())
+        std::transform(p, p + sz, dest.begin(), endianness::swap<float>);
+      else
+        std::copy_n(p, sz, dest.begin());
+      break;
+    }
+    case 0x07u:
+    {
+      std::copy_n(char_p, sz, dest.begin());
+      break;
+    }
+    }
+
+    return it + (sz * type_width);
+  }
+
+  template <typename VecT>
+  std::int64_t typed_value::internal::deserialize_vec(std::istream& is, VecT& dest)
+  {
+    std::uint8_t type_byte = is.get();
+    std::int64_t bytes_read = 1;
+
+    std::uint8_t type = 0x0Fu & type_byte;
+    std::int32_t sz = (type_byte >> 4u);
+    if (sz == 15)
+    {
+      std::int64_t res;
+      if ((res = deserialize_int(is, sz)) < 0)
+        throw std::runtime_error("Invalid byte sequence");
+      bytes_read += res;
+    }
+
+    dest.resize(sz);
+    typedef typename VecT::value_type ValT;
+    if (type_code<ValT>() == type)
+    {
+      is.read((char*)dest.data(), dest.size() * sizeof(ValT));
+      if (endianness::is_big())
+        std::transform(dest.begin(), dest.end(), dest.begin(), endianness::swap<ValT>);
+      return is.good() ? is.gcount() + bytes_read : -1;
+    }
+    else
+    {
+      switch (type)
+      {
+      case 0x01u:
+      {
+        std::int8_t tmp_val;
+        for (auto it = dest.begin(); it != dest.end(); ++it)
+        {
+          is.read((char*)&tmp_val, sizeof(tmp_val));
+          *it = tmp_val;
+        }
+        return is.good() ? bytes_read + sz * sizeof(tmp_val) : -1;
+      }
+      case 0x02u:
+      {
+        std::int16_t tmp_val;
+        for (auto it = dest.begin(); it != dest.end(); ++it)
+        {
+          is.read((char*)&tmp_val, sizeof(tmp_val));
+          *it = le16toh(tmp_val);
+        }
+        return is.good() ? bytes_read + sz * sizeof(tmp_val) : -1;
+      }
+      case 0x03u:
+      {
+        std::int32_t tmp_val;
+        for (auto it = dest.begin(); it != dest.end(); ++it)
+        {
+          is.read((char*)&tmp_val, sizeof(tmp_val));
+          *it = le32toh(tmp_val);
+        }
+        return is.good() ? bytes_read + sz * sizeof(tmp_val) : -1;
+      }
+      case 0x04u:
+      {
+        std::int64_t tmp_val;
+        for (auto it = dest.begin(); it != dest.end(); ++it)
+        {
+          is.read((char*)&tmp_val, sizeof(tmp_val));
+          *it = le64toh(tmp_val);
+        }
+        return is.good() ? bytes_read + sz * sizeof(tmp_val) : -1;
+      }
+      case 0x05u:
+      {
+        float tmp_val;
+        for (auto it = dest.begin(); it != dest.end(); ++it)
+        {
+          is.read((char*)&tmp_val, sizeof(tmp_val));
+          *it = le32toh(tmp_val);
+        }
+        return is.good() ? bytes_read + sz * sizeof(tmp_val) : -1;
+      }
+      case 0x07u:
+      {
+        char tmp_val;
+        for (auto it = dest.begin(); it != dest.end(); ++it)
+        {
+          is.read((char*)&tmp_val, sizeof(tmp_val));
+          *it = tmp_val;
+        }
+        return is.good() ? bytes_read + sz * sizeof(tmp_val) : -1;
+      }
+      }
+    }
+
+    std::cerr << "Error: invalid byte sequence" << std::endl;
+    return -1;
+  }
+
+  template <typename OutT, typename T>
+  typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, bool>::type
+  typed_value::internal::serialize_typed_int_exact(OutT out_it, const T& val)
+  {
+    T v = endianness::is_big() ? endianness::swap(val) : val; //static_cast<T>(val);
+    std::uint8_t type;
+    if (std::is_same<T, std::int8_t>::value)
+      type = 0x01;
+    else if (std::is_same<T, std::int16_t>::value)
+      type = 0x02;
+    else if (std::is_same<T, std::int32_t>::value)
+      type = 0x03;
+    else if (std::is_same<T, std::int64_t>::value)
+      type = 0x04;
+    else
+      return false;
+
+    *(out_it++) = (1u << 4u) | type;
+
+    char* p_end = ((char*)&v) + sizeof(T);
+    for (char* p = (char*)&v; p != p_end; ++p)
+    {
+      *(out_it++) = *p;
+    }
+    return true;
+  }
+
+  template <typename OutT, typename T>
+  typename std::enable_if<std::is_signed<T>::value, bool>::type
+  typed_value::internal::serialize_typed_scalar(OutT out_it, const T& val)
+  {
+    if (std::is_integral<T>::value)
+    {
+      if (val <= std::numeric_limits<std::int8_t>::max() && val >= std::numeric_limits<std::int8_t>::min())
+        return serialize_typed_int_exact(out_it, std::int8_t(val));
+      else if (val <= std::numeric_limits<std::int16_t>::max() && val >= std::numeric_limits<std::int16_t>::min())
+        return serialize_typed_int_exact(out_it, std::int16_t(val));
+      else if (val <= std::numeric_limits<std::int32_t>::max() && val >= std::numeric_limits<std::int32_t>::min())
+        return serialize_typed_int_exact(out_it, std::int32_t(val));
+      else
+        return serialize_typed_int_exact(out_it, std::int64_t(val));
+    }
+
+    if (std::is_same<T, float>::value)
+      *(out_it++) = (1u << 4u) | 0x05u;
+    else if (std::is_same<T, double>::value)
+      *(out_it++) = (1u << 4u) | 0x06u;
+    else
+      return false;
+
+    T le_val = endianness::is_big() ? endianness::swap(val) : val;
+    char* p_end = ((char*)&le_val) + sizeof(T);
+    for (char* p = (char*)&le_val; p != p_end; ++p)
+    {
+      *(out_it++) = *p;
+    }
+
+    return true;
+  }
+
+  template <typename T>
+  typename std::enable_if<std::is_signed<T>::value, bool>::type
+  typed_value::internal::write_typed_scalar(std::ostream& os, const T& val)
+  {
+    std::uint8_t type_byte = 1;
+    if (std::is_integral<T>::value)
+    {
+      if (std::is_same<T, std::int8_t>::value)
+      {
+        type_byte = (type_byte << 4) | 0x01;
+      }
+      else if (std::is_same<T, std::int16_t>::value)
+      {
+        type_byte = (type_byte << 4) | 0x02;
+      }
+      else if (std::is_same<T, std::int32_t>::value)
+      {
+        type_byte = (type_byte << 4) | 0x03;
+      }
+      else
+      {
+        return false;
+      }
+    }
+    else if (std::is_same<T, float>::value)
+    {
+      type_byte = (type_byte << 4) | 0x05;
+    }
+    else
+    {
+      return false;
+    }
+
+    T le_val = endianness::is_big() ? endianness::swap(val) : val;
+    os.write((char*)&type_byte, 1);
+    os.write((char*)&le_val, sizeof(le_val));
+    return true;
+  }
+
+  template <typename OutT>
+  bool typed_value::internal::serialize_type_and_size(OutT out_it, std::uint8_t type, std::size_t size) // TODO: review this function
+  {
+    if (size < 15)
+    {
+      *out_it = size << 4u | type;
+      ++out_it;
+      return true;
+    }
+
+    *out_it = 0xF0 | type;
+    ++out_it;
+
+    return serialize_typed_scalar(out_it, (std::int64_t)size);
+  }
+
+  template <typename Iter, typename T>
+  typename std::enable_if<std::is_signed<T>::value, void>::type
+  typed_value::internal::serialize_typed_vec(Iter out_it, const std::vector<T>& vec) // TODO: use smallest int type.
+  {
+    static_assert(!std::is_same<T, std::int64_t>::value && !std::is_same<T, double>::value, "64-bit integers not allowed in BCF spec.");
+
+    std::uint8_t type_byte = vec.size() < 15 ? vec.size() : 15;
+    if (std::is_same<T, std::int8_t>::value)
+    {
+      type_byte = (type_byte << 4) | 0x01;
+    }
+    else if (std::is_same<T, std::int16_t>::value)
+    {
+      type_byte = (type_byte << 4) | 0x02;
+    }
+    else if (std::is_same<T, std::int32_t>::value)
+    {
+      type_byte = (type_byte << 4) | 0x03;
+    }
+    else if (std::is_same<T, float>::value)
+    {
+      type_byte = (type_byte << 4) | 0x05;
+    }
+
+    *out_it = type_byte;
+
+    if (vec.size() >= 15)
+    {
+      if (vec.size() <= 0x7F)
+        serialize_typed_int_exact(out_it, (std::int8_t)vec.size());
+      else if (vec.size() <= 0x7FFF)
+        serialize_typed_int_exact(out_it, (std::int16_t)vec.size());
+      else if (vec.size() <= 0x7FFFFFFF)
+        serialize_typed_int_exact(out_it, (std::int32_t)vec.size());
+      else
+        throw std::runtime_error("string too big");
+    }
+
+
+
+    if (endianness::is_big() && sizeof(T) > 1)
+    {
+      for (auto it = vec.begin(); it != vec.end(); ++it)
+      {
+        T le_val = endianness::swap(*it);
+        char* p_end = ((char*)&le_val) + sizeof(T);
+        for (char* p = (char*)&le_val; p != p_end; ++p)
+        {
+          *(out_it++) = *p;
+        }
+      }
+    }
+    else
+    {
+      std::copy_n((char*)vec.data(), sizeof(T) * vec.size(), out_it);
+    }
+  }
+
+  template <typename T>
+  typename std::enable_if<std::is_signed<T>::value, void>::type
+  typed_value::internal::write_typed_vec(std::ostream& os, const std::vector<T>& vec)
+  {
+    static_assert(!std::is_same<T, std::int64_t>::value && !std::is_same<T, double>::value, "64-bit integers not allowed in BCF spec.");
+
+    std::uint8_t type_byte = vec.size() < 15 ? vec.size() : 15;
+    if (std::is_same<T, std::int8_t>::value)
+    {
+      type_byte = (type_byte << 4) | 0x01;
+    }
+    else if (std::is_same<T, std::int16_t>::value)
+    {
+      type_byte = (type_byte << 4) | 0x02;
+    }
+    else if (std::is_same<T, std::int32_t>::value)
+    {
+      type_byte = (type_byte << 4) | 0x03;
+    }
+    else if (std::is_same<T, float>::value)
+    {
+      type_byte = (type_byte << 4) | 0x05;
+    }
+
+    os.write((char*)&type_byte, 1);
+
+    if (vec.size() >= 15)
+    {
+      if (vec.size() <= 0x7F)
+        write_typed_scalar(os, (std::int8_t)vec.size());
+      else if (vec.size() <= 0x7FFF)
+        write_typed_scalar(os, (std::int16_t)vec.size());
+      else if (vec.size() <= 0x7FFFFFFF)
+        write_typed_scalar(os, (std::int32_t)vec.size());
+      else
+        throw std::runtime_error("vector too big");
+    }
+
+
+
+    if (endianness::is_big() && sizeof(T) > 1)
+    {
+      for (auto it = vec.begin(); it != vec.end(); ++it)
+      {
+        T le_val = endianness::swap(*it);
+        os.write((char*)&le_val, sizeof(T));
+      }
+    }
+    else
+    {
+      os.write((char*)vec.data(), std::int32_t(sizeof(T) * vec.size()));
+    }
+  }
+
+  template <typename OutT>
+  void typed_value::internal::serialize_typed_str(OutT out_it, const std::string& str)
+  {
+    std::uint8_t type_byte = str.size() < 15 ? str.size() : 15;
+    type_byte = (type_byte << 4) | 0x07;
+
+    *out_it = type_byte;
+
+    if (str.size() >= 15)
+    {
+      if (str.size() <= 0x7F)
+        serialize_typed_int_exact(out_it, (std::int8_t)str.size());
+      else if (str.size() <= 0x7FFF)
+        serialize_typed_int_exact(out_it, (std::int16_t)str.size());
+      else if (str.size() <= 0x7FFFFFFF)
+        serialize_typed_int_exact(out_it, (std::int32_t)str.size());
+      else
+        throw std::runtime_error("string too big");
+    }
+
+    std::copy_n(str.begin(), str.size(), out_it);
+  }
+
+  inline void typed_value::internal::write_typed_str(std::ostream& os, const std::string& str)
+  {
+    std::uint8_t type_byte = str.size() < 15 ? str.size() : 15;
+    type_byte = (type_byte << 4) | 0x07;
+
+
+    os.write((char*)&type_byte, 1);
+    if (str.size() >= 15)
+    {
+      if (str.size() <= 0x7F)
+        serialize_typed_int_exact(std::ostreambuf_iterator<char>(os), (std::int8_t)str.size());
+      else if (str.size() <= 0x7FFF)
+        serialize_typed_int_exact(std::ostreambuf_iterator<char>(os), (std::int16_t)str.size());
+      else if (str.size() <= 0x7FFFFFFF)
+        serialize_typed_int_exact(std::ostreambuf_iterator<char>(os), (std::int32_t)str.size());
+      else
+        throw std::runtime_error("string too big");
+    }
+
+    os.write(str.data(), str.size());
+  }
+
+  template <typename T>
+  typename std::enable_if<std::is_signed<typename T::value_type>::value, std::uint32_t>::type
+  typed_value::internal::get_typed_value_size(const T& vec)
+  {
+    static_assert(!std::is_same<typename T::value_type, std::int64_t>::value && !std::is_same<typename T::value_type, double>::value, "64-bit integers not allowed in BCF spec.");
+    std::uint32_t ret;
+    if (vec.size() < 15)
+      ret = 1;
+    else if (vec.size() <= 0x7F)
+      ret = 2 + 1;
+    else if (vec.size() <= 0x7FFF)
+      ret = 2 + 2;
+    else if (vec.size() <= 0x7FFFFFFF)
+      ret = 2 + 4;
+    else
+      return -1; // vec too big
+
+      ret += vec.size() * sizeof(typename T::value_type);
+      return ret;
+  }
+
+  template <typename T>
+  typename std::enable_if<std::is_signed<T>::value, std::uint32_t>::type
+  typed_value::internal::get_typed_value_size(T)
+  {
+    static_assert(!std::is_same<T, std::int64_t>::value, "64-bit integers not allowed in BCF spec.");
+    return 1 + sizeof(T);
+  }
 }
+
+
 
 #endif // LIBSAVVY_TYPED_VALUE_HPP

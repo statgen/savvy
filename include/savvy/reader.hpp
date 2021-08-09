@@ -34,7 +34,7 @@ namespace savvy
       std::unique_ptr<std::istream> input_stream_;
       std::vector<std::pair<std::string, std::string>> headers_;
       std::vector<std::string> ids_;
-      typed_value temp_val_;
+      typed_value extra_typed_value_;
 
       std::vector<std::size_t> subset_map_;
       std::size_t subset_size_;
@@ -606,21 +606,36 @@ namespace savvy
 
           //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
           // Read and parse shared and individual data
-          r.shared_data_.resize(shared_sz);
-          r.indiv_buf_.resize(indiv_sz);
-          if (!input_stream_->read(r.shared_data_.data(), r.shared_data_.size()) || !input_stream_->read(r.indiv_buf_.data(), r.indiv_buf_.size()))
+//          r.shared_data_.resize(shared_sz);
+//          r.indiv_buf_.resize(indiv_sz);
+//          if (!input_stream_->read(r.shared_data_.data(), r.shared_data_.size()) || !input_stream_->read(r.indiv_buf_.data(), r.indiv_buf_.size()))
+//          {
+//            std::fprintf(stderr, "Error: Invalid record data\n");
+//            input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+//            return *this;
+//          }
+
+          std::uint32_t shared_n_samples{};
+          if (site_info::deserialize_shared(r, *input_stream_, dict_, shared_n_samples) != shared_sz)
           {
-            std::fprintf(stderr, "Error: Invalid record data\n");
+            std::fprintf(stderr, "Error: Invalid shared data\n");
             input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
             return *this;
           }
 
-          if (!variant::deserialize(r, dict_, sort_context_, this->ids_.size(), file_format_ == format::bcf, phasing_))
+          bool pbwt_reset = (file_format_ != format::bcf) && (0x800000u & shared_n_samples);
+          if (pbwt_reset)
+            sort_context_.reset();
+
+          if (variant::deserialize_indiv(r, *input_stream_, dict_, ids_.size(), file_format_ == format::bcf, phasing_) != indiv_sz)
           {
-            std::fprintf(stderr, "Error: Invalid record data\n");
+            std::fprintf(stderr, "Error: Invalid individual data\n");
             input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
             return *this;
           }
+
+          if (file_format_ != format::bcf)
+            variant::pbwt_unsort_typed_values(r, extra_typed_value_, sort_context_);
           //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         }
 
@@ -632,15 +647,7 @@ namespace savvy
           {
             for (auto it = r.format_fields_.begin(); it != r.format_fields_.end(); ++it)
             {
-              if (file_format_ == file::format::sav1)
-              {
-                it->second.copy_subset(temp_val_, subset_map_, subset_size_);
-                it->second = std::move(temp_val_); // TODO: use this approach for all file formats.
-              }
-              else
-              {
-                it->second.subset(subset_map_, subset_size_);
-              }
+              it->second.subset(subset_map_, subset_size_, extra_typed_value_);
               it->second.minimize(); // TODO: Set not_minimized flag and move minimize routine to writer.
             }
           }
