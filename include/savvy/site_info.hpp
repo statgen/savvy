@@ -601,7 +601,7 @@ namespace savvy
                 return false;
               }
 
-              s.info_.emplace_back(kvp[0], typed_value(std::int8_t(1)));
+              s.info_.emplace_back(kvp[0], typed_value(std::vector<std::int8_t>()));
             }
             else if (kvp.size() == 2)
             {
