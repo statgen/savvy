@@ -3256,6 +3256,9 @@ namespace savvy
       throw std::runtime_error("Invalid byte sequence");
 
     dest.resize(sz);
+    if (sz == 0)
+      return it;
+
     char* char_p = &(*it);
     switch (0x0Fu & type_byte)
     {
@@ -3326,8 +3329,12 @@ namespace savvy
         throw std::runtime_error("Invalid byte sequence");
       bytes_read += res;
     }
-
+    
     dest.resize(sz);
+ 
+    if (sz == 0)
+      return bytes_read;
+
     typedef typename VecT::value_type ValT;
     if (type_code<ValT>() == type)
     {
