@@ -224,6 +224,7 @@ namespace savvy
       //std::vector<char> indiv_buf_;
     public:
       using site_info::site_info;
+      using site_info::operator=;
 
       /**
        * Gets vector of FORMAT key-value pairs.
