@@ -805,7 +805,20 @@ namespace savvy
 
       buf[0].i = static_cast<std::int32_t>(res->second);
       buf[1].i = static_cast<std::int32_t>(s.pos_ - 1);
-      buf[2].i = static_cast<std::int32_t>(s.chrom_.size());
+
+      std::int32_t end_tag_val;
+      if (s.get_info("END", end_tag_val))
+      {
+        buf[2].i = 1 + std::max(0, end_tag_val - static_cast<std::int32_t>(s.pos_));
+      }
+      else
+      {
+        std::uint32_t rlen = s.ref_.size();
+        for (auto it = s.alts_.begin(); it != s.alts_.end(); ++it)
+          rlen = std::max(rlen, static_cast<std::uint32_t>(it->size()));
+        buf[2].i = rlen;
+      }
+
       buf[3].f = s.qual_;
 
       std::uint32_t tmp_uint = (std::uint32_t(s.alts_.size() + 1) << 16u) | (0xFFFFu & std::uint32_t(s.info_.size())); // TODO: append pbwt info flags.

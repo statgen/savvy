@@ -405,10 +405,20 @@ namespace savvy
       ofs_.write(serialized_buf_.data(), serialized_buf_.size());
 
       current_block_min_ = std::min(current_block_min_, std::uint32_t(r.pos()));
-      std::size_t max_alt_size = 0;
-      for (auto it = r.alts().begin(); it != r.alts().end(); ++it)
-        max_alt_size = std::max(max_alt_size, it->size());
-      current_block_max_ = std::max(current_block_max_, std::uint32_t(r.pos() + std::max(r.ref().size(), max_alt_size)) - 1);
+      
+      std::int64_t end_val;
+      if (r.get_info("END", end_val))
+      {
+        current_block_max_ = std::max(current_block_max_, std::uint32_t(end_val));
+      }
+      else
+      {
+        std::size_t max_alt_size = 0;
+        for (auto it = r.alts().begin(); it != r.alts().end(); ++it)
+          max_alt_size = std::max(max_alt_size, it->size());
+        current_block_max_ = std::max(current_block_max_, std::uint32_t(r.pos() + std::max(r.ref().size(), max_alt_size)) - 1);
+      }
+
       ++record_count_in_block_;
       ++record_count_;
 
