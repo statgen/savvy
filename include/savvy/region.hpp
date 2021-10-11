@@ -124,8 +124,16 @@ namespace savvy
         static bool compare(const site_info& var, const genomic_region& reg)
         {
           std::size_t max_alt_size = 0;
-          for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
-            max_alt_size = std::max(max_alt_size, it->size());
+          std::int32_t end_val;
+          if (var.get_info("END", end_val))
+          {
+            max_alt_size = std::size_t(end_val);
+          }
+          else
+          {
+            for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
+              max_alt_size = std::max(max_alt_size, it->size());
+          }
           return (var.pos() <= reg.to() && (var.pos() + std::max(var.ref().size(), max_alt_size) - 1) >= reg.from() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
         }
       };
@@ -135,8 +143,16 @@ namespace savvy
         static bool compare(const site_info& var, const genomic_region& reg)
         {
           std::size_t max_alt_size = 0;
-          for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
-            max_alt_size = std::max(max_alt_size, it->size());
+          std::int32_t end_val;
+          if (var.get_info("END", end_val))
+          {
+            max_alt_size = std::size_t(end_val);
+          }
+          else
+          {
+            for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
+              max_alt_size = std::max(max_alt_size, it->size());
+          }
           return (var.pos() >= reg.from() && (var.pos() + std::max(var.ref().size(), max_alt_size) - 1) <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
         }
       };
@@ -154,8 +170,16 @@ namespace savvy
         static bool compare(const site_info& var, const genomic_region& reg)
         {
           std::size_t max_alt_size = 0;
-          for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
-            max_alt_size = std::max(max_alt_size, it->size());
+          std::int32_t end_val;
+          if (var.get_info("END", end_val))
+          {
+            max_alt_size = std::size_t(end_val);
+          }
+          else
+          {
+            for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
+              max_alt_size = std::max(max_alt_size, it->size());
+          }
           std::uint64_t right = (var.pos() + std::max(var.ref().size(), max_alt_size) - 1);
           return (right >= reg.from() && right <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
         }
