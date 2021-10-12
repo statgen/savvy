@@ -123,18 +123,15 @@ namespace savvy
       {
         static bool compare(const site_info& var, const genomic_region& reg)
         {
-          std::size_t max_alt_size = 0;
-          std::int32_t end_val;
-          if (var.get_info("END", end_val))
+          std::uint32_t end_val;
+          if (!var.get_info("END", reinterpret_cast<std::int32_t&>(end_val)))
           {
-            max_alt_size = std::size_t(end_val);
-          }
-          else
-          {
+            std::uint32_t max_allele_size(var.ref().size());
             for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
-              max_alt_size = std::max(max_alt_size, it->size());
+              max_allele_size = std::max(max_allele_size, std::uint32_t(it->size()));
+            end_val = var.pos() + std::max(std::uint32_t(var.ref().size()), max_allele_size) - 1;
           }
-          return (var.pos() <= reg.to() && (var.pos() + std::max(var.ref().size(), max_alt_size) - 1) >= reg.from() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
+          return (var.pos() <= reg.to() && end_val >= reg.from() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
         }
       };
 
@@ -142,18 +139,15 @@ namespace savvy
       {
         static bool compare(const site_info& var, const genomic_region& reg)
         {
-          std::size_t max_alt_size = 0;
-          std::int32_t end_val;
-          if (var.get_info("END", end_val))
+          std::uint32_t end_val;
+          if (!var.get_info("END", reinterpret_cast<std::int32_t&>(end_val)))
           {
-            max_alt_size = std::size_t(end_val);
-          }
-          else
-          {
+            std::uint32_t max_allele_size(var.ref().size());
             for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
-              max_alt_size = std::max(max_alt_size, it->size());
+              max_allele_size = std::max(max_allele_size, std::uint32_t(it->size()));
+            end_val = var.pos() + std::max(std::uint32_t(var.ref().size()), max_allele_size) - 1;
           }
-          return (var.pos() >= reg.from() && (var.pos() + std::max(var.ref().size(), max_alt_size) - 1) <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
+          return (var.pos() >= reg.from() && end_val <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
         }
       };
 
@@ -169,19 +163,15 @@ namespace savvy
       {
         static bool compare(const site_info& var, const genomic_region& reg)
         {
-          std::size_t max_alt_size = 0;
-          std::int32_t end_val;
-          if (var.get_info("END", end_val))
+          std::uint32_t end_val;
+          if (!var.get_info("END", reinterpret_cast<std::int32_t&>(end_val)))
           {
-            max_alt_size = std::size_t(end_val);
-          }
-          else
-          {
+            std::uint32_t max_allele_size(var.ref().size());
             for (auto it = var.alts().begin(); it != var.alts().end(); ++it)
-              max_alt_size = std::max(max_alt_size, it->size());
+              max_allele_size = std::max(max_allele_size, std::uint32_t(it->size()));
+            end_val = (var.pos() + std::max(std::uint32_t(var.ref().size()), max_allele_size) - 1);
           }
-          std::uint64_t right = (var.pos() + std::max(var.ref().size(), max_alt_size) - 1);
-          return (right >= reg.from() && right <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
+          return (end_val >= reg.from() && end_val <= reg.to() && (var.chrom() == reg.chromosome() || reg.chromosome().empty()));
         }
       };
     }
