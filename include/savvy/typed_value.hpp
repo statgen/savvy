@@ -1620,78 +1620,7 @@ namespace savvy
       return ret;
     }
 
-    void serialize_vcf(std::size_t idx, std::ostream& os, char delim) const
-    {
-      assert(!off_type_ && idx < size_);
-
-      switch (val_type_)
-      {
-      case 0x01u:
-      {
-        auto v = ((std::int8_t*)val_data_.data())[idx];
-        if (is_end_of_vector(v))
-          break;
-        if (delim)
-          os.put(delim);
-        if (is_missing(v)) os << '.';
-        else os << static_cast<int>(v);
-        break;
-      }
-      case 0x02u:
-      {
-        auto v = ((std::int16_t*)val_data_.data())[idx];
-        if (is_end_of_vector(v))
-          break;
-        if (delim)
-          os.put(delim);
-        if (is_missing(v)) os << '.';
-        else os << v; // TODO: handle endianess
-        break;
-      }
-      case 0x03u:
-      {
-        auto v = ((std::int32_t*)val_data_.data())[idx];
-        if (is_end_of_vector(v))
-          break;
-        if (delim)
-          os.put(delim);
-        if (is_missing(v)) os << '.';
-        else os << v;
-        break;
-      }
-      case 0x04u:
-      {
-        auto v = ((std::int64_t*)val_data_.data())[idx];
-        if (is_end_of_vector(v))
-          break;
-        if (delim)
-          os.put(delim);
-        if (is_missing(v)) os << '.';
-        else os << v;
-        break;
-      }
-      case 0x05u:
-      {
-        auto v = ((float*)val_data_.data())[idx];
-        if (is_end_of_vector(v))
-          break;
-        if (delim)
-          os.put(delim);
-        if (is_missing(v)) os << '.';
-        else os << v;
-        break;
-      }
-      case 0x07u:
-      {
-        if (val_data_.data()[idx] > '\r')
-          os.put(val_data_.data()[idx]);
-        break;
-      }
-      default:
-        os.setstate(os.rdstate() | std::ios::failbit);
-      }
-    }
-
+    void serialize_vcf(std::size_t idx, std::ostream& os, char delim) const;
     void deserialize_vcf(std::size_t idx, std::size_t length, char* str);
     void deserialize_vcf2(std::size_t idx, std::size_t length, char*& str);
     void deserialize_vcf2_gt(std::size_t idx, std::size_t length, char*& str, typed_value* ph_value);
@@ -1826,6 +1755,30 @@ namespace savvy
   inline bool typed_value::is_end_of_vector(const T& v)
   {
     return v == end_of_vector_value<T>();
+  }
+
+  template<>
+  inline bool typed_value::is_end_of_vector(const float& v)
+  {
+    union
+    {
+      float f;
+      std::uint32_t i;
+    } u;
+    u.f = v;
+    return u.i == 0x7F800002;
+  }
+
+  template<>
+  inline bool typed_value::is_end_of_vector(const double& v)
+  {
+    union
+    {
+      double d;
+      std::uint64_t i;
+    } u;
+    u.d = v;
+    return u.i == 0x7FF0000000000002;
   }
 
   template<>
@@ -2803,6 +2756,79 @@ namespace savvy
     size_(sz)
   {
     val_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
+  }
+
+  inline
+  void typed_value::serialize_vcf(std::size_t idx, std::ostream& os, char delim) const
+  {
+    assert(!off_type_ && idx < size_);
+
+    switch (val_type_)
+    {
+    case 0x01u:
+    {
+      auto v = ((std::int8_t*)val_data_.data())[idx];
+      if (is_end_of_vector(v))
+        break;
+      if (delim)
+        os.put(delim);
+      if (is_missing(v)) os << '.';
+      else os << static_cast<int>(v);
+      break;
+    }
+    case 0x02u:
+    {
+      auto v = ((std::int16_t*)val_data_.data())[idx];
+      if (is_end_of_vector(v))
+        break;
+      if (delim)
+        os.put(delim);
+      if (is_missing(v)) os << '.';
+      else os << v; // TODO: handle endianess
+      break;
+    }
+    case 0x03u:
+    {
+      auto v = ((std::int32_t*)val_data_.data())[idx];
+      if (is_end_of_vector(v))
+        break;
+      if (delim)
+        os.put(delim);
+      if (is_missing(v)) os << '.';
+      else os << v;
+      break;
+    }
+    case 0x04u:
+    {
+      auto v = ((std::int64_t*)val_data_.data())[idx];
+      if (is_end_of_vector(v))
+        break;
+      if (delim)
+        os.put(delim);
+      if (is_missing(v)) os << '.';
+      else os << v;
+      break;
+    }
+    case 0x05u:
+    {
+      auto v = ((float*)val_data_.data())[idx];
+      if (is_end_of_vector(v))
+        break;
+      if (delim)
+        os.put(delim);
+      if (is_missing(v)) os << '.';
+      else os << v;
+      break;
+    }
+    case 0x07u:
+    {
+      if (val_data_.data()[idx] > '\r')
+        os.put(val_data_.data()[idx]);
+      break;
+    }
+    default:
+      os.setstate(os.rdstate() | std::ios::failbit);
+    }
   }
 
   inline
