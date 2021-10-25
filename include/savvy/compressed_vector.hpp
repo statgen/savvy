@@ -10,6 +10,7 @@
 #include <vector>
 #include <algorithm>
 #include <cassert>
+#include <iterator>
 
 namespace savvy
 {
@@ -209,12 +210,11 @@ namespace savvy
       offsets_.reserve(size_);
       for (auto it = val_it; it != val_end; ++it)
       {
-        //typename std::iterator_traits<ValT>::value_type tmp = *it;
-        if (*it)
-        {
-          values_.emplace_back(t_fn(*it));
-          offsets_.emplace_back(it - val_it);
-        }
+        typedef typename std::iterator_traits<ValT>::value_type DerefT;
+        if (*it == DerefT())
+          continue; // Allows NaN values but not Zero values.
+        values_.emplace_back(t_fn(*it));
+        offsets_.emplace_back(it - val_it);
       }
     }
 
@@ -508,11 +508,13 @@ namespace savvy
     std::size_t non_zero_size() const { return values_.size(); }
 
     /**
-     * Treat vector as two-dimensional array and sum elements of each sub-vector. The resulting size of the input vector will be initial size divided by stride.
+     * Treat vector as two-dimensional array and sum elements of each sub-vector. The resulting size of the input vector will be the initial size divided by stride.
      * @param vec Compressed vector to reduce
-     * @param stride Size of sub-vectors.
+     * @param stride Size of sub-vectors
+     * @param accumulate Sum function
      */
-    static void stride_reduce(savvy::compressed_vector<T>& vec, std::size_t stride)
+    template <typename Accumulate = std::plus<T>>
+    static void stride_reduce(savvy::compressed_vector<T>& vec, std::size_t stride, Accumulate accumulate = Accumulate())
     {
       if (stride <= 1)
         return;
@@ -521,25 +523,54 @@ namespace savvy
 
       if (non_zero_size)
       {
-        std::size_t dest_idx = 0;
-        vec.offsets_[dest_idx] = vec.offsets_[0] / stride;
-
-        for (std::size_t i = 1; i < non_zero_size; ++i)
+        std::size_t dest_idx = std::size_t(-1);
+        std::size_t i = 0;
+        for ( ; dest_idx && i < non_zero_size; ++i)
         {
-          if (vec.offsets_[dest_idx] == vec.offsets_[i] / stride)
-          {
-            vec.values_[dest_idx] = vec.values_[dest_idx] + vec.values_[i];
-          }
-          else
-          {
-            ++dest_idx;
-            vec.offsets_[dest_idx] = vec.offsets_[i] / stride;
-            vec.values_[dest_idx] = vec.values_[i];
-          }
+          T v = accumulate(T(), vec.values_[i]);
+          if (v == T()) // This way allows NaN values
+            continue;
+
+          ++dest_idx;
+          vec.offsets_[dest_idx] = vec.offsets_[i] / stride;
+          vec.values_[dest_idx] = v;
         }
 
-        vec.offsets_.resize(dest_idx + 1);
-        vec.values_.resize(dest_idx + 1);
+        if (dest_idx == 0)
+        {
+          for ( ; i < non_zero_size; ++i)
+          {
+            if (vec.offsets_[dest_idx] == vec.offsets_[i] / stride)
+            {
+              vec.values_[dest_idx] = accumulate(vec.values_[dest_idx], vec.values_[i]);
+            }
+            else
+            {
+              T v = accumulate(T(), vec.values_[i]);
+              if (v == T()) // This way allows NaN values
+              {
+              }
+              else
+              {
+                if (vec.values_[dest_idx] == T()) // This way allows NaN values
+                {
+                }
+                else
+                {
+                  ++dest_idx;
+                }
+                vec.offsets_[dest_idx] = vec.offsets_[i] / stride;
+                vec.values_[dest_idx] = v;
+              }
+            }
+          }
+
+          if (vec.values_[dest_idx] == T()) // Last entry could sum to Zero
+            --dest_idx;
+        }
+
+        vec.offsets_.resize(dest_idx + std::size_t(1));
+        vec.values_.resize(dest_idx + std::size_t(1));
       }
       vec.size_ = vec.size_ / stride;
     }

@@ -111,6 +111,7 @@ if(BUILD_TESTS)
     add_test(convert_file_test savvy-test convert-file)
     add_test(subset_test savvy-test subset)
     add_test(random_access_test savvy-test random-access)
+    add_test(stride_reduce_test savvy-test stride-reduce)
 endif()
 
 if (BUILD_EVAL)

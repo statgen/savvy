@@ -25,8 +25,8 @@
 
 namespace savvy
 {
-  template <typename T>
-  void stride_reduce(std::vector<T>& vec, std::size_t stride)
+  template <typename T, typename Accumulate = std::plus<T>>
+  void stride_reduce(std::vector<T>& vec, std::size_t stride, Accumulate accumulate = Accumulate())
   {
     if (stride <= 1)
       return;
@@ -37,22 +37,33 @@ namespace savvy
     {
       const std::size_t local_end = i + stride;
       auto dest_idx = i / stride;
-      vec[dest_idx] = vec[i++];
+      vec[dest_idx] = accumulate(T(), vec[i++]);
 
       for ( ; i < local_end; ++i)
       {
-        vec[dest_idx] += vec[i];
+        vec[dest_idx] = accumulate(vec[dest_idx], vec[i]);
       }
     }
 
     vec.resize(sz / stride);
   }
 
-  template <typename T>
-  void stride_reduce(savvy::compressed_vector<T>& vec, std::size_t stride)
+  template <typename T, typename Accumulate = std::plus<T>>
+  void stride_reduce(savvy::compressed_vector<T>& vec, std::size_t stride, Accumulate accumulate = Accumulate())
   {
-    savvy::compressed_vector<T>::stride_reduce(vec, stride);
+    savvy::compressed_vector<T>::stride_reduce(vec, stride, accumulate);
   }
+
+  template <typename T>
+  struct plus_eov
+  {
+    T operator()(const T& l, const T& r)
+    {
+      if (savvy::typed_value::is_end_of_vector(r))
+        return l;
+      return l + r;
+    }
+  };
 
   namespace detail
   {

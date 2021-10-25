@@ -736,6 +736,78 @@ void subset_test(const std::string& path, const std::string& fmt_field)
   assert(cnt == SAVVYT_MARKER_COUNT_HARD);
 }
 
+struct hash_combine_fn
+{
+  template <typename T>
+  std::size_t operator()(std::size_t seed, const T& val)
+  {
+    seed ^= std::hash<T>()(val) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+    return seed;
+  }
+};
+
+void stride_reduce_test()
+{
+  const std::size_t vec_size = 1000;
+  auto seed = std::time(nullptr);
+  std::cerr << "PRNG seed for stride reduce test: " << seed << std::endl;
+  std::mt19937 prng(seed);
+  // give "true" 1/4 of the time
+  // give "false" 3/4 of the time
+  std::bernoulli_distribution dist(0.05);
+  for (std::size_t p = 2; p <= 7; ++p)
+  {
+    std::vector<int> orig;
+    for (std::size_t i = 0; i < 100; ++i)
+    {
+      bool eov_test = false;
+      orig.resize(p * vec_size);
+      std::generate(orig.begin(), orig.end(), std::bind(std::ref(dist), std::ref(prng)));
+      int orig_sum = std::accumulate(orig.begin(), orig.end(), 0);
+
+      if (i >= 50)
+      {
+        for (std::size_t j = 0; j < 15; ++j)
+          orig[(prng() % vec_size) * p + 1 + (prng() % (p - 1))] = savvy::typed_value::end_of_vector_value<int>();
+
+        orig_sum = 0;
+        for (auto it = orig.begin(); it != orig.end(); ++it)
+        {
+          if (savvy::typed_value::is_end_of_vector(*it))
+            continue;
+          orig_sum += *it;
+        }
+
+        eov_test = true;
+      }
+
+      savvy::compressed_vector<int> sp(orig.begin(), orig.end());
+      if (eov_test)
+        savvy::stride_reduce(sp, p, savvy::plus_eov<int>());
+      else
+        savvy::stride_reduce(sp, p);
+
+      std::vector<int> dense(sp.size());
+      for (auto it = sp.begin(); it != sp.end(); ++it)
+        dense[it.offset()] = *it;
+      int sp_sum = std::accumulate(sp.begin(), sp.end(), 0);
+      int sp_hash_sum = std::accumulate(dense.begin(), dense.end(), 0, hash_combine_fn());
+
+      if (eov_test)
+        savvy::stride_reduce(orig, p, savvy::plus_eov<int>());
+      else
+        savvy::stride_reduce(orig, p);
+      int dense_sum = std::accumulate(orig.begin(), orig.end(), 0);
+      int dense_hash_sum = std::accumulate(orig.begin(), orig.end(), 0, hash_combine_fn());
+
+      assert(orig_sum == sp_sum);
+      assert(orig_sum == dense_sum);
+      assert(sp_hash_sum == dense_hash_sum);
+      assert(sp.size() == orig.size());
+    }
+  }
+}
+
 int main(int argc, char** argv)
 {
   std::string cmd = (argc < 2) ? "" : argv[1];
@@ -748,6 +820,7 @@ int main(int argc, char** argv)
     std::cout << "- random-access" << std::endl;
     std::cout << "- subset" << std::endl;
     std::cout << "- varint" << std::endl;
+    std::cout << "- stride-reduce" << std::endl;
     std::cin >> cmd;
   }
 
@@ -789,6 +862,10 @@ int main(int argc, char** argv)
   else if (cmd == "varint")
   {
     varint_test();
+  }
+  else if (cmd == "stride-reduce")
+  {
+    stride_reduce_test();
   }
   else
   {
