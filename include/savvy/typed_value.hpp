@@ -232,12 +232,11 @@ namespace savvy
       template <typename T>
       void operator()(T* valp, T* endp)
       {
-        const T end_of_vector_val = std::numeric_limits<T>::min() + 1;
-        const T missing_val = std::numeric_limits<T>::min();
+        const T missing_val = missing_value<T>();
 
         for ( ; valp != endp; ++valp)
         {
-          if (*valp == end_of_vector_val) return;
+          if (is_end_of_vector(*valp)) return;
           *valp = T(unsigned(*valp) >> 1u) - 1;
           if (*valp == -1)
             *valp = missing_val;
@@ -247,14 +246,13 @@ namespace savvy
       template <typename T>
       void operator()(T* valp, T* endp, std::int8_t* phasep, std::size_t stride)
       {
-        const T end_of_vector_val = std::numeric_limits<T>::min() + 1;
-        const T missing_val = std::numeric_limits<T>::min();
+        const T missing_val = missing_value<T>();
 
         for (std::size_t i = 0; valp != endp; ++valp,++i)
         {
           std::int8_t ph;
 
-          if (*valp == end_of_vector_val)
+          if (is_end_of_vector(*valp))
           {
             ph = std::int8_t(0x81);
           }
@@ -1748,7 +1746,8 @@ namespace savvy
   typename std::enable_if<std::is_same<T, float>::value || std::is_same<T, double>::value, bool>::type
   typed_value::is_missing(const T& v)
   {
-    return std::isnan(v); // TODO: differentiate between end_of_vector
+    T missing = missing_value<T>();
+    return std::memcmp(&v, &missing, sizeof(T)) == 0;
   }
 
   template<typename T>
