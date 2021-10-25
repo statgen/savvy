@@ -158,7 +158,7 @@ namespace savvy
     {
       for ( ; val_ptr != val_end_ptr; ++val_ptr)
       {
-        if (*val_ptr == std::numeric_limits<T>::min() + 1) return;
+        if (*val_ptr == std::numeric_limits<T>::min() + 1) continue;
         if (*val_ptr == std::numeric_limits<T>::min())
           *val_ptr = T(-1);
         *val_ptr = ((*val_ptr + 1) << 1u) | T(phased); // TODO: restrict values so that they fit (max val for int8_t is 126).
@@ -195,8 +195,8 @@ namespace savvy
       {
         for ( ; val_ptr != val_end_ptr; ++val_ptr)
         {
-          if (*val_ptr == std::numeric_limits<T>::min() + 1) return;
-          if (*val_ptr == std::numeric_limits<T>::min())
+          if (is_end_of_vector(*val_ptr)) continue;
+          if (is_missing(*val_ptr))
             *val_ptr = T(-1);
           *val_ptr = ((*val_ptr + 1) << 1u) | T(phased); // TODO: restrict values so that they fit (max val for int8_t is 126).
         }
@@ -207,9 +207,9 @@ namespace savvy
       {
         for (std::size_t i = 0; val_ptr != val_end_ptr; ++val_ptr,++i)
         {
-          if (*val_ptr != std::numeric_limits<T>::min() + 1)
+          if (!is_end_of_vector(*val_ptr))
           {
-            if (*val_ptr == std::numeric_limits<T>::min())
+            if (is_missing(*val_ptr))
               *val_ptr = T(-1);
             if (i % stride)
               *val_ptr = ((*val_ptr + 1) << 1u) | T(*phase++); // TODO: restrict values so that they fit (max val for int8_t is 126).
@@ -236,7 +236,7 @@ namespace savvy
 
         for ( ; valp != endp; ++valp)
         {
-          if (is_end_of_vector(*valp)) return;
+          if (is_end_of_vector(*valp)) continue;
           *valp = T(unsigned(*valp) >> 1u) - 1;
           if (*valp == -1)
             *valp = missing_val;
@@ -2635,40 +2635,101 @@ namespace savvy
   inline
   std::ostream& operator<<(std::ostream& os, const typed_value& v)
   {
+    union
+    {
+      const std::int8_t* i8;
+      const std::int16_t* i16;
+      const std::int32_t* i32;
+      const std::int64_t* i64;
+      const float* f;
+      const char* s;
+    } u;
+
     if (!v.val_type_ || v.size_ == 0)
     {
       os << ".";
     }
     else
     {
-      for (std::size_t i = 0; i < v.size_; ++i)
+      u.s = v.val_data_.data();
+
+      switch (v.val_type_)
       {
-        if (i > 0)
-          os.put(',');
-        switch (v.val_type_)
+      case 0x01u:
+        for (std::size_t i = 0; i < v.size_; ++i)
         {
-        case 0x01u:
-          os << static_cast<int>(*(((std::int8_t*)v.val_data_.data()) + i));
-          break;
-        case 0x02u:
-          os << *(((std::int16_t*)v.val_data_.data()) + i); // TODO: handle endianess
-          break;
-        case 0x03u:
-          os << *(((std::int32_t*)v.val_data_.data()) + i);
-          break;
-        case 0x04u:
-          os << *(((std::int64_t*)v.val_data_.data()) + i);
-          break;
-        case 0x05u:
-          os << *(((float*)v.val_data_.data()) + i);
-          break;
-        case 0x07u:
-          os.write(v.val_data_.data(), v.size_);
-          i = v.size_;
-          break;
-        default:
-          os.setstate(os.rdstate() | std::ios::failbit);
+          if (!typed_value::is_end_of_vector(u.i8[i]))
+          {
+            if (i > 0)
+              os.put(',');
+            if (typed_value::is_missing(u.i8[i]))
+              os.put('.');
+            else
+              os << static_cast<int>(u.i8[i]);
+          }
         }
+        break;
+      case 0x02u:
+        for (std::size_t i = 0; i < v.size_; ++i)
+        {
+          if (!typed_value::is_end_of_vector(u.i16[i]))
+          {
+            if (i > 0)
+              os.put(',');
+            if (typed_value::is_missing(u.i16[i]))
+              os.put('.');
+            else
+              os << u.i16[i];
+          }
+        }
+        break;
+      case 0x03u:
+        for (std::size_t i = 0; i < v.size_; ++i)
+        {
+          if (!typed_value::is_end_of_vector(u.i32[i]))
+          {
+            if (i > 0)
+              os.put(',');
+            if (typed_value::is_missing(u.i32[i]))
+              os.put('.');
+            else
+              os << u.i32[i];
+          }
+        }
+        break;
+      case 0x04u:
+        for (std::size_t i = 0; i < v.size_; ++i)
+        {
+          if (!typed_value::is_end_of_vector(u.i64[i]))
+          {
+            if (i > 0)
+              os.put(',');
+            if (typed_value::is_missing(u.i64[i]))
+              os.put('.');
+            else
+              os << u.i64[i];
+          }
+        }
+        break;
+      case 0x05u:
+        for (std::size_t i = 0; i < v.size_; ++i)
+        {
+          if (!typed_value::is_end_of_vector(u.f[i]))
+          {
+            if (i > 0)
+              os.put(',');
+            if (typed_value::is_missing(u.f[i]))
+              os.put('.');
+            else
+              os << u.f[i];
+          }
+        }
+        break;
+      case 0x07u:
+        os.write(v.val_data_.data(), v.size_);
+        break;
+      default:
+        os.setstate(os.rdstate() | std::ios::failbit);
       }
     }
 
