@@ -63,7 +63,7 @@ namespace savvy
     private:
       std::mt19937_64 rng_;
       std::unique_ptr<std::streambuf> output_buf_;
-      std::string file_path_;
+      std::fstream append_ofs_;
       std::string index_path_;
       std::ostream ofs_;
       std::size_t n_samples_ = 0;
@@ -171,7 +171,7 @@ namespace savvy
     writer::writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level, std::string custom_index_path) :
       rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t) this),
       output_buf_(create_out_streambuf(file_path, file_format, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
-      file_path_(file_path),
+      append_ofs_(file_path, std::ios::out | std::ios::binary | std::ios::app),
       //samples_(samples_beg, samples_end),
       index_path_(custom_index_path),
       ofs_(output_buf_.get())
@@ -242,8 +242,9 @@ namespace savvy
 
         if (index_path_.empty()) // append if custom index path was not provided
         {
-          std::fstream ofs(file_path_, std::ios::out | std::ios::binary | std::ios::app); // TODO: THIS SEEMS DANGEROUS. Store FILE* when creating zstd stream and use instead of opening new descriptor.
-          if (!::savvy::detail::append_skippable_zstd_frame(idx_fs, ofs))
+          append_ofs_.clear(); // TODO: THIS SEEMS DANGEROUS. Store FILE* when creating zstd stream and use instead of opening new descriptor.
+          append_ofs_.seekp(0, std::ios::end);
+          if (!::savvy::detail::append_skippable_zstd_frame(idx_fs, append_ofs_))
           {
             ofs_.setstate(ofs_.rdstate() | std::ios::badbit); // TODO: Use linkat or send file (see https://stackoverflow.com/a/25154505/1034772)
             std::cerr << "Error: index file too big for skippable zstd frame" << std::endl;

@@ -176,7 +176,7 @@ namespace  savvy
       return bins;
     }
 
-    std::vector<int> reg2bins(std::int64_t beg, std::int64_t end)
+    std::vector<int> reg2bins(std::int64_t beg, std::int64_t end) const
     {
       std::vector<int> bins;
       int l, t, s = min_shift_ + depth_ * 3;

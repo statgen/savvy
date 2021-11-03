@@ -462,7 +462,7 @@ namespace savvy
 //        entry_count_ = be64toh(entry_count_);
       }
 
-      bool good() const { return ifs_.good(); }
+      //bool good() const { return ifs_.good(); }
 
       std::tuple<std::uint32_t, std::uint32_t> range()
       {
@@ -529,9 +529,58 @@ namespace savvy
 
 
       reader(const std::string& file_path) :
-        file_path_(file_path),
         input_file_(file_path, std::ios::binary)
       {
+        init();
+      }
+
+      bool good()
+      {
+        if (input_file_.good())
+          return true;
+        init();
+        return input_file_.good();
+      }
+
+      std::vector<std::string> tree_names() const
+      {
+        std::vector<std::string> ret;
+        std::size_t sz = trees_.size();
+        if (sz > 0)
+        {
+          --sz;
+          ret.reserve(sz);
+          for (auto it = trees_.begin(); it != std::prev(trees_.end()); ++it)
+          {
+            ret.push_back(it->name());
+          }
+        }
+
+        return ret;
+      }
+
+      std::vector<tree_reader>::iterator trees_begin()
+      {
+        return trees_.begin();
+      }
+
+      std::vector<tree_reader>::iterator trees_end()
+      {
+        if (trees_.size())
+          return trees_.begin() + trees_.size() - 1;
+        return trees_.begin();
+      }
+
+      class query;
+      query create_query(genomic_region reg);
+      query create_query(std::vector<genomic_region> regs);
+      std::streampos file_offset() const { return index_file_offset_; }
+      std::streampos size_on_disk() const { return size_on_disk_; }
+    private:
+      void init()
+      {
+        input_file_.clear();
+
         std::array<char, 26> footer;
 
         std::uint8_t block_size_byte = 0;
@@ -634,45 +683,7 @@ namespace savvy
 //        ifs_.read((char*)(&entry_count_), 8);
 //        entry_count_ = be64toh(entry_count_);
       }
-
-      bool good() const { return input_file_.good(); }
-
-      std::vector<std::string> tree_names() const
-      {
-        std::vector<std::string> ret;
-        std::size_t sz = trees_.size();
-        if (sz > 0)
-        {
-          --sz;
-          ret.reserve(sz);
-          for (auto it = trees_.begin(); it != std::prev(trees_.end()); ++it)
-          {
-            ret.push_back(it->name());
-          }
-        }
-
-        return ret;
-      }
-
-      std::vector<tree_reader>::iterator trees_begin()
-      {
-        return trees_.begin();
-      }
-
-      std::vector<tree_reader>::iterator trees_end()
-      {
-        if (trees_.size())
-          return trees_.begin() + trees_.size() - 1;
-        return trees_.begin();
-      }
-
-      class query;
-      query create_query(genomic_region reg);
-      query create_query(std::vector<genomic_region> regs);
-      std::streampos file_offset() const { return index_file_offset_; }
-      std::streampos size_on_disk() const { return size_on_disk_; }
     private:
-      std::string file_path_;
       std::ifstream input_file_;
       std::vector<tree_reader> trees_;
       std::array<char, 16> uuid_;

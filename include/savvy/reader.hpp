@@ -29,7 +29,6 @@ namespace savvy
     class reader : public file
     {
     private:
-      std::string file_path_;
       std::unique_ptr<std::streambuf> sbuf_;
       std::unique_ptr<std::istream> input_stream_;
       std::vector<std::pair<std::string, std::string>> headers_;
@@ -40,9 +39,8 @@ namespace savvy
       std::size_t subset_size_;
 
       // Random access
-      struct index_data
+      struct s1r_query_context
       {
-        s1r::reader file;
         genomic_region reg;
         s1r::reader::query query;
         s1r::reader::query::iterator iter;
@@ -52,8 +50,7 @@ namespace savvy
         std::uint64_t total_records_read;
         std::uint64_t max_records_to_read;
 
-        index_data(const std::string& file_path, genomic_region bounds, bounding_point bound_type = bounding_point::beg) :
-          file(file_path),
+        s1r_query_context(s1r::reader& file, genomic_region bounds, bounding_point bound_type = bounding_point::beg) :
           reg(bounds),
           query(file.create_query(bounds)),
           iter(query.begin()),
@@ -66,16 +63,14 @@ namespace savvy
         }
       };
 
-      struct csi_index_data
+      struct csi_query_context
       {
-        csi_index file;
         genomic_region reg;
         std::list<std::pair<std::uint64_t, std::uint64_t>> intervals;
         std::size_t interval_off;
         bounding_point bounding_type;
 
-        csi_index_data(const std::string& file_path, const std::unordered_map<std::string, std::uint32_t>& contig_map, genomic_region bounds, bounding_point bound_type = bounding_point::beg) :
-          file(file_path),
+        csi_query_context(csi_index& file, const std::unordered_map<std::string, std::uint32_t>& contig_map, genomic_region bounds, bounding_point bound_type = bounding_point::beg) :
           reg(bounds),
           interval_off(0),
           bounding_type(bound_type)
@@ -85,8 +80,10 @@ namespace savvy
         }
       };
 
-      std::unique_ptr<index_data> s1r_index_;
-      std::unique_ptr<csi_index_data> csi_index_;
+      std::unique_ptr<s1r::reader> s1r_index_;
+      std::unique_ptr<s1r_query_context> s1r_query_;
+      std::unique_ptr<csi_index> csi_index_;
+      std::unique_ptr<csi_query_context> csi_query_;
     public:
       /**
        * Default constuctor.
@@ -225,10 +222,8 @@ namespace savvy
     //================================================================//
     // Reader definitions
     inline
-    reader::reader(const std::string& file_path) :
-      file_path_(file_path)
+    reader::reader(const std::string& file_path)
     {
-
       FILE* fp = fopen(file_path.c_str(), "rb");
       if (!fp)
       {
@@ -256,6 +251,12 @@ namespace savvy
 
       if (!read_header())
         input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
+
+      bool csi_exists;
+      if (file_format_ == format::sav1 || file_format_ == format::sav2)
+        s1r_index_ = ::savvy::detail::make_unique<s1r::reader>(::savvy::detail::file_exists(file_path + ".s1r") ? file_path + ".s1r" : file_path);
+      else if ((csi_exists = ::savvy::detail::file_exists(file_path + ".csi")) || ::savvy::detail::file_exists(file_path + ".tbi"))
+        csi_index_ = ::savvy::detail::make_unique<csi_index>(file_path + (csi_exists ? ".csi" : ".tbi"));
     }
 
 //    inline
@@ -308,31 +309,19 @@ namespace savvy
     reader& reader::reset_bounds(genomic_region reg, bounding_point bp)
     {
       input_stream_->clear();
+      s1r_query_.reset(nullptr);
+      csi_query_.reset(nullptr);
 
-      bool csi_exists = false;
-      if (file_format_ == format::sav1 || file_format_ == format::sav2)
+      if (s1r_index_ && s1r_index_->good()) //file_format_ == format::sav1 || file_format_ == format::sav2)
       {
-        // TODO: First check whether index is appended, than check file_path_ + ".s1r"
-        s1r_index_ = ::savvy::detail::make_unique<index_data>(::savvy::detail::file_exists(file_path_ + ".s1r") ? file_path_ + ".s1r" : file_path_, reg, bp);
-        if (!s1r_index_->file.good())
-        {
-          input_stream_->setstate(std::ios::failbit); //TODO: error message
-        }
+        s1r_query_ = ::savvy::detail::make_unique<s1r_query_context>(*s1r_index_, reg, bp);
       }
-      else if ((csi_exists = ::savvy::detail::file_exists(file_path_ + ".csi")) || ::savvy::detail::file_exists(file_path_ + ".tbi"))
+      else if (csi_index_ && csi_index_->good())
       {
-        csi_index_ = ::savvy::detail::make_unique<csi_index_data>(file_path_ + (csi_exists ? ".csi" : ".tbi"), dict_.str_to_int[dictionary::contig], reg, bp);
-        if (!csi_index_->file.good())
+        csi_query_ = ::savvy::detail::make_unique<csi_query_context>(*csi_index_, dict_.str_to_int[dictionary::contig], reg, bp);
+        if (!csi_query_->intervals.empty())
         {
-          input_stream_->setstate(std::ios::failbit); //TODO: error message
-        }
-        else if (csi_index_->intervals.empty())
-        {
-          input_stream_->setstate(std::ios::eofbit);
-        }
-        else
-        {
-          input_stream_->seekg(csi_index_->intervals.front().first);
+          input_stream_->seekg(csi_query_->intervals.front().first);
         }
       }
       else
@@ -350,24 +339,24 @@ namespace savvy
       {
         reset_bounds(genomic_region(reg.chromosome()));
 
-        if (s1r_index_ && s1r_index_->file.good())
+        if (s1r_query_) //s1r_index_ && s1r_index_->good())
         {
           auto discard_skip = [this](std::uint32_t num)
           {
             savvy::variant tmp_var;
-            while (num > 0 && s1r_index_->current_offset_in_block < s1r_index_->total_in_block && good())
+            while (num > 0 && s1r_query_->current_offset_in_block < s1r_query_->total_in_block && good())
             {
               if (!read_record(tmp_var))
                 input_stream_->setstate(input_stream_->rdstate() | std::ios::badbit);
 
-              ++(s1r_index_->current_offset_in_block);
+              ++(s1r_query_->current_offset_in_block);
               --num;
             }
             return num;
           };
 
           std::size_t num_variants_to_skip = reg.from();
-          s1r_index_->max_records_to_read = reg.to() > reg.from() ? reg.to() - reg.from() : 0;
+          s1r_query_->max_records_to_read = reg.to() > reg.from() ? reg.to() - reg.from() : 0;
     //        if (num_variants_to_skip < total_in_block_ - current_offset_in_block_)
     //        {
     //          discard_skip(num_variants_to_skip);
@@ -375,21 +364,21 @@ namespace savvy
     //        else
           {
     //          num_variants_to_skip -= (total_in_block_ - current_offset_in_block_);
-            while (s1r_index_->iter != s1r_index_->query.end())
+            while (s1r_query_->iter != s1r_query_->query.end())
             {
-              s1r_index_->total_in_block = std::uint32_t(0x000000000000FFFF & s1r_index_->iter->value()) + 1;
+              s1r_query_->total_in_block = std::uint32_t(0x000000000000FFFF & s1r_query_->iter->value()) + 1;
 
-              if (num_variants_to_skip < s1r_index_->total_in_block)
+              if (num_variants_to_skip < s1r_query_->total_in_block)
               {
-                s1r_index_->current_offset_in_block = 0;
-                this->input_stream_->seekg(std::streampos((s1r_index_->iter->value() >> 16) & 0x0000FFFFFFFFFFFF));
-                ++(s1r_index_->iter);
+                s1r_query_->current_offset_in_block = 0;
+                this->input_stream_->seekg(std::streampos((s1r_query_->iter->value() >> 16) & 0x0000FFFFFFFFFFFF));
+                ++(s1r_query_->iter);
                 discard_skip(num_variants_to_skip);
                 return *this;
               }
 
-              num_variants_to_skip -= s1r_index_->total_in_block;
-              ++(s1r_index_->iter);
+              num_variants_to_skip -= s1r_query_->total_in_block;
+              ++(s1r_query_->iter);
             }
 
             // Skipped past end of index.
@@ -410,25 +399,25 @@ namespace savvy
     {
       while (this->good())
       {
-        if (s1r_index_->total_records_read == s1r_index_->max_records_to_read)
+        if (s1r_query_->total_records_read == s1r_query_->max_records_to_read)
         {
           this->input_stream_->setstate(std::ios::eofbit);
           break;
         }
 
-        if (s1r_index_->current_offset_in_block >= s1r_index_->total_in_block)
+        if (s1r_query_->current_offset_in_block >= s1r_query_->total_in_block)
         {
-          if (s1r_index_->iter == s1r_index_->query.end())
+          if (s1r_query_->iter == s1r_query_->query.end())
           {
             this->input_stream_->setstate(std::ios::eofbit);
             break;
           }
           else
           {
-            s1r_index_->total_in_block = std::uint32_t(0x000000000000FFFF & s1r_index_->iter->value()) + 1;
-            s1r_index_->current_offset_in_block = 0;
-            this->input_stream_->seekg(std::streampos((s1r_index_->iter->value() >> 16) & 0x0000FFFFFFFFFFFF));
-            ++(s1r_index_->iter);
+            s1r_query_->total_in_block = std::uint32_t(0x000000000000FFFF & s1r_query_->iter->value()) + 1;
+            s1r_query_->current_offset_in_block = 0;
+            this->input_stream_->seekg(std::streampos((s1r_query_->iter->value() >> 16) & 0x0000FFFFFFFFFFFF));
+            ++(s1r_query_->iter);
           }
         }
 
@@ -437,7 +426,7 @@ namespace savvy
 
         if (!this->good())
         {
-          if (s1r_index_->current_offset_in_block < s1r_index_->total_in_block)
+          if (s1r_query_->current_offset_in_block < s1r_query_->total_in_block)
           {
             assert(!"Truncated block");
             this->input_stream_->setstate(std::ios::badbit);
@@ -445,9 +434,9 @@ namespace savvy
         }
         else
         {
-          ++(s1r_index_->current_offset_in_block);
-          ++(s1r_index_->total_records_read);
-          if (region_compare(s1r_index_->bounding_type, r, s1r_index_->reg))
+          ++(s1r_query_->current_offset_in_block);
+          ++(s1r_query_->total_records_read);
+          if (region_compare(s1r_query_->bounding_type, r, s1r_query_->reg))
           {
             //this->read_genotypes(annotations, destination);
             break;
@@ -466,7 +455,7 @@ namespace savvy
     {
       while (input_stream_->good())
       {
-        if (csi_index_->intervals.empty())
+        if (csi_query_->intervals.empty())
         {
           input_stream_->setstate(std::ios::eofbit);
           break;
@@ -474,18 +463,18 @@ namespace savvy
 
         std::uint64_t current_pos = input_stream_->tellg();
 
-        if (current_pos >= csi_index_->intervals.front().second)
+        if (current_pos >= csi_query_->intervals.front().second)
         {
-          csi_index_->intervals.pop_front();
-          if (csi_index_->intervals.empty())
+          csi_query_->intervals.pop_front();
+          if (csi_query_->intervals.empty())
           {
             input_stream_->setstate(std::ios::eofbit);
             return *this;
           }
           else
           {
-            assert(csi_index_->intervals.front().first <= csi_index_->intervals.front().second);
-            input_stream_->seekg(csi_index_->intervals.front().first);
+            assert(csi_query_->intervals.front().first <= csi_query_->intervals.front().second);
+            input_stream_->seekg(csi_query_->intervals.front().first);
           }
         }
 
@@ -498,12 +487,12 @@ namespace savvy
 
         //assert(r.pos() >= pos_before);
 
-        if (region_compare(csi_index_->bounding_type, r, csi_index_->reg))
+        if (region_compare(csi_query_->bounding_type, r, csi_query_->reg))
         {
           //this->read_genotypes(annotations, destination);
           break;
         }
-        else if (r.pos() > csi_index_->reg.to())
+        else if (r.pos() > csi_query_->reg.to())
         {
           input_stream_->setstate(std::ios::eofbit);
         }
@@ -516,10 +505,10 @@ namespace savvy
     {
       if (good())
       {
-        if (s1r_index_)
+        if (s1r_query_)
           return read_indexed_record(r);
 
-        if (csi_index_)
+        if (csi_query_)
           return read_csi_indexed_record(r);
 
         if (!read_record(r) && input_stream_->good())
