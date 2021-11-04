@@ -63,14 +63,13 @@ namespace savvy
     private:
       std::mt19937_64 rng_;
       std::unique_ptr<std::streambuf> output_buf_;
-      std::fstream append_ofs_;
-      std::string index_path_;
       std::ostream ofs_;
       std::size_t n_samples_ = 0;
       std::vector<char> serialized_buf_;
       std::unordered_set<std::string> pbwt_fields_;
 
       // Data members to support indexing
+      std::fstream append_ofs_;
       std::unique_ptr<s1r::writer> index_file_;
       std::string current_chromosome_;
       std::size_t block_size_ = default_block_size;
@@ -78,6 +77,7 @@ namespace savvy
       std::size_t record_count_in_block_ = 0;
       std::uint32_t current_block_min_ = std::numeric_limits<std::uint32_t>::max();
       std::uint32_t current_block_max_ = 0;
+      bool append_index_;
     private:
       static std::filebuf *create_std_filebuf(const std::string& file_path, std::ios::openmode mode);
 
@@ -170,11 +170,10 @@ namespace savvy
     inline
     writer::writer(const std::string& file_path, file::format file_format, std::vector<std::pair<std::string, std::string>> headers, const std::vector<std::string>& ids, std::uint8_t compression_level, std::string custom_index_path) :
       rng_(std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ std::clock() ^ (std::uint64_t) this),
-      output_buf_(create_out_streambuf(file_path, file_format, compression_level)), //opts.compression == compression_type::zstd ? std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path)) : std::unique_ptr<std::streambuf>(new std::filebuf(file_path, std::ios::binary))),
+      output_buf_(create_out_streambuf(file_path, file_format, compression_level)),
+      ofs_(output_buf_.get()),
       append_ofs_(file_path, std::ios::out | std::ios::binary | std::ios::app),
-      //samples_(samples_beg, samples_end),
-      index_path_(custom_index_path),
-      ofs_(output_buf_.get())
+      append_index_(custom_index_path.empty())
     {
       file_format_ = file_format;
       uuid_ = ::savvy::detail::gen_uuid(rng_);
@@ -187,11 +186,11 @@ namespace savvy
       }
 
       // TODO: Use mkstemp when shrinkwrap supports FILE*
-      if (file_format_ == format::sav2 && index_path_ != "/dev/null") // TODO: Check if zstd is enabled.
+      if (file_format_ == format::sav2 && custom_index_path != "/dev/null") // TODO: Check if zstd is enabled.
       {
-        if (index_path_.size())
+        if (custom_index_path.size())
         {
-          index_file_ = ::savvy::detail::make_unique<s1r::writer>(index_path_, uuid_);
+          index_file_ = ::savvy::detail::make_unique<s1r::writer>(custom_index_path, uuid_);
         }
         else
         {
@@ -240,9 +239,8 @@ namespace savvy
         ofs_.flush();
         auto idx_fs = index_file_->close();
 
-        if (index_path_.empty()) // append if custom index path was not provided
+        if (append_index_) // append if custom index path was not provided
         {
-          append_ofs_.clear(); // TODO: THIS SEEMS DANGEROUS. Store FILE* when creating zstd stream and use instead of opening new descriptor.
           append_ofs_.seekp(0, std::ios::end);
           if (!::savvy::detail::append_skippable_zstd_frame(idx_fs, append_ofs_))
           {
