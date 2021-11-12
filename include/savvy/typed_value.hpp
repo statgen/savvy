@@ -435,6 +435,7 @@ namespace savvy
         // also sets dest.sparse_size_
         capply_dense(set_off_type(), std::ref(dest));
 
+        dest.pbwt_flag_ = pbwt_flag_;
         dest.val_type_ = val_type_;
         dest.size_ = size_;
 
@@ -451,13 +452,18 @@ namespace savvy
 
     bool copy_as_dense(typed_value& dest) const
     {
-      dest.val_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
+      dest.sparse_size_ = 0;
+      dest.off_type_ = 0;
+      dest.off_data_.clear();
 
       dest.val_type_ = val_type_;
+      dest.val_data_.resize(size_ * (1u << bcf_type_shift[val_type_]));
       dest.size_ = size_;
+      dest.pbwt_flag_ = pbwt_flag_;
 
       if (off_type_)
       {
+        std::fill(dest.val_data_.begin(), dest.val_data_.end(), 0);
         switch (val_type_)
         {
         case 0x01u:
