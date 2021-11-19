@@ -82,11 +82,15 @@ namespace savvy
         if (!hval.idx.empty())
         {
           std::size_t idx = std::atoi(hval.idx.c_str());
-          dict_.entries[which_dict].resize(idx, {"DELETED", "", 0});
+          dict_.entries[which_dict].resize(std::max(dict_.entries[which_dict].size(), idx + 1), {"DELETED", "", 0});
+          dict_.entries[which_dict][idx] = std::move(e);
+          dict_.str_to_int[which_dict][hval.id] = idx;
         }
-
-        dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size();
-        dict_.entries[which_dict].emplace_back(std::move(e));
+        else
+        {
+          dict_.str_to_int[which_dict][hval.id] = dict_.entries[which_dict].size();
+          dict_.entries[which_dict].emplace_back(std::move(e));
+        }
       }
     }
 
