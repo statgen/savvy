@@ -438,10 +438,14 @@ namespace savvy
       std::uint32_t header_block_sz = 0;
       for (auto it = headers.begin(); it != headers.end(); ++it)
       {
-        std::string key = it->first;
-        std::string val = it->second;
+        auto hval = parse_header_value(it->second);
 
-        auto hval = parse_header_value(val);
+        if (!hval.idx.empty())
+        {
+          remove_header_sub_field(it->second, "IDX");
+          hval.idx.clear();
+        }
+
         if (it->first == "FORMAT")
         {
           if (hval.id == "GT")

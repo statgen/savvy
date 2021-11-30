@@ -282,12 +282,14 @@ namespace savvy
         if (equals_pos != comma_pos)
         {
           std::string key(curr_pos, equals_pos);
-          std::string val(equals_pos + 1, comma_pos);
           detail::trim(key);
-          detail::trim(val, " \t\n\r\f\v\"");
 
           if (key == field_to_parse)
+          {
+            std::string val(equals_pos + 1, comma_pos);
+            detail::trim(val, " \t\n\r\f\v\"");
             return val;
+          }
         }
 
         curr_pos = comma_pos + 1;
@@ -298,16 +300,69 @@ namespace savvy
       if (equals_pos != comma_pos)
       {
         std::string key(curr_pos, equals_pos);
-        std::string val(equals_pos + 1, comma_pos);
         detail::trim(key);
-        detail::trim(val, " \t\n\r\f\v\"");
 
         if (key == field_to_parse)
+        {
+          std::string val(equals_pos + 1, comma_pos);
+          detail::trim(val, " \t\n\r\f\v\"");
           return val;
+        }
       }
     }
 
     return "";
+  }
+
+  inline bool remove_header_sub_field(std::string& header_value, const std::string& field_to_remove)
+  {
+    if (header_value.size())
+    {
+      auto header_value_beg = header_value.begin() + 1;
+      auto header_value_end = header_value.end() - 1;
+      auto cur_pos = header_value_beg;
+      auto comma_pos = std::find(cur_pos, header_value_end, ',');
+
+      while (comma_pos != header_value_end)
+      {
+        auto equals_pos = std::find(cur_pos, comma_pos, '=');
+        if (equals_pos != comma_pos)
+        {
+          std::string key(cur_pos, equals_pos);
+          detail::trim(key);
+
+          if (key == field_to_remove)
+          {
+            auto src = comma_pos + 1;
+            std::size_t field_size = src - cur_pos;
+            std::copy(src, header_value.end(), cur_pos);
+            header_value.resize(header_value.size() - field_size);
+            return true;
+          }
+        }
+
+        cur_pos = comma_pos + 1;
+        comma_pos = std::find(cur_pos, header_value_end, ',');
+      }
+
+      auto equals_pos = std::find(cur_pos, header_value_end, '=');
+      if (equals_pos != header_value_end)
+      {
+        std::string key(cur_pos, equals_pos);
+        detail::trim(key);
+
+        if (key == field_to_remove)
+        {
+          auto dest = std::max(cur_pos - 1, header_value_beg);
+          std::size_t field_size = header_value_end - dest;
+          std::copy(header_value_end, header_value.end(), dest);
+          header_value.resize(header_value.size() - field_size);
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   template <typename T>
