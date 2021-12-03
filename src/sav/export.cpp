@@ -885,7 +885,7 @@ void export_records(savvy::reader& rdr, savvy::writer& wrt, const export_prog_ar
 {
   savvy::variant var;
   savvy::typed_value tmp_val;
-  while (rdr.read(var))
+  while (wrt && rdr.read(var))
   {
     if (args.filter_functor()(var))
     {
