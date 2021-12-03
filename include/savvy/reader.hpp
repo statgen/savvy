@@ -535,6 +535,9 @@ namespace savvy
 
         for (auto it = r.format_fields_.begin(); it != r.format_fields_.end(); ++it)
           it->second.minimize();
+
+        if (input_stream_->eof() && (bool)(*input_stream_))
+          input_stream_->clear();
       }
 
       return *this;
