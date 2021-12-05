@@ -100,6 +100,7 @@ if(BUILD_TESTS)
     enable_testing()
 
     add_definitions(-DSAVVYT_VCF_FILE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file.vcf\"
+                    -DSAVVYT_MISSING_HEADERS_VCF_FILE=\"${CMAKE_CURRENT_SOURCE_DIR}/test_file_missing_headers.vcf\"
                     -DSAVVYT_SAV_FILE_HARD=\"test_file_hard.sav\"
                     -DSAVVYT_SAV_FILE_DOSE=\"test_file_dose.sav\"
                     -DSAVVYT_MARKER_COUNT_HARD=24
@@ -112,6 +113,7 @@ if(BUILD_TESTS)
     add_test(subset_test savvy-test subset)
     add_test(random_access_test savvy-test random-access)
     add_test(stride_reduce_test savvy-test stride-reduce)
+    add_test(missing_headers_test savvy-test missing-headers)
 endif()
 
 if (BUILD_EVAL)

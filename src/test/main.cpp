@@ -808,6 +808,25 @@ void stride_reduce_test()
   }
 }
 
+void missing_headers_test()
+{
+  savvy::reader input(SAVVYT_MISSING_HEADERS_VCF_FILE);
+  savvy::variant var;
+  assert(input >> var);
+  std::int32_t i;
+  assert(!var.get_info("AC", i));
+  std::string s;
+  assert(var.get_info("AC", s));
+  assert(s == "3");
+  assert(input >> var);
+  std::vector<std::int8_t> gt;
+  assert(var.get_format("GT", gt));
+  assert(gt.size() == 6);
+  assert(std::count(gt.begin(), gt.end(), 0) == 4);
+  assert(!(input >> var));
+  assert(!input.bad());
+}
+
 int main(int argc, char** argv)
 {
   std::string cmd = (argc < 2) ? "" : argv[1];
@@ -821,6 +840,7 @@ int main(int argc, char** argv)
     std::cout << "- subset" << std::endl;
     std::cout << "- varint" << std::endl;
     std::cout << "- stride-reduce" << std::endl;
+    std::cout << "- missing-headers" << std::endl;
     std::cin >> cmd;
   }
 
@@ -866,6 +886,10 @@ int main(int argc, char** argv)
   else if (cmd == "stride-reduce")
   {
     stride_reduce_test();
+  }
+  else if (cmd == "missing-headers")
+  {
+    missing_headers_test();
   }
   else
   {

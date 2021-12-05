@@ -15,6 +15,7 @@
 #include "utility.hpp"
 #include "varint.hpp"
 #include "sav1.hpp"
+#include "logging.hpp"
 
 #include <string>
 #include <vector>
@@ -597,26 +598,23 @@ namespace savvy
             {
               if (dict.str_to_int[dictionary::id].find(kvp[0]) == dict.str_to_int[dictionary::id].end())
               {
-                fprintf(stderr, "Info key not in header: %s\n", kvp[0].c_str());
-                is.setstate(is.rdstate() | std::ios::failbit);
-                return false;
+                logging<>::cerr_once("Warning: INFO key (%s) not in header so assuming \"Flag\" type\n", kvp[0].c_str());
               }
 
               s.info_.emplace_back(kvp[0], typed_value(std::vector<std::int8_t>()));
             }
             else if (kvp.size() == 2)
             {
+              std::uint8_t info_val_type = typed_value::str;
               auto res = dict.str_to_int[dictionary::id].find(kvp[0]);
               if (res == dict.str_to_int[dictionary::id].end())
-              {
-                fprintf(stderr, "Info key not in header: %s\n", kvp[0].c_str());
-                is.setstate(is.rdstate() | std::ios::failbit);
-                return false;
-              }
+                logging<>::cerr_once("Warning: INFO key (%s) not in header so assuming \"String\" type\n", kvp[0].c_str());
+              else
+                info_val_type = dict.entries[dictionary::id][res->second].type;
 
               // TODO: get info data type from header
               char* p = kvp[1].size() ? &kvp[1][0] : nullptr;
-              s.info_.emplace_back(kvp[0], typed_value(dict.entries[dictionary::id][res->second].type, p, p + kvp[1].size()));
+              s.info_.emplace_back(kvp[0], typed_value(info_val_type, p, p + kvp[1].size()));
             }
             else
             {
@@ -1291,17 +1289,22 @@ namespace savvy
       typed_value* ph_value = nullptr;
       for (std::size_t i = 0; i < fmt_keys.size(); ++i)
       {
-        // TDOO: get fmt type from header
+        std::uint8_t type = 0;
+        std::size_t number = 0;
+        std::string number_str = ".";
         auto fmt_id_it = dict.str_to_int[dictionary::id].find(fmt_keys[i]);
         if (fmt_id_it == dict.str_to_int[dictionary::id].end() || fmt_id_it->second >= dict.entries[dictionary::id].size())
         {
-          std::fprintf(stderr, "Error: FMT key '%s' not in header\n", fmt_keys[i].c_str());
-          return false;
+          type = typed_value::str;
+          logging<>::cerr_once("Warning: FORMAT key '%s' not in header so assuming \"String\" type\n", fmt_keys[i].c_str());
+          //return false;
+        }
+        else
+        {
+          type = dict.entries[dictionary::id][fmt_id_it->second].type;
+          number_str = dict.entries[dictionary::id][fmt_id_it->second].number;
         }
 
-        std::uint8_t type = dict.entries[dictionary::id][fmt_id_it->second].type;
-        std::size_t number = 0;
-        std::string number_str = dict.entries[dictionary::id][fmt_id_it->second].number;
         if (number_str == "A")
         {
           number = v.alts().size(); // TODO: possibly make 1 the minimum value
@@ -1339,7 +1342,7 @@ namespace savvy
 
         if (number && !fmt_stats[i].is_gt && number != fmt_stats[i].max_stride)
         {
-          std::fprintf(stderr, "Warning: Number (%i) in FMT field (%s) does not match record stride (%i)\n", (int)number, fmt_keys[i].c_str(), (int)fmt_stats[i].max_stride);
+          logging<>::cerr_once("Warning: Number (%i) in FMT field (%s) does not match record stride (%i)\n", (int)number, fmt_keys[i].c_str(), (int)fmt_stats[i].max_stride);
         }
 
         if (fmt_keys[i] == "GT")
@@ -1420,17 +1423,23 @@ namespace savvy
 
       for (auto it = fmt_keys.begin(); it != fmt_keys.end(); ++it)
       {
-        // TDOO: get fmt type from header
+        std::uint8_t type = 0;
+        std::size_t number = 0;
+        std::string number_str = ".";
         auto fmt_id_it = dict.str_to_int[dictionary::id].find(*it);
         if (fmt_id_it == dict.str_to_int[dictionary::id].end() || fmt_id_it->second >= dict.entries[dictionary::id].size())
         {
-          std::fprintf(stderr, "Error: FMT key '%s' not in header\n", it->c_str());
-          return false;
+          type = typed_value::str;
+          logging<>::cerr_once("Warning: FORMAT key '%s' not in header so assuming \"String\" type\n", it->c_str());
+//          return false;
+        }
+        else
+        {
+          type = dict.entries[dictionary::id][fmt_id_it->second].type;
+          number_str = dict.entries[dictionary::id][fmt_id_it->second].number;
         }
 
-        std::uint8_t type = dict.entries[dictionary::id][fmt_id_it->second].type;
-        std::size_t number;
-        std::string number_str = dict.entries[dictionary::id][fmt_id_it->second].number;
+
         if (number_str == "A")
         {
           number = v.alts().size(); // TODO: possibly make 1 the minimum value
