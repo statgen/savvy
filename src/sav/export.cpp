@@ -945,7 +945,7 @@ int export_main(int argc, char** argv)
 
   if (args.regions().size())
   {
-    if (rdr.reset_bounds(args.regions().front(), args.bounding_point()).bad())
+    if (!rdr.reset_bounds(args.regions().front(), args.bounding_point()))
     {
       std::cerr << "Error: failed to load index for genomic region query" << std::endl;
       return EXIT_FAILURE;
@@ -953,7 +953,7 @@ int export_main(int argc, char** argv)
   }
   else if (args.slice())
   {
-    if (rdr.reset_bounds(*args.slice()).bad())
+    if (!rdr.reset_bounds(*args.slice()))
     {
       std::cerr << "Error: failed to load index for slice query" << std::endl;
       return EXIT_FAILURE;
@@ -1075,7 +1075,7 @@ int export_main(int argc, char** argv)
   {
     for (auto it = args.regions().begin() + 1; it != args.regions().end(); ++it)
     {
-      if (rdr.reset_bounds(*it, args.bounding_point()).bad())
+      if (!rdr.reset_bounds(*it, args.bounding_point()))
       {
         std::cerr << "Error: failed to load index for genomic region query" << std::endl;
         return EXIT_FAILURE;
