@@ -488,7 +488,9 @@ namespace savvy
         dict_.entries[dictionary::id].emplace_back(dictionary::entry{"PH", ".", typed_value::int8});
       }
 
-      std::string column_names = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
+      std::string column_names = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO";
+      if (!ids.empty())
+        column_names += "\tFORMAT";
       header_block_sz += column_names.size();
 
       for (auto it = ids.begin(); it != ids.end(); ++it)
