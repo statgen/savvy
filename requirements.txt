@@ -1,1 +1,1 @@
-jonathonl/shrinkwrap@1767208e13d406a6a90d39f0797d2075d2c7bb6a
+jonathonl/shrinkwrap@f25369a4bd78ecdd85e65345256442e8812c50d3
