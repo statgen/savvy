@@ -1314,18 +1314,20 @@ namespace savvy
         std::uint8_t new_val_type = old_val_type;
         if (std::is_integral<T>::value && sizeof(T) > 1)
         {
-          const T eov_val = end_of_vector_value<T>();
-          T min_val = 0; //end_of_vector_value<T>() + 1;
-          T max_val = 0; //std::numeric_limits<std::int8_t>::max();
+          T min_val = 0;
+          T max_val = 0;
           for (T* it = valp; it != endp; ++it)
           {
-            if (*it > max_val)
-              max_val = *it;
-            else if (*it < min_val && *it > eov_val)
-              min_val = *it;
+            if (!is_special_value(*it))
+            {
+              if (*it > max_val)
+                max_val = *it;
+              else if (*it < min_val)
+                min_val = *it;
+            }
           }
 
-          new_val_type = typed_value::type_code(std::max<T>(max_val, -min_val));
+          new_val_type = std::max(type_code(max_val), type_code(min_val));
         }
 
         assert(new_val_type <= old_val_type);
@@ -1862,11 +1864,11 @@ namespace savvy
     std::uint8_t type = type_code<T>();
     if (type >= typed_value::int16 && type <= typed_value::int64)
     {
-      if (val <= std::numeric_limits<std::int8_t>::max() && val > std::numeric_limits<std::int8_t>::min()) // TODO: include other reserved values
+      if (val <= std::numeric_limits<std::int8_t>::max() && val > max_reserved_value<std::int8_t>()) // TODO: include other reserved values
         type = typed_value::int8;
-      else if (val <= std::numeric_limits<std::int16_t>::max() && val > std::numeric_limits<std::int16_t>::min())
+      else if (val <= std::numeric_limits<std::int16_t>::max() && val > max_reserved_value<std::int16_t>())
         type = typed_value::int16;
-      else if (val <= std::numeric_limits<std::int32_t>::max() && val > std::numeric_limits<std::int32_t>::min())
+      else if (val <= std::numeric_limits<std::int32_t>::max() && val > max_reserved_value<std::int32_t>())
         type = typed_value::int32;
       else
         type = typed_value::int64;
@@ -2486,12 +2488,11 @@ namespace savvy
         {
           if (*it > max_val)
             max_val = *it;
-          if (*it < min_val)
+          else if (*it < min_val)
             min_val = *it;
         }
       }
-
-      val_type_ = type_code(std::min(vtype(-max_val), min_val));
+      val_type_ = std::max(type_code(max_val), type_code(min_val));
     }
     else
     {
@@ -2567,12 +2568,12 @@ namespace savvy
         {
           if (*it > max_val)
             max_val = *it;
-          if (*it < min_val)
+          else if (*it < min_val)
             min_val = *it;
         }
       }
 
-      val_type_ = type_code(std::min(vtype(-max_val), min_val));
+      val_type_ = std::max(type_code(max_val), type_code(min_val));
     }
     else
     {
