@@ -138,6 +138,7 @@ namespace savvy
 
       bool serialize_vcf_shared(const site_info& s);
       bool serialize_vcf_indiv(const variant& v, phasing phased);
+      static std::size_t strfmt_buf_size(std::uint8_t type_code);
     };
 
 
@@ -591,8 +592,29 @@ namespace savvy
     }
 
     inline
+    std::size_t writer::strfmt_buf_size(std::uint8_t type_code)
+    {
+      if (type_code == 1)
+        return std::snprintf(nullptr, 0, "%d", std::numeric_limits<int8_t>::min());
+      else if (type_code == 2)
+        return std::snprintf(nullptr, 0, "%d", std::numeric_limits<int16_t>::min());
+      else if (type_code == 3)
+        return std::snprintf(nullptr, 0, "%d", std::numeric_limits<int32_t>::min());
+      else if (type_code == 4)
+        return std::snprintf(nullptr, 0, "%lld", std::numeric_limits<int64_t>::min());
+      else if (type_code == 5)
+        return std::snprintf(nullptr, 0, "%.6g", -std::numeric_limits<float>::min());
+      else if (type_code == 6)
+        return std::snprintf(nullptr, 0, "%.6g", -std::numeric_limits<double>::min());
+      else if (type_code == 7)
+        return 1;
+      return 0;
+    }
+
+    inline
     bool writer::serialize_vcf_indiv(const savvy::variant& v, phasing phased)
     {
+      std::size_t out_buf_size = 1;
       std::vector<const typed_value*> typed_value_ptrs(v.format_fields_.size());
       std::vector<std::size_t> strides(v.format_fields_.size());
       std::vector<char> delims(v.format_fields_.size());
@@ -608,7 +630,7 @@ namespace savvy
           ph_ptr = (std::int8_t*)v.format_fields_[i].second.val_data_.data();
           continue;
         }
-
+        out_buf_size += v.format_fields_[i].second.size() * (strfmt_buf_size(v.format_fields_[i].second.val_type_) + 1);
         ofs_ << (i == 0 ? "\t" : ":") << v.format_fields_[i].first;
 
         strides[i] = (n_samples_ ? v.format_fields_[i].second.size() / n_samples_ : 0);
@@ -630,24 +652,25 @@ namespace savvy
         }
       }
 
-
+      serialized_buf_.resize(out_buf_size);
+      char* out_ptr = serialized_buf_.data();
       if (ph_ptr)
       {
         std::size_t ph_stride = strides[0] - 1;
         for (std::size_t i = 0; i < n_samples_; ++i)
         {
-          ofs_.put('\t');
+          *(out_ptr++) = '\t';
           for (std::size_t k = 0; k < strides[0]; ++k)
           {
-            typed_value_ptrs[0]->serialize_vcf(i * strides[0] + k, ofs_, k > 0 ? (ph_ptr[i * ph_stride + k - 1] ? '|' : '/') : '\0'); // TODO: allow for PH
+            typed_value_ptrs[0]->serialize_vcf(i * strides[0] + k, out_ptr, k > 0 ? (ph_ptr[i * ph_stride + k - 1] ? '|' : '/') : '\0'); // TODO: allow for PH
           }
 
           for (std::size_t j = 2; j < v.format_fields_.size(); ++j)
           {
-            ofs_.put(':');
+            *(out_ptr++) = ':';
             for (std::size_t k = 0; k < strides[j]; ++k)
             {
-              typed_value_ptrs[j]->serialize_vcf(i * strides[j] + k, ofs_, k > 0 ? delims[j] : '\0');
+              typed_value_ptrs[j]->serialize_vcf(i * strides[j] + k, out_ptr, k > 0 ? delims[j] : '\0');
             }
           }
         }
@@ -658,16 +681,22 @@ namespace savvy
         {
           for (std::size_t j = 0; j < v.format_fields_.size(); ++j)
           {
-            ofs_.put(j > 0 ? ':' : '\t');
+            *(out_ptr++) = j > 0 ? ':' : '\t';
             for (std::size_t k = 0; k < strides[j]; ++k)
             {
-              typed_value_ptrs[j]->serialize_vcf(i * strides[j] + k, ofs_, k > 0 ? delims[j] : '\0'); // TODO: allow for PH
+              typed_value_ptrs[j]->serialize_vcf(i * strides[j] + k, out_ptr, k > 0 ? delims[j] : '\0'); // TODO: allow for PH
             }
           }
         }
       }
 
-      ofs_.put('\n');
+      *(out_ptr++) = '\n';
+      if (std::size_t(out_ptr - serialized_buf_.data()) > serialized_buf_.size())
+      {
+        assert(!"Output buffer too small");
+        throw std::runtime_error("VCF output buffer (" + std::to_string(out_ptr - serialized_buf_.data()) + "|" + std::to_string(serialized_buf_.size()) + ") is too small. Please notify maintainer.");
+      }
+      ofs_.write(serialized_buf_.data(), out_ptr - serialized_buf_.data());
 
       return ofs_.good();
     }
