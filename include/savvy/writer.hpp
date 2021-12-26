@@ -34,6 +34,7 @@
 #include <list>
 #include <cstdint>
 #include <type_traits>
+#include <cinttypes>
 
 namespace savvy
 {
@@ -601,7 +602,7 @@ namespace savvy
       else if (type_code == 3)
         return std::snprintf(nullptr, 0, "%d", std::numeric_limits<int32_t>::min());
       else if (type_code == 4)
-        return std::snprintf(nullptr, 0, "%lld", std::numeric_limits<int64_t>::min());
+        return std::snprintf(nullptr, 0, "%" PRId64, std::numeric_limits<int64_t>::min());
       else if (type_code == 5)
         return std::snprintf(nullptr, 0, "%.6g", -std::numeric_limits<float>::min());
       else if (type_code == 6)

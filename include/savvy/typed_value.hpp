@@ -23,6 +23,7 @@
 #include <cstring>
 #include <functional>
 #include <unordered_set>
+#include <cinttypes>
 
 namespace savvy
 {
@@ -2951,7 +2952,7 @@ namespace savvy
         *(out++) = delim;
       if (is_missing(v)) *(out++) = '.';
       else if (!v) *(out++) = '0';
-      else out += std::sprintf(out, "%lld", v);
+      else out += std::sprintf(out, "%" PRId64, v);
       break;
     }
     case 0x05u:
