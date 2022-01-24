@@ -61,7 +61,7 @@ In addition to the genomic region queries that CSI indices enable for VCF/BCF fi
 ```c++
 #include <savvy/reader.hpp>
 
-savvy::reader f("chr1.sav");
+savvy::reader f("chrX.sav");
 savvy::variant var;
 
 f.reset_bounds(savvy::genomic_region("X", 60001, 2699520));
