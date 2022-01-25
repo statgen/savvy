@@ -199,7 +199,7 @@ sav rehead --sample-ids new_ids_file.txt old.sav new.sav
 ## Parameter Trade-offs
 | Action | Pro | Con |
 |:-------|:----|:----|
-|Increasing block size|Smaller file size (especially with pbwt)|Reduces precision of random access|
+|Increasing block size|Smaller file size (especially with PBWT)|Reduces precision of random access|
 |Increasing compression level|Smaller file size|Slower compression speed (decompression not affected)|
 |Enabling PBWT|Smaller file size when used with some fields|Slower compression and decompression|
 
@@ -212,5 +212,5 @@ docker run -v $(pwd):/savvy-src -v $(pwd)/packages:/out savvy-packaging /savvy-s
 
 # Optional Build Targets
 * `-DBUILD_TESTS=ON` allows running of tests with `make test`
-* `-DBUILD_EVAL=ON` enables building of sav-eval executable used to evaluate deserialization peformance
+* `-DBUILD_EVAL=ON` enables building of sav-eval executable used to evaluate deserialization performance
 * `-DBUILD_SPARSE_REGRESSION=ON` enables building of sav-at executable
