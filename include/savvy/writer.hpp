@@ -353,6 +353,32 @@ namespace savvy
       }
       //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
+      //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+      // Validate BCF output
+      if (is_bcf)
+      {
+        for (auto it = r.info_fields().begin(); it != r.info_fields().end(); ++it)
+        {
+          if (it->second.val_width() > 4)
+          {
+            std::cerr << "Error: BCF does not support 64-bit types" << std::endl;
+            ofs_.setstate(ofs_.rdstate() | std::ios::failbit);
+            return *this;
+          }
+        }
+
+        for (auto it = r.format_fields().begin(); it != r.format_fields().end(); ++it)
+        {
+          if (it->second.val_width() > 4)
+          {
+            std::cerr << "Error: BCF does not support 64-bit types" << std::endl;
+            ofs_.setstate(ofs_.rdstate() | std::ios::failbit);
+            return *this;
+          }
+        }
+      }
+      //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
       serialized_buf_.clear();
       serialized_buf_.reserve(24);
 
