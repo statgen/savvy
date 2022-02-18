@@ -814,9 +814,9 @@ void set_info(savvy::site_info& variant, const Vec& genotypes, const std::set<st
 
 void update_standard_info_fields(savvy::variant& var)
 {
-  std::vector<std::int64_t> allele_counts(var.alts().size());
+  std::vector<std::int32_t> allele_counts(var.alts().size());
   std::vector<float> allele_freqs(var.alts().size());
-  std::int64_t mac = 0, an = 0;
+  std::int32_t mac = 0, an = 0;
   float maf = 0.f;
 
   for (auto it = var.format_fields().begin(); it != var.format_fields().end(); ++it)
