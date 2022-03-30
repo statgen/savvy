@@ -122,7 +122,7 @@ namespace savvy
     inline static std::uint8_t type_code();
 
     template<typename T>
-    static typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type
+    static typename std::uint8_t
     type_code(const T& val);
 
     template<typename T>
@@ -1709,8 +1709,8 @@ namespace savvy
 //    char *off_ptr_ = nullptr;
 //    char *val_ptr_ = nullptr;
 //    std::vector<char> local_data_;
-    std::vector<signed char> off_data_;
-    std::vector<signed char> val_data_;
+    std::vector<char> off_data_;
+    std::vector<char> val_data_;
     bool pbwt_flag_ = false;
   };
 
@@ -1861,7 +1861,7 @@ namespace savvy
   }
 
   template<typename T>
-  typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type typed_value::type_code(const T& val)
+  typename std::uint8_t typed_value::type_code(const T& val)
   {
     std::uint8_t type = type_code<T>();
     if (type >= typed_value::int16 && type <= typed_value::int64)
