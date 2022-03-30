@@ -1709,8 +1709,8 @@ namespace savvy
 //    char *off_ptr_ = nullptr;
 //    char *val_ptr_ = nullptr;
 //    std::vector<char> local_data_;
-    std::vector<char> off_data_;
-    std::vector<char> val_data_;
+    std::vector<signed char> off_data_;
+    std::vector<signed char> val_data_;
     bool pbwt_flag_ = false;
   };
 
