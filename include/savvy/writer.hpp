@@ -102,7 +102,7 @@ namespace savvy
        * Sets number of records per zstd block for SAV files.
        * @param bs Block size
        */
-      void set_block_size(std::uint16_t bs);
+      void set_block_size(std::uint32_t bs);
 
       /**
        * Specifies FORMAT fields for which PBWT will be applied.
@@ -254,9 +254,15 @@ namespace savvy
     }
 
     inline
-    void writer::set_block_size(std::uint16_t bs)
+    void writer::set_block_size(std::uint32_t bs)
     {
-      block_size_ = bs;
+      if (bs == 0 && index_file_)
+      {
+        ofs_.setstate(ofs_.rdstate() | std::ios::failbit);
+        std::cerr << "Warning: set_block_size() failed because a block size of zero is not compatible with s1r indexing" << std::endl;
+        return;
+      }
+      block_size_ = std::min<std::size_t>(0x10000, bs);
     }
 
     inline
