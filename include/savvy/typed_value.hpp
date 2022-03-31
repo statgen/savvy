@@ -122,7 +122,7 @@ namespace savvy
     inline static std::uint8_t type_code();
 
     template<typename T>
-    static typename std::uint8_t
+    static typename std::enable_if<std::is_signed<T>::value || std::is_same<T, char>::value, std::uint8_t>::type
     type_code(const T& val);
 
     template<typename T>
@@ -1861,7 +1861,7 @@ namespace savvy
   }
 
   template<typename T>
-  typename std::uint8_t typed_value::type_code(const T& val)
+  typename std::enable_if<std::is_signed<T>::value || std::is_same<T, char>::value, std::uint8_t>::type typed_value::type_code(const T& val)
   {
     std::uint8_t type = type_code<T>();
     if (type >= typed_value::int16 && type <= typed_value::int64)
