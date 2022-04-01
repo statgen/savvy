@@ -122,7 +122,7 @@ namespace savvy
     inline static std::uint8_t type_code();
 
     template<typename T>
-    static typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type
+    static typename std::enable_if<std::is_signed<T>::value || std::is_same<char, T>::value, std::uint8_t>::type
     type_code(const T& val);
 
     template<typename T>
@@ -220,6 +220,9 @@ namespace savvy
         }
       }
 
+      void operator()(char* /*val_ptr*/, char* /*val_end_ptr*/, bool /*phased*/) { return; }
+      void operator()(char* /*val_ptr*/, char* /*val_end_ptr*/, const std::int8_t* /*phase*/, std::size_t /*stride*/) { return; }
+
       void operator()(float* /*val_ptr*/, float* /*val_end_ptr*/, bool /*phased*/) { return; }
       void operator()(float* /*val_ptr*/, float* /*val_end_ptr*/, const std::int8_t* /*phase*/, std::size_t /*stride*/) { return; }
     };
@@ -269,6 +272,9 @@ namespace savvy
             (*phasep++) = ph;
         }
       }
+
+      void operator()(char* /*val_ptr*/, char* /*val_end_ptr*/) { return; }
+      void operator()(char* /*val_ptr*/, char* /*val_end_ptr*/, std::int8_t* /*ph*/, std::size_t /*stride*/) { return; }
 
       void operator()(float* /*valp*/, float* /*endp*/) { return; }
       void operator()(float* /*valp*/, float* /*endp*/, std::int8_t* /*ph*/, std::size_t /*stride*/) { return; }
@@ -1749,7 +1755,7 @@ namespace savvy
   typename std::enable_if<std::is_signed<T>::value && std::is_integral<T>::value, bool>::type
   typed_value::is_missing(const T& v)
   {
-    return v == std::numeric_limits<T>::min();
+    return v == missing_value<T>();
   }
 
   template<typename T>
@@ -1861,7 +1867,7 @@ namespace savvy
   }
 
   template<typename T>
-  typename std::enable_if<std::is_signed<T>::value, std::uint8_t>::type typed_value::type_code(const T& val)
+  typename std::enable_if<std::is_signed<T>::value || std::is_same<char, T>::value, std::uint8_t>::type typed_value::type_code(const T& val)
   {
     std::uint8_t type = type_code<T>();
     if (type >= typed_value::int16 && type <= typed_value::int64)
@@ -1878,7 +1884,7 @@ namespace savvy
     return type;
   }
 
-  template <> inline char typed_value::missing_value<char>() { assert(!"This should not be called for string types"); return '.'; }
+  //template <> inline char typed_value::missing_value<char>() { return '\0'; }
   template <> inline std::int8_t typed_value::missing_value<std::int8_t>() { return 0x80; }
   template <> inline std::int16_t typed_value::missing_value<std::int16_t>() { return 0x8000; }
   template <> inline std::int32_t typed_value::missing_value<std::int32_t>() { return 0x80000000; }
