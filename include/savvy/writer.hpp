@@ -59,7 +59,7 @@ namespace savvy
     class writer : public file
     {
     public:
-      static const int default_compression_level = 3;
+      static const int default_compression_level = 6;
       static const int default_block_size = 4096;
     private:
       std::mt19937_64 rng_;
@@ -161,7 +161,7 @@ namespace savvy
         if (file_fmt == format::sav2 || file_fmt == format::sav1)
           return std::unique_ptr<std::streambuf>(new shrinkwrap::zstd::obuf(file_path, compression_level));
         else
-          return std::unique_ptr<std::streambuf>(new shrinkwrap::bgzf::obuf(file_path));  //, compression_level)); TODO: Add compression level
+          return std::unique_ptr<std::streambuf>(new shrinkwrap::bgzf::obuf(file_path, compression_level));  //, compression_level)); TODO: Add compression level
       }
       else
       {
