@@ -180,6 +180,7 @@ namespace savvy
         //   sendfile(targetfd,fd,&offset, s.st_size);
         // See https://stackoverflow.com/a/25154505/1034772
 
+        std::cerr << "Error: index file too big for skippable zstd frame" << std::endl;
         return false;
       }
 

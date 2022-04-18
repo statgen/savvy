@@ -243,11 +243,10 @@ namespace savvy
 
         if (append_index_) // append if custom index path was not provided
         {
-          append_ofs_.seekp(0, std::ios::end);
           if (!::savvy::detail::append_skippable_zstd_frame(idx_fs, append_ofs_))
           {
             ofs_.setstate(ofs_.rdstate() | std::ios::badbit); // TODO: Use linkat or send file (see https://stackoverflow.com/a/25154505/1034772)
-            std::cerr << "Error: index file too big for skippable zstd frame" << std::endl;
+            std::cerr << "Error: could not append S1R index" << std::endl;
           }
         }
       }
