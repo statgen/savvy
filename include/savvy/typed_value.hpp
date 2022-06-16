@@ -1281,24 +1281,28 @@ namespace savvy
         assert(v.size_ == prev_data.size());
 
         delta_tv.clear();
-        delta_tv.val_type_ = typed_value::type_code<std::int64_t>();
+        delta_tv.val_type_ = typed_value::int64;
         delta_tv.val_data_.resize(v.size_ * sizeof(std::int64_t));
         delta_tv.size_ = v.size_;
         auto delta_ptr = (std::int64_t*)delta_tv.val_data_.data();
 
         v.capply_dense(delta_encoder_fn(), std::ref(prev_data), delta_ptr);
 
-//        auto it = (std::int16_t*)v.val_data_.data();
-//        auto end_it = it + v.size_;
-//        for ( ; it != end_it; ++it)
-//          *(delta_ptr++) = *it - *(prev_ptr++);
-//
-//        prev_ptr = prev_data.data();
-//        for (it = (std::int16_t*)v.val_data_.data(); it != end_it; ++it)
-//          *(prev_ptr++) = *it;
-
         delta_tv.minimize();
         serialize(delta_tv, out_it, 1, true);
+      }
+
+      static void delta_decode(const typed_value& src_v, typed_value& dest_v, std::vector<std::int64_t>& prev_data)
+      {
+        if (prev_data.empty())
+          prev_data.resize(src_v.size_);
+        assert(src_v.size_ == prev_data.size());
+
+        dest_v.clear();
+        dest_v.val_type_ = typed_value::int64;
+        dest_v.val_data_.resize(src_v.size_ * sizeof(std::int64_t));
+        dest_v.size_ = src_v.size_;
+        src_v.capply_dense(delta_decoder_fn(), std::ref(prev_data), (std::int64_t*)dest_v.val_data_.data());
       }
 
       static void pbwt_unsort(const typed_value& src_v, typed_value& dest_v, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);

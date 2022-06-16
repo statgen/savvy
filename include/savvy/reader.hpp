@@ -627,7 +627,17 @@ namespace savvy
           }
 
           if (file_format_ != format::bcf)
-            variant::pbwt_unsort_typed_values(r, extra_typed_value_, sort_context_);
+          {
+            //variant::pbwt_unsort_typed_values(r, extra_typed_value_, sort_context_);
+            for (auto it = r.format_fields_.begin(); it != r.format_fields_.end(); ++it)
+            {
+              if (it->second.pbwt_flag())
+              {
+                typed_value::internal::delta_decode(it->second, extra_typed_value_, delta_prev_vecs_[it->first]);
+                std::swap(it->second, extra_typed_value_);
+              }
+            }
+          }
           //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         }
 
