@@ -1229,6 +1229,78 @@ namespace savvy
         }
       };
 
+      struct delta_encoder_fn
+      {
+        template <typename T>
+        void operator()(const T* valp, const T* endp, std::vector<std::int64_t>& prev_data, std::int64_t* delta_ptr)
+        {
+          std::size_t sz = endp - valp;
+
+          if (sz == prev_data.size())
+          {
+            for (std::size_t i = 0; i < sz; ++i)
+              delta_ptr[i] = valp[i] - prev_data[i];
+
+            for (std::size_t i = 0; i < sz; ++i)
+              prev_data[i] = valp[i];
+          }
+          else
+          {
+            assert(!"TODO ...");
+          }
+        }
+      };
+
+      struct delta_decoder_fn
+      {
+        template <typename T>
+        void operator()(const T* valp, const T* endp, std::vector<std::int64_t>& prev_data, std::int64_t* dest_ptr)
+        {
+          std::size_t sz = endp - valp;
+
+          if (sz == prev_data.size())
+          {
+            for (std::size_t i = 0; i < sz; ++i)
+              dest_ptr[i] = valp[i] + prev_data[i];
+
+            for (std::size_t i = 0; i < sz; ++i)
+              prev_data[i] = dest_ptr[i];
+          }
+          else
+          {
+            assert(!"TODO ...");
+          }
+        }
+      };
+
+      template <typename Iter>
+      static void serialize_delta(const typed_value& v, Iter out_it, std::vector<std::int64_t>& prev_data, typed_value& delta_tv)
+      {
+        if (prev_data.empty())
+          prev_data.resize(v.size_);
+        assert(v.size_ == prev_data.size());
+
+        delta_tv.clear();
+        delta_tv.val_type_ = typed_value::type_code<std::int64_t>();
+        delta_tv.val_data_.resize(v.size_ * sizeof(std::int64_t));
+        delta_tv.size_ = v.size_;
+        auto delta_ptr = (std::int64_t*)delta_tv.val_data_.data();
+
+        v.capply_dense(delta_encoder_fn(), std::ref(prev_data), delta_ptr);
+
+//        auto it = (std::int16_t*)v.val_data_.data();
+//        auto end_it = it + v.size_;
+//        for ( ; it != end_it; ++it)
+//          *(delta_ptr++) = *it - *(prev_ptr++);
+//
+//        prev_ptr = prev_data.data();
+//        for (it = (std::int16_t*)v.val_data_.data(); it != end_it; ++it)
+//          *(prev_ptr++) = *it;
+
+        delta_tv.minimize();
+        serialize(delta_tv, out_it, 1, true);
+      }
+
       static void pbwt_unsort(const typed_value& src_v, typed_value& dest_v, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
 
       template<typename InIter, typename OutIter>
@@ -1237,7 +1309,7 @@ namespace savvy
       static std::int64_t deserialize(typed_value& v, std::istream& is, std::size_t size_divisor);
 
       template<typename Iter>
-      static void serialize(const typed_value& v, Iter out_it, std::size_t size_divisor);
+      static void serialize(const typed_value& v, Iter out_it, std::size_t size_divisor, bool type_flag = false);
 
       template<typename Iter>
       static void serialize(const typed_value& v, Iter out_it, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
@@ -2287,10 +2359,11 @@ namespace savvy
   }
 
   template <typename Iter>
-  void typed_value::internal::serialize(const typed_value& v, Iter out_it, std::size_t size_divisor)
+  void typed_value::internal::serialize(const typed_value& v, Iter out_it, std::size_t size_divisor, bool type_flag)
   {
     assert(!v.off_type_ || size_divisor == 1);
-    std::uint8_t type_byte =  v.off_type_ ? typed_value::sparse : v.val_type_;
+    auto type_flag_bit = type_flag ? 0x08u : 0x00u;
+    std::uint8_t type_byte =  v.off_type_ ? typed_value::sparse : (type_flag_bit | v.val_type_);
     std::size_t sz = v.size_ / size_divisor;
     type_byte = std::uint8_t(std::min(std::size_t(15), sz) << 4u) | type_byte;
     *(out_it++) = type_byte;

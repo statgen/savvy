@@ -317,6 +317,8 @@ namespace savvy
         current_block_max_ = 0;
 
         sort_context_.reset();
+        for (auto it = delta_prev_vecs_.begin(); it != delta_prev_vecs_.end(); ++it)
+          std::fill(it->second.begin(), it->second.end(), 0);
         flushed = true;
       }
 
@@ -344,12 +346,16 @@ namespace savvy
       // Determine which fields sort
       std::size_t n_fmt = 0;
       std::vector<::savvy::internal::pbwt_sort_map*> pbwt_format_pointers;
+      std::vector<std::vector<std::int64_t>*> delta_format_pointers;
       pbwt_format_pointers.reserve(r.format_fields().size());
+      delta_format_pointers.reserve(r.format_fields().size());
       for (auto it = r.format_fields().begin(); it != r.format_fields().end(); ++it)
       {
         pbwt_format_pointers.emplace_back(nullptr);
+        delta_format_pointers.emplace_back(nullptr);
         if (!it->second.is_sparse() && it->second.val_width() <= 2 && pbwt_fields_.find(it->first) != pbwt_fields_.end())
         {
+          delta_format_pointers.back() = &delta_prev_vecs_[it->first];
           pbwt_format_pointers.back() = &sort_context_.format_contexts[it->first][it->second.size()];
         }
 
@@ -409,7 +415,7 @@ namespace savvy
       // Serialize individual data
       if (!variant::serialize(r, std::back_inserter(serialized_buf_),
         dict_, n_samples_, is_bcf, phasing_,
-        sort_context_, pbwt_format_pointers))
+        delta_buffer_tv_ /*sort_context_*/, delta_format_pointers /*pbwt_format_pointers*/))
       {
         ofs_.setstate(ofs_.rdstate() | std::ios::badbit);
         return *this;

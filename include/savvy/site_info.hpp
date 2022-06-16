@@ -260,7 +260,7 @@ namespace savvy
       void set_format(const std::string& key, typed_value&& val);
     private:
       template <typename OutT>
-      static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_map*>& pbwt_format_pointers);
+      static bool serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, typed_value& delta_tv, const std::vector</*::savvy::internal::pbwt_sort_map*/std::vector<std::int64_t>*>& pbwt_format_pointers);
       static std::int64_t deserialize_indiv(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased);
       static void pbwt_unsort_typed_values(variant& v, typed_value& extra_val, internal::pbwt_sort_context& pbwt_context);
       static bool deserialize_vcf(variant& v, std::istream& is, const dictionary& dict, std::size_t sample_size, phasing phasing_status);
@@ -1582,7 +1582,7 @@ namespace savvy
     }
 
     template <typename OutT>
-    bool variant::serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, ::savvy::internal::pbwt_sort_context& pbwt_ctx, const std::vector<::savvy::internal::pbwt_sort_map*>& pbwt_format_pointers)
+    bool variant::serialize(const variant& v, OutT out_it, const dictionary& dict, std::size_t sample_size, bool is_bcf, phasing phased, typed_value& delta_tv, const std::vector</*::savvy::internal::pbwt_sort_map*/std::vector<std::int64_t>*>& delta_format_pointers)
     {
       // Encode FMT
       for (auto it = v.format_fields_.begin(); it != v.format_fields_.end(); ++it)
@@ -1598,10 +1598,11 @@ namespace savvy
         // TODO: Allow for BCF writing.
         typed_value::internal::serialize_typed_scalar(out_it, static_cast<std::int32_t>(res->second));
 
-        auto* pbwt_ptr = pbwt_format_pointers[it - v.format_fields_.begin()];
+        auto* pbwt_ptr = delta_format_pointers[it - v.format_fields_.begin()];
         if (pbwt_ptr)
         {
-          typed_value::internal::serialize(it->second, out_it, *pbwt_ptr, pbwt_ctx.prev_sort_mapping, pbwt_ctx.counts);
+          typed_value::internal::serialize_delta(it->second, out_it, *pbwt_ptr, delta_tv);
+          //typed_value::internal::serialize(it->second, out_it, *pbwt_ptr, pbwt_ctx.prev_sort_mapping, pbwt_ctx.counts);
         }
         else
         {

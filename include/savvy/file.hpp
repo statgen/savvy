@@ -35,6 +35,8 @@ namespace savvy
     std::list<header_value_details> format_headers_;
     std::unordered_map<std::string, std::reference_wrapper<header_value_details>> format_headers_map_;
     ::savvy::internal::pbwt_sort_context sort_context_;
+    std::unordered_map<std::string, std::vector<std::int64_t>> delta_prev_vecs_;
+    typed_value delta_buffer_tv_;
     phasing phasing_ = phasing::unknown;
     format file_format_;
   public:
