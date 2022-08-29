@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <algorithm>
 #include <map>
+#include <limits>
 
 
 namespace savvy

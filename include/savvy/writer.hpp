@@ -35,6 +35,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <cinttypes>
+#include <limits>
 
 namespace savvy
 {

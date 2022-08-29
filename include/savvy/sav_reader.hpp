@@ -34,6 +34,7 @@
 #include <unordered_set>
 #include <random>
 #include <chrono>
+#include <limits>
 
 namespace savvy
 {

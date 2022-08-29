@@ -10,6 +10,7 @@
 
 #include <set>
 #include <fstream>
+#include <limits>
 #include <getopt.h>
 
 class index_prog_args

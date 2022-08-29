@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <random>
 #include <chrono>
+#include <limits>
 #include <getopt.h>
 
 std::vector<std::string> split_string_to_vector(const char* in, char delim)
