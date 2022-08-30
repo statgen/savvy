@@ -21,6 +21,7 @@
 #include <string>
 #include <memory>
 #include <stdexcept>
+#include <limits>
 
 namespace savvy
 {

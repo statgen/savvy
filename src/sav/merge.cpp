@@ -18,6 +18,7 @@
 #include <deque>
 #include <vector>
 #include <set>
+#include <limits>
 
 class merge_prog_args
 {

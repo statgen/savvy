@@ -23,6 +23,7 @@
 #include <array>
 #include <cstring>
 #include <tuple>
+#include <limits>
 
 namespace savvy
 {

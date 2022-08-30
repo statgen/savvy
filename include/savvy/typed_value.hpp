@@ -24,6 +24,7 @@
 #include <functional>
 #include <unordered_set>
 #include <cinttypes>
+#include <limits>
 
 namespace savvy
 {
