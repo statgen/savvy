@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(savvy VERSION 2.0.1)
+project(savvy VERSION 2.1.0)
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
