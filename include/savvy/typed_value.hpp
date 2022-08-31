@@ -1261,10 +1261,13 @@ namespace savvy
           if (sz == prev_data.size())
           {
             for (std::size_t i = 0; i < sz; ++i)
+            {
               dest_ptr[i] = valp[i] + prev_data[i];
-
-            for (std::size_t i = 0; i < sz; ++i)
               prev_data[i] = dest_ptr[i];
+            }
+
+            //for (std::size_t i = 0; i < sz; ++i)
+            //  prev_data[i] = dest_ptr[i];
           }
           else
           {
@@ -1292,18 +1295,7 @@ namespace savvy
         serialize(delta_tv, out_it, 1, true);
       }
 
-      static void delta_decode(const typed_value& src_v, typed_value& dest_v, std::vector<std::int64_t>& prev_data)
-      {
-        if (prev_data.empty())
-          prev_data.resize(src_v.size_);
-        assert(src_v.size_ == prev_data.size());
-
-        dest_v.clear();
-        dest_v.val_type_ = typed_value::int64;
-        dest_v.val_data_.resize(src_v.size_ * sizeof(std::int64_t));
-        dest_v.size_ = src_v.size_;
-        src_v.capply_dense(delta_decoder_fn(), std::ref(prev_data), (std::int64_t*)dest_v.val_data_.data());
-      }
+      static void delta_decode(const typed_value& src_v, typed_value& dest_v, std::vector<std::int64_t>& prev_data);
 
       static void pbwt_unsort(const typed_value& src_v, typed_value& dest_v, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts);
 
@@ -2140,6 +2132,28 @@ namespace savvy
     }
     return *this;
   }
+
+  inline
+  void typed_value::internal::delta_decode(const typed_value& src_v, typed_value& dest_v, std::vector<std::int64_t>& prev_data)
+  {
+    if (prev_data.empty())
+      prev_data.resize(src_v.size_);
+    assert(src_v.size_ == prev_data.size());
+
+    dest_v.clear();
+    dest_v.val_type_ = typed_value::int64;
+    dest_v.val_data_.resize(src_v.size_ * sizeof(std::int64_t));
+    dest_v.size_ = src_v.size_;
+    
+    src_v.capply_dense(delta_decoder_fn(), std::ref(prev_data), (std::int64_t*)dest_v.val_data_.data());
+    //if (src_v.val_type_ == 0x01u) delta_decoder_fn()((std::int8_t *) src_v.val_data_.data(), ((std::int8_t *) src_v.val_data_.data()) + src_v.size_, std::ref(prev_data), (std::int64_t*)dest_v.val_data_.data());
+    //else if (src_v.val_type_ == 0x02u) delta_decoder_fn()((std::int16_t *) src_v.val_data_.data(), ((std::int16_t *) src_v.val_data_.data()) + src_v.size_, std::ref(prev_data), (std::int64_t*)dest_v.val_data_.data());
+    //else 
+    //{
+    //  fprintf(stderr, "PBWT sorted vector values cannot be wider than 16 bits\n"); // TODO: handle better
+    //  exit(-1);
+    //}
+  } 
 
   /*template<typename SrcT, typename DestT>
   static void pbwt_unsort(SrcT src_ptr, std::size_t sz, DestT dest_ptr, std::vector<std::size_t>& sort_mapping, std::vector<std::size_t>& prev_sort_mapping, std::vector<std::size_t>& counts_old, omp::internal::thread_pool2& tpool)

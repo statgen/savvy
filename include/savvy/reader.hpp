@@ -617,7 +617,11 @@ namespace savvy
 
           bool pbwt_reset = (file_format_ != format::bcf) && (0x800000u & shared_n_samples);
           if (pbwt_reset)
+          {
             sort_context_.reset();
+            for (auto it = delta_prev_vecs_.begin(); it != delta_prev_vecs_.end(); ++it)
+              it->second.clear();
+          }
 
           if (variant::deserialize_indiv(r, *input_stream_, dict_, ids_.size(), file_format_ == format::bcf, phasing_) != indiv_sz)
           {
@@ -628,13 +632,28 @@ namespace savvy
 
           if (file_format_ != format::bcf)
           {
-            //variant::pbwt_unsort_typed_values(r, extra_typed_value_, sort_context_);
-            for (auto it = r.format_fields_.begin(); it != r.format_fields_.end(); ++it)
+            if (false)
             {
-              if (it->second.pbwt_flag())
+              variant::pbwt_unsort_typed_values(r, extra_typed_value_, sort_context_);
+              for (auto it = r.format_fields_.begin(); it != r.format_fields_.end(); ++it)
               {
-                typed_value::internal::delta_decode(it->second, extra_typed_value_, delta_prev_vecs_[it->first]);
-                std::swap(it->second, extra_typed_value_);
+                if (it->second.pbwt_flag())
+                {
+                  auto& format_pbwt_ctx = sort_context_.format_contexts[it->first][it->second.size()];
+                  typed_value::internal::pbwt_unsort(it->second, extra_typed_value_, format_pbwt_ctx, sort_context_.prev_sort_mapping, sort_context_.counts);
+                  std::swap(it->second, extra_typed_value_);
+                }
+              }
+            }
+            else if (true)
+            {
+              for (auto it = r.format_fields_.begin(); it != r.format_fields_.end(); ++it)
+              {
+                if (it->second.pbwt_flag())
+                {
+                  typed_value::internal::delta_decode(it->second, extra_typed_value_, delta_prev_vecs_[it->first]);
+                  std::swap(it->second, extra_typed_value_);
+                }
               }
             }
           }
