@@ -12,7 +12,14 @@ out_dir=$2
 
 export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
+
+cget --version
+
 cget ignore xz
+cget install -f ${src_dir}/requirements.txt --prefix /cget
+rm /cget/lib/libz.so*
+ls -ahl /cget/lib/
+cget remove --yes jonathonl/shrinkwrap --prefix /cget
 cget install -f ${src_dir}/requirements.txt --prefix /cget
 unset CFLAGS
 unset CXXFLAGS

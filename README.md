@@ -205,7 +205,7 @@ sav rehead --sample-ids new_ids_file.txt old.sav new.sav
 
 # Packaging
 ```shell
-docker build -t savvy-packaging - < packaging-dockerfile-ubuntu16
+docker build -t savvy-packaging - < packaging-dockerfile-ubuntu20
 mkdir -p packages
 docker run -v $(pwd):/savvy-src -v $(pwd)/packages:/out savvy-packaging /savvy-src/package-linux.sh /savvy-src /out
 ```
