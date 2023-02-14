@@ -1,4 +1,8 @@
 #!/bin/bash
+# Usage: docker build -t packaging-alpine3.17 - < packaging-dockerfile-alpine3.17
+#        docker run -v $(pwd):/savvy-src -v $(pwd)/packages:/out packaging-alpine3.17 /savvy-src/package-linux.sh /savvy-src /out
+
+
 set -euo pipefail
 
 src_dir=$1
@@ -13,14 +17,11 @@ out_dir=$2
 export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
 
-cget --version
+d=`pwd`
+cd ${src_dir}
+cmake -P cmake/get-dependencies.cmake /cget -DSHRINKWRAP_PREFER_STATIC=ON
+cd $d
 
-cget ignore xz
-cget install -f ${src_dir}/requirements.txt --prefix /cget
-rm /cget/lib/libz.so*
-ls -ahl /cget/lib/
-cget remove --yes jonathonl/shrinkwrap --prefix /cget
-cget install -f ${src_dir}/requirements.txt --prefix /cget
 unset CFLAGS
 unset CXXFLAGS
 
@@ -70,16 +71,20 @@ unset CXXFLAGS
 #cp savvy-*.{sh,deb,rpm} ${out_dir}/
 #cd ..
 
+arc=`uname -m`
 
 # sav cli statically linked
 mkdir build-cli
 cd build-cli
 cmake \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_TOOLCHAIN_FILE=/cget/cget/cget.cmake \
+  -DCMAKE_PREFIX_PATH=/cget \
+  -DCMAKE_CXX_FLAGS="-I/cget/include" \
   -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
-  -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
-  -DCPACK_GENERATOR="STGZ;DEB;RPM" \
+  -DCMAKE_EXE_LINKER_FLAGS="-static" \
+  -DCPACK_GENERATOR="STGZ" \
+  -DCPACK_SYSTEM_NAME="Linux-${arc}" \
+  -DCPACK_RESOURCE_FILE_LICENSE=${src_dir}/LICENSE \
   -DCPACK_PACKAGE_CONTACT="csg-devel@umich.edu" \
   -DCPACK_ARCHIVE_COMPONENT_INSTALL=ON \
   -DCPACK_DEB_COMPONENT_INSTALL=ON \
@@ -89,5 +94,5 @@ cmake \
 
 make sav manuals
 make package
-cp savvy-*.{sh,deb,rpm} ${out_dir}/
+cp savvy-*.sh ${out_dir}/
 cd ..
