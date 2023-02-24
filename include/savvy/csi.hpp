@@ -139,6 +139,14 @@ namespace  savvy
                       }
                     }
                   }
+
+                  std::uint32_t n_intv{};
+                  if (fs_.read((char*)&n_intv, sizeof(n_intv)))
+                  {
+                    std::uint64_t ioff{};
+                    for (std::size_t v = 0; v < n_intv; ++v)
+                      fs_.read((char *) &ioff, sizeof(ioff));
+                  }
                 }
               }
             }
