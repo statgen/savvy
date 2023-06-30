@@ -354,6 +354,14 @@ namespace savvy
           pbwt_format_pointers.back() = &sort_context_.format_contexts[it->first][it->second.size()];
         }
 
+        if (it->second.size() == 0 || (it->second.size() % n_samples_) != 0)
+        {
+          std::cerr << "Error: FMT/" << it->first << " is either empty or not divisible by the number of samples" << std::endl;
+          ofs_.setstate(ofs_.rdstate() | std::ios::failbit);
+          return *this;
+        }
+
+
         if (file_format_ == format::sav2 || it->first != "PH")
           ++n_fmt;
       }
