@@ -1519,6 +1519,7 @@ namespace savvy
 //          break;
         }
         std::swap(off_data_, tmp_value.off_data_);
+        off_type_ = typed_value::int64;
         ret = apply_sparse(subset_shift_sparse_tpl(), subset_mask, size_, std::ref(sparse_size_));
       }
       else if (val_type_)
