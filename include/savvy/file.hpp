@@ -78,6 +78,8 @@ namespace savvy
           e.type = typed_value::real;
         else if (hval.type == "String")
           e.type = typed_value::str;
+        else
+          e.type = 0;
 
         if (!hval.idx.empty())
         {
