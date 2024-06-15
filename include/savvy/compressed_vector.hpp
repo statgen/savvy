@@ -421,7 +421,7 @@ namespace savvy
     template <typename AggregateT>
     AggregateT dot_slow(const self_type& other, AggregateT ret) const
     {
-      assert(size_ = other.size_);
+      assert(size_ == other.size_);
       if (non_zero_size() < other.non_zero_size())
       {
         auto beg_it = offsets_.begin();
