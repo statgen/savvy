@@ -21,7 +21,7 @@ private:
   std::string input_path_;
   std::string output_path_;
   std::string sample_ids_path_;
-  int expected_arg_sz_ = 3;
+  int expected_arg_sz_ = 2;
   bool help_ = false;
 public:
   rehead_prog_args() :
@@ -29,6 +29,7 @@ public:
       {
         {"help", no_argument, 0, 'h'},
         {"sample-ids", required_argument, 0, 'i'},
+        {"output", required_argument, 0, 'o'},
         {0, 0, 0, 0}
       })
   {
@@ -43,10 +44,11 @@ public:
 
   void print_usage(std::ostream& os)
   {
-    os << "Usage: sav rehead [opts ...] <headers_file> <in.sav> <out.sav> \n";
-    os << "Or: sav rehead [opts ...] -i <sample_ids_file> <in.sav> <out.sav> \n";
+    os << "Usage: sav rehead [opts ...] <headers_file> <in.sav> -o <out.sav> \n";
+    os << "Or: sav rehead [opts ...] -i <sample_ids_file> <in.sav> -o <out.sav> \n";
     os << "\n";
     os << " -h, --help         Print usage\n";
+    os << " -o, --output       Path to output file\n";
     os << " -I, --sample-ids   Path to file containing list of sample IDs that will replace existing IDs.\n";
     os << std::flush;
   }
@@ -55,14 +57,17 @@ public:
   {
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "hI:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "hI:o:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
       {
       case 'I':
         sample_ids_path_ = std::string(optarg ? optarg : "");
-        expected_arg_sz_ = 2;
+        expected_arg_sz_ = 1;
+        break;
+      case 'o':
+        output_path_ = std::string(optarg ? optarg : "");
         break;
       case 'h':
         help_ = true;
@@ -76,12 +81,17 @@ public:
 
     if (remaining_arg_count < expected_arg_sz_)
     {
-      std::cerr << "Too few arguments\n";
+      std::cerr << "Error: too few arguments\n";
       return false;
     }
     else if (remaining_arg_count > expected_arg_sz_)
     {
-      std::cerr << "Too many arguments\n";
+      std::cerr << "Error: too many arguments\n";
+      return false;
+    }
+    else if (output_path_.empty())
+    {
+      std::cerr << "Error: --output is a required argument\n";
       return false;
     }
     else
