@@ -96,16 +96,14 @@ public:
     }
     else
     {
-      if (expected_arg_sz_ == 3)
+      if (expected_arg_sz_ == 2)
       {
         headers_path_ = argv[optind];
         input_path_ = argv[optind + 1];
-        output_path_ = argv[optind + 2];
       }
       else
       {
         input_path_ = argv[optind];
-        output_path_ = argv[optind + 1];
       }
 
       if (input_path_ == "/dev/stdin" || input_path_ == "/dev/fd/0")
@@ -144,7 +142,7 @@ int rehead_main(int argc, char **argv)
 
   if (!sav_reader)
   {
-    std::cerr << "Error: failed to open input file" << std::endl;
+    std::cerr << "Error: failed to open input file " << args.input_path() << std::endl;
     return EXIT_FAILURE;
   }
 
