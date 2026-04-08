@@ -43,6 +43,7 @@ public:
     os << "or: sav [opts ...]\n";
     os << "\n";
     os << "Sub-commands:\n";
+    os << " concat:      Concatenates SAV files into one output\n";
     os << " export:      Exports SAV to VCF or SAV\n";
     os << " head:        Prints SAV headers or samples IDs\n";
     os << " import:      Imports VCF or BCF into SAV\n";
