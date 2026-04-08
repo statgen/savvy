@@ -72,7 +72,7 @@ public:
 
     int remaining_arg_count = argc - optind;
 
-    if (remaining_arg_count < 2)
+    if (remaining_arg_count < 1)
     {
       std::cerr << "Too few arguments\n";
       return false;
