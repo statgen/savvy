@@ -28,7 +28,7 @@ public:
     long_options_(
       {
         {"help", no_argument, 0, 'h'},
-        {"out", required_argument, 0, 'o'},
+        {"output", required_argument, 0, 'o'},
         {0, 0, 0, 0}
       })
   {
@@ -46,7 +46,7 @@ public:
     os << "Usage: sav concat [opts ...] <first.sav> <second.sav> [addl_files.sav ...] \n";
     os << "\n";
     os << " -h, --help             Print usage\n";
-    os << " -o, --out              Output file (default: /dev/stdout)\n";
+    os << " -o, --output           Output file (default: /dev/stdout)\n";
     os << std::flush;
   }
 

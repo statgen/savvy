@@ -48,7 +48,7 @@ private:
   filter filter_;
   std::string sub_command_;
   std::string input_path_;
-  std::string output_path_;
+  std::string output_path_ = "/dev/stdout";
   std::string index_path_;
   std::string file_format_;
   std::string headers_path_;
@@ -77,6 +77,7 @@ public:
         {"index", no_argument, 0, 'x'},
         {"index-file", required_argument, 0, 'X'},
         {"info-fields", required_argument, 0, 'm'},
+        {"output", required_argument, 0, 'o'},
         {"output-format", required_argument, 0, 'O'},
         {"pbwt-fields", required_argument, 0, '\x01'},
         {"phasing", required_argument, 0, '\x01'},
@@ -124,9 +125,9 @@ public:
   void print_usage(std::ostream& os)
   {
     if (sub_command_ == "import")
-      os << "Usage: sav import [opts ...] [in.sav] [out.{vcf,vcf.gz,sav}]\n";
+      os << "Usage: sav import [opts ...] [in.{vcf,vcf.gz,bcf}]\n";
     else
-      os << "Usage: sav export [opts ...] [in.sav] [out.{vcf,vcf.gz,sav}]\n";
+      os << "Usage: sav export [opts ...] [in.sav]\n";
     os << "\n";
     os << " -#                     Number (#) of compression level (1-19, default: " << default_compression_level << ")\n";
     os << " -b, --block-size       Number of markers in SAV compression block (0-65535, default: " << default_block_size << ")\n";
@@ -138,6 +139,7 @@ public:
     os << " -i, --sample-ids       Comma separated list of sample IDs to subset\n";
     os << " -I, --sample-ids-file  Path to file containing list of sample IDs to subset\n";
     //os << " -m, --info-fields      Comma separated list of INFO (metadata) fields to include with each variant (default: exports all info fields)\n";
+    os << " -o, --output           Output file path (default: /dev/stdout)\n";
     if (sub_command_ != "import")
       os << " -O, --output-format    Output file format (vcf, vcf.gz or sav, default: vcf)\n";
     os << " -p, --bounding-point   Determines the inclusion policy of indels during region queries (any, all, beg or end, default: beg)\n";
@@ -148,13 +150,13 @@ public:
     //os << " -x, --index            Enables indexing (SAV output only)\n";
     os << " -X, --index-file       Specifies index output file (SAV output only)\n";
     os << "\n";
-    os << "     --phasing          Sets file phasing status if phasing header is not present (none, full, or partial)\n";
+    os << "     --phasing             Sets file phasing status if phasing header is not present (none, full, or partial)\n";
     os << "     --pbwt-fields         Comma separated list of FORMAT fields for which to enable PBWT sorting\n";
     os << "     --sparse-fields       Comma separated list of FORMAT fields to make sparse (default: GT,HDS,DS,EC)\n";
     os << "     --sparse-threshold    Non-zero frequency threshold for which sparse fields are encoded as sparse vectors (default: 1.0)\n";
     //os << "     --headers          Path to headers file that is either formatted as VCF headers or tab-delimited key value pairs\n";
     //os << "     --sites-only       Exclude individual level data.\n";
-    os << "     --update-info      Specifies whether AC, MAC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
+    os << "     --update-info         Specifies whether AC, MAC, AN, AF and MAF info fields should be updated (always, never or auto, default: auto)\n";
     os << std::flush;
   }
 
@@ -164,7 +166,7 @@ public:
 
     int long_index = 0;
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "0123456789b:c:f:hi:I:m:O:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
+    while ((opt = getopt_long(argc, argv, "0123456789b:c:f:hi:I:m:o:O:p:r:R:sS:xX:", long_options_.data(), &long_index )) != -1)
     {
       char copt = char(opt & 0xFF);
       switch (copt)
@@ -327,6 +329,9 @@ public:
       case 'm':
         info_fields_ = split_string_to_vector(optarg ? optarg : "", ',');
         break;
+      case 'o':
+        output_path_ = (optarg ? optarg : "");
+        break;
       case 'O':
       {
         std::string str_opt_arg(optarg ? optarg : "");
@@ -443,14 +448,12 @@ public:
       }
 
       input_path_ = "/dev/stdin";
-      output_path_ = "/dev/stdout";
     }
     else if (remaining_arg_count == 1)
     {
       input_path_ = argv[optind];
-      output_path_ = "/dev/stdout";
     }
-    else if (remaining_arg_count == 2)
+    /*else if (remaining_arg_count == 2)
     {
       input_path_ = argv[optind];
       output_path_ = argv[optind + 1];
@@ -469,7 +472,7 @@ public:
         else if (::savvy::detail::has_extension(output_path_, ".vcf.gz"))
           file_format_ = "vcf.gz";
       }
-    }
+    }*/
     else
     {
       std::cerr << "Too many arguments\n";
@@ -478,10 +481,21 @@ public:
 
     if (file_format_.empty())
     {
-      if (sub_command_ == "import")
+      if (::savvy::detail::has_extension(output_path_, ".sav"))
         file_format_ = "sav";
-      else
+      else if (::savvy::detail::has_extension(output_path_, ".bcf"))
+        file_format_ = "bcf";
+      else if (::savvy::detail::has_extension(output_path_, ".vcf"))
         file_format_ = "vcf";
+      else if (::savvy::detail::has_extension(output_path_, ".vcf.gz"))
+        file_format_ = "vcf.gz";
+      else
+      {
+        if (sub_command_ == "import")
+          file_format_ = "sav";
+        else
+          file_format_ = "vcf";
+      }
     }
 
     if (regions_.size() && slice_)
