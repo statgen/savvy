@@ -1,7 +1,8 @@
 #!/bin/bash
 # Usage: docker build -t packaging-alpine3.17 - < packaging-dockerfile-alpine3.17
 #        docker run -v $(pwd):/savvy-src -v $(pwd)/packages:/out packaging-alpine3.17 /savvy-src/package-linux.sh /savvy-src /out
-
+# Or: sudo apptainer build packaging.sif packaging-singularity-alpine3.17.def
+#     apptainer exec -B $(pwd):/savvy-src -B $(pwd)/packages:/out packaging.sif /savvy-src/package-linux.sh /savvy-src /out
 
 set -euo pipefail
 
@@ -14,12 +15,14 @@ out_dir=$2
 #cget install -DCMAKE_C_FLAGS=-fPIC -DCMAKE_CXX_FLAGS=-fPIC jonathonl/shrinkwrap@v1.0.0-beta --prefix /cget
 #cget install -DCMAKE_C_FLAGS=-fPIC -DCMAKE_CXX_FLAGS=-fPIC htslib,https://github.com/samtools/htslib/releases/download/1.6/htslib-1.6.tar.bz2 -DCMAKE_VERBOSE_MAKEFILE=1 --cmake /savvy-src/dep/htslib.cmake --prefix /cget
 
+tmp_dir=`mktemp -d`
+
 export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
 
 d=`pwd`
 cd ${src_dir}
-cmake -P cmake/get-dependencies.cmake /cget -DSHRINKWRAP_PREFER_STATIC=ON
+cmake -P cmake/get-dependencies.cmake $tmp_dir/cget -DSHRINKWRAP_PREFER_STATIC=ON
 cd $d
 
 unset CFLAGS
@@ -74,12 +77,12 @@ unset CXXFLAGS
 arc=`uname -m`
 
 # sav cli statically linked
-mkdir build-cli
-cd build-cli
+mkdir $tmp_dir/build-cli
+cd $tmp_dir/build-cli
 cmake \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH=/cget \
-  -DCMAKE_CXX_FLAGS="-I/cget/include" \
+  -DCMAKE_PREFIX_PATH=$tmp_dir/cget \
+  -DCMAKE_CXX_FLAGS="-I$tmp_dir/cget/include" \
   -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
   -DCMAKE_EXE_LINKER_FLAGS="-static" \
   -DCPACK_GENERATOR="STGZ" \
@@ -96,3 +99,5 @@ make sav manuals
 make package
 cp savvy-*.sh ${out_dir}/
 cd ..
+
+rm -r $tmp_dir
